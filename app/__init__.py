@@ -4,7 +4,7 @@ from config.settings import Config
 from dotenv import load_dotenv
 
 
-load_dotenv()  # Carrega variáveis do .env
+load_dotenv()
 
 db = SQLAlchemy()
 
@@ -13,7 +13,8 @@ def create_app():
     instance = Flask(__name__)
     instance.config.from_object(Config)
     db.init_app(instance)
-    from app.routes import app as app_bp
+    
+    from app.routes import app_bp
     instance.register_blueprint(app_bp)
 
     return instance
