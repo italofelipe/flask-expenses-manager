@@ -1,7 +1,7 @@
 from flask import Blueprint, request, jsonify, current_app
 from werkzeug.security import generate_password_hash, check_password_hash
 from app.models import User
-from app import db
+from app.extensions.database import db
 import jwt
 import datetime
 
@@ -10,7 +10,6 @@ login_bp = Blueprint("login", __name__, url_prefix="/login")
 @login_bp.route("/register", methods=["POST"])
 def register():
     
-
     data = request.get_json()
 
     # Validação mínima

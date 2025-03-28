@@ -2,11 +2,10 @@ from flask import Flask
 from flask_sqlalchemy import SQLAlchemy
 from config.settings import Config
 from dotenv import load_dotenv
-
+from app.controllers import all_routes
+from app.extensions.database import db
 
 load_dotenv()
-
-db = SQLAlchemy()
 
 def create_app():
     print("Creating Flask app")
@@ -14,7 +13,9 @@ def create_app():
     instance.config.from_object(Config)
     db.init_app(instance)
     
-    from app.routes import app_bp
-    instance.register_blueprint(app_bp)
+    from app.controllers import app_bp
+    
+    for bp in all_routes:
+        instance.register_blueprint(bp)
 
     return instance

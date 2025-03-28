@@ -1,4 +1,4 @@
-from . import db
+from app.extensions.database import db
 import uuid
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy import text
