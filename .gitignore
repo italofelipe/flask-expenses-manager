@@ -1,0 +1,52 @@
+# Bytecode
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Virtual environments
+venv/
+.env/
+.venv/
+env/
+ENV/
+
+# Flask & Python environment
+instance/
+*.sqlite3
+*.log
+
+# Environment variables
+.env
+
+# IDEs
+.vscode/
+.idea/
+*.swp
+
+# MacOS
+.DS_Store
+
+# Docker
+*.pid
+*.seed
+*.bak
+*.pid
+*.tar
+*.log
+*.gz
+*.zip
+*.tgz
+
+# Pytest cache
+.pytest_cache/
+
+# Migrations
+migrations/
+
+# DBeaver connections (se usar .dbeaver-data-sources.xml)
+.dbeaver/
+
+# Database volumes (não comitar dados locais)
+pgdata/
+
+.env
