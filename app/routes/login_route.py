@@ -1,12 +1,16 @@
-from flask import Blueprint, request, jsonify
-from werkzeug.security import generate_password_hash
+from flask import Blueprint, request, jsonify, current_app
+from werkzeug.security import generate_password_hash, check_password_hash
 from app.models import User
 from app import db
+import jwt
+import datetime
 
 login_bp = Blueprint("login", __name__, url_prefix="/login")
 
-@login_bp.route("", methods=["POST"])
+@login_bp.route("/register", methods=["POST"])
 def register():
+    
+
     data = request.get_json()
 
     # Validação mínima
@@ -52,5 +56,43 @@ def register():
         db.session.rollback()
         return jsonify({
             "message": "Failed to create user",
+            "error": str(e)
+        }), 500
+        
+@login_bp.route("/auth", methods=["POST"])
+def authenticate():
+    data = request.get_json()
+    
+    if not data or not data.get("password") or not (data.get("email") or data.get("name")):
+        return jsonify({"message": "Missing credentials"}), 400
+    user = None
+    if data.get("email"):
+        user = User.query.filter_by(email=data["email"]).first()
+    elif data.get("name"):
+        user = User.query.filter_by(name=data["name"]).first()
+
+    if not user or not check_password_hash(user.password, data["password"]):
+        return jsonify({"message": "Invalid credentials"}), 401
+
+    try:
+        payload = {
+            "user_id": str(user.id),
+            "exp": datetime.datetime.now() + datetime.timedelta(hours=1)
+        }
+        token = jwt.encode(payload, current_app.config["SECRET_KEY"], algorithm="HS256")
+
+        return jsonify({
+            "message": "Login successful",
+            "token": token,
+            "user": {
+                "id": str(user.id),
+                "name": user.name,
+                "email": user.email
+            }
+        }), 200
+
+    except Exception as e:
+        return jsonify({
+            "message": "Login failed",
             "error": str(e)
         }), 500
