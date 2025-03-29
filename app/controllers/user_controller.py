@@ -3,13 +3,14 @@ from flask_jwt_extended import jwt_required, get_jwt_identity, JWTManager
 from app.extensions.database import db
 from app.models import User
 from datetime import datetime
+from uuid import UUID
 
 user_bp = Blueprint("user", __name__, url_prefix="/user")
 
 @user_bp.route("/profile", methods=["PUT"])
 @jwt_required()
 def update_profile():
-    user_id = get_jwt_identity()
+    user_id = UUID(get_jwt_identity())
     user = User.query.get(user_id)
     if not user:
         return jsonify({"message": "Usuário não encontrado"}), 404
@@ -74,7 +75,7 @@ def update_profile():
 @user_bp.route("/me", methods=["GET"])
 @jwt_required()
 def get_profile():
-    user_id = get_jwt_identity()
+    user_id = UUID(get_jwt_identity())
     user = User.query.get(user_id)
     if not user:
         return jsonify({"message": "Usuário não encontrado"}), 404
@@ -96,7 +97,8 @@ def get_profile():
 @user_bp.route("/debug-token", methods=["GET"])
 @jwt_required()
 def debug_token():
+    user_id = UUID(get_jwt_identity())
     return jsonify({
         "message": "Token válido",
-        "user_id": get_jwt_identity()
+        "user_id": user_id
     }), 200

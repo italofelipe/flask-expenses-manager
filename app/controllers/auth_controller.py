@@ -2,8 +2,8 @@ from flask import Blueprint, request, jsonify, current_app
 from werkzeug.security import generate_password_hash, check_password_hash
 from app.models import User
 from app.extensions.database import db
-import jwt
-import datetime
+from flask_jwt_extended import create_access_token
+from datetime import timedelta
 
 login_bp = Blueprint("login", __name__, url_prefix="/login")
 
@@ -74,11 +74,7 @@ def authenticate():
         return jsonify({"message": "Invalid credentials"}), 401
 
     try:
-        payload = {
-            "user_id": str(user.id),
-            "exp": datetime.datetime.now() + datetime.timedelta(hours=1)
-        }
-        token = jwt.encode(payload, current_app.config["SECRET_KEY"], algorithm="HS256")
+        token = create_access_token(identity=str(user.id), expires_delta=timedelta(hours=1))
 
         return jsonify({
             "message": "Login successful",
