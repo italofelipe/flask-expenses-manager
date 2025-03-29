@@ -8,3 +8,5 @@ Flask-SQLAlchemy
 
 werkzeug
 PyJWT
+flask-jwt-extended
+flask-migrate
