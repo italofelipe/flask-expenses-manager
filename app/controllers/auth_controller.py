@@ -18,17 +18,21 @@ def register() -> Response:
     # Validação mínima
     required_fields = ["name", "email", "password"]
     if not data or not all(field in data for field in required_fields):
-        return (
-            jsonify({"message": "Missing required fields", "data": None}),
-            400,
+        return Response(
+            jsonify({"message": "Missing required fields", "data": None}).get_data(),
+            status=400,
+            mimetype="application/json",
         )
 
     try:
         # Verifica se o e-mail já existe
         if User.query.filter_by(email=data["email"]).first():
-            return (
-                jsonify({"message": "Email already registered", "data": None}),
-                409,
+            return Response(
+                jsonify(
+                    {"message": "Email already registered", "data": None}
+                ).get_data(),
+                status=409,
+                mimetype="application/json",
             )
 
         # Criptografa a senha
@@ -45,7 +49,7 @@ def register() -> Response:
         print(user.id)
         db.session.commit()
 
-        return (
+        return Response(
             jsonify(
                 {
                     "message": "User created successfully",
@@ -55,15 +59,17 @@ def register() -> Response:
                         "email": user.email,
                     },
                 }
-            ),
-            201,
+            ).get_data(),
+            status=201,
+            mimetype="application/json",
         )
 
     except Exception as e:
         db.session.rollback()
-        return (
-            jsonify({"message": "Failed to create user", "error": str(e)}),
-            500,
+        return Response(
+            jsonify({"message": "Failed to create user", "error": str(e)}).get_data(),
+            status=500,
+            mimetype="application/json",
         )
 
 
@@ -76,7 +82,11 @@ def authenticate() -> Response:
         or not data.get("password")
         or not (data.get("email") or data.get("name"))
     ):
-        return jsonify({"message": "Missing credentials"}), 400
+        return Response(
+            jsonify({"message": "Missing credentials"}).get_data(),
+            status=400,
+            mimetype="application/json",
+        )
     user = None
     if data.get("email"):
         user = User.query.filter_by(email=data["email"]).first()
@@ -84,14 +94,18 @@ def authenticate() -> Response:
         user = User.query.filter_by(name=data["name"]).first()
 
     if not user or not check_password_hash(user.password, data["password"]):
-        return jsonify({"message": "Invalid credentials"}), 401
+        return Response(
+            jsonify({"message": "Invalid credentials"}).get_data(),
+            status=401,
+            mimetype="application/json",
+        )
 
     try:
         token = create_access_token(
             identity=str(user.id), expires_delta=timedelta(hours=1)
         )
 
-        return (
+        return Response(
             jsonify(
                 {
                     "message": "Login successful",
@@ -102,12 +116,17 @@ def authenticate() -> Response:
                         "email": user.email,
                     },
                 }
-            ),
-            200,
+            ).get_data(),
+            status=200,
+            mimetype="application/json",
         )
 
     except Exception as e:
-        return jsonify({"message": "Login failed", "error": str(e)}), 500
+        return Response(
+            jsonify({"message": "Login failed", "error": str(e)}).get_data(),
+            status=500,
+            mimetype="application/json",
+        )
 
 
 def assign_user_profile_fields(
