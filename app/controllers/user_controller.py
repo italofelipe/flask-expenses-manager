@@ -47,22 +47,34 @@ def update_profile() -> Response:
     user_id = UUID(get_jwt_identity())
     user = User.query.get(user_id)
     if not user:
-        return jsonify({"message": "Usuário não encontrado"}), 404
+        return Response(
+            jsonify({"message": "Usuário não encontrado"}).get_data(),
+            status=404,
+            mimetype="application/json",
+        )
 
     data = request.get_json()
 
     result = assign_user_profile_fields(user, data)
     if result["error"]:
-        return jsonify({"message": result["message"]}), 400
+        return Response(
+            jsonify({"message": result["message"]}).get_data(),
+            status=400,
+            mimetype="application/json",
+        )
 
     # Validação de dados
     errors = user.validate_profile_data()
     if errors:
-        return jsonify({"message": "Erro de validação", "errors": errors}), 400
+        return Response(
+            jsonify({"message": "Erro de validação", "errors": errors}).get_data(),
+            status=400,
+            mimetype="application/json",
+        )
 
     try:
         db.session.commit()
-        return (
+        return Response(
             jsonify(
                 {
                     "message": "Perfil atualizado com sucesso",
@@ -102,11 +114,18 @@ def update_profile() -> Response:
                         ),
                     },
                 }
-            ),
-            200,
+            ).get_data(),
+            status=200,
+            mimetype="application/json",
         )
     except Exception as e:
-        return jsonify({"message": "Erro ao atualizar perfil", "error": str(e)}), 500
+        return Response(
+            jsonify(
+                {"message": "Erro ao atualizar perfil", "error": str(e)}
+            ).get_data(),
+            status=500,
+            mimetype="application/json",
+        )
 
 
 @cast(Callable[..., Response], user_bp.route("/me", methods=["GET"]))
@@ -115,9 +134,13 @@ def get_profile() -> Response:
     user_id = UUID(get_jwt_identity())
     user = User.query.get(user_id)
     if not user:
-        return jsonify({"message": "Usuário não encontrado"}), 404
+        return Response(
+            jsonify({"message": "Usuário não encontrado"}).get_data(),
+            status=404,
+            mimetype="application/json",
+        )
 
-    return (
+    return Response(
         jsonify(
             {
                 "id": str(user.id),
@@ -144,8 +167,9 @@ def get_profile() -> Response:
                     else None
                 ),
             }
-        ),
-        200,
+        ).get_data(),
+        status=200,
+        mimetype="application/json",
     )
 
 
@@ -153,4 +177,8 @@ def get_profile() -> Response:
 @cast(Callable[..., Response], jwt_required())
 def debug_token() -> Response:
     user_id = UUID(get_jwt_identity())
-    return jsonify({"message": "Token válido", "user_id": user_id}), 200
+    return Response(
+        jsonify({"message": "Token válido", "user_id": str(user_id)}).get_data(),
+        status=200,
+        mimetype="application/json",
+    )
