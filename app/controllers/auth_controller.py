@@ -3,10 +3,12 @@ from typing import Any, Callable, Dict, Union, cast
 
 from flask import Blueprint, Response, jsonify, request
 from flask_jwt_extended import create_access_token
+from marshmallow import ValidationError
 from werkzeug.security import check_password_hash, generate_password_hash
 
 from app.extensions.database import db
 from app.models import User
+from app.schemas.user_schemas import UserRegistrationSchema
 
 JSON_MIMETYPE = "application/json"
 
@@ -16,10 +18,21 @@ login_bp = Blueprint("login", __name__, url_prefix="/login")
 @cast(Callable[..., Response], login_bp.route("/register", methods=["POST"]))
 def register() -> Response:
     data = request.get_json()
+    schema = UserRegistrationSchema()
+    try:
+        validated_data = schema.load(data)
+    except ValidationError as err:
+        return Response(
+            jsonify({"message": "Validation error", "errors": err.messages}).get_data(),
+            status=400,
+            mimetype=JSON_MIMETYPE,
+        )
 
     # Validação mínima
     required_fields = ["name", "email", "password"]
-    if not data or not all(field in data for field in required_fields):
+    if not validated_data or not all(
+        field in validated_data for field in required_fields
+    ):
         return Response(
             jsonify({"message": "Missing required fields", "data": None}).get_data(),
             status=400,
@@ -28,7 +41,7 @@ def register() -> Response:
 
     try:
         # Verifica se o e-mail já existe
-        if User.query.filter_by(email=data["email"]).first():
+        if User.query.filter_by(email=validated_data["email"]).first():
             return Response(
                 jsonify(
                     {"message": "Email already registered", "data": None}
@@ -38,12 +51,12 @@ def register() -> Response:
             )
 
         # Criptografa a senha
-        hashed_password = generate_password_hash(data["password"])
+        hashed_password = generate_password_hash(validated_data["password"])
 
         # Cria novo usuário
         user = User(
-            name=data["name"],
-            email=data["email"],
+            name=validated_data["name"],
+            email=validated_data["email"],
             password=hashed_password,
         )
         db.session.add(user)
@@ -159,4 +172,5 @@ def assign_user_profile_fields(
                         ),
                     }
             setattr(user, field, value)
+    user.updated_at = datetime.utcnow()
     return {"error": False}

@@ -10,3 +10,7 @@ werkzeug
 PyJWT
 flask-jwt-extended
 flask-migrate
+flask-marshmallow
+marshmallow
+marshmallow-sqlalchemy
+flask_jwt_extended

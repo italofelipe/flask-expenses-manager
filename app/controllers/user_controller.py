@@ -4,9 +4,11 @@ from uuid import UUID
 
 from flask import Blueprint, Response, jsonify, request
 from flask_jwt_extended import get_jwt_identity, jwt_required
+from marshmallow import ValidationError
 
 from app.extensions.database import db
 from app.models import User
+from app.schemas.user_schemas import UserProfileSchema
 
 JSON_MIMETYPE = "application/json"
 
@@ -55,7 +57,15 @@ def update_profile() -> Response:
             mimetype=JSON_MIMETYPE,
         )
 
-    data = request.get_json()
+    schema = UserProfileSchema()
+    try:
+        data = schema.load(request.get_json())
+    except ValidationError as err:
+        return Response(
+            jsonify({"message": "Validation error", "errors": err.messages}).get_data(),
+            status=400,
+            mimetype=JSON_MIMETYPE,
+        )
 
     result = assign_user_profile_fields(user, data)
     if result["error"]:

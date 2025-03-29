@@ -1,11 +1,14 @@
 from flask import Flask
 from flask_jwt_extended import JWTManager
+from flask_marshmallow import Marshmallow
 from flask_migrate import Migrate
 
 from app.controllers import all_routes
 from app.extensions.database import db
+from app.extensions.error_handlers import register_error_handlers
 
 jwt = JWTManager()
+ma = Marshmallow()
 
 
 def create_app() -> Flask:
@@ -21,8 +24,10 @@ def create_app() -> Flask:
 
     # Inicializa extensões
     db.init_app(app)
+    ma.init_app(app)
     Migrate(app, db)
     jwt.init_app(app)
+    register_error_handlers(app)
 
     # Registra blueprints
     for route in all_routes:
