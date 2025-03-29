@@ -1,16 +1,19 @@
 from flask import Flask
-from flask_migrate import Migrate
 from flask_jwt_extended import JWTManager
-from app.extensions.database import db
+from flask_migrate import Migrate
+
 from app.controllers import all_routes
+from app.extensions.database import db
 
 jwt = JWTManager()
 
-def create_app():
+
+def create_app() -> Flask:
     print("Creating Flask app")
 
     app = Flask(__name__, instance_relative_config=True)
-    from config.settings import Config
+    from config import Config
+
     app.config.from_object(Config)
 
     # Carrega variáveis de ambiente com prefixo FLASK_ do .env
@@ -24,8 +27,6 @@ def create_app():
     # Registra blueprints
     for route in all_routes:
         app.register_blueprint(route)
-
-   
 
     # Debug das configurações JWT
     print("JWT config loaded:")

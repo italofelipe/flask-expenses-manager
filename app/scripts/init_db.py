@@ -1,5 +1,5 @@
-from app.extensions.database import db
 from app import create_app
+from app.extensions.database import db
 
 app = create_app()
 

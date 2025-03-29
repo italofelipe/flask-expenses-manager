@@ -1,32 +1,35 @@
-from flask import Blueprint, request, jsonify, current_app
-from werkzeug.security import generate_password_hash, check_password_hash
-from app.models import User
-from app.extensions.database import db
+from datetime import datetime, timedelta
+from typing import Any, Callable, Dict, Union, cast
+
+from flask import Blueprint, Response, jsonify, request
 from flask_jwt_extended import create_access_token
-from datetime import timedelta
+from werkzeug.security import check_password_hash, generate_password_hash
+
+from app.extensions.database import db
+from app.models import User
 
 login_bp = Blueprint("login", __name__, url_prefix="/login")
 
-@login_bp.route("/register", methods=["POST"])
-def register():
-    
+
+@cast(Callable[..., Response], login_bp.route("/register", methods=["POST"]))
+def register() -> Response:
     data = request.get_json()
 
     # Validação mínima
     required_fields = ["name", "email", "password"]
     if not data or not all(field in data for field in required_fields):
-        return jsonify({
-            "message": "Missing required fields",
-            "data": None
-        }), 400
+        return (
+            jsonify({"message": "Missing required fields", "data": None}),
+            400,
+        )
 
     try:
         # Verifica se o e-mail já existe
         if User.query.filter_by(email=data["email"]).first():
-            return jsonify({
-                "message": "Email already registered",
-                "data": None
-            }), 409
+            return (
+                jsonify({"message": "Email already registered", "data": None}),
+                409,
+            )
 
         # Criptografa a senha
         hashed_password = generate_password_hash(data["password"])
@@ -35,34 +38,44 @@ def register():
         user = User(
             name=data["name"],
             email=data["email"],
-            password=hashed_password
+            password=hashed_password,
         )
         db.session.add(user)
         db.session.flush()
         print(user.id)
         db.session.commit()
 
-        return jsonify({
-            "message": "User created successfully",
-            "data": {
-                "id": str(user.id),
-                "name": user.name,
-                "email": user.email
-            }
-        }), 201
+        return (
+            jsonify(
+                {
+                    "message": "User created successfully",
+                    "data": {
+                        "id": str(user.id),
+                        "name": user.name,
+                        "email": user.email,
+                    },
+                }
+            ),
+            201,
+        )
 
     except Exception as e:
         db.session.rollback()
-        return jsonify({
-            "message": "Failed to create user",
-            "error": str(e)
-        }), 500
-        
-@login_bp.route("/auth", methods=["POST"])
-def authenticate():
+        return (
+            jsonify({"message": "Failed to create user", "error": str(e)}),
+            500,
+        )
+
+
+@cast(Callable[..., Response], login_bp.route("/auth", methods=["POST"]))
+def authenticate() -> Response:
     data = request.get_json()
-    
-    if not data or not data.get("password") or not (data.get("email") or data.get("name")):
+
+    if (
+        not data
+        or not data.get("password")
+        or not (data.get("email") or data.get("name"))
+    ):
         return jsonify({"message": "Missing credentials"}), 400
     user = None
     if data.get("email"):
@@ -74,20 +87,55 @@ def authenticate():
         return jsonify({"message": "Invalid credentials"}), 401
 
     try:
-        token = create_access_token(identity=str(user.id), expires_delta=timedelta(hours=1))
+        token = create_access_token(
+            identity=str(user.id), expires_delta=timedelta(hours=1)
+        )
 
-        return jsonify({
-            "message": "Login successful",
-            "token": token,
-            "user": {
-                "id": str(user.id),
-                "name": user.name,
-                "email": user.email
-            }
-        }), 200
+        return (
+            jsonify(
+                {
+                    "message": "Login successful",
+                    "token": token,
+                    "user": {
+                        "id": str(user.id),
+                        "name": user.name,
+                        "email": user.email,
+                    },
+                }
+            ),
+            200,
+        )
 
     except Exception as e:
-        return jsonify({
-            "message": "Login failed",
-            "error": str(e)
-        }), 500
+        return jsonify({"message": "Login failed", "error": str(e)}), 500
+
+
+def assign_user_profile_fields(
+    user: User, data: Dict[str, Any]
+) -> Dict[str, Union[str, bool]]:
+    date_fields = ["birth_date", "investment_goal_date"]
+    for field in [
+        "gender",
+        "birth_date",
+        "monthly_income",
+        "net_worth",
+        "monthly_expenses",
+        "initial_investment",
+        "monthly_investment",
+        "investment_goal_date",
+    ]:
+        if field in data:
+            value = data[field]
+            if field in date_fields and isinstance(value, str):
+                try:
+                    value = datetime.strptime(value, "%Y-%m-%d").date()
+                except ValueError:
+                    return {
+                        "error": True,
+                        "field": field,
+                        "message": (
+                            f"Formato inválido para '{field}'. Use 'YYYY-MM-DD'."
+                        ),
+                    }
+            setattr(user, field, value)
+    return {"error": False}

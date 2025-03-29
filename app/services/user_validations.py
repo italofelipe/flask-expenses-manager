@@ -1,6 +1,9 @@
 from datetime import date
 
-def validate_user_profile_data(user):
+from app.models import User
+
+
+def validate_user_profile_data(user: User) -> list[str]:
     errors = []
 
     if user.birth_date:
@@ -20,11 +23,14 @@ def validate_user_profile_data(user):
         "net_worth",
         "monthly_expenses",
         "initial_investment",
-        "monthly_investment"
+        "monthly_investment",
     ]:
         value = getattr(user, field_name)
         if value is not None and value < 0:
-            errors.append(f"{field_name.replace('_', ' ').capitalize()} não pode ser negativo.")
+            errors.append(
+                f"{field_name.replace('_', ' ').capitalize()} "
+                f"não pode ser negativo."
+            )
 
     if user.gender and user.gender.lower() not in ["masculino", "feminino", "outro"]:
         errors.append("Gênero deve ser 'masculino', 'feminino' ou 'outro'.")
