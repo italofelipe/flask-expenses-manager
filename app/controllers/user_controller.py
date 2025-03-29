@@ -8,6 +8,8 @@ from flask_jwt_extended import get_jwt_identity, jwt_required
 from app.extensions.database import db
 from app.models import User
 
+JSON_MIMETYPE = "application/json"
+
 user_bp = Blueprint("user", __name__, url_prefix="/user")
 
 
@@ -50,7 +52,7 @@ def update_profile() -> Response:
         return Response(
             jsonify({"message": "Usuário não encontrado"}).get_data(),
             status=404,
-            mimetype="application/json",
+            mimetype=JSON_MIMETYPE,
         )
 
     data = request.get_json()
@@ -60,7 +62,7 @@ def update_profile() -> Response:
         return Response(
             jsonify({"message": result["message"]}).get_data(),
             status=400,
-            mimetype="application/json",
+            mimetype=JSON_MIMETYPE,
         )
 
     # Validação de dados
@@ -69,7 +71,7 @@ def update_profile() -> Response:
         return Response(
             jsonify({"message": "Erro de validação", "errors": errors}).get_data(),
             status=400,
-            mimetype="application/json",
+            mimetype=JSON_MIMETYPE,
         )
 
     try:
@@ -116,7 +118,7 @@ def update_profile() -> Response:
                 }
             ).get_data(),
             status=200,
-            mimetype="application/json",
+            mimetype=JSON_MIMETYPE,
         )
     except Exception as e:
         return Response(
@@ -124,7 +126,7 @@ def update_profile() -> Response:
                 {"message": "Erro ao atualizar perfil", "error": str(e)}
             ).get_data(),
             status=500,
-            mimetype="application/json",
+            mimetype=JSON_MIMETYPE,
         )
 
 
@@ -137,7 +139,7 @@ def get_profile() -> Response:
         return Response(
             jsonify({"message": "Usuário não encontrado"}).get_data(),
             status=404,
-            mimetype="application/json",
+            mimetype=JSON_MIMETYPE,
         )
 
     return Response(
@@ -169,7 +171,7 @@ def get_profile() -> Response:
             }
         ).get_data(),
         status=200,
-        mimetype="application/json",
+        mimetype=JSON_MIMETYPE,
     )
 
 
@@ -180,5 +182,5 @@ def debug_token() -> Response:
     return Response(
         jsonify({"message": "Token válido", "user_id": str(user_id)}).get_data(),
         status=200,
-        mimetype="application/json",
+        mimetype=JSON_MIMETYPE,
     )

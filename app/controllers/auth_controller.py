@@ -8,6 +8,8 @@ from werkzeug.security import check_password_hash, generate_password_hash
 from app.extensions.database import db
 from app.models import User
 
+JSON_MIMETYPE = "application/json"
+
 login_bp = Blueprint("login", __name__, url_prefix="/login")
 
 
@@ -21,7 +23,7 @@ def register() -> Response:
         return Response(
             jsonify({"message": "Missing required fields", "data": None}).get_data(),
             status=400,
-            mimetype="application/json",
+            mimetype=JSON_MIMETYPE,
         )
 
     try:
@@ -32,7 +34,7 @@ def register() -> Response:
                     {"message": "Email already registered", "data": None}
                 ).get_data(),
                 status=409,
-                mimetype="application/json",
+                mimetype=JSON_MIMETYPE,
             )
 
         # Criptografa a senha
@@ -61,7 +63,7 @@ def register() -> Response:
                 }
             ).get_data(),
             status=201,
-            mimetype="application/json",
+            mimetype=JSON_MIMETYPE,
         )
 
     except Exception as e:
@@ -69,7 +71,7 @@ def register() -> Response:
         return Response(
             jsonify({"message": "Failed to create user", "error": str(e)}).get_data(),
             status=500,
-            mimetype="application/json",
+            mimetype=JSON_MIMETYPE,
         )
 
 
@@ -85,7 +87,7 @@ def authenticate() -> Response:
         return Response(
             jsonify({"message": "Missing credentials"}).get_data(),
             status=400,
-            mimetype="application/json",
+            mimetype=JSON_MIMETYPE,
         )
     user = None
     if data.get("email"):
@@ -97,7 +99,7 @@ def authenticate() -> Response:
         return Response(
             jsonify({"message": "Invalid credentials"}).get_data(),
             status=401,
-            mimetype="application/json",
+            mimetype=JSON_MIMETYPE,
         )
 
     try:
@@ -118,14 +120,14 @@ def authenticate() -> Response:
                 }
             ).get_data(),
             status=200,
-            mimetype="application/json",
+            mimetype=JSON_MIMETYPE,
         )
 
     except Exception as e:
         return Response(
             jsonify({"message": "Login failed", "error": str(e)}).get_data(),
             status=500,
-            mimetype="application/json",
+            mimetype=JSON_MIMETYPE,
         )
 
 

@@ -5,6 +5,7 @@ import jwt
 from flask import Response, current_app, jsonify, request
 
 F = TypeVar("F", bound=Callable[..., Any])
+JSON_MIMETYPE = "application/json"
 
 
 def token_required(f: F) -> Callable[..., Any]:
@@ -12,7 +13,11 @@ def token_required(f: F) -> Callable[..., Any]:
     def decorated(*args: Any, **kwargs: Any) -> Response:
         auth_header = request.headers.get("Authorization")
         if not auth_header:
-            return jsonify({"message": "Token is missing!"}), 401
+            return Response(
+                jsonify({"message": "Token is missing!"}).get_data(),
+                status=401,
+                mimetype=JSON_MIMETYPE,
+            )
 
         try:
             token = auth_header.split(" ")[1]
@@ -21,9 +26,17 @@ def token_required(f: F) -> Callable[..., Any]:
             )
             request.user_id = payload["user_id"]  # opcional: pode injetar o ID
         except jwt.ExpiredSignatureError:
-            return jsonify({"message": "Token expired!"}), 401
+            return Response(
+                jsonify({"message": "Token expired!"}).get_data(),
+                status=401,
+                mimetype=JSON_MIMETYPE,
+            )
         except jwt.InvalidTokenError:
-            return jsonify({"message": "Invalid token!"}), 401
+            return Response(
+                jsonify({"message": "Invalid token!"}).get_data(),
+                status=401,
+                mimetype=JSON_MIMETYPE,
+            )
 
         return f(*args, **kwargs)
 
