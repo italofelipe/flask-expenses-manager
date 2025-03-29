@@ -1,0 +1,27 @@
+[
+  {
+    "name": "Lina Inverse",
+    "email": "lina@email.com",
+    "password": "123456"
+  },
+  {
+    "name": "Rilay Crestfall",
+    "email": "rilay@email.com",
+    "password": "123456"
+  },
+  {
+    "name": "Nevermore",
+    "email": "nevermore@email.com",
+    "password": "123456"
+  },
+  {
+    "name": "mogul",
+    "email": "mogul@email.com",
+    "password": "123456"
+  },
+  {
+    "name": "davion",
+    "email": "davion@email.com",
+    "password": "123456"
+  }
+]

@@ -2,14 +2,23 @@ from flask import Flask
 from flask_jwt_extended import JWTManager
 from flask_marshmallow import Marshmallow
 from flask_migrate import Migrate
+from flask_apispec import FlaskApiSpec, use_kwargs
+from apispec import APISpec
+from apispec.ext.marshmallow import MarshmallowPlugin
+from marshmallow import Schema, fields
 
 from app.controllers import all_routes
+from app.controllers.auth_controller import RegisterResource, AuthResource
 from app.extensions.database import db
 from app.extensions.error_handlers import register_error_handlers
 
 jwt = JWTManager()
 ma = Marshmallow()
 
+class AuthSchema(Schema):
+    email = fields.Email(required=False)
+    name = fields.Str(required=False)
+    password = fields.Str(required=True)
 
 def create_app() -> Flask:
     print("Creating Flask app")
@@ -27,16 +36,30 @@ def create_app() -> Flask:
     ma.init_app(app)
     Migrate(app, db)
     jwt.init_app(app)
+
+    # Configuração do Swagger (OpenAPI 3.0)
+    app.config.update({
+        'APISPEC_SPEC': APISpec(
+            title='Not Enough Cash, Stranger!',
+            version='1.0.0',
+            openapi_version='3.0.2',
+            plugins=[MarshmallowPlugin()],
+        ),
+        'APISPEC_SWAGGER_URL': '/docs/swagger/',  # JSON da spec
+        'APISPEC_SWAGGER_UI_URL': '/docs/',       # Swagger UI
+    })
+
+    docs = FlaskApiSpec(app)
+
+    # Registra erros globais
     register_error_handlers(app)
 
-    # Registra blueprints
+    # ✅ Registra blueprints ANTES dos endpoints no Swagger
     for route in all_routes:
         app.register_blueprint(route)
 
-    # Debug das configurações JWT
-    print("JWT config loaded:")
-    print("  JWT_SECRET_KEY:", app.config.get("JWT_SECRET_KEY"))
-    print("  JWT_TOKEN_LOCATION:", app.config.get("JWT_TOKEN_LOCATION"))
-    print("  JWT_HEADER_TYPE:", app.config.get("JWT_HEADER_TYPE"))
+    # ✅ Registra os endpoints documentados no Swagger
+    docs.register(RegisterResource, blueprint="login")
+    docs.register(AuthResource, blueprint="login")
 
     return app

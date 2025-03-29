@@ -1,10 +1,12 @@
 from datetime import datetime, timedelta
-from typing import Any, Callable, Dict, Union, cast
+from typing import Any, Dict, Union
 
-from flask import Blueprint, Response, jsonify, request
+from flask import Blueprint, Response, jsonify
 from flask_jwt_extended import create_access_token
-from marshmallow import ValidationError
+from marshmallow import ValidationError, Schema, fields
 from werkzeug.security import check_password_hash, generate_password_hash
+from flask_apispec.views import MethodResource
+from flask_apispec import use_kwargs, doc
 
 from app.extensions.database import db
 from app.models import User
@@ -15,114 +17,93 @@ JSON_MIMETYPE = "application/json"
 login_bp = Blueprint("login", __name__, url_prefix="/login")
 
 
-@cast(Callable[..., Response], login_bp.route("/register", methods=["POST"]))
-def register() -> Response:
-    data = request.get_json()
-    schema = UserRegistrationSchema()
-    try:
-        validated_data = schema.load(data)
-    except ValidationError as err:
-        return Response(
-            jsonify({"message": "Validation error", "errors": err.messages}).get_data(),
-            status=400,
-            mimetype=JSON_MIMETYPE,
-        )
+class AuthSchema(Schema):
+    email = fields.Email(required=False)
+    name = fields.Str(required=False)
+    password = fields.Str(required=True)
 
-    # Validação mínima
-    required_fields = ["name", "email", "password"]
-    if not validated_data or not all(
-        field in validated_data for field in required_fields
-    ):
-        return Response(
-            jsonify({"message": "Missing required fields", "data": None}).get_data(),
-            status=400,
-            mimetype=JSON_MIMETYPE,
-        )
 
-    try:
-        # Verifica se o e-mail já existe
+class RegisterResource(MethodResource):
+    @doc(description="Registro de novo usuário", tags=["Autenticação"])
+    @use_kwargs(UserRegistrationSchema, location="json")
+    def post(self, **kwargs) -> Response:
+        schema = UserRegistrationSchema()
+        try:
+            validated_data = schema.load(kwargs)
+        except ValidationError as err:
+            return Response(
+                jsonify({"message": "Validation error", "errors": err.messages}).get_data(),
+                status=400,
+                mimetype=JSON_MIMETYPE,
+            )
+
         if User.query.filter_by(email=validated_data["email"]).first():
             return Response(
-                jsonify(
-                    {"message": "Email already registered", "data": None}
-                ).get_data(),
+                jsonify({"message": "Email already registered", "data": None}).get_data(),
                 status=409,
                 mimetype=JSON_MIMETYPE,
             )
 
-        # Criptografa a senha
-        hashed_password = generate_password_hash(validated_data["password"])
+        try:
+            hashed_password = generate_password_hash(validated_data["password"])
+            user = User(
+                name=validated_data["name"],
+                email=validated_data["email"],
+                password=hashed_password,
+            )
+            db.session.add(user)
+            db.session.flush()
+            db.session.commit()
 
-        # Cria novo usuário
-        user = User(
-            name=validated_data["name"],
-            email=validated_data["email"],
-            password=hashed_password,
-        )
-        db.session.add(user)
-        db.session.flush()
-        print(user.id)
-        db.session.commit()
-
-        return Response(
-            jsonify(
-                {
+            return Response(
+                jsonify({
                     "message": "User created successfully",
                     "data": {
                         "id": str(user.id),
                         "name": user.name,
                         "email": user.email,
                     },
-                }
-            ).get_data(),
-            status=201,
-            mimetype=JSON_MIMETYPE,
-        )
-
-    except Exception as e:
-        db.session.rollback()
-        return Response(
-            jsonify({"message": "Failed to create user", "error": str(e)}).get_data(),
-            status=500,
-            mimetype=JSON_MIMETYPE,
-        )
+                }).get_data(),
+                status=201,
+                mimetype=JSON_MIMETYPE,
+            )
+        except Exception as e:
+            db.session.rollback()
+            return Response(
+                jsonify({"message": "Failed to create user", "error": str(e)}).get_data(),
+                status=500,
+                mimetype=JSON_MIMETYPE,
+            )
 
 
-@cast(Callable[..., Response], login_bp.route("/auth", methods=["POST"]))
-def authenticate() -> Response:
-    data = request.get_json()
+class AuthResource(MethodResource):
+    @doc(description="Autenticação de usuário", tags=["Autenticação"])
+    @use_kwargs(AuthSchema, location="json")
+    def post(self, **kwargs) -> Response:
+        email = kwargs.get("email")
+        name = kwargs.get("name")
+        password = kwargs.get("password")
 
-    if (
-        not data
-        or not data.get("password")
-        or not (data.get("email") or data.get("name"))
-    ):
-        return Response(
-            jsonify({"message": "Missing credentials"}).get_data(),
-            status=400,
-            mimetype=JSON_MIMETYPE,
-        )
-    user = None
-    if data.get("email"):
-        user = User.query.filter_by(email=data["email"]).first()
-    elif data.get("name"):
-        user = User.query.filter_by(name=data["name"]).first()
+        if not password or not (email or name):
+            return Response(
+                jsonify({"message": "Missing credentials"}).get_data(),
+                status=400,
+                mimetype=JSON_MIMETYPE,
+            )
 
-    if not user or not check_password_hash(user.password, data["password"]):
-        return Response(
-            jsonify({"message": "Invalid credentials"}).get_data(),
-            status=401,
-            mimetype=JSON_MIMETYPE,
-        )
+        user = User.query.filter_by(email=email).first() if email else User.query.filter_by(name=name).first()
 
-    try:
-        token = create_access_token(
-            identity=str(user.id), expires_delta=timedelta(hours=1)
-        )
+        if not user or not check_password_hash(user.password, password):
+            return Response(
+                jsonify({"message": "Invalid credentials"}).get_data(),
+                status=401,
+                mimetype=JSON_MIMETYPE,
+            )
 
-        return Response(
-            jsonify(
-                {
+        try:
+            token = create_access_token(identity=str(user.id), expires_delta=timedelta(hours=1))
+            return Response(
+                jsonify({
                     "message": "Login successful",
                     "token": token,
                     "user": {
@@ -130,47 +111,18 @@ def authenticate() -> Response:
                         "name": user.name,
                         "email": user.email,
                     },
-                }
-            ).get_data(),
-            status=200,
-            mimetype=JSON_MIMETYPE,
-        )
-
-    except Exception as e:
-        return Response(
-            jsonify({"message": "Login failed", "error": str(e)}).get_data(),
-            status=500,
-            mimetype=JSON_MIMETYPE,
-        )
+                }).get_data(),
+                status=200,
+                mimetype=JSON_MIMETYPE,
+            )
+        except Exception as e:
+            return Response(
+                jsonify({"message": "Login failed", "error": str(e)}).get_data(),
+                status=500,
+                mimetype=JSON_MIMETYPE,
+            )
 
 
-def assign_user_profile_fields(
-    user: User, data: Dict[str, Any]
-) -> Dict[str, Union[str, bool]]:
-    date_fields = ["birth_date", "investment_goal_date"]
-    for field in [
-        "gender",
-        "birth_date",
-        "monthly_income",
-        "net_worth",
-        "monthly_expenses",
-        "initial_investment",
-        "monthly_investment",
-        "investment_goal_date",
-    ]:
-        if field in data:
-            value = data[field]
-            if field in date_fields and isinstance(value, str):
-                try:
-                    value = datetime.strptime(value, "%Y-%m-%d").date()
-                except ValueError:
-                    return {
-                        "error": True,
-                        "field": field,
-                        "message": (
-                            f"Formato inválido para '{field}'. Use 'YYYY-MM-DD'."
-                        ),
-                    }
-            setattr(user, field, value)
-    user.updated_at = datetime.utcnow()
-    return {"error": False}
+# Registra os endpoints no blueprint
+login_bp.add_url_rule("/register", view_func=RegisterResource.as_view("registerresource"))
+login_bp.add_url_rule("/auth", view_func=AuthResource.as_view("authresource"))
