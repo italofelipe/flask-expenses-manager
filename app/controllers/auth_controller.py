@@ -1,12 +1,12 @@
-from datetime import datetime, timedelta
-from typing import Any, Dict, Union
+from datetime import timedelta
+from typing import Any
 
 from flask import Blueprint, Response, jsonify
-from flask_jwt_extended import create_access_token
-from marshmallow import ValidationError, Schema, fields
-from werkzeug.security import check_password_hash, generate_password_hash
+from flask_apispec import doc, use_kwargs
 from flask_apispec.views import MethodResource
-from flask_apispec import use_kwargs, doc
+from flask_jwt_extended import create_access_token
+from marshmallow import Schema, ValidationError, fields
+from werkzeug.security import check_password_hash, generate_password_hash
 
 from app.extensions.database import db
 from app.models import User
@@ -24,22 +24,26 @@ class AuthSchema(Schema):
 
 
 class RegisterResource(MethodResource):
-    @doc(description="Registro de novo usuário", tags=["Autenticação"])
-    @use_kwargs(UserRegistrationSchema, location="json")
-    def post(self, **kwargs) -> Response:
+    @doc(description="Registro de novo usuário", tags=["Autenticação"])  # type: ignore
+    @use_kwargs(UserRegistrationSchema, location="json")  # type: ignore
+    def post(self, **kwargs: Any) -> Response:
         schema = UserRegistrationSchema()
         try:
             validated_data = schema.load(kwargs)
         except ValidationError as err:
             return Response(
-                jsonify({"message": "Validation error", "errors": err.messages}).get_data(),
+                jsonify(
+                    {"message": "Validation error", "errors": err.messages}
+                ).get_data(),
                 status=400,
                 mimetype=JSON_MIMETYPE,
             )
 
         if User.query.filter_by(email=validated_data["email"]).first():
             return Response(
-                jsonify({"message": "Email already registered", "data": None}).get_data(),
+                jsonify(
+                    {"message": "Email already registered", "data": None}
+                ).get_data(),
                 status=409,
                 mimetype=JSON_MIMETYPE,
             )
@@ -56,30 +60,34 @@ class RegisterResource(MethodResource):
             db.session.commit()
 
             return Response(
-                jsonify({
-                    "message": "User created successfully",
-                    "data": {
-                        "id": str(user.id),
-                        "name": user.name,
-                        "email": user.email,
-                    },
-                }).get_data(),
+                jsonify(
+                    {
+                        "message": "User created successfully",
+                        "data": {
+                            "id": str(user.id),
+                            "name": user.name,
+                            "email": user.email,
+                        },
+                    }
+                ).get_data(),
                 status=201,
                 mimetype=JSON_MIMETYPE,
             )
         except Exception as e:
             db.session.rollback()
             return Response(
-                jsonify({"message": "Failed to create user", "error": str(e)}).get_data(),
+                jsonify(
+                    {"message": "Failed to create user", "error": str(e)}
+                ).get_data(),
                 status=500,
                 mimetype=JSON_MIMETYPE,
             )
 
 
 class AuthResource(MethodResource):
-    @doc(description="Autenticação de usuário", tags=["Autenticação"])
-    @use_kwargs(AuthSchema, location="json")
-    def post(self, **kwargs) -> Response:
+    @doc(description="Autenticação de usuário", tags=["Autenticação"])  # type: ignore
+    @use_kwargs(AuthSchema, location="json")  # type: ignore
+    def post(self, **kwargs: Any) -> Response:
         email = kwargs.get("email")
         name = kwargs.get("name")
         password = kwargs.get("password")
@@ -91,7 +99,11 @@ class AuthResource(MethodResource):
                 mimetype=JSON_MIMETYPE,
             )
 
-        user = User.query.filter_by(email=email).first() if email else User.query.filter_by(name=name).first()
+        user = (
+            User.query.filter_by(email=email).first()
+            if email
+            else User.query.filter_by(name=name).first()
+        )
 
         if not user or not check_password_hash(user.password, password):
             return Response(
@@ -101,17 +113,21 @@ class AuthResource(MethodResource):
             )
 
         try:
-            token = create_access_token(identity=str(user.id), expires_delta=timedelta(hours=1))
+            token = create_access_token(
+                identity=str(user.id), expires_delta=timedelta(hours=1)
+            )
             return Response(
-                jsonify({
-                    "message": "Login successful",
-                    "token": token,
-                    "user": {
-                        "id": str(user.id),
-                        "name": user.name,
-                        "email": user.email,
-                    },
-                }).get_data(),
+                jsonify(
+                    {
+                        "message": "Login successful",
+                        "token": token,
+                        "user": {
+                            "id": str(user.id),
+                            "name": user.name,
+                            "email": user.email,
+                        },
+                    }
+                ).get_data(),
                 status=200,
                 mimetype=JSON_MIMETYPE,
             )
@@ -124,5 +140,7 @@ class AuthResource(MethodResource):
 
 
 # Registra os endpoints no blueprint
-login_bp.add_url_rule("/register", view_func=RegisterResource.as_view("registerresource"))
+login_bp.add_url_rule(
+    "/register", view_func=RegisterResource.as_view("registerresource")
+)
 login_bp.add_url_rule("/auth", view_func=AuthResource.as_view("authresource"))

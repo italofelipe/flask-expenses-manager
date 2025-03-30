@@ -1,24 +1,26 @@
+from apispec import APISpec
+from apispec.ext.marshmallow import MarshmallowPlugin
 from flask import Flask
+from flask_apispec import FlaskApiSpec
 from flask_jwt_extended import JWTManager
 from flask_marshmallow import Marshmallow
 from flask_migrate import Migrate
-from flask_apispec import FlaskApiSpec, use_kwargs
-from apispec import APISpec
-from apispec.ext.marshmallow import MarshmallowPlugin
 from marshmallow import Schema, fields
 
 from app.controllers import all_routes
-from app.controllers.auth_controller import RegisterResource, AuthResource
+from app.controllers.auth_controller import AuthResource, RegisterResource
 from app.extensions.database import db
 from app.extensions.error_handlers import register_error_handlers
 
 jwt = JWTManager()
 ma = Marshmallow()
 
+
 class AuthSchema(Schema):
     email = fields.Email(required=False)
     name = fields.Str(required=False)
     password = fields.Str(required=True)
+
 
 def create_app() -> Flask:
     print("Creating Flask app")
@@ -38,16 +40,18 @@ def create_app() -> Flask:
     jwt.init_app(app)
 
     # Configuração do Swagger (OpenAPI 3.0)
-    app.config.update({
-        'APISPEC_SPEC': APISpec(
-            title='Not Enough Cash, Stranger!',
-            version='1.0.0',
-            openapi_version='3.0.2',
-            plugins=[MarshmallowPlugin()],
-        ),
-        'APISPEC_SWAGGER_URL': '/docs/swagger/',  # JSON da spec
-        'APISPEC_SWAGGER_UI_URL': '/docs/',       # Swagger UI
-    })
+    app.config.update(
+        {
+            "APISPEC_SPEC": APISpec(
+                title="Not Enough Cash, Stranger!",
+                version="1.0.0",
+                openapi_version="3.0.2",
+                plugins=[MarshmallowPlugin()],
+            ),
+            "APISPEC_SWAGGER_URL": "/docs/swagger/",  # JSON da spec
+            "APISPEC_SWAGGER_UI_URL": "/docs/",  # Swagger UI
+        }
+    )
 
     docs = FlaskApiSpec(app)
 
