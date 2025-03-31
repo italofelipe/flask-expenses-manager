@@ -7,7 +7,11 @@ from flask_marshmallow import Marshmallow
 from flask_migrate import Migrate
 
 from app.controllers import all_routes
-from app.controllers.auth_controller import AuthResource, RegisterResource
+from app.controllers.auth_controller import (
+    AuthResource,
+    LogoutResource,
+    RegisterResource,
+)
 from app.controllers.user_controller import UserProfileResource
 from app.extensions.database import db
 from app.extensions.error_handlers import register_error_handlers
@@ -70,6 +74,7 @@ def create_app() -> Flask:
     docs.register(RegisterResource, blueprint="auth", endpoint="registerresource")
     docs.register(AuthResource, blueprint="auth", endpoint="authresource")
     docs.register(UserProfileResource, blueprint="user", endpoint="profile")
+    docs.register(LogoutResource, blueprint="auth", endpoint="logoutresource")
 
     from app.extensions.jwt_callbacks import register_jwt_callbacks
     from app.middleware.auth_guard import register_auth_guard

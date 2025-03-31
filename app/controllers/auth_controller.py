@@ -31,7 +31,16 @@ class ValidatedUserData(TypedDict):
 
 
 class RegisterResource(MethodResource):
-    @doc(description="Registro de novo usuário", tags=["Autenticação"])  # type: ignore[misc]
+    @doc(
+        description="Cria um novo usuário no sistema",
+        tags=["Autenticação"],
+        responses={
+            201: {"description": "Usuário criado com sucesso"},
+            400: {"description": "Erro de validação"},
+            409: {"description": "Email já registrado"},
+            500: {"description": "Erro interno do servidor"},
+        },
+    )  # type: ignore[misc]
     @use_kwargs(UserRegistrationSchema, location="json")  # type: ignore[misc]
     def post(self, **kwargs: Any) -> Response:
         schema = UserRegistrationSchema()
@@ -107,6 +116,12 @@ class AuthResource(MethodResource):
                 }
             },
         },
+        responses={
+            200: {"description": "Login realizado com sucesso"},
+            400: {"description": "Credenciais ausentes"},
+            401: {"description": "Credenciais inválidas"},
+            500: {"description": "Erro interno ao efetuar login"},
+        },
     )  # type: ignore[misc]
     @use_kwargs(AuthSchema, location="json")  # type: ignore[misc]
     @marshal_with(AuthSuccessResponseSchema, code=200)  # type: ignore[misc]
@@ -171,9 +186,12 @@ class AuthResource(MethodResource):
 
 class LogoutResource(MethodResource):
     @doc(
-        description="Revoga o token JWT atual",
+        description="Revoga o token JWT atual (logout do usuário)",
         tags=["Autenticação"],
         security=[{"BearerAuth": []}],
+        responses={
+            200: {"description": "Logout realizado com sucesso"},
+        },
     )  # type: ignore[misc]
     @jwt_required()  # type: ignore[misc]
     def post(self) -> Response:

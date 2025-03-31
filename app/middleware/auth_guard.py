@@ -14,11 +14,18 @@ def register_auth_guard(app: Any) -> None:
             "authresource",
             "refreshtokenresource",
             "static",
+            "swaggerui.index",
+            "swaggerui.static",
+            "swaggerui.swagger_json",
+            "swagger-ui",
+            "swagger-ui.static",
+            "swagger-ui.swagger_json",
         }
-
         if not request.endpoint:
             return
-
+        if request.path.startswith("/docs"):
+            return
+        print("ENDPOINT REQUISITADO:", request.endpoint)
         endpoint = request.endpoint.split(".")[-1]
         if endpoint in open_endpoints:
             return
