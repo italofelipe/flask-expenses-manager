@@ -1,11 +1,11 @@
 from datetime import timedelta
-from typing import Any
+from typing import Any, TypedDict, cast
 
 from flask import Blueprint, Response, jsonify
 from flask_apispec import doc, marshal_with, use_kwargs
 from flask_apispec.views import MethodResource
 from flask_jwt_extended import create_access_token
-from marshmallow import Schema, ValidationError, fields
+from marshmallow import ValidationError
 from werkzeug.security import check_password_hash, generate_password_hash
 
 from app.extensions.database import db
@@ -19,13 +19,19 @@ JSON_MIMETYPE = "application/json"
 login_bp = Blueprint("login", __name__, url_prefix="/login")
 
 
+class ValidatedUserData(TypedDict):
+    name: str
+    email: str
+    password: str
+
+
 class RegisterResource(MethodResource):
-    @doc(description="Registro de novo usuário", tags=["Autenticação"])
+    @doc(description="Registro de novo usuário", tags=["Autenticação"])  # type: ignore[misc]
     @use_kwargs(UserRegistrationSchema, location="json")  # type: ignore[misc]
     def post(self, **kwargs: Any) -> Response:
         schema = UserRegistrationSchema()
         try:
-            validated_data = schema.load(kwargs)
+            validated_data = cast(ValidatedUserData, schema.load(kwargs))
         except ValidationError as err:
             return Response(
                 jsonify(
@@ -93,14 +99,13 @@ class AuthResource(MethodResource):
                 }
             },
         },
-    )
-    @use_kwargs(AuthSchema, location="json")
+    )  # type: ignore[misc]
+    @use_kwargs(AuthSchema, location="json")  # type: ignore[misc]
     @marshal_with(AuthSuccessResponseSchema, code=200)  # type: ignore[misc]
     @marshal_with(ErrorResponseSchema, code=400)  # type: ignore[misc]
     @marshal_with(ErrorResponseSchema, code=401)  # type: ignore[misc]
     @marshal_with(ErrorResponseSchema, code=500)  # type: ignore[misc]
     def post(self, **kwargs: Any) -> Response:
-        # A validação é feita automaticamente pelo @use_kwargs
         email = kwargs.get("email")
         name = kwargs.get("name")
         password = kwargs.get("password")
@@ -152,7 +157,6 @@ class AuthResource(MethodResource):
             )
 
 
-# Registra os endpoints no blueprint
 login_bp.add_url_rule(
     "/register", view_func=RegisterResource.as_view("registerresource")
 )

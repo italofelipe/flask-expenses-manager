@@ -2,11 +2,10 @@ from datetime import datetime
 from typing import Any, Callable, Dict, Union, cast
 from uuid import UUID
 
-from flask import Blueprint, Response, jsonify, request
-from flask_apispec import doc, marshal_with, use_kwargs
+from flask import Blueprint, Response, jsonify
+from flask_apispec import doc, use_kwargs
 from flask_apispec.views import MethodResource
 from flask_jwt_extended import get_jwt_identity, jwt_required
-from marshmallow import ValidationError
 
 from app.extensions.database import db
 from app.models import User
@@ -48,10 +47,14 @@ def assign_user_profile_fields(
 
 
 class UserProfileResource(MethodResource):
-    @doc(description="Atualiza o perfil do usuário autenticado", tags=["Usuário"])
-    @use_kwargs(UserProfileSchema, location="json")
-    @jwt_required()
-    def put(self) -> Response:
+    @doc(
+        description="Atualiza o perfil do usuário autenticado",
+        tags=["Usuário"],
+        security=[{"BearerAuth": []}],
+    )  # type: ignore[misc]
+    @jwt_required()  # type: ignore[misc]
+    @use_kwargs(UserProfileSchema(), location="json")  # type: ignore[misc]
+    def put(self, **kwargs: Any) -> Response:
         user_id = UUID(get_jwt_identity())
         user = User.query.get(user_id)
         if not user:
@@ -61,7 +64,7 @@ class UserProfileResource(MethodResource):
                 mimetype=JSON_MIMETYPE,
             )
 
-        data = request.get_json()
+        data = kwargs
 
         result = assign_user_profile_fields(user, data)
         if result["error"]:
@@ -197,7 +200,3 @@ def debug_token() -> Response:
 user_bp.add_url_rule(
     "/profile", view_func=UserProfileResource.as_view("profile"), methods=["PUT"]
 )
-
-from flask_apispec import FlaskApiSpec
-
-docs = FlaskApiSpec()

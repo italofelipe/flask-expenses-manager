@@ -5,7 +5,6 @@ from flask_apispec import FlaskApiSpec
 from flask_jwt_extended import JWTManager
 from flask_marshmallow import Marshmallow
 from flask_migrate import Migrate
-from marshmallow import Schema, ValidationError, fields, validates_schema
 
 from app.controllers import all_routes
 from app.controllers.auth_controller import AuthResource, RegisterResource

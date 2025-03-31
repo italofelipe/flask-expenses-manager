@@ -1,3 +1,5 @@
+from typing import Optional
+
 from marshmallow import Schema, ValidationError, fields, validates_schema
 
 
@@ -6,8 +8,8 @@ class AuthSchema(Schema):
     name = fields.String(load_default=None)
     password = fields.String(required=True)
 
-    @validates_schema
-    def validate_identity(self, data, **kwargs):
+    @validates_schema  # type: ignore[misc]
+    def validate_identity(self, data: dict[str, Optional[str]]) -> None:
         if not data.get("email") and not data.get("name"):
             raise ValidationError("Either 'email' or 'name' must be provided.")
 
