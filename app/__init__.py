@@ -71,4 +71,10 @@ def create_app() -> Flask:
     docs.register(AuthResource, blueprint="login")
     docs.register(UserProfileResource, blueprint="user", endpoint="profile")
 
+    from app.extensions.jwt_callbacks import register_jwt_callbacks
+    from app.middleware.auth_guard import register_auth_guard
+
+    register_auth_guard(app)
+    register_jwt_callbacks(jwt)
+
     return app
