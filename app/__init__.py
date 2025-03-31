@@ -5,21 +5,16 @@ from flask_apispec import FlaskApiSpec
 from flask_jwt_extended import JWTManager
 from flask_marshmallow import Marshmallow
 from flask_migrate import Migrate
-from marshmallow import Schema, fields
+from marshmallow import Schema, fields, ValidationError, validates_schema
 
 from app.controllers import all_routes
 from app.controllers.auth_controller import AuthResource, RegisterResource
+from app.controllers.user_controller import UserProfileResource
 from app.extensions.database import db
 from app.extensions.error_handlers import register_error_handlers
 
 jwt = JWTManager()
 ma = Marshmallow()
-
-
-class AuthSchema(Schema):
-    email = fields.Email(required=False)
-    name = fields.Str(required=False)
-    password = fields.Str(required=True)
 
 
 def create_app() -> Flask:
@@ -47,9 +42,19 @@ def create_app() -> Flask:
                 version="1.0.0",
                 openapi_version="3.0.2",
                 plugins=[MarshmallowPlugin()],
+                components={
+                    "securitySchemes": {
+                        "BearerAuth": {
+                            "type": "http",
+                            "scheme": "bearer",
+                            "bearerFormat": "JWT",
+                        }
+                    }
+                }
             ),
             "APISPEC_SWAGGER_URL": "/docs/swagger/",  # JSON da spec
             "APISPEC_SWAGGER_UI_URL": "/docs/",  # Swagger UI
+            "APISPEC_OPTIONS": {"security": [{"BearerAuth": []}]}
         }
     )
 
@@ -65,5 +70,6 @@ def create_app() -> Flask:
     # ✅ Registra os endpoints documentados no Swagger
     docs.register(RegisterResource, blueprint="login")
     docs.register(AuthResource, blueprint="login")
+    docs.register(UserProfileResource, blueprint="user", endpoint="profile")
 
     return app

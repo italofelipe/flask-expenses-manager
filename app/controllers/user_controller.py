@@ -5,6 +5,8 @@ from uuid import UUID
 from flask import Blueprint, Response, jsonify, request
 from flask_jwt_extended import get_jwt_identity, jwt_required
 from marshmallow import ValidationError
+from flask_apispec.views import MethodResource
+from flask_apispec import use_kwargs, marshal_with, doc
 
 from app.extensions.database import db
 from app.models import User
@@ -45,99 +47,92 @@ def assign_user_profile_fields(
     return {"error": False}
 
 
-@cast(Callable[..., Response], user_bp.route("/profile", methods=["PUT"]))
-@cast(Callable[..., Response], jwt_required())
-def update_profile() -> Response:
-    user_id = UUID(get_jwt_identity())
-    user = User.query.get(user_id)
-    if not user:
-        return Response(
-            jsonify({"message": "Usuário não encontrado"}).get_data(),
-            status=404,
-            mimetype=JSON_MIMETYPE,
-        )
+class UserProfileResource(MethodResource):
+    @doc(description="Atualiza o perfil do usuário autenticado", tags=["Usuário"])
+    @use_kwargs(UserProfileSchema, location="json")
+    @jwt_required()
+    def put(self) -> Response:
+        user_id = UUID(get_jwt_identity())
+        user = User.query.get(user_id)
+        if not user:
+            return Response(
+                jsonify({"message": "Usuário não encontrado"}).get_data(),
+                status=404,
+                mimetype=JSON_MIMETYPE,
+            )
 
-    schema = UserProfileSchema()
-    try:
-        data = schema.load(request.get_json())
-    except ValidationError as err:
-        return Response(
-            jsonify({"message": "Validation error", "errors": err.messages}).get_data(),
-            status=400,
-            mimetype=JSON_MIMETYPE,
-        )
+        data = request.get_json()
 
-    result = assign_user_profile_fields(user, data)
-    if result["error"]:
-        return Response(
-            jsonify({"message": result["message"]}).get_data(),
-            status=400,
-            mimetype=JSON_MIMETYPE,
-        )
+        result = assign_user_profile_fields(user, data)
+        if result["error"]:
+            return Response(
+                jsonify({"message": result["message"]}).get_data(),
+                status=400,
+                mimetype=JSON_MIMETYPE,
+            )
 
-    # Validação de dados
-    errors = user.validate_profile_data()
-    if errors:
-        return Response(
-            jsonify({"message": "Erro de validação", "errors": errors}).get_data(),
-            status=400,
-            mimetype=JSON_MIMETYPE,
-        )
+        # Validação de dados
+        errors = user.validate_profile_data()
+        if errors:
+            return Response(
+                jsonify({"message": "Erro de validação", "errors": errors}).get_data(),
+                status=400,
+                mimetype=JSON_MIMETYPE,
+            )
 
-    try:
-        db.session.commit()
-        return Response(
-            jsonify(
-                {
-                    "message": "Perfil atualizado com sucesso",
-                    "data": {
-                        "id": str(user.id),
-                        "name": user.name,
-                        "email": user.email,
-                        "gender": user.gender,
-                        "birth_date": (
-                            str(user.birth_date) if user.birth_date else None
-                        ),
-                        "monthly_income": (
-                            float(user.monthly_income) if user.monthly_income else None
-                        ),
-                        "net_worth": (
-                            float(user.net_worth) if user.net_worth else None
-                        ),
-                        "monthly_expenses": (
-                            float(user.monthly_expenses)
-                            if user.monthly_expenses
-                            else None
-                        ),
-                        "initial_investment": (
-                            float(user.initial_investment)
-                            if user.initial_investment
-                            else None
-                        ),
-                        "monthly_investment": (
-                            float(user.monthly_investment)
-                            if user.monthly_investment
-                            else None
-                        ),
-                        "investment_goal_date": (
-                            str(user.investment_goal_date)
-                            if user.investment_goal_date
-                            else None
-                        ),
-                    },
-                }
-            ).get_data(),
-            status=200,
-            mimetype=JSON_MIMETYPE,
-        )
-    except Exception as e:
-        return Response(
-            jsonify(
-                {"message": "Erro ao atualizar perfil", "error": str(e)}
-            ).get_data(),
-            status=500,
-            mimetype=JSON_MIMETYPE,
-        )
+        try:
+            db.session.commit()
+            return Response(
+                jsonify(
+                    {
+                        "message": "Perfil atualizado com sucesso",
+                        "data": {
+                            "id": str(user.id),
+                            "name": user.name,
+                            "email": user.email,
+                            "gender": user.gender,
+                            "birth_date": (
+                                str(user.birth_date) if user.birth_date else None
+                            ),
+                            "monthly_income": (
+                                float(user.monthly_income) if user.monthly_income else None
+                            ),
+                            "net_worth": (
+                                float(user.net_worth) if user.net_worth else None
+                            ),
+                            "monthly_expenses": (
+                                float(user.monthly_expenses)
+                                if user.monthly_expenses
+                                else None
+                            ),
+                            "initial_investment": (
+                                float(user.initial_investment)
+                                if user.initial_investment
+                                else None
+                            ),
+                            "monthly_investment": (
+                                float(user.monthly_investment)
+                                if user.monthly_investment else None
+                            ),
+                            "investment_goal_date": (
+                                str(user.investment_goal_date)
+                                if user.investment_goal_date
+                                else None
+                            ),
+                        },
+                    }
+                ).get_data(),
+                status=200,
+                mimetype=JSON_MIMETYPE,
+            )
+        except Exception as e:
+            return Response(
+                jsonify(
+                    {"message": "Erro ao atualizar perfil", "error": str(e)}
+                ).get_data(),
+                status=500,
+                mimetype=JSON_MIMETYPE,
+            )
 
 
 @cast(Callable[..., Response], user_bp.route("/me", methods=["GET"]))
@@ -194,3 +189,11 @@ def debug_token() -> Response:
         status=200,
         mimetype=JSON_MIMETYPE,
     )
+
+user_bp.add_url_rule(
+    "/profile", view_func=UserProfileResource.as_view("profile"), methods=["PUT"]
+)
+
+from flask_apispec import FlaskApiSpec
+docs = FlaskApiSpec()
+
