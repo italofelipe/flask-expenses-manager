@@ -4,7 +4,12 @@ from typing import Any, TypedDict, cast
 from flask import Blueprint, Response, jsonify
 from flask_apispec import doc, marshal_with, use_kwargs
 from flask_apispec.views import MethodResource
-from flask_jwt_extended import create_access_token
+from flask_jwt_extended import (
+    create_access_token,
+    get_jti,
+    get_jwt_identity,
+    jwt_required,
+)
 from marshmallow import ValidationError
 from werkzeug.security import check_password_hash, generate_password_hash
 
@@ -137,6 +142,10 @@ class AuthResource(MethodResource):
             token = create_access_token(
                 identity=str(user.id), expires_delta=timedelta(hours=1)
             )
+            jti = get_jti(token)
+            if user.current_jti != jti:
+                user.current_jti = jti
+                db.session.commit()
             return Response(
                 jsonify(
                     {
@@ -160,7 +169,28 @@ class AuthResource(MethodResource):
             )
 
 
+class LogoutResource(MethodResource):
+    @doc(
+        description="Revoga o token JWT atual",
+        tags=["Autenticação"],
+        security=[{"BearerAuth": []}],
+    )  # type: ignore[misc]
+    @jwt_required()  # type: ignore[misc]
+    def post(self) -> Response:
+        identity = get_jwt_identity()
+        user = User.query.get(identity)
+        if user:
+            user.current_jti = None
+            db.session.commit()
+        return Response(
+            jsonify({"message": "Logout successful"}).get_data(),
+            status=200,
+            mimetype=JSON_MIMETYPE,
+        )
+
+
 login_bp.add_url_rule(
     "/register", view_func=RegisterResource.as_view("registerresource")
 )
 login_bp.add_url_rule("/login", view_func=AuthResource.as_view("authresource"))
+login_bp.add_url_rule("/logout", view_func=LogoutResource.as_view("logoutresource"))

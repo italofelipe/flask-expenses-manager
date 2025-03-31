@@ -14,8 +14,9 @@ class User(db.Model):
     name = db.Column(db.String(128), nullable=False)
     email = db.Column(db.String(128), nullable=False, unique=True)
     password = db.Column(db.String(256), nullable=False)
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
-    updated_at = db.Column(db.DateTime, default=datetime.utcnow)
+    created_at = db.Column(db.DateTime, default=datetime.now)
+    updated_at = db.Column(db.DateTime, default=datetime.now)
+    current_jti = db.Column(db.String(128), nullable=True)
 
     # Dados pessoais - informações adicionais coletadas após o cadastro inicial
     gender = db.Column(db.String(20), nullable=True)

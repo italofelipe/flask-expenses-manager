@@ -5,7 +5,7 @@ from uuid import UUID
 from flask import Blueprint, Response, jsonify
 from flask_apispec import doc, use_kwargs
 from flask_apispec.views import MethodResource
-from flask_jwt_extended import get_jwt_identity, jwt_required
+from flask_jwt_extended import get_jwt, get_jwt_identity, jwt_required
 
 from app.extensions.database import db
 from app.models import User
@@ -56,11 +56,19 @@ class UserProfileResource(MethodResource):
     @use_kwargs(UserProfileSchema(), location="json")  # type: ignore[misc]
     def put(self, **kwargs: Any) -> Response:
         user_id = UUID(get_jwt_identity())
+        jti = get_jwt()["jti"]
         user = User.query.get(user_id)
         if not user:
             return Response(
                 jsonify({"message": "Usuário não encontrado"}).get_data(),
                 status=404,
+                mimetype=JSON_MIMETYPE,
+            )
+
+        if not hasattr(user, "current_jti") or user.current_jti != jti:
+            return Response(
+                jsonify({"message": "Token revogado"}).get_data(),
+                status=401,
                 mimetype=JSON_MIMETYPE,
             )
 
@@ -145,11 +153,12 @@ class UserProfileResource(MethodResource):
 @cast(Callable[..., Response], jwt_required())
 def get_profile() -> Response:
     user_id = UUID(get_jwt_identity())
+    jti = get_jwt()["jti"]
     user = User.query.get(user_id)
-    if not user:
+    if not user or not hasattr(user, "current_jti") or user.current_jti != jti:
         return Response(
-            jsonify({"message": "Usuário não encontrado"}).get_data(),
-            status=404,
+            jsonify({"message": "Token revogado ou usuário não encontrado"}).get_data(),
+            status=401,
             mimetype=JSON_MIMETYPE,
         )
 
