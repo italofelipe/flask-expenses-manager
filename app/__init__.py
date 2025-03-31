@@ -67,8 +67,8 @@ def create_app() -> Flask:
         app.register_blueprint(route)
 
     # ✅ Registra os endpoints documentados no Swagger
-    docs.register(RegisterResource, blueprint="login")
-    docs.register(AuthResource, blueprint="login")
+    docs.register(RegisterResource, blueprint="auth", endpoint="registerresource")
+    docs.register(AuthResource, blueprint="auth", endpoint="authresource")
     docs.register(UserProfileResource, blueprint="user", endpoint="profile")
 
     from app.extensions.jwt_callbacks import register_jwt_callbacks

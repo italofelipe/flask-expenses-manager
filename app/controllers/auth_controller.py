@@ -16,7 +16,7 @@ from app.schemas.user_schemas import UserRegistrationSchema
 
 JSON_MIMETYPE = "application/json"
 
-login_bp = Blueprint("login", __name__, url_prefix="/login")
+login_bp = Blueprint("auth", __name__, url_prefix="/auth")
 
 
 class ValidatedUserData(TypedDict):
@@ -163,4 +163,4 @@ class AuthResource(MethodResource):
 login_bp.add_url_rule(
     "/register", view_func=RegisterResource.as_view("registerresource")
 )
-login_bp.add_url_rule("/auth", view_func=AuthResource.as_view("authresource"))
+login_bp.add_url_rule("/login", view_func=AuthResource.as_view("authresource"))
