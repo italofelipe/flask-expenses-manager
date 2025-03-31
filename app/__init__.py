@@ -5,7 +5,7 @@ from flask_apispec import FlaskApiSpec
 from flask_jwt_extended import JWTManager
 from flask_marshmallow import Marshmallow
 from flask_migrate import Migrate
-from marshmallow import Schema, fields, ValidationError, validates_schema
+from marshmallow import Schema, ValidationError, fields, validates_schema
 
 from app.controllers import all_routes
 from app.controllers.auth_controller import AuthResource, RegisterResource
@@ -50,11 +50,11 @@ def create_app() -> Flask:
                             "bearerFormat": "JWT",
                         }
                     }
-                }
+                },
             ),
             "APISPEC_SWAGGER_URL": "/docs/swagger/",  # JSON da spec
             "APISPEC_SWAGGER_UI_URL": "/docs/",  # Swagger UI
-            "APISPEC_OPTIONS": {"security": [{"BearerAuth": []}]}
+            "APISPEC_OPTIONS": {"security": [{"BearerAuth": []}]},
         }
     )
 

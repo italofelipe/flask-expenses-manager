@@ -1,4 +1,5 @@
-from marshmallow import Schema, fields, validates_schema, ValidationError
+from marshmallow import Schema, ValidationError, fields, validates_schema
+
 
 class AuthSchema(Schema):
     email = fields.String(load_default=None)
@@ -14,8 +15,4 @@ class AuthSchema(Schema):
 class AuthSuccessResponseSchema(Schema):
     message = fields.String(required=True)
     token = fields.String(required=True)
-    user = fields.Dict(
-        required=True,
-        keys=fields.String(),
-        values=fields.String()
-    )
+    user = fields.Dict(required=True, keys=fields.String(), values=fields.String())

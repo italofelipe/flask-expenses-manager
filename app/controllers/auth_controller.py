@@ -1,20 +1,23 @@
 from datetime import timedelta
 from typing import Any
+
 from flask import Blueprint, Response, jsonify
-from flask_apispec import doc, use_kwargs, marshal_with
+from flask_apispec import doc, marshal_with, use_kwargs
 from flask_apispec.views import MethodResource
 from flask_jwt_extended import create_access_token
 from marshmallow import Schema, ValidationError, fields
 from werkzeug.security import check_password_hash, generate_password_hash
+
 from app.extensions.database import db
 from app.models import User
-from app.schemas.user_schemas import UserRegistrationSchema
 from app.schemas.auth_schema import AuthSchema, AuthSuccessResponseSchema
 from app.schemas.error_schema import ErrorResponseSchema
+from app.schemas.user_schemas import UserRegistrationSchema
 
 JSON_MIMETYPE = "application/json"
 
 login_bp = Blueprint("login", __name__, url_prefix="/login")
+
 
 class RegisterResource(MethodResource):
     @doc(description="Registro de novo usuário", tags=["Autenticação"])
@@ -86,10 +89,7 @@ class AuthResource(MethodResource):
             "content": {
                 "application/json": {
                     "schema": AuthSchema,
-                    "example": {
-                        "email": "email@email.com",
-                        "password": "123456"
-                    }
+                    "example": {"email": "email@email.com", "password": "123456"},
                 }
             },
         },

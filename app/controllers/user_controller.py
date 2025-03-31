@@ -3,10 +3,10 @@ from typing import Any, Callable, Dict, Union, cast
 from uuid import UUID
 
 from flask import Blueprint, Response, jsonify, request
+from flask_apispec import doc, marshal_with, use_kwargs
+from flask_apispec.views import MethodResource
 from flask_jwt_extended import get_jwt_identity, jwt_required
 from marshmallow import ValidationError
-from flask_apispec.views import MethodResource
-from flask_apispec import use_kwargs, marshal_with, doc
 
 from app.extensions.database import db
 from app.models import User
@@ -95,7 +95,9 @@ class UserProfileResource(MethodResource):
                                 str(user.birth_date) if user.birth_date else None
                             ),
                             "monthly_income": (
-                                float(user.monthly_income) if user.monthly_income else None
+                                float(user.monthly_income)
+                                if user.monthly_income
+                                else None
                             ),
                             "net_worth": (
                                 float(user.net_worth) if user.net_worth else None
@@ -112,7 +114,8 @@ class UserProfileResource(MethodResource):
                             ),
                             "monthly_investment": (
                                 float(user.monthly_investment)
-                                if user.monthly_investment else None
+                                if user.monthly_investment
+                                else None
                             ),
                             "investment_goal_date": (
                                 str(user.investment_goal_date)
@@ -190,10 +193,11 @@ def debug_token() -> Response:
         mimetype=JSON_MIMETYPE,
     )
 
+
 user_bp.add_url_rule(
     "/profile", view_func=UserProfileResource.as_view("profile"), methods=["PUT"]
 )
 
 from flask_apispec import FlaskApiSpec
-docs = FlaskApiSpec()
 
+docs = FlaskApiSpec()
