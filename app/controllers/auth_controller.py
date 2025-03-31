@@ -95,7 +95,10 @@ class AuthResource(MethodResource):
             "content": {
                 "application/json": {
                     "schema": AuthSchema,
-                    "example": {"email": "email@email.com", "password": "123456"},
+                    "example": {
+                        "email": "email@email.com",
+                        "password": "<YOUR_PASSWORD>",
+                    },
                 }
             },
         },
