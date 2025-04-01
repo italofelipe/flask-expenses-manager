@@ -16,6 +16,9 @@ from app.controllers.transaction_controller import TransactionResource
 from app.controllers.user_controller import UserProfileResource
 from app.extensions.database import db
 from app.extensions.error_handlers import register_error_handlers
+from app.models.account import Account  # type: ignore
+from app.models.credit_card import CreditCard  # type: ignore
+from app.models.tag import Tag  # type: ignore
 
 jwt = JWTManager()
 ma = Marshmallow()

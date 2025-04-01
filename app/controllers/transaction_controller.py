@@ -4,10 +4,16 @@ from uuid import UUID
 from flask import Blueprint, Response, jsonify
 from flask_apispec import doc, use_kwargs
 from flask_apispec.views import MethodResource
-from flask_jwt_extended import get_jwt_identity, jwt_required
+from flask_jwt_extended import (
+    get_jwt,
+    get_jwt_identity,
+    jwt_required,
+    verify_jwt_in_request,
+)
 from marshmallow import Schema, fields
 
 from app.extensions.database import db
+from app.extensions.jwt_callbacks import is_token_revoked
 from app.models.transaction import Transaction, TransactionStatus, TransactionType
 
 transaction_bp = Blueprint("transaction", __name__, url_prefix="/transactions")
@@ -35,6 +41,11 @@ class TransactionResource(MethodResource):
     @jwt_required()  # type: ignore
     @use_kwargs(TransactionCreateSchema, location="json")  # type: ignore
     def post(self, **kwargs: Any) -> Response:
+        verify_jwt_in_request()
+        jwt_data = get_jwt()
+        if is_token_revoked(jwt_data["jti"]):
+            return jsonify({"error": "Token inválido."}), 401
+
         user_id = get_jwt_identity()
 
         try:
