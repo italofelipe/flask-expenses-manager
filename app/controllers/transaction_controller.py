@@ -1,4 +1,4 @@
-from typing import Any
+from typing import Any, Dict
 from uuid import UUID
 
 from flask import Blueprint, Response, jsonify
@@ -17,6 +17,34 @@ from app.extensions.jwt_callbacks import is_token_revoked
 from app.models.transaction import Transaction, TransactionStatus, TransactionType
 
 transaction_bp = Blueprint("transaction", __name__, url_prefix="/transactions")
+
+
+def serialize_transaction(transaction: Transaction) -> Dict[str, Any]:
+    return {
+        "id": str(transaction.id),
+        "title": transaction.title,
+        "amount": str(transaction.amount),
+        "type": transaction.type.value,
+        "due_date": transaction.due_date.isoformat(),
+        "description": transaction.description,
+        "observation": transaction.observation,
+        "is_recurring": transaction.is_recurring,
+        "is_installment": transaction.is_installment,
+        "installment_count": transaction.installment_count,
+        "tag_id": str(transaction.tag_id) if transaction.tag_id else None,
+        "account_id": str(transaction.account_id) if transaction.account_id else None,
+        "credit_card_id": str(transaction.credit_card_id)
+        if transaction.credit_card_id
+        else None,
+        "status": transaction.status.value,
+        "currency": transaction.currency,
+        "created_at": transaction.created_at.isoformat()
+        if transaction.created_at
+        else None,
+        "updated_at": transaction.updated_at.isoformat()
+        if transaction.updated_at
+        else None,
+    }
 
 
 class TransactionCreateSchema(Schema):
@@ -87,33 +115,7 @@ class TransactionResource(MethodResource):
             db.session.add(transaction)
             db.session.commit()
 
-            created_data = {
-                "id": str(transaction.id),
-                "title": transaction.title,
-                "amount": str(transaction.amount),
-                "type": transaction.type.value,
-                "due_date": transaction.due_date.isoformat(),
-                "description": transaction.description,
-                "observation": transaction.observation,
-                "is_recurring": transaction.is_recurring,
-                "is_installment": transaction.is_installment,
-                "installment_count": transaction.installment_count,
-                "tag_id": str(transaction.tag_id) if transaction.tag_id else None,
-                "account_id": str(transaction.account_id)
-                if transaction.account_id
-                else None,
-                "credit_card_id": str(transaction.credit_card_id)
-                if transaction.credit_card_id
-                else None,
-                "status": transaction.status.value,
-                "currency": transaction.currency,
-                "created_at": transaction.created_at.isoformat()
-                if transaction.created_at
-                else None,
-                "updated_at": transaction.updated_at.isoformat()
-                if transaction.updated_at
-                else None,
-            }
+            created_data = serialize_transaction(transaction)
 
             response = jsonify(
                 {"message": "Transação criada com sucesso", "transaction": created_data}
@@ -160,29 +162,7 @@ class TransactionResource(MethodResource):
 
             db.session.commit()
 
-            updated_data = {
-                "id": str(transaction.id),
-                "title": transaction.title,
-                "amount": str(transaction.amount),
-                "type": transaction.type.value,
-                "due_date": transaction.due_date.isoformat(),
-                "description": transaction.description,
-                "observation": transaction.observation,
-                "is_recurring": transaction.is_recurring,
-                "is_installment": transaction.is_installment,
-                "installment_count": transaction.installment_count,
-                "tag_id": str(transaction.tag_id) if transaction.tag_id else None,
-                "account_id": str(transaction.account_id)
-                if transaction.account_id
-                else None,
-                "credit_card_id": str(transaction.credit_card_id)
-                if transaction.credit_card_id
-                else None,
-                "status": transaction.status.value,
-                "currency": transaction.currency,
-                "created_at": transaction.created_at.isoformat(),
-                "updated_at": transaction.updated_at.isoformat(),
-            }
+            updated_data = serialize_transaction(transaction)
 
             response = jsonify(
                 {
