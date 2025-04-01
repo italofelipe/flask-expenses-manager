@@ -13,7 +13,7 @@ from app.controllers.auth_controller import (
     RegisterResource,
 )
 from app.controllers.transaction_controller import TransactionResource
-from app.controllers.user_controller import UserProfileResource
+from app.controllers.user_controller import UserMeResource, UserProfileResource
 from app.extensions.database import db
 from app.extensions.error_handlers import register_error_handlers
 from app.models.account import Account  # noqa: F401
@@ -78,6 +78,7 @@ def create_app() -> Flask:
     docs.register(RegisterResource, blueprint="auth", endpoint="registerresource")
     docs.register(AuthResource, blueprint="auth", endpoint="authresource")
     docs.register(UserProfileResource, blueprint="user", endpoint="profile")
+    docs.register(UserMeResource, blueprint="user", endpoint="me")
     docs.register(LogoutResource, blueprint="auth", endpoint="logoutresource")
     docs.register(
         TransactionResource, blueprint="transaction", endpoint="transactionresource"
