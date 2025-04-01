@@ -7,6 +7,7 @@ from flask_apispec import doc, use_kwargs
 from flask_apispec.views import MethodResource
 from flask_jwt_extended import get_jwt, get_jwt_identity, jwt_required
 from sqlalchemy import extract
+from sqlalchemy.orm.query import Query
 
 from app.extensions.database import db
 from app.models.transaction import Transaction
@@ -46,6 +47,55 @@ def assign_user_profile_fields(
                     }
             setattr(user, field, value)
     return {"error": False}
+
+
+def validate_user_token(user_id: UUID, jti: str) -> Union[User, Response]:
+    user = User.query.get(user_id)
+    if not user or not hasattr(user, "current_jti") or user.current_jti != jti:
+        return Response(
+            jsonify({"message": "Token revogado ou usuário não encontrado"}).get_data(),
+            status=401,
+            mimetype=JSON_MIMETYPE,
+        )
+    return user
+
+
+def filter_transactions(
+    user_id: UUID, status: str, month: str
+) -> Union[Query, Response]:
+    query = Transaction.query.filter_by(user_id=user_id)
+
+    if status:
+        try:
+            from app.models.transaction import TransactionStatus
+
+            query = query.filter(
+                Transaction.status == TransactionStatus(status.lower())
+            )
+        except ValueError:
+            return Response(
+                jsonify({"message": f"Status inválido: {status}"}).get_data(),
+                status=400,
+                mimetype=JSON_MIMETYPE,
+            )
+
+    if month:
+        try:
+            year, month_num = map(int, month.split("-"))
+            query = query.filter(
+                extract("year", Transaction.due_date) == year,
+                extract("month", Transaction.due_date) == month_num,
+            )
+        except ValueError:
+            return Response(
+                jsonify(
+                    {"message": "Parâmetro 'month' inválido. Use o formato YYYY-MM"}
+                ).get_data(),
+                status=400,
+                mimetype=JSON_MIMETYPE,
+            )
+
+    return query
 
 
 class UserProfileResource(MethodResource):
@@ -179,15 +229,10 @@ class UserMeResource(MethodResource):
     def get(self) -> Response:
         user_id = UUID(get_jwt_identity())
         jti = get_jwt()["jti"]
-        user = User.query.get(user_id)
-        if not user or not hasattr(user, "current_jti") or user.current_jti != jti:
-            return Response(
-                jsonify(
-                    {"message": "Token revocado ou usuário não encontrado"}
-                ).get_data(),
-                status=401,
-                mimetype=JSON_MIMETYPE,
-            )
+        user_or_response = validate_user_token(user_id, jti)
+        if isinstance(user_or_response, Response):
+            return user_or_response
+        user = user_or_response
 
         # Paginação e filtros
         page = int(request.args.get("page", 1))
@@ -195,37 +240,10 @@ class UserMeResource(MethodResource):
         status = request.args.get("status")
         month = request.args.get("month")
 
-        query = Transaction.query.filter_by(user_id=user.id)
-
-        if status:
-            try:
-                from app.models.transaction import TransactionStatus
-
-                query = query.filter(
-                    Transaction.status == TransactionStatus(status.lower())
-                )
-            except ValueError:
-                return Response(
-                    jsonify({"message": f"Status inválido: {status}"}).get_data(),
-                    status=400,
-                    mimetype=JSON_MIMETYPE,
-                )
-
-        if month:
-            try:
-                year, month_num = map(int, month.split("-"))
-                query = query.filter(
-                    extract("year", Transaction.due_date) == year,
-                    extract("month", Transaction.due_date) == month_num,
-                )
-            except ValueError:
-                return Response(
-                    jsonify(
-                        {"message": "Parâmetro 'month' inválido. Use o formato YYYY-MM"}
-                    ).get_data(),
-                    status=400,
-                    mimetype=JSON_MIMETYPE,
-                )
+        query_or_response = filter_transactions(user.id, status, month)
+        if isinstance(query_or_response, Response):
+            return query_or_response
+        query = query_or_response
 
         pagination = query.order_by(Transaction.due_date.desc()).paginate(
             page=page, per_page=limit, error_out=False
