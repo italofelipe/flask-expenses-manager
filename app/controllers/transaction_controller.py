@@ -89,7 +89,9 @@ class TransactionResource(MethodResource):
         verify_jwt_in_request()
         jwt_data = get_jwt()
         if is_token_revoked(jwt_data["jti"]):
-            return jsonify({"error": "Token inválido."}), 401
+            response = jsonify({"error": "Token inválido."})
+            response.status_code = 401
+            return response
 
         user_id = get_jwt_identity()
 
@@ -229,6 +231,47 @@ class TransactionResource(MethodResource):
             response.status_code = 500
             return response
 
+    @doc(
+        description="Restaura uma transação deletada logicamente",
+        tags=["Transações"],
+        security=[{"BearerAuth": []}],
+    )  # type: ignore
+    @jwt_required()  # type: ignore
+    def patch(self, transaction_id: UUID) -> Response:
+        verify_jwt_in_request()
+        jwt_data = get_jwt()
+        if is_token_revoked(jwt_data["jti"]):
+            return jsonify({"error": "Token inválido."}), 401
+
+        user_id = get_jwt_identity()
+
+        transaction = Transaction.query.filter_by(
+            id=transaction_id, user_id=user_id, deleted=True
+        ).first()
+        if not transaction:
+            response = jsonify({"error": "Transação não encontrada."})
+            response.status_code = 404
+            return response
+
+        if not transaction.deleted:
+            response = jsonify({"error": "Transação não está deletada."})
+            response.status_code = 400
+            return response
+
+        try:
+            transaction.deleted = False
+            db.session.commit()
+            response = jsonify({"message": "Transação restaurada com sucesso"})
+            response.status_code = 200
+            return response
+        except Exception as e:
+            db.session.rollback()
+            response = jsonify(
+                {"error": "Erro ao restaurar transação", "message": str(e)}
+            )
+            response.status_code = 500
+            return response
+
 
 # Registra a rota
 transaction_bp.add_url_rule(
@@ -245,4 +288,10 @@ transaction_bp.add_url_rule(
     "/<uuid:transaction_id>",
     view_func=TransactionResource.as_view("transactiondelete"),
     methods=["DELETE"],
+)
+
+transaction_bp.add_url_rule(
+    "/restore/<uuid:transaction_id>",
+    view_func=TransactionResource.as_view("transaction_restore"),
+    methods=["PATCH"],
 )
