@@ -46,6 +46,10 @@ class Transaction(db.Model):
         UUID(as_uuid=True), db.ForeignKey("credit_cards.id"), nullable=True
     )
 
+    deleted = db.Column(
+        db.Boolean, default=False, nullable=False, server_default=db.text("false")
+    )
+
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     updated_at = db.Column(
         db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow

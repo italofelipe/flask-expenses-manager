@@ -63,7 +63,7 @@ def validate_user_token(user_id: UUID, jti: str) -> Union[User, Response]:
 def filter_transactions(
     user_id: UUID, status: str, month: str
 ) -> Union[Query, Response]:
-    query = Transaction.query.filter_by(user_id=user_id)
+    query = Transaction.query.filter_by(user_id=user_id, deleted=False)
 
     if status:
         try:
