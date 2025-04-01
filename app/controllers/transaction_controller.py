@@ -307,6 +307,49 @@ class TransactionResource(MethodResource):
             return response
 
 
+class TransactionForceDeleteResource(MethodResource):
+    @doc(
+        description="Remove permanentemente uma transação deletada (soft deleted)",
+        tags=["Transações"],
+        security=[{"BearerAuth": []}],
+    )  # type: ignore
+    @jwt_required()  # type: ignore
+    def delete(self, transaction_id: UUID) -> Response:
+        verify_jwt_in_request()
+        jwt_data = get_jwt()
+        if is_token_revoked(jwt_data["jti"]):
+            response = jsonify({"error": "Token inválido."})
+            response.status_code = 401
+            return response
+
+        user_id = get_jwt_identity()
+
+        transaction = Transaction.query.filter_by(
+            id=transaction_id, user_id=UUID(user_id), deleted=True
+        ).first()
+
+        if not transaction:
+            response = jsonify(
+                {"error": "Transação não encontrada ou não está deletada."}
+            )
+            response.status_code = 404
+            return response
+
+        try:
+            db.session.delete(transaction)
+            db.session.commit()
+            response = jsonify({"message": "Transação removida permanentemente."})
+            response.status_code = 200
+            return response
+        except Exception as e:
+            db.session.rollback()
+            response = jsonify(
+                {"error": "Erro ao deletar permanentemente", "message": str(e)}
+            )
+            response.status_code = 500
+            return response
+
+
 # Registra a rota
 transaction_bp.add_url_rule(
     "", view_func=TransactionResource.as_view("transactionresource")
@@ -334,4 +377,10 @@ transaction_bp.add_url_rule(
     "/deleted",
     view_func=TransactionResource.as_view("transaction_list_deleted"),
     methods=["GET"],
+)
+
+transaction_bp.add_url_rule(
+    "/<uuid:transaction_id>/force",
+    view_func=TransactionForceDeleteResource.as_view("transaction_delete_force"),
+    methods=["DELETE"],
 )
