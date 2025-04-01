@@ -272,6 +272,40 @@ class TransactionResource(MethodResource):
             response.status_code = 500
             return response
 
+    @doc(
+        description="Lista todas as transações deletadas (soft deleted) do usuário autenticado",
+        tags=["Transações"],
+        security=[{"BearerAuth": []}],
+    )  # type: ignore
+    @jwt_required()  # type: ignore
+    def get(self) -> Response:
+        verify_jwt_in_request()
+        jwt_data = get_jwt()
+        if is_token_revoked(jwt_data["jti"]):
+            response = jsonify({"error": "Token inválido."})
+            response.status_code = 401
+            return response
+
+        user_id = get_jwt_identity()
+
+        try:
+            transactions = Transaction.query.filter_by(
+                user_id=user_id, deleted=True
+            ).all()
+
+            serialized = [serialize_transaction(t) for t in transactions]
+
+            response = jsonify({"deleted_transactions": serialized})
+            response.status_code = 200
+            return response
+        except Exception as e:
+            db.session.rollback()
+            response = jsonify(
+                {"error": "Erro ao buscar transações deletadas", "message": str(e)}
+            )
+            response.status_code = 500
+            return response
+
 
 # Registra a rota
 transaction_bp.add_url_rule(
@@ -294,4 +328,10 @@ transaction_bp.add_url_rule(
     "/restore/<uuid:transaction_id>",
     view_func=TransactionResource.as_view("transaction_restore"),
     methods=["PATCH"],
+)
+
+transaction_bp.add_url_rule(
+    "/deleted",
+    view_func=TransactionResource.as_view("transaction_list_deleted"),
+    methods=["GET"],
 )

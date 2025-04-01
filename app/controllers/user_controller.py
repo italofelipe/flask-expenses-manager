@@ -119,7 +119,7 @@ class UserProfileResource(MethodResource):
 
         if not hasattr(user, "current_jti") or user.current_jti != jti:
             return Response(
-                jsonify({"message": "Token revocado"}).get_data(),
+                jsonify({"message": "Token revogado"}).get_data(),
                 status=401,
                 mimetype=JSON_MIMETYPE,
             )
