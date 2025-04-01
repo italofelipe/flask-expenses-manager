@@ -1,4 +1,4 @@
-from typing import Any
+from typing import Any, Dict
 from uuid import UUID
 
 from flask import jsonify
@@ -16,7 +16,9 @@ def is_token_revoked(jti: str) -> bool:
 
 def register_jwt_callbacks(jwt: JWTManager) -> None:
     @jwt.token_in_blocklist_loader  # type: ignore[misc]
-    def check_if_token_revoked(jwt_header: dict, jwt_payload: dict) -> bool:
+    def check_if_token_revoked(
+        jwt_header: Dict[str, Any], jwt_payload: Dict[str, Any]
+    ) -> bool:
         user_id = jwt_payload.get("sub")
         jti = jwt_payload.get("jti")
 
@@ -28,7 +30,7 @@ def register_jwt_callbacks(jwt: JWTManager) -> None:
 
     @jwt.revoked_token_loader  # type: ignore[misc]
     def revoked_token_callback(
-        jwt_header: dict[str, Any], jwt_payload: dict[str, Any]
+        jwt_header: Dict[str, Any], jwt_payload: Dict[str, Any]
     ) -> Any:
         return jsonify({"message": "Token revogado"}), 401
 
@@ -38,7 +40,7 @@ def register_jwt_callbacks(jwt: JWTManager) -> None:
 
     @jwt.expired_token_loader  # type: ignore[misc]
     def expired_token_callback(
-        jwt_header: dict[str, Any], jwt_payload: dict[str, Any]
+        jwt_header: Dict[str, Any], jwt_payload: Dict[str, Any]
     ) -> Any:
         return jsonify({"message": "Token expirado"}), 401
 

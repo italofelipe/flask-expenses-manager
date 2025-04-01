@@ -36,6 +36,23 @@ class TransactionCreateSchema(Schema):
     currency = fields.String(required=False)
 
 
+class TransactionUpdateSchema(Schema):
+    title = fields.String(required=False)
+    amount = fields.Decimal(required=False, as_string=True)
+    type = fields.String(required=False)
+    due_date = fields.Date(required=False)
+    description = fields.String(required=False)
+    observation = fields.String(required=False)
+    is_recurring = fields.Boolean(required=False)
+    is_installment = fields.Boolean(required=False)
+    installment_count = fields.Integer(required=False)
+    tag_id = fields.UUID(required=False)
+    account_id = fields.UUID(required=False)
+    credit_card_id = fields.UUID(required=False)
+    status = fields.String(required=False)
+    currency = fields.String(required=False)
+
+
 class TransactionResource(MethodResource):
     @doc(description="Cria uma nova transação", tags=["Transações"])  # type: ignore
     @jwt_required()  # type: ignore
@@ -110,8 +127,87 @@ class TransactionResource(MethodResource):
             response.status_code = 500
             return response
 
+    @doc(description="Atualiza dados de uma transação", tags=["Transações"])  # type: ignore
+    @jwt_required()  # type: ignore
+    @use_kwargs(TransactionUpdateSchema, location="json")  # type: ignore
+    def put(self, transaction_id: UUID, **kwargs: Any):
+        verify_jwt_in_request()
+        jwt_data = get_jwt()
+
+        if is_token_revoked(jwt_data["jti"]):
+            response = jsonify({"error": "Token inválido."})
+            response.status_code = 401
+            return response
+        user_id = get_jwt_identity()
+        transaction = Transaction.query.get(transaction_id)
+
+        if transaction is None:
+            response = jsonify({"error": "Transação não encontrada."})
+            response.status_code = 404
+            return response
+
+        if str(transaction.user_id) != str(user_id):
+            response = jsonify(
+                {"error": "Você não tem permissão para editar esta transação."}
+            )
+            response.status_code = 403
+            return response
+
+        try:
+            for field, value in kwargs.items():
+                if hasattr(transaction, field):
+                    setattr(transaction, field, value)
+
+            db.session.commit()
+
+            updated_data = {
+                "id": str(transaction.id),
+                "title": transaction.title,
+                "amount": str(transaction.amount),
+                "type": transaction.type.value,
+                "due_date": transaction.due_date.isoformat(),
+                "description": transaction.description,
+                "observation": transaction.observation,
+                "is_recurring": transaction.is_recurring,
+                "is_installment": transaction.is_installment,
+                "installment_count": transaction.installment_count,
+                "tag_id": str(transaction.tag_id) if transaction.tag_id else None,
+                "account_id": str(transaction.account_id)
+                if transaction.account_id
+                else None,
+                "credit_card_id": str(transaction.credit_card_id)
+                if transaction.credit_card_id
+                else None,
+                "status": transaction.status.value,
+                "currency": transaction.currency,
+                "created_at": transaction.created_at.isoformat(),
+                "updated_at": transaction.updated_at.isoformat(),
+            }
+
+            response = jsonify(
+                {
+                    "message": "Transação atualizada com sucesso",
+                    "transaction": updated_data,
+                }
+            )
+            response.status_code = 200
+            return response
+
+        except Exception as e:
+            db.session.rollback()
+            return (
+                jsonify({"error": "Erro ao atualizar transação", "message": str(e)}),
+                500,
+            )
+
 
 # Registra a rota
 transaction_bp.add_url_rule(
     "", view_func=TransactionResource.as_view("transactionresource")
+)
+
+transaction_bp.add_url_rule(
+    "/<uuid:transaction_id>",
+    view_func=TransactionResource.as_view("transactionupdate"),
+    methods=["PUT"],
 )
