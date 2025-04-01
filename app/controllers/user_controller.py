@@ -8,7 +8,7 @@ from flask_apispec.views import MethodResource
 from flask_jwt_extended import get_jwt, get_jwt_identity, jwt_required
 
 from app.extensions.database import db
-from app.models import User
+from app.models.user import User
 from app.schemas.user_schemas import UserProfileSchema
 
 JSON_MIMETYPE = "application/json"

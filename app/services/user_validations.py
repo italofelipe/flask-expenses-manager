@@ -1,6 +1,6 @@
 from datetime import date
 
-from app.models import User
+from app.models.user import User
 
 
 def validate_user_profile_data(user: User) -> list[str]:

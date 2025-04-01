@@ -14,7 +14,7 @@ from marshmallow import ValidationError
 from werkzeug.security import check_password_hash, generate_password_hash
 
 from app.extensions.database import db
-from app.models import User
+from app.models.user import User
 from app.schemas.auth_schema import AuthSchema, AuthSuccessResponseSchema
 from app.schemas.error_schema import ErrorResponseSchema
 from app.schemas.user_schemas import UserRegistrationSchema
