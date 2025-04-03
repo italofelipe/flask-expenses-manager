@@ -1,5 +1,6 @@
 import enum
 from datetime import datetime
+from typing import Any
 from uuid import uuid4
 
 from sqlalchemy.dialects.postgresql import UUID
@@ -64,3 +65,36 @@ class Transaction(db.Model):
             f"<Transaction(id={self.id}, title={self.title}, amount={self.amount}, "
             f"status={self.status})>"
         )
+
+    @staticmethod
+    def get_monthly_summary(user_id: UUID, year: int, month: int) -> dict[str, Any]:
+        from sqlalchemy import extract, func
+
+        income_total = (
+            db.session.query(func.coalesce(func.sum(Transaction.amount), 0))
+            .filter_by(user_id=user_id, deleted=False, type=TransactionType.INCOME)
+            .filter(extract("year", Transaction.due_date) == year)
+            .filter(extract("month", Transaction.due_date) == month)
+            .scalar()
+        )
+
+        expense_total = (
+            db.session.query(func.coalesce(func.sum(Transaction.amount), 0))
+            .filter_by(user_id=user_id, deleted=False, type=TransactionType.EXPENSE)
+            .filter(extract("year", Transaction.due_date) == year)
+            .filter(extract("month", Transaction.due_date) == month)
+            .scalar()
+        )
+
+        transactions = (
+            Transaction.query.filter_by(user_id=user_id, deleted=False)
+            .filter(extract("year", Transaction.due_date) == year)
+            .filter(extract("month", Transaction.due_date) == month)
+            .all()
+        )
+
+        return {
+            "income_total": str(income_total),
+            "expense_total": str(expense_total),
+            "transactions": transactions,
+        }

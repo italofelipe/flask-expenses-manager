@@ -1,6 +1,7 @@
 from typing import Any, Dict
 from uuid import UUID
 
+import flask
 from flask import Blueprint, Response, jsonify
 from flask_apispec import doc, use_kwargs
 from flask_apispec.views import MethodResource
@@ -15,6 +16,7 @@ from marshmallow import Schema, fields
 from app.extensions.database import db
 from app.extensions.jwt_callbacks import is_token_revoked
 from app.models.transaction import Transaction, TransactionStatus, TransactionType
+from app.utils.pagination import PaginatedResponse
 
 transaction_bp = Blueprint("transaction", __name__, url_prefix="/transactions")
 
@@ -307,6 +309,80 @@ class TransactionResource(MethodResource):
             return response
 
 
+class TransactionSummaryResource(MethodResource):
+    @doc(
+        description="Resumo mensal das transações (total de receitas e despesas)",
+        tags=["Transações"],
+        security=[{"BearerAuth": []}],
+        params={
+            "month": {
+                "description": "Formato YYYY-MM (ex: 2025-04)",
+                "in": "query",
+                "type": "string",
+            }
+        },
+    )  # type: ignore
+    @jwt_required()  # type: ignore
+    def get(self) -> Response:
+        verify_jwt_in_request()
+        jwt_data = get_jwt()
+        if is_token_revoked(jwt_data["jti"]):
+            return jsonify({"error": "Token inválido."}), 401
+
+        user_id = get_jwt_identity()
+        month = flask.request.args.get("month")
+        if not month:
+            return (
+                jsonify(
+                    {"error": "Parâmetro 'month' é obrigatório no formato YYYY-MM."}
+                ),
+                400,
+            )
+
+        try:
+            year, month_number = map(int, month.split("-"))
+        except ValueError:
+            return jsonify({"error": "Formato de mês inválido. Use YYYY-MM."}), 400
+
+        try:
+            transactions = (
+                Transaction.query.filter_by(user_id=user_id, deleted=False)
+                .filter(db.extract("year", Transaction.due_date) == year)
+                .filter(db.extract("month", Transaction.due_date) == month_number)
+                .all()
+            )
+
+            income_total = sum(
+                t.amount for t in transactions if t.type == TransactionType.INCOME
+            )
+            expense_total = sum(
+                t.amount for t in transactions if t.type == TransactionType.EXPENSE
+            )
+
+            page = int(flask.request.args.get("page", 1))
+            page_size = int(flask.request.args.get("page_size", 10))
+
+            serialized = [serialize_transaction(t) for t in transactions]
+            response = jsonify(
+                {
+                    "month": month,
+                    "income_total": float(income_total),
+                    "expense_total": float(expense_total),
+                    **PaginatedResponse.format(
+                        serialized, len(transactions), page, page_size
+                    ),
+                }
+            )
+            response.status_code = 200
+            return response
+        except Exception as e:
+            db.session.rollback()
+            return (
+                jsonify({"error": "Erro ao calcular resumo mensal", "message": str(e)}),
+                500,
+            )
+
+
 class TransactionForceDeleteResource(MethodResource):
     @doc(
         description="Remove permanentemente uma transação deletada (soft deleted)",
@@ -383,4 +459,16 @@ transaction_bp.add_url_rule(
     "/<uuid:transaction_id>/force",
     view_func=TransactionForceDeleteResource.as_view("transaction_delete_force"),
     methods=["DELETE"],
+)
+
+transaction_bp.add_url_rule(
+    "/summary",
+    view_func=TransactionSummaryResource.as_view("transaction_monthly_summary"),
+    methods=["GET"],
+)
+
+transaction_bp.add_url_rule(
+    "/list",
+    view_func=TransactionResource.as_view("transaction_list_active"),
+    methods=["GET"],
 )

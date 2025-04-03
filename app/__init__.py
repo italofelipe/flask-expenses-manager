@@ -6,14 +6,14 @@ from flask_jwt_extended import JWTManager
 from flask_marshmallow import Marshmallow
 from flask_migrate import Migrate
 
-from app.controllers import all_routes
 from app.controllers.auth_controller import (
     AuthResource,
     LogoutResource,
     RegisterResource,
+    auth_bp,
 )
-from app.controllers.transaction_controller import TransactionResource
-from app.controllers.user_controller import UserMeResource, UserProfileResource
+from app.controllers.transaction_controller import TransactionResource, transaction_bp
+from app.controllers.user_controller import UserMeResource, UserProfileResource, user_bp
 from app.extensions.database import db
 from app.extensions.error_handlers import register_error_handlers
 from app.models.account import Account  # noqa: F401
@@ -71,8 +71,9 @@ def create_app() -> Flask:
     register_error_handlers(app)
 
     # ✅ Registra blueprints ANTES dos endpoints no Swagger
-    for route in all_routes:
-        app.register_blueprint(route)
+    app.register_blueprint(transaction_bp)
+    app.register_blueprint(user_bp)
+    app.register_blueprint(auth_bp)
 
     # ✅ Registra os endpoints documentados no Swagger
     docs.register(RegisterResource, blueprint="auth", endpoint="registerresource")

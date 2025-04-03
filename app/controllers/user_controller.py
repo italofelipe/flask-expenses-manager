@@ -13,6 +13,7 @@ from app.extensions.database import db
 from app.models.transaction import Transaction
 from app.models.user import User
 from app.schemas.user_schemas import UserProfileSchema
+from app.utils.pagination import PaginatedResponse
 
 JSON_MIMETYPE = "application/json"
 
@@ -270,6 +271,9 @@ class UserMeResource(MethodResource):
             }
             for t in pagination.items
         ]
+        paginated_transactions = PaginatedResponse.format(
+            transactions, pagination.total, pagination.page, pagination.per_page
+        )
 
         return Response(
             jsonify(
@@ -297,15 +301,7 @@ class UserMeResource(MethodResource):
                         if user.investment_goal_date
                         else None,
                     },
-                    "transactions": {
-                        "items": transactions,
-                        "pagination": {
-                            "page": pagination.page,
-                            "limit": pagination.per_page,
-                            "total_items": pagination.total,
-                            "total_pages": pagination.pages,
-                        },
-                    },
+                    "transactions": paginated_transactions,
                 }
             ).get_data(),
             status=200,
