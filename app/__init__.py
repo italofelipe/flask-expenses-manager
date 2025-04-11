@@ -12,6 +12,7 @@ from app.controllers.auth_controller import (
     RegisterResource,
     auth_bp,
 )
+from app.controllers.ticker_controller import ticker_bp
 from app.controllers.transaction_controller import TransactionResource, transaction_bp
 from app.controllers.user_controller import UserMeResource, UserProfileResource, user_bp
 from app.extensions.database import db
@@ -74,6 +75,7 @@ def create_app() -> Flask:
     app.register_blueprint(transaction_bp)
     app.register_blueprint(user_bp)
     app.register_blueprint(auth_bp)
+    app.register_blueprint(ticker_bp)
 
     # ✅ Registra os endpoints documentados no Swagger
     docs.register(RegisterResource, blueprint="auth", endpoint="registerresource")
@@ -91,3 +93,6 @@ def create_app() -> Flask:
     register_jwt_callbacks(jwt)
 
     return app
+
+
+__all__ = ["create_app"]
