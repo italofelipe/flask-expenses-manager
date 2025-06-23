@@ -1,0 +1,26 @@
+from marshmallow import Schema, fields, validate
+
+
+class TransactionSchema(Schema):
+    id = fields.UUID(dump_only=True)
+    user_id = fields.UUID(required=False)
+    title = fields.Str(required=True)
+    description = fields.Str()
+    observation = fields.Str()
+    is_recurring = fields.Bool()
+    is_installment = fields.Bool()
+    installment_count = fields.Int()
+    amount = fields.Decimal(as_string=True, required=True)
+    currency = fields.Str(validate=validate.Length(equal=3))
+    status = fields.Str()
+    type = fields.Str(required=True)
+    due_date = fields.Date(required=True)
+    start_date = fields.Date()
+    end_date = fields.Date()
+    tag_id = fields.UUID(allow_none=True)
+    account_id = fields.UUID(allow_none=True)
+    credit_card_id = fields.UUID(allow_none=True)
+    installment_group_id = fields.UUID(dump_only=True)
+    paid_at = fields.DateTime(allow_none=True)
+    created_at = fields.DateTime(dump_only=True)
+    updated_at = fields.DateTime(dump_only=True)

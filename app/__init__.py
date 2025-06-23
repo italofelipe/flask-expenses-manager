@@ -42,6 +42,10 @@ def create_app() -> Flask:
     Migrate(app, db)
     jwt.init_app(app)
 
+    # Cria todas as tabelas no banco de dados (apenas para ambiente de desenvolvimento)
+    with app.app_context():
+        db.create_all()
+
     # Configuração do Swagger (OpenAPI 3.0)
     app.config.update(
         {

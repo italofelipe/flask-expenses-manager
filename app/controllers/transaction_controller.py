@@ -11,14 +11,16 @@ from flask_jwt_extended import (
     jwt_required,
     verify_jwt_in_request,
 )
-from marshmallow import Schema, fields
 
 from app.extensions.database import db
 from app.extensions.jwt_callbacks import is_token_revoked
 from app.models.transaction import Transaction, TransactionStatus, TransactionType
+from app.schemas.transaction_schema import TransactionSchema
 from app.utils.pagination import PaginatedResponse
 
 transaction_bp = Blueprint("transaction", __name__, url_prefix="/transactions")
+
+INVALID_TOKEN_MESSAGE = "Token inválido."
 
 
 def serialize_transaction(transaction: Transaction) -> Dict[str, Any]:
@@ -28,6 +30,10 @@ def serialize_transaction(transaction: Transaction) -> Dict[str, Any]:
         "amount": str(transaction.amount),
         "type": transaction.type.value,
         "due_date": transaction.due_date.isoformat(),
+        "start_date": transaction.start_date.isoformat()
+        if transaction.start_date
+        else None,
+        "end_date": transaction.end_date.isoformat() if transaction.end_date else None,
         "description": transaction.description,
         "observation": transaction.observation,
         "is_recurring": transaction.is_recurring,
@@ -49,99 +55,139 @@ def serialize_transaction(transaction: Transaction) -> Dict[str, Any]:
     }
 
 
-class TransactionCreateSchema(Schema):
-    title = fields.String(required=True)
-    amount = fields.Decimal(required=True, as_string=True)
-    type = fields.String(required=True)
-    due_date = fields.Date(required=True)
-    description = fields.String(required=False)
-    observation = fields.String(required=False)
-    is_recurring = fields.Boolean(required=False)
-    is_installment = fields.Boolean(required=False)
-    installment_count = fields.Integer(required=False)
-    tag_id = fields.UUID(required=False)
-    account_id = fields.UUID(required=False)
-    credit_card_id = fields.UUID(required=False)
-    status = fields.String(required=False)
-    currency = fields.String(required=False)
-
-
-class TransactionUpdateSchema(Schema):
-    title = fields.String(required=False)
-    amount = fields.Decimal(required=False, as_string=True)
-    type = fields.String(required=False)
-    due_date = fields.Date(required=False)
-    description = fields.String(required=False)
-    observation = fields.String(required=False)
-    is_recurring = fields.Boolean(required=False)
-    is_installment = fields.Boolean(required=False)
-    installment_count = fields.Integer(required=False)
-    tag_id = fields.UUID(required=False)
-    account_id = fields.UUID(required=False)
-    credit_card_id = fields.UUID(required=False)
-    status = fields.String(required=False)
-    currency = fields.String(required=False)
-
-
 class TransactionResource(MethodResource):
     @doc(description="Cria uma nova transação", tags=["Transações"])  # type: ignore
     @jwt_required()  # type: ignore
-    @use_kwargs(TransactionCreateSchema, location="json")  # type: ignore
+    @use_kwargs(TransactionSchema, location="json")  # type: ignore
     def post(self, **kwargs: Any) -> Response:
         verify_jwt_in_request()
         jwt_data = get_jwt()
         if is_token_revoked(jwt_data["jti"]):
-            response = jsonify({"error": "Token inválido."})
+            response = jsonify({"error": INVALID_TOKEN_MESSAGE})
             response.status_code = 401
             return response
 
         user_id = get_jwt_identity()
 
-        try:
-            transaction = Transaction(
-                user_id=UUID(user_id),
-                title=kwargs["title"],
-                amount=kwargs["amount"],
-                type=TransactionType(kwargs["type"].lower()),
-                due_date=kwargs["due_date"],
-                description=kwargs.get("description"),
-                observation=kwargs.get("observation"),
-                is_recurring=kwargs.get("is_recurring", False),
-                is_installment=kwargs.get("is_installment", False),
-                installment_count=kwargs.get("installment_count"),
-                tag_id=kwargs.get("tag_id"),
-                account_id=kwargs.get("account_id"),
-                credit_card_id=kwargs.get("credit_card_id"),
-                status=TransactionStatus(kwargs.get("status", "pending").lower()),
-                currency=kwargs.get("currency", "BRL"),
-            )
+        # Bloco para criar transações parceladas se necessário
+        if kwargs.get("is_installment") and kwargs.get("installment_count"):
+            from decimal import Decimal
+            from uuid import uuid4
 
-            db.session.add(transaction)
-            db.session.commit()
+            from dateutil.relativedelta import relativedelta  # type: ignore
 
-            created_data = serialize_transaction(transaction)
+            try:
+                group_id = uuid4()
+                total = Decimal(kwargs["amount"])
+                count = int(kwargs["installment_count"])
+                base_date = kwargs["due_date"]
+                value = round(total / count, 2)
+                title = kwargs["title"]
 
-            response = jsonify(
-                {"message": "Transação criada com sucesso", "transaction": created_data}
-            )
-            response.status_code = 201
-            return response
+                transactions = []
+                for i in range(count):
+                    due = base_date + relativedelta(months=i)
+                    t = Transaction(
+                        user_id=UUID(user_id),
+                        title=f"{title} ({i+1}/{count})",
+                        amount=value,
+                        type=TransactionType(kwargs["type"].lower()),
+                        due_date=due,
+                        start_date=kwargs.get("start_date"),
+                        end_date=kwargs.get("end_date"),
+                        description=kwargs.get("description"),
+                        observation=kwargs.get("observation"),
+                        is_recurring=kwargs.get("is_recurring", False),
+                        is_installment=True,
+                        installment_count=count,
+                        tag_id=kwargs.get("tag_id"),
+                        account_id=kwargs.get("account_id"),
+                        credit_card_id=kwargs.get("credit_card_id"),
+                        status=TransactionStatus(
+                            kwargs.get("status", "pending").lower()
+                        ),
+                        currency=kwargs.get("currency", "BRL"),
+                        installment_group_id=group_id,
+                    )
+                    transactions.append(t)
 
-        except Exception as e:
-            db.session.rollback()
-            response = jsonify({"error": "Erro ao criar transação", "message": str(e)})
-            response.status_code = 500
-            return response
+                db.session.add_all(transactions)
+                db.session.commit()
+
+                created_data = [serialize_transaction(t) for t in transactions]
+                return (
+                    jsonify(
+                        {
+                            "message": "Transações parceladas criadas com sucesso",
+                            "transactions": created_data,
+                        }
+                    ),
+                    201,
+                )
+            except Exception as e:
+                db.session.rollback()
+                return (
+                    jsonify(
+                        {
+                            "error": "Erro ao criar transações parceladas",
+                            "message": str(e),
+                        }
+                    ),
+                    500,
+                )
+        else:
+            try:
+                transaction = Transaction(
+                    user_id=UUID(user_id),
+                    title=kwargs["title"],
+                    amount=kwargs["amount"],
+                    type=TransactionType(kwargs["type"].lower()),
+                    due_date=kwargs["due_date"],
+                    start_date=kwargs.get("start_date"),
+                    end_date=kwargs.get("end_date"),
+                    description=kwargs.get("description"),
+                    observation=kwargs.get("observation"),
+                    is_recurring=kwargs.get("is_recurring", False),
+                    is_installment=kwargs.get("is_installment", False),
+                    installment_count=kwargs.get("installment_count"),
+                    tag_id=kwargs.get("tag_id"),
+                    account_id=kwargs.get("account_id"),
+                    credit_card_id=kwargs.get("credit_card_id"),
+                    status=TransactionStatus(kwargs.get("status", "pending").lower()),
+                    currency=kwargs.get("currency", "BRL"),
+                )
+
+                db.session.add(transaction)
+                db.session.commit()
+
+                created_data = [serialize_transaction(transaction)]
+
+                response = jsonify(
+                    {
+                        "message": "Transação criada com sucesso",
+                        "transaction": created_data,
+                    }
+                )
+                response.status_code = 201
+                return response
+
+            except Exception as e:
+                db.session.rollback()
+                response = jsonify(
+                    {"error": "Erro ao criar transação", "message": str(e)}
+                )
+                response.status_code = 500
+                return response
 
     @doc(description="Atualiza dados de uma transação", tags=["Transações"])  # type: ignore
     @jwt_required()  # type: ignore
-    @use_kwargs(TransactionUpdateSchema, location="json")  # type: ignore
+    @use_kwargs(TransactionSchema(partial=True), location="json")  # type: ignore
     def put(self, transaction_id: UUID, **kwargs: Any):
         verify_jwt_in_request()
         jwt_data = get_jwt()
 
         if is_token_revoked(jwt_data["jti"]):
-            response = jsonify({"error": "Token inválido."})
+            response = jsonify({"error": INVALID_TOKEN_MESSAGE})
             response.status_code = 401
             return response
         user_id = get_jwt_identity()
@@ -160,6 +206,40 @@ class TransactionResource(MethodResource):
             )
             response.status_code = 403
             return response
+
+        # Validações de status e paid_at
+        from datetime import datetime
+
+        # Validação: status=PAID exige paid_at
+        if kwargs.get("status", "").lower() == "paid" and not kwargs.get("paid_at"):
+            return (
+                jsonify(
+                    {
+                        "error": (
+                            "É obrigatório informar 'paid_at' ao marcar a transação "
+                            "como paga (status=PAID)."
+                        )
+                    }
+                ),
+                400,
+            )
+
+        # Validação: paid_at exige status=PAID
+        if kwargs.get("paid_at") and kwargs.get("status", "").lower() != "paid":
+            return (
+                jsonify(
+                    {"error": "'paid_at' só pode ser definido se o status for 'PAID'."}
+                ),
+                400,
+            )
+
+        # Validação: paid_at não pode estar no futuro
+        if "paid_at" in kwargs and kwargs["paid_at"] is not None:
+            if kwargs["paid_at"] > datetime.utcnow():
+                return (
+                    jsonify({"error": "'paid_at' não pode ser uma data futura."}),
+                    400,
+                )
 
         try:
             for field, value in kwargs.items():
@@ -193,7 +273,7 @@ class TransactionResource(MethodResource):
         jwt_data = get_jwt()
 
         if is_token_revoked(jwt_data["jti"]):
-            response = jsonify({"error": "Token inválido."})
+            response = jsonify({"error": INVALID_TOKEN_MESSAGE})
             response.status_code = 401
             return response
 
@@ -243,7 +323,7 @@ class TransactionResource(MethodResource):
         verify_jwt_in_request()
         jwt_data = get_jwt()
         if is_token_revoked(jwt_data["jti"]):
-            return jsonify({"error": "Token inválido."}), 401
+            return jsonify({"error": INVALID_TOKEN_MESSAGE}), 401
 
         user_id = get_jwt_identity()
 
@@ -284,7 +364,7 @@ class TransactionResource(MethodResource):
         verify_jwt_in_request()
         jwt_data = get_jwt()
         if is_token_revoked(jwt_data["jti"]):
-            response = jsonify({"error": "Token inválido."})
+            response = jsonify({"error": INVALID_TOKEN_MESSAGE})
             response.status_code = 401
             return response
 
@@ -327,7 +407,7 @@ class TransactionSummaryResource(MethodResource):
         verify_jwt_in_request()
         jwt_data = get_jwt()
         if is_token_revoked(jwt_data["jti"]):
-            return jsonify({"error": "Token inválido."}), 401
+            return jsonify({"error": INVALID_TOKEN_MESSAGE}), 401
 
         user_id = get_jwt_identity()
         month = flask.request.args.get("month")
@@ -394,7 +474,7 @@ class TransactionForceDeleteResource(MethodResource):
         verify_jwt_in_request()
         jwt_data = get_jwt()
         if is_token_revoked(jwt_data["jti"]):
-            response = jsonify({"error": "Token inválido."})
+            response = jsonify({"error": INVALID_TOKEN_MESSAGE})
             response.status_code = 401
             return response
 

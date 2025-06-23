@@ -18,6 +18,7 @@ class TransactionStatus(enum.Enum):
     PENDING = "pending"
     CANCELLED = "cancelled"
     POSTPONED = "postponed"
+    OVERDUE = "overdue"
 
 
 class Transaction(db.Model):
@@ -39,6 +40,8 @@ class Transaction(db.Model):
     type = db.Column(db.Enum(TransactionType), nullable=False)
 
     due_date = db.Column(db.Date, nullable=False)
+    start_date = db.Column(db.Date, nullable=True)
+    end_date = db.Column(db.Date, nullable=True)
     tag_id = db.Column(UUID(as_uuid=True), db.ForeignKey("tags.id"), nullable=True)
     account_id = db.Column(
         UUID(as_uuid=True), db.ForeignKey("accounts.id"), nullable=True
@@ -46,6 +49,8 @@ class Transaction(db.Model):
     credit_card_id = db.Column(
         UUID(as_uuid=True), db.ForeignKey("credit_cards.id"), nullable=True
     )
+    installment_group_id = db.Column(UUID(as_uuid=True), nullable=True)
+    paid_at = db.Column(db.DateTime, nullable=True)
 
     deleted = db.Column(
         db.Boolean, default=False, nullable=False, server_default=db.text("false")
