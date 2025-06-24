@@ -101,9 +101,34 @@ def filter_transactions(
 
 class UserProfileResource(MethodResource):
     @doc(
-        description="Atualiza o perfil do usuário autenticado",
+        description=(
+            "Atualiza o perfil do usuário autenticado.\n\n"
+            "Campos aceitos:\n"
+            "- gender: 'masculino', 'feminino', 'outro'\n"
+            "- birth_date: 'YYYY-MM-DD'\n"
+            """- monthly_income, net_worth, monthly_expenses, initial_investment,
+            monthly_investment: decimal\n"""
+            "- investment_goal_date: 'YYYY-MM-DD'\n\n"
+            "Exemplo de request:\n"
+            """{\n  'gender': 'masculino', 'birth_date': '1990-05-15',
+            'monthly_income': '5000.00',
+            'net_worth': '100000.00',
+            'monthly_expenses': '2000.00',
+            'initial_investment': '10000.00',
+            'monthly_investment': '500.00',
+            'investment_goal_date': '2025-12-31' }\n\n"""
+            "Exemplo de resposta:\n"
+            "{ 'message': 'Perfil atualizado com sucesso', 'data': { ...dados do usuário... } }"
+        ),
         tags=["Usuário"],
         security=[{"BearerAuth": []}],
+        responses={
+            200: {"description": "Perfil atualizado com sucesso"},
+            400: {"description": "Erro de validação"},
+            401: {"description": "Token revogado"},
+            404: {"description": "Usuário não encontrado"},
+            500: {"description": "Erro ao atualizar perfil"},
+        },
     )  # type: ignore[misc]
     @jwt_required()  # type: ignore[misc]
     @use_kwargs(UserProfileSchema(), location="json")  # type: ignore[misc]
@@ -204,26 +229,28 @@ class UserProfileResource(MethodResource):
 
 class UserMeResource(MethodResource):
     @doc(
-        description="Retorna os dados do usuário autenticado junto com suas transações paginadas",
+        description=(
+            "Retorna os dados do usuário autenticado e suas transações paginadas.\n\n"
+            "Filtros disponíveis:\n"
+            "- page: número da página\n"
+            "- limit: itens por página\n"
+            "- status: status da transação (paid, pending, cancelled, postponed)\n"
+            "- month: filtra transações pelo mês (YYYY-MM)\n\n"
+            "Exemplo de resposta:\n"
+            """{\n  'user': { 'id': '...', 'name': '...', ... },\n
+            'transactions': { 'items': [...], 'total': 10, ... }\n}"""
+        ),
         tags=["Usuário"],
         security=[{"BearerAuth": []}],
         params={
             "page": {"description": "Número da página", "type": "integer"},
-            "limit": {
-                "description": "Quantidade de itens por página",
-                "type": "integer",
-            },
-            "status": {
-                "description": (
-                    "Filtra as transações pelo status "
-                    "(paid, pending, cancelled, postponed)"
-                ),
-                "type": "string",
-            },
-            "month": {
-                "description": "Filtra transações pelo mês no formato YYYY-MM",
-                "type": "string",
-            },
+            "limit": {"description": "Itens por página", "type": "integer"},
+            "status": {"description": "Status da transação", "type": "string"},
+            "month": {"description": "Mês no formato YYYY-MM", "type": "string"},
+        },
+        responses={
+            200: {"description": "Dados do usuário e transações paginadas"},
+            401: {"description": "Token inválido ou expirado"},
         },
     )  # type: ignore
     @cast(Callable[..., Response], jwt_required())

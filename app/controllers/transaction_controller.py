@@ -56,7 +56,36 @@ def serialize_transaction(transaction: Transaction) -> Dict[str, Any]:
 
 
 class TransactionResource(MethodResource):
-    @doc(description="Cria uma nova transação", tags=["Transações"])  # type: ignore
+    @doc(
+        description=(
+            "Cria uma nova transação.\n\n"
+            "Campos obrigatórios: title, amount, type, due_date.\n"
+            """Campos opcionais: description, observation,
+            is_recurring, is_installment, installment_count,
+            currency, status, tag_id, account_id, credit_card_id.\n"""
+            "Se is_installment=True, informe installment_count.\n"
+            "Se is_recurring=True, informe start_date, end_date.\n\n"
+            "Exemplo de request:\n"
+            """{ 'title': 'Conta de luz',
+            'amount': '150.50', 'type': 'expense',
+            'due_date': '2024-02-15',
+            'is_installment': True,
+            'installment_count': 12,
+            'is_recurring': True,
+            'start_date': '2024-01-01',
+            'end_date': '2024-12-31' }\n\n"""
+            "Exemplo de resposta:\n"
+            "{ 'message': 'Transação criada com sucesso', 'transaction': [{...}] }"
+        ),
+        tags=["Transações"],
+        security=[{"BearerAuth": []}],
+        responses={
+            201: {"description": "Transação criada com sucesso"},
+            400: {"description": "Erro de validação"},
+            401: {"description": "Token inválido"},
+            500: {"description": "Erro interno"},
+        },
+    )  # type: ignore
     @jwt_required()  # type: ignore
     @use_kwargs(TransactionSchema, location="json")  # type: ignore
     def post(self, **kwargs: Any) -> Response:
@@ -179,7 +208,27 @@ class TransactionResource(MethodResource):
                 response.status_code = 500
                 return response
 
-    @doc(description="Atualiza dados de uma transação", tags=["Transações"])  # type: ignore
+    @doc(
+        description=(
+            "Atualiza dados de uma transação existente.\n\n"
+            "Campos aceitos: qualquer campo da transação.\n"
+            "Se status=PAID, é obrigatório informar paid_at.\n\n"
+            "Exemplo de request:\n"
+            "{ 'status': 'paid', 'paid_at': '2024-02-20T10:00:00Z' }\n\n"
+            "Exemplo de resposta:\n"
+            "{ 'message': 'Transação atualizada com sucesso', 'transaction': {...} }"
+        ),
+        tags=["Transações"],
+        security=[{"BearerAuth": []}],
+        responses={
+            200: {"description": "Transação atualizada com sucesso"},
+            400: {"description": "Erro de validação"},
+            401: {"description": "Token inválido"},
+            403: {"description": "Sem permissão"},
+            404: {"description": "Transação não encontrada"},
+            500: {"description": "Erro interno"},
+        },
+    )  # type: ignore
     @jwt_required()  # type: ignore
     @use_kwargs(TransactionSchema(partial=True), location="json")  # type: ignore
     def put(self, transaction_id: UUID, **kwargs: Any):
@@ -266,7 +315,26 @@ class TransactionResource(MethodResource):
                 500,
             )
 
-    @doc(description="Deleta (soft delete) uma transação", tags=["Transações"])  # type: ignore
+    @doc(
+        description=(
+            "Deleta (soft delete) uma transação.\n\n"
+            "A transação não é removida do banco, apenas marcada como deletada.\n\n"
+            "Exemplo de resposta:\n"
+            "{ 'message': 'Transação deletada com sucesso (soft delete).' }"
+        ),
+        params={
+            "transaction_id": {"description": "ID da transação", "type": "string"},
+        },
+        tags=["Transações"],
+        security=[{"BearerAuth": []}],
+        responses={
+            200: {"description": "Transação deletada com sucesso"},
+            401: {"description": "Token inválido"},
+            403: {"description": "Sem permissão"},
+            404: {"description": "Transação não encontrada"},
+            500: {"description": "Erro interno"},
+        },
+    )  # type: ignore
     @jwt_required()  # type: ignore
     def delete(self, transaction_id: UUID) -> Response:
         verify_jwt_in_request()
@@ -314,9 +382,20 @@ class TransactionResource(MethodResource):
             return response
 
     @doc(
-        description="Restaura uma transação deletada logicamente",
+        description=(
+            "Restaura uma transação deletada logicamente.\n\n"
+            "Exemplo de resposta:\n"
+            "{ 'message': 'Transação restaurada com sucesso' }"
+        ),
         tags=["Transações"],
         security=[{"BearerAuth": []}],
+        responses={
+            200: {"description": "Transação restaurada com sucesso"},
+            400: {"description": "Transação não está deletada"},
+            401: {"description": "Token inválido"},
+            404: {"description": "Transação não encontrada"},
+            500: {"description": "Erro interno"},
+        },
     )  # type: ignore
     @jwt_required()  # type: ignore
     def patch(self, transaction_id: UUID) -> Response:
@@ -355,12 +434,21 @@ class TransactionResource(MethodResource):
             return response
 
     @doc(
-        description="Lista todas as transações deletadas (soft deleted) do usuário autenticado",
+        description=(
+            "Lista todas as transações deletadas (soft deleted) do usuário autenticado.\n\n"
+            "Exemplo de resposta:\n"
+            "{ 'deleted_transactions': [{...}] }"
+        ),
         tags=["Transações"],
         security=[{"BearerAuth": []}],
+        responses={
+            200: {"description": "Lista de transações deletadas"},
+            401: {"description": "Token inválido"},
+            500: {"description": "Erro interno"},
+        },
     )  # type: ignore
     @jwt_required()  # type: ignore
-    def get(self) -> Response:
+    def get_deleted(self) -> Response:
         verify_jwt_in_request()
         jwt_data = get_jwt()
         if is_token_revoked(jwt_data["jti"]):
@@ -388,10 +476,92 @@ class TransactionResource(MethodResource):
             response.status_code = 500
             return response
 
+    @doc(
+        description=(
+            "Lista todas as transações ativas do usuário autenticado.\n\n"
+            "Filtros disponíveis:\n"
+            "- page: número da página\n"
+            "- per_page: itens por página\n"
+            "- type: tipo da transação (income, expense)\n"
+            "- status: status da transação\n"
+            "- start_date, end_date: período (YYYY-MM-DD)\n"
+            "- tag_id, account_id, credit_card_id: filtros por relacionamento\n\n"
+            "Exemplo de resposta:\n"
+            "{ 'transactions': [...], 'total': 20, 'page': 1, 'per_page': 10 }"
+        ),
+        tags=["Transações"],
+        security=[{"BearerAuth": []}],
+        params={
+            "page": {"description": "Número da página", "type": "integer"},
+            "per_page": {"description": "Itens por página", "type": "integer"},
+            "type": {
+                "description": "Tipo da transação (income, expense)",
+                "type": "string",
+            },
+            "status": {"description": "Status da transação", "type": "string"},
+            "start_date": {
+                "description": "Data inicial (YYYY-MM-DD)",
+                "type": "string",
+            },
+            "end_date": {"description": "Data final (YYYY-MM-DD)", "type": "string"},
+            "tag_id": {"description": "Filtrar por tag", "type": "string"},
+            "account_id": {"description": "Filtrar por conta", "type": "string"},
+            "credit_card_id": {
+                "description": "Filtrar por cartão de crédito",
+                "type": "string",
+            },
+        },
+        responses={
+            200: {"description": "Lista de transações"},
+            401: {"description": "Token inválido ou expirado"},
+            500: {"description": "Erro interno"},
+        },
+    )  # type: ignore
+    @jwt_required()  # type: ignore
+    def get_active(self) -> Response:
+        verify_jwt_in_request()
+        jwt_data = get_jwt()
+        if is_token_revoked(jwt_data["jti"]):
+            response = jsonify({"error": INVALID_TOKEN_MESSAGE})
+            response.status_code = 401
+            return response
+
+        user_id = get_jwt_identity()
+
+        try:
+            transactions = Transaction.query.filter_by(
+                user_id=user_id, deleted=False
+            ).all()
+
+            serialized = [serialize_transaction(t) for t in transactions]
+
+            response = jsonify(
+                {
+                    "transactions": serialized,
+                    "total": len(transactions),
+                    "page": 1,
+                    "per_page": len(transactions),
+                }
+            )
+            response.status_code = 200
+            return response
+        except Exception as e:
+            db.session.rollback()
+            response = jsonify(
+                {"error": "Erro ao buscar transações ativas", "message": str(e)}
+            )
+            response.status_code = 500
+            return response
+
 
 class TransactionSummaryResource(MethodResource):
     @doc(
-        description="Resumo mensal das transações (total de receitas e despesas)",
+        description=(
+            "Resumo mensal das transações (total de receitas e despesas).\n\n"
+            "Parâmetro obrigatório: month=YYYY-MM.\n\n"
+            "Exemplo de resposta:\n"
+            "{ 'month': '2024-02', 'income_total': 5000.00, 'expense_total': 3000.00, ... }"
+        ),
         tags=["Transações"],
         security=[{"BearerAuth": []}],
         params={
@@ -399,7 +569,13 @@ class TransactionSummaryResource(MethodResource):
                 "description": "Formato YYYY-MM (ex: 2025-04)",
                 "in": "query",
                 "type": "string",
-            }
+            },
+        },
+        responses={
+            200: {"description": "Resumo mensal de transações"},
+            400: {"description": "Parâmetro inválido"},
+            401: {"description": "Token inválido"},
+            500: {"description": "Erro interno"},
         },
     )  # type: ignore
     @jwt_required()  # type: ignore
@@ -465,9 +641,26 @@ class TransactionSummaryResource(MethodResource):
 
 class TransactionForceDeleteResource(MethodResource):
     @doc(
-        description="Remove permanentemente uma transação deletada (soft deleted)",
+        description=(
+            "Remove permanentemente uma transação deletada (soft deleted).\n\n"
+            "Só pode ser usada em transações já marcadas como deletadas.\n\n"
+            "Exemplo de resposta:\n"
+            "{ 'message': 'Transação removida permanentemente.' }"
+        ),
         tags=["Transações"],
         security=[{"BearerAuth": []}],
+        params={
+            "transaction_id": {
+                "description": "ID da transação a ser removida",
+                "type": "string",
+            },
+        },
+        responses={
+            200: {"description": "Transação removida permanentemente"},
+            401: {"description": "Token inválido"},
+            404: {"description": "Transação não encontrada ou não está deletada"},
+            500: {"description": "Erro interno"},
+        },
     )  # type: ignore
     @jwt_required()  # type: ignore
     def delete(self, transaction_id: UUID) -> Response:

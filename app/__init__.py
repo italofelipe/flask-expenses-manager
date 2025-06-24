@@ -15,6 +15,7 @@ from app.controllers.auth_controller import (
 from app.controllers.ticker_controller import ticker_bp
 from app.controllers.transaction_controller import TransactionResource, transaction_bp
 from app.controllers.user_controller import UserMeResource, UserProfileResource, user_bp
+from app.docs.api_documentation import API_INFO, TAGS
 from app.extensions.database import db
 from app.extensions.error_handlers import register_error_handlers
 from app.models.account import Account  # noqa: F401
@@ -46,23 +47,30 @@ def create_app() -> Flask:
     with app.app_context():
         db.create_all()
 
-    # Configuração do Swagger (OpenAPI 3.0)
+    # Configuração do Swagger (OpenAPI 3.0) com documentação melhorada
     app.config.update(
         {
             "APISPEC_SPEC": APISpec(
-                title="Not Enough Cash, Stranger!",
-                version="1.0.0",
+                title=API_INFO["title"],
+                version=API_INFO["version"],
                 openapi_version="3.0.2",
                 plugins=[MarshmallowPlugin()],
+                info={
+                    "description": API_INFO["description"],
+                    "contact": API_INFO["contact"],
+                    "license": API_INFO["license"],
+                },
                 components={
                     "securitySchemes": {
                         "BearerAuth": {
                             "type": "http",
                             "scheme": "bearer",
                             "bearerFormat": "JWT",
+                            "description": "Token JWT obtido através do login",
                         }
                     }
                 },
+                tags=TAGS,
             ),
             "APISPEC_SWAGGER_URL": "/docs/swagger/",  # JSON da spec
             "APISPEC_SWAGGER_UI_URL": "/docs/",  # Swagger UI
