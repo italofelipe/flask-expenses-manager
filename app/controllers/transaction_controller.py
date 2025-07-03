@@ -30,9 +30,9 @@ def serialize_transaction(transaction: Transaction) -> Dict[str, Any]:
         "amount": str(transaction.amount),
         "type": transaction.type.value,
         "due_date": transaction.due_date.isoformat(),
-        "start_date": transaction.start_date.isoformat()
-        if transaction.start_date
-        else None,
+        "start_date": (
+            transaction.start_date.isoformat() if transaction.start_date else None
+        ),
         "end_date": transaction.end_date.isoformat() if transaction.end_date else None,
         "description": transaction.description,
         "observation": transaction.observation,
@@ -41,17 +41,17 @@ def serialize_transaction(transaction: Transaction) -> Dict[str, Any]:
         "installment_count": transaction.installment_count,
         "tag_id": str(transaction.tag_id) if transaction.tag_id else None,
         "account_id": str(transaction.account_id) if transaction.account_id else None,
-        "credit_card_id": str(transaction.credit_card_id)
-        if transaction.credit_card_id
-        else None,
+        "credit_card_id": (
+            str(transaction.credit_card_id) if transaction.credit_card_id else None
+        ),
         "status": transaction.status.value,
         "currency": transaction.currency,
-        "created_at": transaction.created_at.isoformat()
-        if transaction.created_at
-        else None,
-        "updated_at": transaction.updated_at.isoformat()
-        if transaction.updated_at
-        else None,
+        "created_at": (
+            transaction.created_at.isoformat() if transaction.created_at else None
+        ),
+        "updated_at": (
+            transaction.updated_at.isoformat() if transaction.updated_at else None
+        ),
     }
 
 
@@ -67,7 +67,8 @@ class TransactionResource(MethodResource):
             "Se is_recurring=True, informe start_date, end_date.\n\n"
             "Exemplo de request:\n"
             """{ 'title': 'Conta de luz',
-            'amount': '150.50', 'type': 'expense',
+            'amount': '150.50',
+            'type': 'expense',
             'due_date': '2024-02-15',
             'is_installment': True,
             'installment_count': 12,
@@ -98,6 +99,10 @@ class TransactionResource(MethodResource):
 
         user_id = get_jwt_identity()
 
+        # Normaliza o campo 'type' para minúsculo, se presente
+        if "type" in kwargs:
+            kwargs["type"] = kwargs["type"].lower()
+
         # Bloco para criar transações parceladas se necessário
         if kwargs.get("is_installment") and kwargs.get("installment_count"):
             from decimal import Decimal
@@ -112,6 +117,9 @@ class TransactionResource(MethodResource):
                 base_date = kwargs["due_date"]
                 value = round(total / count, 2)
                 title = kwargs["title"]
+                # Normaliza novamente 'type' (por segurança, caso kwargs seja alterado)
+                if "type" in kwargs:
+                    kwargs["type"] = kwargs["type"].lower()
 
                 transactions = []
                 for i in range(count):
@@ -120,7 +128,7 @@ class TransactionResource(MethodResource):
                         user_id=UUID(user_id),
                         title=f"{title} ({i+1}/{count})",
                         amount=value,
-                        type=TransactionType(kwargs["type"].lower()),
+                        type=TransactionType(kwargs["type"]),
                         due_date=due,
                         start_date=kwargs.get("start_date"),
                         end_date=kwargs.get("end_date"),
@@ -170,7 +178,7 @@ class TransactionResource(MethodResource):
                     user_id=UUID(user_id),
                     title=kwargs["title"],
                     amount=kwargs["amount"],
-                    type=TransactionType(kwargs["type"].lower()),
+                    type=TransactionType(kwargs["type"]),
                     due_date=kwargs["due_date"],
                     start_date=kwargs.get("start_date"),
                     end_date=kwargs.get("end_date"),
@@ -220,6 +228,7 @@ class TransactionResource(MethodResource):
         ),
         tags=["Transações"],
         security=[{"BearerAuth": []}],
+        # TODO: CRIAR ENUMS PARA MAPEAR OS STATUS E TIPOS DE TRANSACOES
         responses={
             200: {"description": "Transação atualizada com sucesso"},
             400: {"description": "Erro de validação"},

@@ -5,8 +5,9 @@ Apenas para visualizar a documentação Swagger
 """
 
 import os
-from typing import Any
 from unittest.mock import patch
+
+from flask import Flask
 
 # Configurar variáveis de ambiente
 env_vars: dict[str, str] = {
@@ -35,7 +36,7 @@ def run_app() -> None:
         with patch("app.extensions.database.db.create_all"):
             from app import create_app
 
-            app: Any = create_app()
+            app: Flask = create_app()
 
             # Rodar a aplicação
             app.run(host="0.0.0.0", port=5000, debug=True)

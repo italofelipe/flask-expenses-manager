@@ -21,9 +21,18 @@ class UserRegistrationSchema(Schema):
     password = fields.Str(
         required=True,
         load_only=True,
-        validate=validate.Length(min=6, max=256),
-        description="Senha do usuário (mínimo 6 caracteres)",
-        example="minhasenha123",
+        description=(
+            "Senha do usuário (mínimo 10 caracteres, "
+            "contendo ao menos uma letra maiúscula, um número e um símbolo)"
+        ),
+        example="MinhaSenha@123",
+        validate=validate.Regexp(
+            r"^(?=.*[A-Z])(?=.*\d)(?=.*[^A-Za-z0-9]).{10,}$",
+            error=(
+                "A senha deve ter no mínimo 10 caracteres, conter ao menos "
+                "uma letra maiúscula, um número e um símbolo."
+            ),
+        ),
     )
 
 

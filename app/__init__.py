@@ -83,13 +83,13 @@ def create_app() -> Flask:
     # Registra erros globais
     register_error_handlers(app)
 
-    # ✅ Registra blueprints ANTES dos endpoints no Swagger
+    # Registra blueprints ANTES dos endpoints no Swagger
     app.register_blueprint(transaction_bp)
     app.register_blueprint(user_bp)
     app.register_blueprint(auth_bp)
     app.register_blueprint(ticker_bp)
 
-    # ✅ Registra os endpoints documentados no Swagger
+    # Registra os endpoints documentados no Swagger
     docs.register(RegisterResource, blueprint="auth", endpoint="registerresource")
     docs.register(AuthResource, blueprint="auth", endpoint="authresource")
     docs.register(UserProfileResource, blueprint="user", endpoint="profile")

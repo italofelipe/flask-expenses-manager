@@ -1,7 +1,7 @@
 from datetime import timedelta
-from typing import Any, TypedDict, cast
+from typing import Any
 
-from flask import Blueprint, Response, jsonify
+from flask import Blueprint, Response, abort, jsonify, make_response
 from flask_apispec import doc, marshal_with, use_kwargs
 from flask_apispec.views import MethodResource
 from flask_jwt_extended import (
@@ -10,7 +10,8 @@ from flask_jwt_extended import (
     get_jwt_identity,
     jwt_required,
 )
-from marshmallow import ValidationError
+from webargs import ValidationError as WebargsValidationError
+from webargs.flaskparser import parser
 from werkzeug.security import check_password_hash, generate_password_hash
 
 from app.extensions.database import db
@@ -22,12 +23,6 @@ from app.schemas.user_schemas import UserRegistrationSchema
 JSON_MIMETYPE = "application/json"
 
 auth_bp = Blueprint("auth", __name__, url_prefix="/auth")
-
-
-class ValidatedUserData(TypedDict):
-    name: str
-    email: str
-    password: str
 
 
 class RegisterResource(MethodResource):
@@ -42,19 +37,7 @@ class RegisterResource(MethodResource):
         },
     )  # type: ignore[misc]
     @use_kwargs(UserRegistrationSchema, location="json")  # type: ignore[misc]
-    def post(self, **kwargs: Any) -> Response:
-        schema = UserRegistrationSchema()
-        try:
-            validated_data = cast(ValidatedUserData, schema.load(kwargs))
-        except ValidationError as err:
-            return Response(
-                jsonify(
-                    {"message": "Validation error", "errors": err.messages}
-                ).get_data(),
-                status=400,
-                mimetype=JSON_MIMETYPE,
-            )
-
+    def post(self, **validated_data: Any) -> Response:
         if User.query.filter_by(email=validated_data["email"]).first():
             return Response(
                 jsonify(
@@ -212,3 +195,33 @@ auth_bp.add_url_rule(
 )
 auth_bp.add_url_rule("/login", view_func=AuthResource.as_view("authresource"))
 auth_bp.add_url_rule("/logout", view_func=LogoutResource.as_view("logoutresource"))
+
+
+# ----------------------------------------------------------------------
+# Global Webargs validation error handler
+# ----------------------------------------------------------------------
+@parser.error_handler
+def handle_webargs_error(  # type: ignore[override]
+    err: WebargsValidationError,
+    req,
+    schema=None,
+    *,
+    error_status_code=None,
+    error_headers=None,
+    **kwargs,
+):
+    """
+    Converte erros de validação (422) do Webargs/Marshmallow em uma
+    resposta JSON 400 mais amigável para o cliente.
+    """
+    error_message = "Validation error"
+    if "password" in err.messages:
+        error_message = (
+            "Senha inválida: não atende aos critérios mínimos de segurança "
+            "(mín. 10 caracteres, 1 letra maiúscula, 1 número e 1 símbolo)."
+        )
+
+    resp = make_response(
+        jsonify({"message": error_message, "errors": err.messages}), 400
+    )
+    abort(resp)  # Levanta HTTPException para Webargs/Flask
