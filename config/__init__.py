@@ -17,6 +17,9 @@ class Config:
     )
     SQLALCHEMY_TRACK_MODIFICATIONS = False
 
+    # Brapi config
+    BRAPI_KEY = os.getenv("BRAPI_KEY")
+
 
 class DevelopmentConfig(Config):
     DEBUG = True

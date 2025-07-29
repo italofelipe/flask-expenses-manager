@@ -1,5 +1,5 @@
 from datetime import timedelta
-from typing import Any
+from typing import Any, NoReturn
 
 from flask import Blueprint, Response, abort, jsonify, make_response
 from flask_apispec import doc, marshal_with, use_kwargs
@@ -200,16 +200,16 @@ auth_bp.add_url_rule("/logout", view_func=LogoutResource.as_view("logoutresource
 # ----------------------------------------------------------------------
 # Global Webargs validation error handler
 # ----------------------------------------------------------------------
-@parser.error_handler
-def handle_webargs_error(  # type: ignore[override]
+@parser.error_handler  # type: ignore[misc]
+def handle_webargs_error(
     err: WebargsValidationError,
-    req,
-    schema=None,
+    req: Any,
+    schema: Any = None,
     *,
-    error_status_code=None,
-    error_headers=None,
-    **kwargs,
-):
+    error_status_code: Any = None,
+    error_headers: Any = None,
+    **kwargs: Any,
+) -> Any:
     """
     Converte erros de validação (422) do Webargs/Marshmallow em uma
     resposta JSON 400 mais amigável para o cliente.
@@ -225,3 +225,4 @@ def handle_webargs_error(  # type: ignore[override]
         jsonify({"message": error_message, "errors": err.messages}), 400
     )
     abort(resp)  # Levanta HTTPException para Webargs/Flask
+    raise AssertionError  # Added for type completeness

@@ -5,7 +5,8 @@ class TransactionSchema(Schema):
     """Schema para criação e atualização de transações financeiras"""
 
     class Meta:
-        schema_name = "TransactionCreate"
+        name = "TransactionCreate"
+        ordered = True
 
     id = fields.UUID(
         dump_only=True, description="ID único da transação (gerado automaticamente)"
@@ -103,7 +104,8 @@ class TransactionResponseSchema(Schema):
     """Schema para resposta de transações"""
 
     class Meta:
-        schema_name = "TransactionResponse"
+        name = "TransactionResponse"
+        ordered = True
 
     id = fields.UUID(description="ID único da transação")
     user_id = fields.UUID(description="ID do usuário")
@@ -133,7 +135,8 @@ class TransactionListSchema(Schema):
     """Schema para listagem de transações"""
 
     class Meta:
-        schema_name = "TransactionList"
+        name = "TransactionList"
+        ordered = True
 
     transactions = fields.List(fields.Nested(TransactionResponseSchema))
     total = fields.Int(description="Total de transações")
@@ -145,7 +148,8 @@ class MonthlySummarySchema(Schema):
     """Schema para resumo mensal de transações"""
 
     class Meta:
-        schema_name = "MonthlySummary"
+        name = "MonthlySummary"
+        ordered = True
 
     income_total = fields.Str(description="Total de receitas do mês")
     expense_total = fields.Str(description="Total de despesas do mês")

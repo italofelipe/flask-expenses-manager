@@ -12,6 +12,7 @@ from sqlalchemy.orm.query import Query
 from app.extensions.database import db
 from app.models.transaction import Transaction
 from app.models.user import User
+from app.models.wallet import Wallet
 from app.schemas.user_schemas import UserProfileSchema
 from app.utils.pagination import PaginatedResponse
 
@@ -302,6 +303,28 @@ class UserMeResource(MethodResource):
             transactions, pagination.total, pagination.page, pagination.per_page
         )
 
+        wallet_items = Wallet.query.filter_by(user_id=user.id).all()
+        wallet_data = [
+            {
+                "id": str(w.id),
+                "name": w.name,
+                "value": float(w.value) if w.value is not None else None,
+                "estimated_value_on_create_date": (
+                    float(w.estimated_value_on_create_date)
+                    if w.estimated_value_on_create_date is not None
+                    else None
+                ),
+                "ticker": w.ticker,
+                "quantity": w.quantity,
+                "target_withdraw_date": (
+                    str(w.target_withdraw_date) if w.target_withdraw_date else None
+                ),
+                "register_date": str(w.register_date),
+                "should_be_on_wallet": w.should_be_on_wallet,
+            }
+            for w in wallet_items
+        ]
+
         return Response(
             jsonify(
                 {
@@ -311,24 +334,33 @@ class UserMeResource(MethodResource):
                         "email": user.email,
                         "gender": user.gender,
                         "birth_date": str(user.birth_date) if user.birth_date else None,
-                        "monthly_income": float(user.monthly_income)
-                        if user.monthly_income
-                        else None,
+                        "monthly_income": (
+                            float(user.monthly_income) if user.monthly_income else None
+                        ),
                         "net_worth": float(user.net_worth) if user.net_worth else None,
-                        "monthly_expenses": float(user.monthly_expenses)
-                        if user.monthly_expenses
-                        else None,
-                        "initial_investment": float(user.initial_investment)
-                        if user.initial_investment
-                        else None,
-                        "monthly_investment": float(user.monthly_investment)
-                        if user.monthly_investment
-                        else None,
-                        "investment_goal_date": str(user.investment_goal_date)
-                        if user.investment_goal_date
-                        else None,
+                        "monthly_expenses": (
+                            float(user.monthly_expenses)
+                            if user.monthly_expenses
+                            else None
+                        ),
+                        "initial_investment": (
+                            float(user.initial_investment)
+                            if user.initial_investment
+                            else None
+                        ),
+                        "monthly_investment": (
+                            float(user.monthly_investment)
+                            if user.monthly_investment
+                            else None
+                        ),
+                        "investment_goal_date": (
+                            str(user.investment_goal_date)
+                            if user.investment_goal_date
+                            else None
+                        ),
                     },
                     "transactions": paginated_transactions,
+                    "wallet": wallet_data,
                 }
             ).get_data(),
             status=200,
