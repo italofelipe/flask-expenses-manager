@@ -25,7 +25,7 @@ class WalletSchema(Schema):
     updated_at = fields.DateTime(dump_only=True)
 
     @validates_schema
-    def validate_fields(self, data: Dict[str, Any]) -> None:
+    def validate_fields(self, data: Dict[str, Any], **kwargs: Any) -> None:
         """Valida as regras de negócio entre os campos ticker, quantity e value."""
         has_ticker = bool(data.get("ticker"))
         has_quantity = data.get("quantity") is not None
@@ -43,7 +43,8 @@ class WalletSchema(Schema):
                 field_name="value",
             )
 
-        if not has_ticker and not has_value:
+        # Somente se nem value nem ticker forem enviados (ex: criação ou atualização sem base anterior)
+        if not has_ticker and not has_value and not kwargs.get("partial", False):
             raise ValidationError(
                 "Informe o campo 'value' caso não esteja usando 'ticker'.",
                 field_name="value",
