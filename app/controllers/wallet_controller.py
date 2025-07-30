@@ -13,6 +13,9 @@ from app.models.wallet import Wallet
 from app.schemas.wallet_schema import WalletSchema
 from app.services.investment_service import InvestmentService
 
+# Import PaginatedResponse for paginated investment history
+from app.utils.pagination import PaginatedResponse
+
 wallet_bp = Blueprint("wallet", __name__, url_prefix="/wallet")
 
 
@@ -149,6 +152,72 @@ def list_wallet_entries(page: int, per_page: int) -> tuple[dict[str, Any], int]:
     }, 200
 
 
+# GET /wallet/<uuid:investment_id>/history - Histórico paginado de um investimento
+@wallet_bp.route("/<uuid:investment_id>/history", methods=["GET"])
+@doc(
+    description="Retorna o histórico de alterações de um investimento, paginado e ordenado.",
+    tags=["Wallet"],
+    security=[{"BearerAuth": []}],
+    params={
+        "investment_id": {"description": "ID do investimento"},
+        "page": {"description": "Página desejada (default: 1)"},
+        "per_page": {"description": "Itens por página (default: 5, 0 para todos)"},
+    },
+    responses={
+        200: {"description": "Histórico paginado"},
+        401: {"description": "Token inválido"},
+        403: {"description": "Sem permissão"},
+        404: {"description": "Investimento não encontrado"},
+    },
+)  # type: ignore[misc]
+@jwt_required()  # type: ignore[misc]
+def get_wallet_history(investment_id: UUID) -> tuple[Dict[str, Any], int]:
+    """Retorna histórico de alterações de um investimento específico, paginado."""
+    user_id: UUID = UUID(get_jwt_identity())
+    investment = Wallet.query.filter_by(id=str(investment_id)).first()
+    if not investment:
+        return {"error": "Investimento não encontrado"}, 404
+    if str(investment.user_id) != str(user_id):
+        return {
+            "error": "Você não tem permissão para ver o histórico deste investimento."
+        }, 403
+
+    # Parâmetros de paginação
+    page = request.args.get("page", default=1, type=int)
+    per_page = request.args.get("per_page", default=5, type=int)
+
+    history = investment.history or []
+
+    # Ordena por originalQuantity e changeDate, ambos em ordem decrescente
+    def _sort_key(item: Dict[str, Any]):
+        qty = item.get("originalQuantity", 0) or 0
+        date_str = item.get("changeDate", "")
+        return (qty, date_str)
+
+    sorted_history = sorted(history, key=_sort_key, reverse=True)
+    total = len(sorted_history)
+
+    # Seleciona página
+    if per_page <= 0:
+        items = sorted_history
+        current_per_page = total or 1
+        current_page = 1
+    else:
+        start = (page - 1) * per_page
+        end = start + per_page
+        items = sorted_history[start:end]
+        current_page = page
+        current_per_page = per_page
+
+    response = PaginatedResponse.format(
+        data=items,
+        total=total,
+        page=current_page,
+        page_size=current_per_page,
+    )
+    return response, 200
+
+
 # PUT /wallet/<uuid:investment_id> - Atualizar investimento existente
 from flask import jsonify  # (caso precise de jsonify, mas manter padrão de retorno)
 
@@ -192,17 +261,21 @@ def update_wallet_entry(investment_id: UUID) -> tuple[dict[str, Any], int]:
     # Histórico de alterações: detecta mudanças antes do update
     changes: Dict[str, Any] = {}
     if "quantity" in validated_data and validated_data["quantity"] != old_quantity:
+        # calcula preço de mercado para valor original
+        price = InvestmentService.get_market_price(investment.ticker)
         changes = {
+            "changeDate": datetime.utcnow().isoformat(),
+            "originalQuantity": old_quantity,
+            # mantém o estimated anterior
             "estimated_value_on_create_date": (
                 float(old_estimated)
                 if isinstance(old_estimated, Decimal)
                 else old_estimated
             ),
-            "originalQuantity": old_quantity,
+            # usa preço de mercado atual como originalValue
             "originalValue": (
-                float(old_value) if isinstance(old_value, Decimal) else old_value
+                float(price) if isinstance(price, (int, float, Decimal)) else price
             ),
-            "changeDate": datetime.utcnow().isoformat(),
         }
     elif "value" in validated_data and validated_data["value"] != old_value:
         changes = {
