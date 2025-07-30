@@ -1,3 +1,4 @@
+from datetime import date
 from typing import Any, Dict
 
 from marshmallow import Schema, ValidationError, fields, validates_schema
@@ -18,7 +19,7 @@ class WalletSchema(Schema):
     estimated_value_on_create_date = fields.Decimal(as_string=True, allow_none=True)
     ticker = fields.String(allow_none=True)
     quantity = fields.Integer(allow_none=True)
-    register_date = fields.Date(required=True)
+    register_date = fields.Date(missing=lambda: date.today())
     target_withdraw_date = fields.Date(allow_none=True)
     should_be_on_wallet = fields.Boolean(required=True)
     created_at = fields.DateTime(dump_only=True)

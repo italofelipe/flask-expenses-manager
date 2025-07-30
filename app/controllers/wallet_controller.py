@@ -1,3 +1,5 @@
+from datetime import date, datetime
+from decimal import Decimal
 from typing import Any, Dict
 from uuid import UUID
 
@@ -5,12 +7,11 @@ from flask import Blueprint, request
 from flask_apispec import doc, use_kwargs
 from flask_jwt_extended import get_jwt_identity, jwt_required
 from marshmallow import ValidationError, fields
-from requests import get  # type: ignore[import-untyped]
 
 from app.extensions.database import db
 from app.models.wallet import Wallet
 from app.schemas.wallet_schema import WalletSchema
-from config import Config
+from app.services.investment_service import InvestmentService
 
 wallet_bp = Blueprint("wallet", __name__, url_prefix="/wallet")
 
@@ -48,13 +49,6 @@ def add_wallet_entry() -> tuple[dict[str, str], int]:
     user_id: UUID = UUID(get_jwt_identity())
     data: Dict[str, Any] = request.get_json()
 
-    # Normalização entre ticker e value
-    has_ticker = data.get("ticker") is not None
-    if has_ticker:
-        data["value"] = None
-    else:
-        data["ticker"] = None
-
     schema = WalletSchema()
 
     try:
@@ -62,36 +56,21 @@ def add_wallet_entry() -> tuple[dict[str, str], int]:
     except ValidationError as err:
         return {"error": "Dados inválidos", "messages": str(err.messages)}, 400
 
-    ticker: str | None = validated_data.get("ticker")
-    estimated_value_on_create_date: float | None = None
-
-    if ticker:
-        ticker = ticker.upper()
-
-        config = Config()
-        brapi_resp = get(
-            f"https://brapi.dev/api/quote/{ticker}",
-            headers={"Authorization": f"Bearer {config.BRAPI_KEY}"},
-        )
-        if brapi_resp.status_code != 200 or not brapi_resp.json().get("results"):
-            return {"error": f"Ticker inválido: {ticker}"}, 400
-
-        validated_data["ticker"] = ticker
-        market_price = brapi_resp.json()["results"][0]["regularMarketPrice"]
-        estimated_value_on_create_date = (
-            float(market_price) * validated_data["quantity"]
-        )
-    # Se não houver ticker, estimated_value_on_create_date permanece None
+    # Calcula valor estimado
+    estimated_value = InvestmentService.calculate_estimated_value(validated_data)
+    validated_data["estimated_value_on_create_date"] = estimated_value
 
     try:
         new_wallet = Wallet(
             user_id=user_id,
             name=validated_data["name"],
-            value=validated_data["value"],
-            estimated_value_on_create_date=estimated_value_on_create_date,
+            value=validated_data.get("value"),
+            estimated_value_on_create_date=validated_data[
+                "estimated_value_on_create_date"
+            ],
             ticker=validated_data.get("ticker"),
             quantity=validated_data.get("quantity"),
-            register_date=validated_data["register_date"],
+            register_date=validated_data.get("register_date", date.today()),
             target_withdraw_date=validated_data.get("target_withdraw_date"),
             should_be_on_wallet=validated_data["should_be_on_wallet"],
         )
@@ -192,10 +171,17 @@ def update_wallet_entry(investment_id: UUID) -> tuple[dict[str, Any], int]:
     """Atualiza um investimento existente (pertencente ao usuário autenticado)."""
     user_id: UUID = UUID(get_jwt_identity())
     data: Dict[str, Any] = request.get_json()
-    print("DATA", data)
-    print("INVESTMENT_ID", investment_id)
-    print("USER_ID", user_id)
-    # (Removido: Normalização entre ticker e value conforme regras de criação)
+
+    investment = Wallet.query.filter_by(id=str(investment_id)).first()
+    if investment and str(investment.user_id) != str(user_id):
+        return {"error": "Você não tem permissão para editar este investimento."}, 403
+    if not investment:
+        return {"error": "Investimento não encontrado"}, 404
+
+    # Captura valores antigos para histórico
+    old_quantity = investment.quantity
+    old_estimated = investment.estimated_value_on_create_date
+    old_value = investment.value
 
     schema = WalletSchema(partial=True)
     try:
@@ -203,46 +189,46 @@ def update_wallet_entry(investment_id: UUID) -> tuple[dict[str, Any], int]:
     except ValidationError as err:
         return {"error": "Dados inválidos", "messages": str(err.messages)}, 400
 
-    # Busca o investimento pelo ID como string
-    investment = Wallet.query.filter_by(id=str(investment_id)).first()
-    # Verifica se o usuário é o dono do investimento
-    if investment and str(investment.user_id) != str(user_id):
-        return {"error": "Você não tem permissão para editar este investimento."}, 403
-    if not investment:
-        return {"error": "Investimento não encontrado"}, 404
-
-    # Guarda valores antigos para comparação
-    old_quantity = investment.quantity
-    old_ticker = investment.ticker
-    old_value = investment.value
+    # Histórico de alterações: detecta mudanças antes do update
+    changes: Dict[str, Any] = {}
+    if "quantity" in validated_data and validated_data["quantity"] != old_quantity:
+        changes = {
+            "estimated_value_on_create_date": (
+                float(old_estimated)
+                if isinstance(old_estimated, Decimal)
+                else old_estimated
+            ),
+            "originalQuantity": old_quantity,
+            "originalValue": (
+                float(old_value) if isinstance(old_value, Decimal) else old_value
+            ),
+            "changeDate": datetime.utcnow().isoformat(),
+        }
+    elif "value" in validated_data and validated_data["value"] != old_value:
+        changes = {
+            "originalValue": (
+                float(old_value) if isinstance(old_value, Decimal) else old_value
+            ),
+            "changeDate": datetime.utcnow().isoformat(),
+        }
+    if changes:
+        history = investment.history or []
+        history.append(changes)
+        investment.history = history
 
     # Aplica apenas os campos enviados
     for field, value in validated_data.items():
         setattr(investment, field, value)
 
-    # Recalcula estimated_value_on_create_date se quantity ou ticker mudou
-    new_quantity = investment.quantity
-    new_ticker = investment.ticker
-    new_value = investment.value
-
-    if new_quantity != old_quantity or new_ticker != old_ticker:
-        if new_ticker:
-            # busca preço atual via BRAPI
-            config = Config()
-            resp = get(
-                f"https://brapi.dev/api/quote/{new_ticker.upper()}",
-                headers={"Authorization": f"Bearer {config.BRAPI_KEY}"},
-            )
-            if resp.status_code == 200 and resp.json().get("results"):
-                price = resp.json()["results"][0]["regularMarketPrice"]
-                investment.estimated_value_on_create_date = float(price) * float(
-                    new_quantity
-                )
-        elif new_value is not None:
-            # recalc para valor fixo
-            investment.estimated_value_on_create_date = float(new_value) * float(
-                new_quantity
-            )
+    # Recalcula usando InvestmentService
+    recalc_data = {
+        **validated_data,
+        "ticker": investment.ticker,
+        "value": investment.value,
+        "quantity": investment.quantity,
+    }
+    new_estimate = InvestmentService.calculate_estimated_value(recalc_data)
+    investment.estimated_value_on_create_date = new_estimate
 
     try:
         db.session.commit()
@@ -257,6 +243,7 @@ def update_wallet_entry(investment_id: UUID) -> tuple[dict[str, Any], int]:
         else:
             # ticker: omit value
             investment_data.pop("value", None)
+        investment_data["history"] = investment.history
         return {
             "message": "Investimento atualizado com sucesso",
             "investment": investment_data,

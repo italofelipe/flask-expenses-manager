@@ -2,6 +2,7 @@ import uuid
 from datetime import date
 
 from sqlalchemy.dialects.postgresql import UUID
+from sqlalchemy.ext.mutable import MutableList
 
 from app.extensions.database import db
 
@@ -13,7 +14,7 @@ class Wallet(db.Model):
     user_id = db.Column(UUID(as_uuid=True), db.ForeignKey("users.id"), nullable=False)
 
     name = db.Column(db.String(128), nullable=False)
-    value = db.Column(db.Numeric(12, 2), nullable=False)
+    value = db.Column(db.Numeric(12, 2), nullable=True)
 
     estimated_value_on_create_date = db.Column(db.Numeric(12, 2), nullable=True)
 
@@ -28,6 +29,7 @@ class Wallet(db.Model):
     updated_at = db.Column(
         db.DateTime, server_default=db.func.now(), onupdate=db.func.now()
     )
+    history = db.Column(MutableList.as_mutable(db.JSON), default=list, nullable=True)
 
     # Relacionamento (opcional, útil para backref no User)
     user = db.relationship("User", backref="wallet_entries")
