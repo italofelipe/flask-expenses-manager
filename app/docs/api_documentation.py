@@ -9,17 +9,16 @@ API_INFO = {
     "version": "1.0.0",
     "description": (
         "API para gerenciamento financeiro pessoal.\n\n"
-        "- Controle de transações, contas, cartões, investimentos.\n"
+        "- Controle de transações, carteira e dados de usuário.\n"
         "- Autenticação JWT.\n"
-        "- Consulte exemplos, modelos e instruções nos links abaixo.\n"
-        "- Para detalhes completos, acesse a documentação externa."
+        "- Consulte os documentos técnicos em docs/."
     ),
     "termsOfService": "https://seusite.com/termos",
     "contact": {"name": "Italo Chagas", "url": "https://github.com/italofelipe"},
     "license": {"name": "MIT", "url": "https://opensource.org/licenses/MIT"},
     "externalDocs": {
-        "description": "Documentação completa, exemplos e modelos de dados",
-        "url": "https://github.com/seurepo/docs/API_DOCUMENTATION.md",
+        "description": "Documentação técnica atual (as-is)",
+        "url": "https://github.com/italofelipe/flask-template/tree/main/docs",
     },
 }
 
@@ -34,15 +33,15 @@ TAGS = [
         "description": "Criação, edição e consulta de transações financeiras",
     },
     {
-        "name": "Investimentos",
-        "description": "Gerenciamento de ativos financeiros (tickers)",
+        "name": "Wallet",
+        "description": "Gerenciamento da carteira de investimentos",
     },
-    {"name": "Contas", "description": "Gerenciamento de contas bancárias"},
+    {"name": "Contas", "description": "Gerenciamento de contas bancárias (pendente)"},
     {
         "name": "Cartões de Crédito",
-        "description": "Gerenciamento de cartões de crédito",
+        "description": "Gerenciamento de cartões de crédito (pendente)",
     },
-    {"name": "Tags", "description": "Sistema de categorização por tags"},
+    {"name": "Tags", "description": "Sistema de categorização por tags (pendente)"},
 ]
 
 EXAMPLES = {
@@ -72,8 +71,14 @@ EXAMPLES = {
             "investment_goal_date": "2030-12-31",
         },
     },
-    "user_ticker": {
-        "summary": "Exemplo de criação de ticker",
-        "value": {"symbol": "PETR4", "quantity": 100.0, "type": "stock"},
+    "wallet_create": {
+        "summary": "Exemplo de criação de item da carteira",
+        "value": {
+            "name": "Investimento PETR4",
+            "ticker": "PETR4",
+            "quantity": 10,
+            "register_date": "2024-07-01",
+            "should_be_on_wallet": True,
+        },
     },
 }

@@ -1,7 +1,7 @@
 from typing import Any, Dict, Optional
 
-import requests
-from requests.exceptions import RequestException
+import requests  # type: ignore[import]
+from requests.exceptions import RequestException  # type: ignore[import]
 
 from config import Config
 

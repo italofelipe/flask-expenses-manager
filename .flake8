@@ -1,2 +1,43 @@
 [flake8]
-max-line-length = 100
+# Comprimento máximo de linha (PEP-8 recomenda 79, mas 88/100 é comum em projetos modernos)
+max-line-length = 88
+
+# Ignorar conflitos entre Black e Flake8
+# - E203: espaço antes de ‘:’ em slices
+# - W503: quebra antes de operador binário
+extend-ignore = E203, W503
+
+# Não analisar arquivos/pastas gerados ou de configuração
+exclude =
+    .git,
+    __pycache__,
+    build,
+    dist,
+    .venv,
+    venv,
+    env,
+    migrations,
+    docs/_build,
+    *.egg-info,
+
+# Códigos a permitir só em __init__.py (imports para expor API pública)
+per-file-ignores =
+    __init__.py: F401
+
+# Códigos que queremos sempre checar
+#   C – cyclomatic complexity (flake8-complexity)
+#   E,F,W – erros e avisos básicos do Flake8
+#   B – flake8-bugbear (boas práticas e potenciais bugs)
+#   B950 – linha > 88 mas <= 100 (avisar leve overflow)
+select = C,E,F,W,B,B950
+
+# Limiar de complexidade ciclomática (mantenha até 10, ajuste conforme necessidade)
+max-complexity = 10
+
+# Convenções de ordenação de imports
+# Configure se usar flake8-import-order ou isort
+import-order-style = google
+application-import-names = your_package_name
+
+# Configuração de docstrings (se usar flake8-docstrings)
+docstring-convention = google

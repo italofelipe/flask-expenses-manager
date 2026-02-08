@@ -19,11 +19,12 @@ from app.utils.pagination import PaginatedResponse
 wallet_bp = Blueprint("wallet", __name__, url_prefix="/wallet")
 
 
-@wallet_bp.route("", methods=["POST"])
+@wallet_bp.route("", methods=["POST"])  # type: ignore[misc]
 @doc(
     description=(
         "Adiciona um novo item à carteira do usuário.\n\n"
-        "Você pode informar um valor fixo (como R$1000,00 em poupança) ou um ativo com ticker.\n\n"
+        "Você pode informar um valor fixo (como R$1000,00 em poupança) "
+        "ou um ativo com ticker.\n\n"
         "Regras:\n"
         "- Se informar o campo 'ticker', o campo 'value' será ignorado.\n"
         "- Se não informar 'ticker', é obrigatório informar 'value'.\n"
@@ -47,7 +48,7 @@ wallet_bp = Blueprint("wallet", __name__, url_prefix="/wallet")
     },
 )  # type: ignore[misc]
 @jwt_required()  # type: ignore[misc]
-def add_wallet_entry() -> tuple[dict[str, str], int]:
+def add_wallet_entry() -> tuple[dict[str, Any], int]:
     """Adiciona um novo item à carteira do usuário com validação de ticker."""
     user_id: UUID = UUID(get_jwt_identity())
     data: Dict[str, Any] = request.get_json()
@@ -104,7 +105,7 @@ def add_wallet_entry() -> tuple[dict[str, str], int]:
 
 
 # GET /wallet - Listar investimentos do usuário com paginação
-@wallet_bp.route("", methods=["GET"])
+@wallet_bp.route("", methods=["GET"])  # type: ignore[misc]
 @doc(
     description="Lista os investimentos cadastrados na carteira com paginação.",
     tags=["Wallet"],
@@ -113,14 +114,14 @@ def add_wallet_entry() -> tuple[dict[str, str], int]:
         200: {"description": "Lista paginada de investimentos"},
         401: {"description": "Token inválido"},
     },
-)
+)  # type: ignore[misc]
 @use_kwargs(
     {
         "page": fields.Int(missing=1, validate=lambda x: x > 0),
         "per_page": fields.Int(missing=10, validate=lambda x: 0 < x <= 100),
     },
     location="query",
-)
+)  # type: ignore[misc]
 @jwt_required()  # type: ignore[misc]
 def list_wallet_entries(page: int, per_page: int) -> tuple[dict[str, Any], int]:
     """Lista paginada dos investimentos do usuário autenticado."""
@@ -153,9 +154,11 @@ def list_wallet_entries(page: int, per_page: int) -> tuple[dict[str, Any], int]:
 
 
 # GET /wallet/<uuid:investment_id>/history - Histórico paginado de um investimento
-@wallet_bp.route("/<uuid:investment_id>/history", methods=["GET"])
+@wallet_bp.route("/<uuid:investment_id>/history", methods=["GET"])  # type: ignore[misc]
 @doc(
-    description="Retorna o histórico de alterações de um investimento, paginado e ordenado.",
+    description=(
+        "Retorna o histórico de alterações de um investimento, " "paginado e ordenado."
+    ),
     tags=["Wallet"],
     security=[{"BearerAuth": []}],
     params={
@@ -189,7 +192,7 @@ def get_wallet_history(investment_id: UUID) -> tuple[Dict[str, Any], int]:
     history = investment.history or []
 
     # Ordena por originalQuantity e changeDate, ambos em ordem decrescente
-    def _sort_key(item: Dict[str, Any]):
+    def _sort_key(item: Dict[str, Any]) -> tuple[Any, str]:
         qty = item.get("originalQuantity", 0) or 0
         date_str = item.get("changeDate", "")
         return (qty, date_str)
@@ -219,10 +222,7 @@ def get_wallet_history(investment_id: UUID) -> tuple[Dict[str, Any], int]:
 
 
 # PUT /wallet/<uuid:investment_id> - Atualizar investimento existente
-from flask import jsonify  # (caso precise de jsonify, mas manter padrão de retorno)
-
-
-@wallet_bp.route("/<uuid:investment_id>", methods=["PUT"])
+@wallet_bp.route("/<uuid:investment_id>", methods=["PUT"])  # type: ignore[misc]
 @doc(
     description="Atualiza um investimento existente da carteira do usuário.",
     tags=["Wallet"],
@@ -234,7 +234,7 @@ from flask import jsonify  # (caso precise de jsonify, mas manter padrão de ret
         401: {"description": "Token inválido"},
         404: {"description": "Investimento não encontrado"},
     },
-)
+)  # type: ignore[misc]
 @jwt_required()  # type: ignore[misc]
 def update_wallet_entry(investment_id: UUID) -> tuple[dict[str, Any], int]:
     """Atualiza um investimento existente (pertencente ao usuário autenticado)."""
@@ -247,53 +247,72 @@ def update_wallet_entry(investment_id: UUID) -> tuple[dict[str, Any], int]:
     if not investment:
         return {"error": "Investimento não encontrado"}, 404
 
-    # Captura valores antigos para histórico
-    old_quantity = investment.quantity
-    old_estimated = investment.estimated_value_on_create_date
-    old_value = investment.value
-
     schema = WalletSchema(partial=True)
     try:
         validated_data = schema.load(data, partial=True)
     except ValidationError as err:
         return {"error": "Dados inválidos", "messages": str(err.messages)}, 400
 
-    # Histórico de alterações: detecta mudanças antes do update
+    _update_investment_history(investment, validated_data)
+    _apply_validated_fields(investment, validated_data)
+
+    return _commit_investment_update(investment)
+
+
+def _build_quantity_change(
+    investment: Wallet, old_quantity: Any, old_estimated: Any
+) -> Dict[str, Any]:
+    """Constrói registro de histórico para mudança de quantidade."""
+    price = InvestmentService.get_market_price(investment.ticker)
+    return {
+        "changeDate": datetime.utcnow().isoformat(),
+        "originalQuantity": old_quantity,
+        "estimated_value_on_create_date": (
+            float(old_estimated)
+            if isinstance(old_estimated, Decimal)
+            else old_estimated
+        ),
+        "originalValue": (
+            float(price) if isinstance(price, (int, float, Decimal)) else price
+        ),
+    }
+
+
+def _build_value_change(old_value: Any) -> Dict[str, Any]:
+    """Constrói registro de histórico para mudança de valor."""
+    return {
+        "originalValue": (
+            float(old_value) if isinstance(old_value, Decimal) else old_value
+        ),
+        "changeDate": datetime.utcnow().isoformat(),
+    }
+
+
+def _update_investment_history(
+    investment: Wallet, validated_data: Dict[str, Any]
+) -> None:
+    """Atualiza o histórico do investimento se houver mudanças relevantes."""
+    old_quantity = investment.quantity
+    old_estimated = investment.estimated_value_on_create_date
+    old_value = investment.value
+
     changes: Dict[str, Any] = {}
     if "quantity" in validated_data and validated_data["quantity"] != old_quantity:
-        # calcula preço de mercado para valor original
-        price = InvestmentService.get_market_price(investment.ticker)
-        changes = {
-            "changeDate": datetime.utcnow().isoformat(),
-            "originalQuantity": old_quantity,
-            # mantém o estimated anterior
-            "estimated_value_on_create_date": (
-                float(old_estimated)
-                if isinstance(old_estimated, Decimal)
-                else old_estimated
-            ),
-            # usa preço de mercado atual como originalValue
-            "originalValue": (
-                float(price) if isinstance(price, (int, float, Decimal)) else price
-            ),
-        }
+        changes = _build_quantity_change(investment, old_quantity, old_estimated)
     elif "value" in validated_data and validated_data["value"] != old_value:
-        changes = {
-            "originalValue": (
-                float(old_value) if isinstance(old_value, Decimal) else old_value
-            ),
-            "changeDate": datetime.utcnow().isoformat(),
-        }
+        changes = _build_value_change(old_value)
+
     if changes:
         history = investment.history or []
         history.append(changes)
         investment.history = history
 
-    # Aplica apenas os campos enviados
+
+def _apply_validated_fields(investment: Wallet, validated_data: Dict[str, Any]) -> None:
+    """Aplica campos validados e recalcula valor estimado."""
     for field, value in validated_data.items():
         setattr(investment, field, value)
 
-    # Recalcula usando InvestmentService
     recalc_data = {
         **validated_data,
         "ticker": investment.ticker,
@@ -303,25 +322,24 @@ def update_wallet_entry(investment_id: UUID) -> tuple[dict[str, Any], int]:
     new_estimate = InvestmentService.calculate_estimated_value(recalc_data)
     investment.estimated_value_on_create_date = new_estimate
 
+
+def _commit_investment_update(investment: Wallet) -> tuple[dict[str, Any], int]:
+    """Persiste as alterações e retorna resposta formatada."""
     try:
         db.session.commit()
         schema = WalletSchema()
         investment_data = schema.dump(investment)
-        # Omite campos conforme tipo de investimento
         if investment_data.get("ticker") is None:
-            # hardcoded: omit ticker, quantity, and estimated value
             investment_data.pop("estimated_value_on_create_date", None)
             investment_data.pop("ticker", None)
             investment_data.pop("quantity", None)
         else:
-            # ticker: omit value
             investment_data.pop("value", None)
         investment_data["history"] = investment.history
         return {
             "message": "Investimento atualizado com sucesso",
             "investment": investment_data,
         }, 200
-
     except Exception as e:
         db.session.rollback()
         import traceback
@@ -331,7 +349,7 @@ def update_wallet_entry(investment_id: UUID) -> tuple[dict[str, Any], int]:
 
 
 # DELETE /wallet/<uuid:investment_id> - Deletar investimento existente
-@wallet_bp.route("/<uuid:investment_id>", methods=["DELETE"])
+@wallet_bp.route("/<uuid:investment_id>", methods=["DELETE"])  # type: ignore[misc]
 @doc(
     description="Deleta um investimento da carteira do usuário autenticado.",
     tags=["Wallet"],

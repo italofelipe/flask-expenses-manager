@@ -1,0 +1,86 @@
+# wallet_controller.py
+
+Arquivo: `/Users/italochagas/Desktop/projetos/flask/flask-template/app/controllers/wallet_controller.py`
+
+## Responsabilidade
+Gerenciar carteira de investimentos do usuário:
+- cadastro de item com ticker ou valor fixo
+- listagem paginada
+- atualização com trilha de histórico
+- exclusão
+
+## Blueprint
+- Prefixo: `/wallet`
+
+## Recursos e comportamento
+
+## `add_wallet_entry`
+Endpoint: `POST /wallet`
+
+O que faz:
+- Exige JWT.
+- Valida payload com `WalletSchema`.
+- Calcula `estimated_value_on_create_date` via `InvestmentService`.
+- Salva item da carteira.
+- Ajusta payload de saída para ocultar campos incompatíveis conforme tipo de registro.
+
+Regras de validação efetivas:
+- Com `ticker`:
+  - `quantity` obrigatório
+  - `value` proibido
+- Sem `ticker`:
+  - `value` obrigatório
+
+## `list_wallet_entries`
+Endpoint: `GET /wallet`
+
+O que faz:
+- Lista itens do usuário com paginação (`page`, `per_page`).
+- Ordena por `created_at desc`.
+- Ajusta payload de saída omitindo campos por tipo.
+
+## `get_wallet_history`
+Endpoint: `GET /wallet/{investment_id}/history`
+
+O que faz:
+- Verifica existência e autorização do investimento.
+- Lê histórico JSON (`history`) da entidade.
+- Ordena e pagina resultado.
+
+## `update_wallet_entry`
+Endpoint: `PUT /wallet/{investment_id}`
+
+O que faz:
+- Verifica autorização do usuário.
+- Valida payload parcial com `WalletSchema(partial=True)`.
+- Detecta mudança de `quantity` ou `value` e registra snapshot em `history`.
+- Recalcula `estimated_value_on_create_date` com `InvestmentService`.
+- Persiste alterações.
+
+## `delete_wallet_entry`
+Endpoint: `DELETE /wallet/{investment_id}`
+
+O que faz:
+- Verifica propriedade do recurso.
+- Remove registro da carteira.
+
+## Dependências principais
+- `app.models.wallet.Wallet`
+- `WalletSchema`
+- `InvestmentService` (integração BRAPI)
+- `PaginatedResponse`
+
+## Pontos incompletos / melhorias (Fase 0)
+1. Histórico é armazenado como JSON mutável na própria linha, sem versionamento formal por tabela.
+2. Integração BRAPI não usa timeout explícito, retry/backoff ou cache local.
+3. Campo `quantity` no model é inteiro, o que pode limitar ativos fracionários em alguns cenários.
+4. Não há endpoint consolidado de valuation atual da carteira com P/L por ativo.
+5. Existem logs de erro via `print`, sem estratégia padronizada de observabilidade.
+
+## Recomendação de implementação futura (sem alterar comportamento agora)
+- Criar serviços separados:
+  - `WalletService` (CRUD)
+  - `MarketDataService` (BRAPI, cache, retry, timeout)
+  - `PortfolioValuationService` (cálculos e métricas)
+- Introduzir testes de integração com mocks de BRAPI.
+- Evoluir histórico para modelo de eventos/auditoria separado quando necessário.
