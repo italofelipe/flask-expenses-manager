@@ -1,0 +1,27 @@
+version: 0.2
+
+phases:
+  install:
+    runtime-versions:
+      python: 3.13
+    commands:
+      - pip install -r requirements.txt
+      - pip install sonar-scanner-cli docker
+
+  pre_build:
+    commands:
+      - echo "Rodando análise Sonar..."
+      - sonar-scanner \
+        -Dsonar.projectKey=seu_projeto \
+        -Dsonar.organization=sua_org \
+        -Dsonar.host.url=https://sonarcloud.io \
+        -Dsonar.login=$SONAR_TOKEN
+
+  build:
+    commands:
+      - echo "Build da imagem Docker"
+      - docker build -t flask-template .
+
+artifacts:
+  files:
+    - "**/*"

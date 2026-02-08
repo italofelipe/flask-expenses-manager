@@ -1,3 +1,5 @@
+import os
+
 from apispec import APISpec
 from apispec.ext.marshmallow import MarshmallowPlugin
 from flask import Flask
@@ -12,7 +14,6 @@ from app.controllers.auth_controller import (
     RegisterResource,
     auth_bp,
 )
-from app.controllers.ticker_controller import ticker_bp
 from app.controllers.transaction_controller import TransactionResource, transaction_bp
 from app.controllers.user_controller import UserMeResource, UserProfileResource, user_bp
 from app.controllers.wallet_controller import wallet_bp
@@ -34,6 +35,9 @@ def create_app() -> Flask:
     from config import Config
 
     app.config.from_object(Config)
+    runtime_database_url = os.getenv("DATABASE_URL")
+    if runtime_database_url:
+        app.config["SQLALCHEMY_DATABASE_URI"] = runtime_database_url
 
     # Carrega variáveis de ambiente com prefixo FLASK_ do .env
     app.config.from_prefixed_env()
@@ -88,7 +92,6 @@ def create_app() -> Flask:
     app.register_blueprint(transaction_bp)
     app.register_blueprint(user_bp)
     app.register_blueprint(auth_bp)
-    app.register_blueprint(ticker_bp)
     app.register_blueprint(wallet_bp)
 
     # Registra os endpoints documentados no Swagger

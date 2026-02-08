@@ -119,7 +119,8 @@ class UserProfileResource(MethodResource):
             'monthly_investment': '500.00',
             'investment_goal_date': '2025-12-31' }\n\n"""
             "Exemplo de resposta:\n"
-            "{ 'message': 'Perfil atualizado com sucesso', 'data': { ...dados do usuário... } }"
+            "{ 'message': 'Perfil atualizado com sucesso', "
+            "'data': { ...dados do usuário... } }"
         ),
         tags=["Usuário"],
         security=[{"BearerAuth": []}],

@@ -1,5 +1,5 @@
 from datetime import timedelta
-from typing import Any, NoReturn
+from typing import Any
 
 from flask import Blueprint, Response, abort, jsonify, make_response
 from flask_apispec import doc, marshal_with, use_kwargs

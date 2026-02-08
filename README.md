@@ -68,6 +68,9 @@ docker-compose up --build
 - `/Users/italochagas/Desktop/projetos/flask/flask-template/docs/controllers/wallet_controller.md`
 - `/Users/italochagas/Desktop/projetos/flask/flask-template/docs/API_RESPONSE_CONTRACT.md` (contrato alvo de resposta)
 - `/Users/italochagas/Desktop/projetos/flask/flask-template/docs/PHASE0_RESPONSE_ADOPTION_PLAN.md` (plano de adoção sem quebra)
+- `/Users/italochagas/Desktop/projetos/flask/flask-template/docs/PHASE0_IMPLEMENTATION_LOG.md` (log das entregas da Fase 0)
+- `/Users/italochagas/Desktop/projetos/flask/flask-template/docs/TESTING.md` (setup e execução da suíte)
+- `/Users/italochagas/Desktop/projetos/flask/flask-template/docs/CI_CD.md` (pipeline CI no GitHub Actions)
 
 ## Qualidade de código
 Hooks configurados via `.pre-commit-config.yaml`:
@@ -83,7 +86,7 @@ pre-commit run --all-files
 ```
 
 ## Situação atual de testes
-Existem testes iniciais (`tests/`), mas a cobertura ainda é baixa para o domínio completo.
+Existe suíte configurada em `tests/` com `pytest` e setup isolado de banco para execução local.
 
 ## Fase 0 (documentação e consistência)
 Nesta fase, o foco é alinhar documentação com comportamento real e mapear lacunas sem alterar regras de negócio já funcionando.

@@ -108,7 +108,7 @@ class TransactionResource(MethodResource):
             from decimal import Decimal
             from uuid import uuid4
 
-            from dateutil.relativedelta import relativedelta  # type: ignore
+            from dateutil.relativedelta import relativedelta
 
             try:
                 group_id = uuid4()
@@ -126,7 +126,7 @@ class TransactionResource(MethodResource):
                     due = base_date + relativedelta(months=i)
                     t = Transaction(
                         user_id=UUID(user_id),
-                        title=f"{title} ({i+1}/{count})",
+                        title=f"{title} ({i + 1}/{count})",
                         amount=value,
                         type=TransactionType(kwargs["type"]),
                         due_date=due,
@@ -240,7 +240,7 @@ class TransactionResource(MethodResource):
     )  # type: ignore
     @jwt_required()  # type: ignore
     @use_kwargs(TransactionSchema(partial=True), location="json")  # type: ignore
-    def put(self, transaction_id: UUID, **kwargs: Any):
+    def put(self, transaction_id: UUID, **kwargs: Any):  # noqa: C901
         verify_jwt_in_request()
         jwt_data = get_jwt()
 
@@ -444,7 +444,8 @@ class TransactionResource(MethodResource):
 
     @doc(
         description=(
-            "Lista todas as transações deletadas (soft deleted) do usuário autenticado.\n\n"
+            "Lista todas as transações deletadas "
+            "(soft deleted) do usuário autenticado.\n\n"
             "Exemplo de resposta:\n"
             "{ 'deleted_transactions': [{...}] }"
         ),
@@ -569,7 +570,8 @@ class TransactionSummaryResource(MethodResource):
             "Resumo mensal das transações (total de receitas e despesas).\n\n"
             "Parâmetro obrigatório: month=YYYY-MM.\n\n"
             "Exemplo de resposta:\n"
-            "{ 'month': '2024-02', 'income_total': 5000.00, 'expense_total': 3000.00, ... }"
+            "{ 'month': '2024-02', 'income_total': 5000.00, "
+            "'expense_total': 3000.00, ... }"
         ),
         tags=["Transações"],
         security=[{"BearerAuth": []}],
