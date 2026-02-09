@@ -38,8 +38,11 @@ def run_app() -> None:
 
             app: Flask = create_app()
 
-            # Rodar a aplicação
-            app.run(host="0.0.0.0", port=5000, debug=True)
+            # Rodar a aplicação apenas em loopback para evitar exposição externa.
+            host = os.getenv("FLASK_RUN_HOST", "127.0.0.1")
+            if host == "0.0.0.0":
+                host = "127.0.0.1"
+            app.run(host=host, port=5000, debug=True)
 
     except KeyboardInterrupt:
         print("\n👋 Aplicação finalizada!")

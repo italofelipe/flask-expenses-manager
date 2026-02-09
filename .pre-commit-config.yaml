@@ -22,3 +22,12 @@ repos:
     additional_dependencies:
     - types-requests==2.32.4.20260107
     - types-python-dateutil==2.9.0.20260124
+
+- repo: local
+  hooks:
+  - id: sonar-local-check
+    name: sonar-local-check
+    entry: scripts/sonar_local_check.sh
+    language: system
+    pass_filenames: false
+    always_run: true

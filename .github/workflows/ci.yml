@@ -118,3 +118,12 @@ jobs:
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
           SONAR_HOST_URL: https://sonarcloud.io
+
+      - name: Enforce Sonar Policy (A ratings + no critical bugs)
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+          SONAR_HOST_URL: https://sonarcloud.io
+          SONAR_PROJECT_KEY: ${{ vars.SONAR_PROJECT_KEY }}
+          SONAR_BRANCH: ${{ github.head_ref || github.ref_name }}
+        run: |
+          bash scripts/sonar_enforce_ci.sh
