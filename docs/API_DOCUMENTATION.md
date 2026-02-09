@@ -259,7 +259,6 @@ Atualiza item da carteira e salva histórico quando `quantity` ou `value` mudam.
 
 ## 5) GraphQL (fase 1)
 - `POST /graphql`
-- `GET /graphql` (health/check simples)
 
 Objetivo da fase 1:
 - adicionar suporte GraphQL gradual sem quebrar os endpoints REST.

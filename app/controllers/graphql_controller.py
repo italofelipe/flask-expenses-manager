@@ -7,14 +7,8 @@ from app.graphql import schema
 graphql_bp = Blueprint("graphql", __name__, url_prefix="/graphql")
 
 
-@graphql_bp.route("", methods=["GET", "POST"])  # type: ignore[misc]
+@graphql_bp.route("", methods=["POST"])  # type: ignore[misc]
 def execute_graphql() -> tuple[dict[str, Any], int]:
-    if request.method == "GET":
-        return (
-            {"message": ("GraphQL endpoint ativo. Envie POST com query em JSON.")},
-            200,
-        )
-
     payload: Dict[str, Any] = request.get_json(silent=True) or {}
     query = payload.get("query")
     variables = payload.get("variables")

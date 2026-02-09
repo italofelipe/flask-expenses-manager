@@ -11,10 +11,6 @@ Arquivo: `/Users/italochagas/Desktop/projetos/flask/flask-template/app/controlle
 
 ## Endpoints
 
-## `GET /graphql`
-O que faz:
-- endpoint leve para health check e orientação de uso.
-
 ## `POST /graphql`
 O que faz:
 - recebe body com:
