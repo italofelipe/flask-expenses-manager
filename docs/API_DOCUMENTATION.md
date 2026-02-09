@@ -124,6 +124,7 @@ Query params atuais:
 - `GET /transactions/deleted`
 - `DELETE /transactions/{transaction_id}/force`
 - `GET /transactions/summary?month=YYYY-MM`
+- `GET /transactions/dashboard?month=YYYY-MM`
 - `GET /transactions/list`
 - `GET /transactions/expenses`
 
@@ -138,6 +139,7 @@ Suporta:
 - tipo `income|expense`
 - status (`paid|pending|cancelled|postponed|overdue`)
 - recorrência (`is_recurring`, `start_date`, `end_date`)
+- parcelamento com soma exata (diferença de arredondamento ajustada na última parcela)
 - validações de recorrência:
   - `is_recurring=true` exige `start_date` e `end_date`
   - `due_date` deve estar entre `start_date` e `end_date`
@@ -174,6 +176,19 @@ Remove definitivamente uma transação já soft-deleted.
 ### `GET /transactions/summary?month=YYYY-MM`
 Calcula total mensal de receitas e despesas e retorna transações do mês.
 - Com `X-API-Contract: v2`, itens em `data.items` e paginação em `meta.pagination`.
+
+### `GET /transactions/dashboard?month=YYYY-MM`
+Retorna um dashboard mensal consolidado com foco em visão executiva:
+- totais de receita, despesa e saldo (`income_total`, `expense_total`, `balance`)
+- contagens por tipo (`income`, `expense`) e total
+- contagens por status (`paid`, `pending`, `cancelled`, `postponed`, `overdue`)
+- principais categorias (tags) de receita e despesa por valor agregado
+
+Com `X-API-Contract: v2`:
+- mês em `data.month`
+- totais em `data.totals`
+- contagens em `data.counts`
+- categorias em `data.top_categories`
 
 ### `GET /transactions/list`
 Lista transações ativas do usuário.

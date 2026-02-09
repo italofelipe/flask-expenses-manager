@@ -1,5 +1,5 @@
 from datetime import date, datetime
-from decimal import Decimal
+from decimal import ROUND_DOWN, Decimal
 from typing import Any, Dict
 from uuid import UUID
 
@@ -17,6 +17,7 @@ from app.extensions.database import db
 from app.extensions.jwt_callbacks import is_token_revoked
 from app.models.transaction import Transaction, TransactionStatus, TransactionType
 from app.schemas.transaction_schema import TransactionSchema
+from app.services.transaction_analytics_service import TransactionAnalyticsService
 from app.utils.pagination import PaginatedResponse
 from app.utils.response_builder import error_payload, success_payload
 
@@ -110,6 +111,20 @@ def _parse_optional_date(value: str | None, field_name: str) -> date | None:
         ) from exc
 
 
+def _parse_month_param(value: str | None) -> tuple[int, int, str]:
+    if not value:
+        raise ValueError("Parâmetro 'month' é obrigatório no formato YYYY-MM.")
+    try:
+        year, month_number = map(int, value.split("-"))
+    except ValueError as exc:
+        raise ValueError("Formato de mês inválido. Use YYYY-MM.") from exc
+
+    if month_number < 1 or month_number > 12:
+        raise ValueError("Formato de mês inválido. Use YYYY-MM.")
+
+    return year, month_number, f"{year:04d}-{month_number:02d}"
+
+
 def _validate_recurring_payload(
     *,
     is_recurring: bool,
@@ -156,6 +171,22 @@ def _resolve_transaction_ordering(order_by: str, order: str) -> Any:
 
     column = allowed_order_by[order_by]
     return column.asc() if order == "asc" else column.desc()
+
+
+def _build_installment_amounts(total: Decimal, count: int) -> list[Decimal]:
+    if count < 1:
+        raise ValueError("'installment_count' deve ser maior que zero.")
+
+    normalized_total = total.quantize(Decimal("0.01"))
+    base_amount = (normalized_total / count).quantize(
+        Decimal("0.01"), rounding=ROUND_DOWN
+    )
+    amounts = [base_amount] * count
+
+    distributed = base_amount * count
+    remainder = (normalized_total - distributed).quantize(Decimal("0.01"))
+    amounts[-1] = (amounts[-1] + remainder).quantize(Decimal("0.01"))
+    return amounts
 
 
 def _invalid_token_response() -> Response:
@@ -276,7 +307,7 @@ class TransactionResource(MethodResource):
                 total = Decimal(kwargs["amount"])
                 count = int(kwargs["installment_count"])
                 base_date = kwargs["due_date"]
-                value = round(total / count, 2)
+                installment_amounts = _build_installment_amounts(total, count)
                 title = kwargs["title"]
                 if "type" in kwargs:
                     kwargs["type"] = kwargs["type"].lower()
@@ -287,7 +318,7 @@ class TransactionResource(MethodResource):
                     transaction = Transaction(
                         user_id=UUID(user_id),
                         title=f"{title} ({i + 1}/{count})",
-                        amount=value,
+                        amount=installment_amounts[i],
                         type=TransactionType(kwargs["type"]),
                         due_date=due,
                         start_date=kwargs.get("start_date"),
@@ -989,44 +1020,14 @@ class TransactionSummaryResource(MethodResource):
 
         user_id = get_jwt_identity()
         user_uuid = UUID(user_id)
-        month = request.args.get("month")
-        if not month:
-            return _compat_error(
-                legacy_payload={
-                    "error": "Parâmetro 'month' é obrigatório no formato YYYY-MM."
-                },
-                status_code=400,
-                message="Parâmetro 'month' é obrigatório no formato YYYY-MM.",
-                error_code="VALIDATION_ERROR",
-            )
-
         try:
-            year, month_number = map(int, month.split("-"))
-        except ValueError:
-            return _compat_error(
-                legacy_payload={"error": "Formato de mês inválido. Use YYYY-MM."},
-                status_code=400,
-                message="Formato de mês inválido. Use YYYY-MM.",
-                error_code="VALIDATION_ERROR",
+            year, month_number, month = _parse_month_param(request.args.get("month"))
+            analytics = TransactionAnalyticsService(user_uuid)
+            transactions = analytics.get_month_transactions(
+                year=year, month_number=month_number
             )
-
-        try:
-            transactions = (
-                Transaction.query.filter_by(user_id=user_uuid, deleted=False)
-                .filter(db.extract("year", Transaction.due_date) == year)
-                .filter(db.extract("month", Transaction.due_date) == month_number)
-                .all()
-            )
-
-            income_total = sum(
-                item.amount
-                for item in transactions
-                if item.type == TransactionType.INCOME
-            )
-            expense_total = sum(
-                item.amount
-                for item in transactions
-                if item.type == TransactionType.EXPENSE
+            aggregates = analytics.get_month_aggregates(
+                year=year, month_number=month_number
             )
 
             page = int(request.args.get("page", 1))
@@ -1040,16 +1041,16 @@ class TransactionSummaryResource(MethodResource):
             return _compat_success(
                 legacy_payload={
                     "month": month,
-                    "income_total": float(income_total),
-                    "expense_total": float(expense_total),
+                    "income_total": float(aggregates["income_total"]),
+                    "expense_total": float(aggregates["expense_total"]),
                     **paginated,
                 },
                 status_code=200,
                 message="Resumo mensal calculado com sucesso",
                 data={
                     "month": month,
-                    "income_total": float(income_total),
-                    "expense_total": float(expense_total),
+                    "income_total": float(aggregates["income_total"]),
+                    "expense_total": float(aggregates["expense_total"]),
                     "items": paginated["data"],
                 },
                 meta={
@@ -1061,6 +1062,13 @@ class TransactionSummaryResource(MethodResource):
                     }
                 },
             )
+        except ValueError as exc:
+            return _compat_error(
+                legacy_payload={"error": str(exc)},
+                status_code=400,
+                message=str(exc),
+                error_code="VALIDATION_ERROR",
+            )
         except Exception as exc:
             db.session.rollback()
             return _compat_error(
@@ -1070,6 +1078,127 @@ class TransactionSummaryResource(MethodResource):
                 },
                 status_code=500,
                 message="Erro ao calcular resumo mensal",
+                error_code="INTERNAL_ERROR",
+                details={"exception": str(exc)},
+            )
+
+
+class TransactionMonthlyDashboardResource(MethodResource):
+    @doc(
+        description=(
+            "Dashboard mensal de transações com totais, contagens e categorias "
+            "principais.\n\n"
+            "Parâmetro obrigatório: month=YYYY-MM.\n\n"
+            "Métricas retornadas:\n"
+            "- income_total, expense_total, balance\n"
+            "- contagens por tipo e por status\n"
+            "- top categorias de despesas e receitas"
+        ),
+        tags=["Transações"],
+        security=[{"BearerAuth": []}],
+        params={
+            "month": {
+                "description": "Formato YYYY-MM (ex: 2025-04)",
+                "in": "query",
+                "type": "string",
+            },
+            CONTRACT_HEADER: {
+                "in": "header",
+                "description": "Opcional. Envie 'v2' para o contrato padronizado.",
+                "type": "string",
+                "required": False,
+            },
+        },
+        responses={
+            200: {"description": "Dashboard mensal de transações"},
+            400: {"description": "Parâmetro inválido"},
+            401: {"description": "Token inválido"},
+            500: {"description": "Erro interno"},
+        },
+    )  # type: ignore[misc]
+    @jwt_required()  # type: ignore[misc]
+    def get(self) -> Response:
+        verify_jwt_in_request()
+        jwt_data = get_jwt()
+        if is_token_revoked(jwt_data["jti"]):
+            return _invalid_token_response()
+
+        user_id = get_jwt_identity()
+        user_uuid = UUID(user_id)
+
+        try:
+            year, month_number, month = _parse_month_param(request.args.get("month"))
+            analytics = TransactionAnalyticsService(user_uuid)
+            aggregates = analytics.get_month_aggregates(
+                year=year,
+                month_number=month_number,
+            )
+            status_counts = analytics.get_status_counts(
+                year=year, month_number=month_number
+            )
+            top_expense_categories = analytics.get_top_categories(
+                year=year,
+                month_number=month_number,
+                transaction_type=TransactionType.EXPENSE,
+            )
+            top_income_categories = analytics.get_top_categories(
+                year=year,
+                month_number=month_number,
+                transaction_type=TransactionType.INCOME,
+            )
+
+            return _compat_success(
+                legacy_payload={
+                    "month": month,
+                    "income_total": float(aggregates["income_total"]),
+                    "expense_total": float(aggregates["expense_total"]),
+                    "balance": float(aggregates["balance"]),
+                    "counts": {
+                        "total_transactions": aggregates["total_transactions"],
+                        "income_transactions": aggregates["income_transactions"],
+                        "expense_transactions": aggregates["expense_transactions"],
+                        "status": status_counts,
+                    },
+                    "top_expense_categories": top_expense_categories,
+                    "top_income_categories": top_income_categories,
+                },
+                status_code=200,
+                message="Dashboard mensal calculado com sucesso",
+                data={
+                    "month": month,
+                    "totals": {
+                        "income_total": float(aggregates["income_total"]),
+                        "expense_total": float(aggregates["expense_total"]),
+                        "balance": float(aggregates["balance"]),
+                    },
+                    "counts": {
+                        "total_transactions": aggregates["total_transactions"],
+                        "income_transactions": aggregates["income_transactions"],
+                        "expense_transactions": aggregates["expense_transactions"],
+                        "status": status_counts,
+                    },
+                    "top_categories": {
+                        "expense": top_expense_categories,
+                        "income": top_income_categories,
+                    },
+                },
+            )
+        except ValueError as exc:
+            return _compat_error(
+                legacy_payload={"error": str(exc)},
+                status_code=400,
+                message=str(exc),
+                error_code="VALIDATION_ERROR",
+            )
+        except Exception as exc:
+            db.session.rollback()
+            return _compat_error(
+                legacy_payload={
+                    "error": "Erro ao calcular dashboard mensal",
+                    "message": str(exc),
+                },
+                status_code=500,
+                message="Erro ao calcular dashboard mensal",
                 error_code="INTERNAL_ERROR",
                 details={"exception": str(exc)},
             )
@@ -1441,6 +1570,14 @@ transaction_bp.add_url_rule(
 transaction_bp.add_url_rule(
     "/summary",
     view_func=TransactionSummaryResource.as_view("transaction_monthly_summary"),
+    methods=["GET"],
+)
+
+transaction_bp.add_url_rule(
+    "/dashboard",
+    view_func=TransactionMonthlyDashboardResource.as_view(
+        "transaction_monthly_dashboard"
+    ),
     methods=["GET"],
 )
 

@@ -10,6 +10,7 @@ Gerenciar ciclo completo de transações financeiras:
 - hard delete
 - listagens
 - resumo mensal
+- dashboard mensal
 
 ## Blueprint
 - Prefixo: `/transactions`
@@ -37,6 +38,9 @@ O que faz:
 - Exige JWT válido e não revogado.
 - Cria transação simples.
 - Quando `is_installment=true`, gera múltiplas transações com `installment_group_id`.
+- Parcelamento agora garante soma exata:
+  - divide com arredondamento controlado
+  - aplica diferença residual na última parcela
 - Valida recorrência (`is_recurring=true`):
   - exige `start_date` e `end_date`
   - exige `due_date` dentro do intervalo
@@ -144,6 +148,29 @@ O que faz:
   - dados em `data.month`, `data.income_total`, `data.expense_total`, `data.items`
   - paginação em `meta.pagination`
 
+## `TransactionMonthlyDashboardResource.get`
+Endpoint: `GET /transactions/dashboard?month=YYYY-MM`
+
+O que faz:
+- Calcula visão mensal consolidada de transações do usuário.
+- Retorna:
+  - totais: `income_total`, `expense_total`, `balance`
+  - contagens: total, por tipo e por status
+  - categorias principais (tags) por valor agregado para:
+    - despesas
+    - receitas
+- Aceita `month` no formato `YYYY-MM` (obrigatório).
+
+Contrato:
+- Legado:
+  - campos no payload raiz (`income_total`, `expense_total`, `balance`, `counts`)
+  - listas em `top_expense_categories` e `top_income_categories`
+- v2:
+  - `data.month`
+  - `data.totals`
+  - `data.counts`
+  - `data.top_categories`
+
 ## `TransactionForceDeleteResource.delete`
 Endpoint: `DELETE /transactions/{transaction_id}/force`
 
@@ -157,6 +184,7 @@ O que faz:
 - `TransactionType`, `TransactionStatus`
 - `TransactionSchema`
 - `PaginatedResponse`
+- `TransactionAnalyticsService` (agregações de resumo/dashboard)
 - JWT callbacks de revogação
 
 ## Pontos incompletos / TODOs (identificados no código)

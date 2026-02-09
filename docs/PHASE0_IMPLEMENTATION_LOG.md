@@ -157,3 +157,40 @@
   - paginação/ordenação
   - métricas de contagem
   - resposta no contrato legado
+
+## Atualização adicional (Transactions - parcelamento com arredondamento controlado C3)
+- Cálculo de parcelas refatorado para manter soma exata do valor total.
+- Regra aplicada:
+  - divide com arredondamento para baixo em centavos
+  - diferença residual é aplicada na última parcela
+- Implementação no helper interno `_build_installment_amounts(...)`.
+- Testes adicionados:
+  - `tests/test_transaction_installments.py`
+
+## Atualização adicional (Transactions - dashboard mensal C4)
+- Novo endpoint: `GET /transactions/dashboard?month=YYYY-MM`
+- Entregas implementadas:
+  - totais mensais (`income_total`, `expense_total`, `balance`)
+  - contagens por tipo (`income`, `expense`, `total`)
+  - contagens por status (`paid`, `pending`, `cancelled`, `postponed`, `overdue`)
+  - categorias principais por valor agregado para receitas e despesas (tags)
+- Contrato legado e `v2` suportados.
+- Refatoração de apoio:
+  - helper único para parsing/validação de mês (`_parse_month_param`)
+  - `TransactionSummaryResource` passou a reutilizar o mesmo parser
+  - extração de agregações para `app/services/transaction_analytics_service.py`
+    (separação de responsabilidades e melhor testabilidade)
+- Testes adicionados em `tests/test_transaction_contract.py`:
+  - dashboard mensal no contrato `v2`
+  - dashboard mensal no contrato legado
+  - validação de `month` inválido
+- Validação da suíte:
+  - testes de transações passaram
+  - suíte completa passou com cobertura total `88%`
+
+## Atualização adicional (Qualidade - lint stack)
+- Corrigido problema de execução local do `flake8` causado por incompatibilidade de `pyflakes`.
+- Ajuste aplicado em `requirements-dev.txt`:
+  - `pyflakes==3.2.0` (compatível com `flake8==7.1.1`)
+- Validação executada:
+  - `pre-commit` (black, flake8, isort, mypy) passou para os arquivos alterados.

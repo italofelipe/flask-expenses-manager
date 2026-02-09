@@ -1,5 +1,7 @@
 # Plano de Tarefas por Área - Not Enough Cash, Stranger!
 
+> Fonte de verdade para acompanhamento operacional (status, progresso, risco e commit): `TASKS.md`.
+
 ## 1) Diagnóstico rápido (estado atual)
 
 ### 1.1 Autenticação e usuário
@@ -83,8 +85,8 @@
   - [x] `start_date <= end_date`
   - [x] criação automática de ocorrências futuras (serviço idempotente + job agendado)
   - [x] prevenção de duplicidade
-- [ ] C3. Consolidar regras de parcelamento (soma das parcelas = total, arredondamento final).
-- [ ] C4. Criar endpoint de dashboard mensal (receitas, despesas, saldo, categorias principais).
+- [x] C3. Consolidar regras de parcelamento (soma das parcelas = total, arredondamento final).
+- [x] C4. Criar endpoint de dashboard mensal (receitas, despesas, saldo, categorias principais).
 - [x] C5. Criar endpoint de despesas por período com paginação, ordenação e métricas agregadas.
 
 ## Área D - Investimentos
@@ -95,6 +97,10 @@
 - [ ] D5. Implementar P/L absoluto e percentual por ativo e total.
 - [ ] D6. Adicionar resiliência BRAPI (timeout, retry, tratamento de erro e cache curto).
 - [ ] D7. Criar endpoint de evolução histórica da carteira por período.
+- [ ] D8. Expandir feature de Carteira para múltiplos produtos (`ações`, `FII`, `CDB`, `CDI` e similares), com:
+  - integração BRAPI para preço na data do aporte e preço atual,
+  - cálculo de ganho/perda no tempo por posição e consolidado,
+  - modelagem modular e testável para suportar novos tipos de investimento.
 
 ## Área E - Metas financeiras
 - [ ] E1. Criar model `Goal` (nome, valor alvo, prazo, prioridade, status).
@@ -176,3 +182,4 @@
 - O projeto atual não usa Pydantic no runtime (usa Marshmallow/Webargs).
 - Existem referências na documentação para rotas/recursos que ainda não estão implementados (especialmente `ticker` separado e alguns caminhos antigos de auth/transação).
 - O módulo de metas ainda não existe e deve ser tratado como nova feature de domínio.
+- Arquivos de ticker/carteira (`app/controllers/ticker_controller.py` e `app/models/user_ticker.py`) foram restaurados após exclusão acidental e a evolução dessa área seguirá via backlog da Área D.

@@ -1,6 +1,12 @@
 import uuid
 from datetime import date, timedelta
 from typing import Any, Dict
+from uuid import UUID
+
+from flask_jwt_extended import decode_token
+
+from app.extensions.database import db
+from app.models.tag import Tag
 
 
 def _register_and_login(client) -> str:
@@ -116,6 +122,123 @@ def test_transaction_summary_missing_month_v2_contract(client) -> None:
 
     response = client.get(
         "/transactions/summary",
+        headers=_auth_headers(token, "v2"),
+    )
+
+    assert response.status_code == 400
+    body = response.get_json()
+    assert body["success"] is False
+    assert body["error"]["code"] == "VALIDATION_ERROR"
+
+
+def test_transaction_dashboard_v2_contract(client) -> None:
+    token = _register_and_login(client)
+    month_ref = date.today().strftime("%Y-%m")
+
+    with client.application.app_context():
+        user_id = UUID(decode_token(token)["sub"])
+        food_tag = Tag(user_id=user_id, name="Alimentacao")
+        home_tag = Tag(user_id=user_id, name="Moradia")
+        db.session.add_all([food_tag, home_tag])
+        db.session.commit()
+        food_tag_id = str(food_tag.id)
+        home_tag_id = str(home_tag.id)
+
+    payloads = [
+        _transaction_payload(
+            title="Salario",
+            type="income",
+            status="paid",
+            amount="1000.00",
+            due_date=date.today().isoformat(),
+        ),
+        _transaction_payload(
+            title="Mercado",
+            type="expense",
+            status="pending",
+            amount="100.00",
+            tag_id=food_tag_id,
+            due_date=date.today().isoformat(),
+        ),
+        _transaction_payload(
+            title="Aluguel",
+            type="expense",
+            status="paid",
+            amount="300.00",
+            tag_id=home_tag_id,
+            due_date=date.today().isoformat(),
+        ),
+        _transaction_payload(
+            title="Cafe",
+            type="expense",
+            status="cancelled",
+            amount="50.00",
+            due_date=date.today().isoformat(),
+        ),
+    ]
+    for payload in payloads:
+        created = client.post(
+            "/transactions",
+            json=payload,
+            headers=_auth_headers(token, "v2"),
+        )
+        assert created.status_code == 201
+
+    response = client.get(
+        f"/transactions/dashboard?month={month_ref}",
+        headers=_auth_headers(token, "v2"),
+    )
+
+    assert response.status_code == 200
+    body = response.get_json()
+    assert body["success"] is True
+    assert body["data"]["month"] == month_ref
+    assert body["data"]["totals"]["income_total"] == 1000.0
+    assert body["data"]["totals"]["expense_total"] == 450.0
+    assert body["data"]["totals"]["balance"] == 550.0
+    assert body["data"]["counts"]["total_transactions"] == 4
+    assert body["data"]["counts"]["income_transactions"] == 1
+    assert body["data"]["counts"]["expense_transactions"] == 3
+    assert body["data"]["counts"]["status"]["paid"] == 2
+    assert body["data"]["counts"]["status"]["pending"] == 1
+    assert body["data"]["counts"]["status"]["cancelled"] == 1
+    assert body["data"]["top_categories"]["expense"][0]["category_name"] == "Moradia"
+    assert body["data"]["top_categories"]["expense"][0]["total_amount"] == 300.0
+
+
+def test_transaction_dashboard_legacy_contract(client) -> None:
+    token = _register_and_login(client)
+    month_ref = date.today().strftime("%Y-%m")
+
+    created = client.post(
+        "/transactions",
+        json=_transaction_payload(type="expense", amount="100.00"),
+        headers=_auth_headers(token),
+    )
+    assert created.status_code == 201
+
+    response = client.get(
+        f"/transactions/dashboard?month={month_ref}",
+        headers=_auth_headers(token),
+    )
+
+    assert response.status_code == 200
+    body = response.get_json()
+    assert "success" not in body
+    assert body["month"] == month_ref
+    assert "income_total" in body
+    assert "expense_total" in body
+    assert "balance" in body
+    assert "counts" in body
+    assert "top_expense_categories" in body
+    assert "top_income_categories" in body
+
+
+def test_transaction_dashboard_invalid_month_v2_contract(client) -> None:
+    token = _register_and_login(client)
+
+    response = client.get(
+        "/transactions/dashboard?month=2026-13",
         headers=_auth_headers(token, "v2"),
     )
 
