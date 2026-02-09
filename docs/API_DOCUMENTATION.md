@@ -1,262 +1,210 @@
-# Documentação da API - Not Enough Cash, Stranger!
+# API Documentation (As-Is)
 
-## 📋 Visão Geral
+Este documento descreve o comportamento real da API com base no código atual da branch.
 
-Esta API fornece funcionalidades completas para gerenciamento financeiro pessoal, incluindo controle de transações, investimentos, contas bancárias e cartões de crédito.
+## Base URL
+- Local (Docker): `http://localhost:3333`
 
-## 🔗 Acesso à Documentação
+## Autenticação
+A API usa JWT via header:
 
-- **Swagger UI**: `http://localhost:5000/docs/`
-- **OpenAPI JSON**: `http://localhost:5000/docs/swagger/`
-
-## 🔐 Autenticação
-
-A API utiliza JWT (JSON Web Tokens) para autenticação:
-
-1. **Registro**: `POST /auth/register`
-2. **Login**: `POST /auth/login`
-3. **Logout**: `POST /auth/logout`
-
-Para endpoints protegidos, inclua o header:
-```
-Authorization: Bearer <seu_token_jwt>
+```http
+Authorization: Bearer <token>
 ```
 
-## 📊 Modelos de Dados
+Fluxo atual:
+1. `POST /auth/register`
+2. `POST /auth/login`
+3. `POST /auth/logout`
 
-### Usuário (User)
-```json
-{
-  "id": "uuid",
-  "name": "string (2-128 chars)",
-  "email": "email@exemplo.com",
-  "password": "string (min 6 chars)",
-  "gender": "masculino|feminino|outro",
-  "birth_date": "YYYY-MM-DD",
-  "monthly_income": "decimal",
-  "net_worth": "decimal",
-  "monthly_expenses": "decimal",
-  "initial_investment": "decimal",
-  "monthly_investment": "decimal",
-  "investment_goal_date": "YYYY-MM-DD"
-}
-```
+## Domínios disponíveis
+- Autenticação
+- Usuário/perfil
+- Transações
+- Carteira (investimentos)
 
-### Transação (Transaction)
-```json
-{
-  "id": "uuid",
-  "title": "string (1-120 chars)",
-  "description": "string (max 300 chars)",
-  "observation": "string (max 500 chars)",
-  "amount": "decimal (min 0.01)",
-  "currency": "string (3 chars, ISO 4217)",
-  "type": "income|expense",
-  "status": "paid|pending|cancelled|postponed|overdue",
-  "due_date": "YYYY-MM-DD",
-  "is_recurring": "boolean",
-  "is_installment": "boolean",
-  "installment_count": "integer (1-60)",
-  "start_date": "YYYY-MM-DD",
-  "end_date": "YYYY-MM-DD",
-  "tag_id": "uuid",
-  "account_id": "uuid",
-  "credit_card_id": "uuid"
-}
-```
+## Endpoints
 
-### Ativo Financeiro (UserTicker)
-```json
-{
-  "id": "uuid",
-  "symbol": "string (1-10 chars)",
-  "quantity": "float (min 0.01)",
-  "type": "stock|fii|etf|bond|crypto|other"
-}
-```
+## 1) Auth
+- `POST /auth/register`
+- `POST /auth/login`
+- `POST /auth/logout`
 
-### Conta Bancária (Account)
-```json
-{
-  "id": "uuid",
-  "name": "string (1-100 chars)"
-}
-```
+### `POST /auth/register`
+Cria usuário com `name`, `email`, `password`.
 
-### Cartão de Crédito (CreditCard)
-```json
-{
-  "id": "uuid",
-  "name": "string (1-100 chars)"
-}
-```
+Resposta de sucesso:
+- `201`
 
-### Tag
-```json
-{
-  "id": "uuid",
-  "name": "string (1-50 chars)"
-}
-```
+Erros comuns:
+- `409` email já cadastrado
+- `400` erro de validação
 
-## 🚀 Endpoints Principais
+### `POST /auth/login`
+Aceita `email` ou `name` + `password`.
 
-### Autenticação
-- `POST /auth/register` - Registrar novo usuário
-- `POST /auth/login` - Fazer login
-- `POST /auth/logout` - Fazer logout
+Resposta de sucesso:
+- `200` com token JWT
 
-### Usuários
-- `GET /user/me` - Obter dados do usuário logado
-- `PUT /user/profile` - Atualizar perfil do usuário
+Erros comuns:
+- `400` credenciais ausentes
+- `401` credenciais inválidas
 
-### Transações
-- `GET /transaction/` - Listar transações (com paginação)
-- `POST /transaction/` - Criar nova transação
-- `GET /transaction/{id}` - Obter transação específica
-- `PUT /transaction/{id}` - Atualizar transação
-- `DELETE /transaction/{id}` - Excluir transação
-- `GET /transaction/summary/{year}/{month}` - Resumo mensal
+### `POST /auth/logout`
+Revoga a sessão atual do usuário autenticado.
 
-### Investimentos (Tickers)
-- `GET /ticker/` - Listar ativos do usuário
-- `POST /ticker/` - Adicionar novo ativo
-- `GET /ticker/{id}` - Obter ativo específico
-- `PUT /ticker/{id}` - Atualizar ativo
-- `DELETE /ticker/{id}` - Remover ativo
+Resposta de sucesso:
+- `200`
 
-## 📝 Exemplos de Uso
+## 2) User
+- `PUT /user/profile`
+- `GET /user/me`
 
-### Criar uma Transação
-```bash
-curl -X POST "http://localhost:5000/transaction/" \
-  -H "Authorization: Bearer <seu_token>" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "title": "Pagamento da conta de luz",
-    "description": "Conta de energia elétrica do mês de janeiro",
-    "amount": "150.50",
-    "type": "expense",
-    "due_date": "2024-02-15",
-    "currency": "BRL",
-    "is_recurring": false
-  }'
-```
+### `PUT /user/profile`
+Atualiza perfil financeiro/pessoal do usuário autenticado.
 
-### Atualizar Perfil do Usuário
-```bash
-curl -X PUT "http://localhost:5000/user/profile" \
-  -H "Authorization: Bearer <seu_token>" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "gender": "masculino",
-    "birth_date": "1990-05-15",
-    "monthly_income": "5000.00",
-    "net_worth": "50000.00",
-    "monthly_expenses": "3000.00"
-  }'
-```
+Campos suportados:
+- `gender`
+- `birth_date`
+- `monthly_income`
+- `net_worth`
+- `monthly_expenses`
+- `initial_investment`
+- `monthly_investment`
+- `investment_goal_date`
 
-### Adicionar Ativo Financeiro
-```bash
-curl -X POST "http://localhost:5000/ticker/" \
-  -H "Authorization: Bearer <seu_token>" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "symbol": "PETR4",
-    "quantity": 100.0,
-    "type": "stock"
-  }'
-```
+Resposta de sucesso:
+- `200`
 
-## 🔍 Filtros e Paginação
+Erros comuns:
+- `400` validação
+- `401` token revogado/ausente
+- `404` usuário não encontrado
 
-### Transações
-- `page`: Número da página (padrão: 1)
-- `per_page`: Itens por página (padrão: 20, máximo: 100)
-- `type`: Filtrar por tipo (income/expense)
-- `status`: Filtrar por status
-- `start_date`: Data inicial
-- `end_date`: Data final
-- `tag_id`: Filtrar por tag
-- `account_id`: Filtrar por conta
-- `credit_card_id`: Filtrar por cartão
+### `GET /user/me`
+Retorna:
+- dados do usuário
+- transações paginadas
+- carteira do usuário
 
-### Exemplo de Filtro
-```bash
-GET /transaction/?type=expense&status=pending&page=1&per_page=10
-```
+Query params atuais:
+- `page`
+- `limit`
+- `status`
+- `month` (`YYYY-MM`)
 
-## 📊 Resumo Mensal
+## 3) Transactions
+- `POST /transactions`
+- `PUT /transactions/{transaction_id}`
+- `DELETE /transactions/{transaction_id}`
+- `PATCH /transactions/restore/{transaction_id}`
+- `GET /transactions/deleted`
+- `DELETE /transactions/{transaction_id}/force`
+- `GET /transactions/summary?month=YYYY-MM`
+- `GET /transactions/list`
 
-O endpoint `/transaction/summary/{year}/{month}` retorna:
+Contrato de resposta:
+- Padrão legado (default): sem envelope `success/data/meta`.
+- Novo contrato: enviar header `X-API-Contract: v2`.
 
-```json
-{
-  "income_total": "5000.00",
-  "expense_total": "3000.00",
-  "transactions": [...]
-}
-```
+### `POST /transactions`
+Cria transação única ou parcelada (`is_installment=true`).
 
-## ⚠️ Códigos de Erro
+Suporta:
+- tipo `income|expense`
+- status (`paid|pending|cancelled|postponed|overdue`)
+- recorrência (`is_recurring`, `start_date`, `end_date`)
+- Com `X-API-Contract: v2`:
+  - simples em `data.transaction`
+  - parcelada em `data.transactions`
 
-- `400` - Dados inválidos
-- `401` - Não autorizado (token inválido/expirado)
-- `404` - Recurso não encontrado
-- `422` - Erro de validação
-- `500` - Erro interno do servidor
+### `PUT /transactions/{transaction_id}`
+Atualiza campos da transação.
 
-## 🔧 Configuração
+Regra específica implementada:
+- Se `status=paid`, exige `paid_at`.
+- `paid_at` não pode ser no futuro.
+- Com `X-API-Contract: v2`, retorna envelope padronizado.
 
-### Variáveis de Ambiente
-```bash
-FLASK_ENV=development
-FLASK_DEBUG=True
-DATABASE_URL=postgresql://user:pass@localhost/dbname
-JWT_SECRET_KEY=your-secret-key
-```
+### `DELETE /transactions/{transaction_id}`
+Soft delete (`deleted=true`).
+- Com `X-API-Contract: v2`, retorna envelope padronizado.
 
-### Dependências
-```bash
-pip install -r requirements.txt
-```
+### `PATCH /transactions/restore/{transaction_id}`
+Restaura transação soft-deleted.
+- Com `X-API-Contract: v2`, retorna envelope padronizado.
 
-## 🚀 Executando a API
+### `GET /transactions/deleted`
+Lista transações deletadas logicamente do usuário.
+- Com `X-API-Contract: v2`, itens em `data.deleted_transactions`.
 
-1. **Instalar dependências**:
-   ```bash
-   pip install -r requirements.txt
-   ```
+### `DELETE /transactions/{transaction_id}/force`
+Remove definitivamente uma transação já soft-deleted.
+- Com `X-API-Contract: v2`, retorna envelope padronizado.
 
-2. **Configurar banco de dados**:
-   ```bash
-   flask db upgrade
-   ```
+### `GET /transactions/summary?month=YYYY-MM`
+Calcula total mensal de receitas e despesas e retorna transações do mês.
+- Com `X-API-Contract: v2`, itens em `data.items` e paginação em `meta.pagination`.
 
-3. **Executar a aplicação**:
-   ```bash
-   python run.py
-   ```
+### `GET /transactions/list`
+Lista transações ativas do usuário.
+- Com `X-API-Contract: v2`, itens em `data.transactions` e paginação em `meta.pagination`.
 
-4. **Acessar documentação**:
-   ```
-   http://localhost:5000/docs/
-   ```
+## 4) Wallet
+- `POST /wallet`
+- `GET /wallet`
+- `GET /wallet/{investment_id}/history`
+- `PUT /wallet/{investment_id}`
+- `DELETE /wallet/{investment_id}`
 
-## 📚 Recursos Adicionais
+Contrato de resposta:
+- Padrão legado (default): sem envelope `success/data/meta`.
+- Novo contrato: enviar header `X-API-Contract: v2`.
 
-- **Validações**: Todos os campos possuem validações apropriadas
-- **Paginação**: Endpoints de listagem suportam paginação
-- **Soft Delete**: Transações são marcadas como deletadas, não removidas fisicamente
-- **Relacionamentos**: Suporte completo a relacionamentos entre entidades
-- **Auditoria**: Campos `created_at` e `updated_at` em todas as entidades
+### `POST /wallet`
+Cria item da carteira.
 
-## 🤝 Contribuindo
+Regras implementadas:
+- Com `ticker`: `quantity` obrigatório e `value` não deve ser enviado.
+- Sem `ticker`: `value` obrigatório.
+- `estimated_value_on_create_date` é calculado via BRAPI (quando há ticker) ou por `value * quantity`.
+- Com header `X-API-Contract: v2`, retorna envelope padronizado.
 
-Para contribuir com a documentação:
+### `GET /wallet`
+Lista carteira paginada (`page`, `per_page`).
+- Com `X-API-Contract: v2`, paginação vem em `meta.pagination`.
 
-1. Atualize os schemas em `app/schemas/`
-2. Adicione exemplos em `app/docs/api_documentation.py`
-3. Atualize este README conforme necessário
-4. Teste a documentação no Swagger UI
+### `GET /wallet/{investment_id}/history`
+Retorna histórico paginado de alterações do investimento.
+- Com `X-API-Contract: v2`, itens ficam em `data.items`.
+
+### `PUT /wallet/{investment_id}`
+Atualiza item da carteira e salva histórico quando `quantity` ou `value` mudam.
+- Com `X-API-Contract: v2`, retorna envelope padronizado.
+
+### `DELETE /wallet/{investment_id}`
+Remove item da carteira.
+- Com `X-API-Contract: v2`, retorna envelope padronizado.
+
+## Contratos e status code
+A API ainda não está 100% padronizada em payload de sucesso/erro entre todos os controllers.
+
+Referência de padronização (Fase 0):
+- `/Users/italochagas/Desktop/projetos/flask/flask-template/docs/API_RESPONSE_CONTRACT.md`
+- `/Users/italochagas/Desktop/projetos/flask/flask-template/docs/PHASE0_RESPONSE_ADOPTION_PLAN.md`
+
+## Lacunas e TODOs identificados no código (Fase 0)
+1. `transaction_controller.py` contém comentário TODO de enum para status/tipo, mas enums já existem no model e o TODO está desatualizado.
+2. `GET /transactions/list` hoje retorna todos os ativos sem aplicar filtros/paginação documentados.
+3. Não há módulo de metas financeiras implementado (`goals`).
+4. Não há CRUD exposto para `Tag`, `Account` e `CreditCard` (existem model/schema, mas sem controller).
+5. A documentação histórica citava endpoints `/ticker` e `/transaction`; o código atual usa `/wallet` e `/transactions`.
+6. Projeto usa Marshmallow/Webargs em runtime; Pydantic não está implementado no fluxo atual.
+
+## Diretrizes para próximas implementações (senior baseline)
+- SOLID e separação clara entre Controller, Service e regras de domínio.
+- Controller fino, com regras em serviços puros e testáveis.
+- Validação centralizada e consistente de contratos de entrada/saída.
+- Padronização de erros e códigos HTTP.
+- Cobertura de testes por domínio (unitário + integração).
+- Dependências externas (BRAPI) com timeout, retry e fallback.

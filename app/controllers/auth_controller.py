@@ -1,5 +1,6 @@
 from datetime import timedelta
 from typing import Any
+from uuid import UUID
 
 from flask import Blueprint, Response, abort, jsonify, make_response
 from flask_apispec import doc, marshal_with, use_kwargs
@@ -179,7 +180,7 @@ class LogoutResource(MethodResource):
     @jwt_required()  # type: ignore[misc]
     def post(self) -> Response:
         identity = get_jwt_identity()
-        user = User.query.get(identity)
+        user = User.query.get(UUID(identity))
         if user:
             user.current_jti = None
             db.session.commit()

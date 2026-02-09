@@ -1,8 +1,9 @@
+from datetime import datetime
+from decimal import Decimal
 from typing import Any, Dict
 from uuid import UUID
 
-import flask
-from flask import Blueprint, Response, jsonify
+from flask import Blueprint, Response, jsonify, request
 from flask_apispec import doc, use_kwargs
 from flask_apispec.views import MethodResource
 from flask_jwt_extended import (
@@ -17,10 +18,65 @@ from app.extensions.jwt_callbacks import is_token_revoked
 from app.models.transaction import Transaction, TransactionStatus, TransactionType
 from app.schemas.transaction_schema import TransactionSchema
 from app.utils.pagination import PaginatedResponse
+from app.utils.response_builder import error_payload, success_payload
 
 transaction_bp = Blueprint("transaction", __name__, url_prefix="/transactions")
 
 INVALID_TOKEN_MESSAGE = "Token inválido."
+CONTRACT_HEADER = "X-API-Contract"
+CONTRACT_V2 = "v2"
+
+
+def _is_v2_contract() -> bool:
+    header_value = str(request.headers.get(CONTRACT_HEADER, "")).strip().lower()
+    return header_value == CONTRACT_V2
+
+
+def _json_response(payload: Dict[str, Any], status_code: int) -> Response:
+    response = jsonify(payload)
+    response.status_code = status_code
+    return response
+
+
+def _compat_success(
+    *,
+    legacy_payload: Dict[str, Any],
+    status_code: int,
+    message: str,
+    data: Dict[str, Any],
+    meta: Dict[str, Any] | None = None,
+) -> Response:
+    if _is_v2_contract():
+        return _json_response(
+            success_payload(message=message, data=data, meta=meta),
+            status_code,
+        )
+    return _json_response(legacy_payload, status_code)
+
+
+def _compat_error(
+    *,
+    legacy_payload: Dict[str, Any],
+    status_code: int,
+    message: str,
+    error_code: str,
+    details: Dict[str, Any] | None = None,
+) -> Response:
+    if _is_v2_contract():
+        return _json_response(
+            error_payload(message=message, code=error_code, details=details),
+            status_code,
+        )
+    return _json_response(legacy_payload, status_code)
+
+
+def _invalid_token_response() -> Response:
+    return _compat_error(
+        legacy_payload={"error": INVALID_TOKEN_MESSAGE},
+        status_code=401,
+        message=INVALID_TOKEN_MESSAGE,
+        error_code="UNAUTHORIZED",
+    )
 
 
 def serialize_transaction(transaction: Transaction) -> Dict[str, Any]:
@@ -80,6 +136,14 @@ class TransactionResource(MethodResource):
         ),
         tags=["Transações"],
         security=[{"BearerAuth": []}],
+        params={
+            CONTRACT_HEADER: {
+                "in": "header",
+                "description": "Opcional. Envie 'v2' para o contrato padronizado.",
+                "type": "string",
+                "required": False,
+            }
+        },
         responses={
             201: {"description": "Transação criada com sucesso"},
             400: {"description": "Erro de validação"},
@@ -93,19 +157,14 @@ class TransactionResource(MethodResource):
         verify_jwt_in_request()
         jwt_data = get_jwt()
         if is_token_revoked(jwt_data["jti"]):
-            response = jsonify({"error": INVALID_TOKEN_MESSAGE})
-            response.status_code = 401
-            return response
+            return _invalid_token_response()
 
         user_id = get_jwt_identity()
 
-        # Normaliza o campo 'type' para minúsculo, se presente
         if "type" in kwargs:
             kwargs["type"] = kwargs["type"].lower()
 
-        # Bloco para criar transações parceladas se necessário
         if kwargs.get("is_installment") and kwargs.get("installment_count"):
-            from decimal import Decimal
             from uuid import uuid4
 
             from dateutil.relativedelta import relativedelta
@@ -117,14 +176,13 @@ class TransactionResource(MethodResource):
                 base_date = kwargs["due_date"]
                 value = round(total / count, 2)
                 title = kwargs["title"]
-                # Normaliza novamente 'type' (por segurança, caso kwargs seja alterado)
                 if "type" in kwargs:
                     kwargs["type"] = kwargs["type"].lower()
 
                 transactions = []
                 for i in range(count):
                     due = base_date + relativedelta(months=i)
-                    t = Transaction(
+                    transaction = Transaction(
                         user_id=UUID(user_id),
                         title=f"{title} ({i + 1}/{count})",
                         amount=value,
@@ -146,75 +204,81 @@ class TransactionResource(MethodResource):
                         currency=kwargs.get("currency", "BRL"),
                         installment_group_id=group_id,
                     )
-                    transactions.append(t)
+                    transactions.append(transaction)
 
                 db.session.add_all(transactions)
                 db.session.commit()
 
-                created_data = [serialize_transaction(t) for t in transactions]
-                return (
-                    jsonify(
-                        {
-                            "message": "Transações parceladas criadas com sucesso",
-                            "transactions": created_data,
-                        }
-                    ),
-                    201,
+                created_data = [serialize_transaction(item) for item in transactions]
+                return _compat_success(
+                    legacy_payload={
+                        "message": "Transações parceladas criadas com sucesso",
+                        "transactions": created_data,
+                    },
+                    status_code=201,
+                    message="Transações parceladas criadas com sucesso",
+                    data={"transactions": created_data},
                 )
-            except Exception as e:
+            except Exception as exc:
                 db.session.rollback()
-                return (
-                    jsonify(
-                        {
-                            "error": "Erro ao criar transações parceladas",
-                            "message": str(e),
-                        }
-                    ),
-                    500,
-                )
-        else:
-            try:
-                transaction = Transaction(
-                    user_id=UUID(user_id),
-                    title=kwargs["title"],
-                    amount=kwargs["amount"],
-                    type=TransactionType(kwargs["type"]),
-                    due_date=kwargs["due_date"],
-                    start_date=kwargs.get("start_date"),
-                    end_date=kwargs.get("end_date"),
-                    description=kwargs.get("description"),
-                    observation=kwargs.get("observation"),
-                    is_recurring=kwargs.get("is_recurring", False),
-                    is_installment=kwargs.get("is_installment", False),
-                    installment_count=kwargs.get("installment_count"),
-                    tag_id=kwargs.get("tag_id"),
-                    account_id=kwargs.get("account_id"),
-                    credit_card_id=kwargs.get("credit_card_id"),
-                    status=TransactionStatus(kwargs.get("status", "pending").lower()),
-                    currency=kwargs.get("currency", "BRL"),
+                return _compat_error(
+                    legacy_payload={
+                        "error": "Erro ao criar transações parceladas",
+                        "message": str(exc),
+                    },
+                    status_code=500,
+                    message="Erro ao criar transações parceladas",
+                    error_code="INTERNAL_ERROR",
+                    details={"exception": str(exc)},
                 )
 
-                db.session.add(transaction)
-                db.session.commit()
+        try:
+            transaction = Transaction(
+                user_id=UUID(user_id),
+                title=kwargs["title"],
+                amount=kwargs["amount"],
+                type=TransactionType(kwargs["type"]),
+                due_date=kwargs["due_date"],
+                start_date=kwargs.get("start_date"),
+                end_date=kwargs.get("end_date"),
+                description=kwargs.get("description"),
+                observation=kwargs.get("observation"),
+                is_recurring=kwargs.get("is_recurring", False),
+                is_installment=kwargs.get("is_installment", False),
+                installment_count=kwargs.get("installment_count"),
+                tag_id=kwargs.get("tag_id"),
+                account_id=kwargs.get("account_id"),
+                credit_card_id=kwargs.get("credit_card_id"),
+                status=TransactionStatus(kwargs.get("status", "pending").lower()),
+                currency=kwargs.get("currency", "BRL"),
+            )
 
-                created_data = [serialize_transaction(transaction)]
+            db.session.add(transaction)
+            db.session.commit()
 
-                response = jsonify(
-                    {
-                        "message": "Transação criada com sucesso",
-                        "transaction": created_data,
-                    }
-                )
-                response.status_code = 201
-                return response
+            created_data = [serialize_transaction(transaction)]
 
-            except Exception as e:
-                db.session.rollback()
-                response = jsonify(
-                    {"error": "Erro ao criar transação", "message": str(e)}
-                )
-                response.status_code = 500
-                return response
+            return _compat_success(
+                legacy_payload={
+                    "message": "Transação criada com sucesso",
+                    "transaction": created_data,
+                },
+                status_code=201,
+                message="Transação criada com sucesso",
+                data={"transaction": created_data},
+            )
+        except Exception as exc:
+            db.session.rollback()
+            return _compat_error(
+                legacy_payload={
+                    "error": "Erro ao criar transação",
+                    "message": str(exc),
+                },
+                status_code=500,
+                message="Erro ao criar transação",
+                error_code="INTERNAL_ERROR",
+                details={"exception": str(exc)},
+            )
 
     @doc(
         description=(
@@ -228,7 +292,15 @@ class TransactionResource(MethodResource):
         ),
         tags=["Transações"],
         security=[{"BearerAuth": []}],
-        # TODO: CRIAR ENUMS PARA MAPEAR OS STATUS E TIPOS DE TRANSACOES
+        params={
+            "transaction_id": {"description": "ID da transação", "type": "string"},
+            CONTRACT_HEADER: {
+                "in": "header",
+                "description": "Opcional. Envie 'v2' para o contrato padronizado.",
+                "type": "string",
+                "required": False,
+            },
+        },
         responses={
             200: {"description": "Transação atualizada com sucesso"},
             400: {"description": "Erro de validação"},
@@ -240,63 +312,69 @@ class TransactionResource(MethodResource):
     )  # type: ignore
     @jwt_required()  # type: ignore
     @use_kwargs(TransactionSchema(partial=True), location="json")  # type: ignore
-    def put(self, transaction_id: UUID, **kwargs: Any):  # noqa: C901
+    def put(self, transaction_id: UUID, **kwargs: Any) -> Response:  # noqa: C901
         verify_jwt_in_request()
         jwt_data = get_jwt()
 
         if is_token_revoked(jwt_data["jti"]):
-            response = jsonify({"error": INVALID_TOKEN_MESSAGE})
-            response.status_code = 401
-            return response
+            return _invalid_token_response()
+
         user_id = get_jwt_identity()
         transaction = Transaction.query.filter_by(
             id=transaction_id, deleted=False
         ).first()
 
         if transaction is None:
-            response = jsonify({"error": "Transação não encontrada."})
-            response.status_code = 404
-            return response
+            return _compat_error(
+                legacy_payload={"error": "Transação não encontrada."},
+                status_code=404,
+                message="Transação não encontrada.",
+                error_code="NOT_FOUND",
+            )
 
         if str(transaction.user_id) != str(user_id):
-            response = jsonify(
-                {"error": "Você não tem permissão para editar esta transação."}
+            return _compat_error(
+                legacy_payload={
+                    "error": "Você não tem permissão para editar esta transação."
+                },
+                status_code=403,
+                message="Você não tem permissão para editar esta transação.",
+                error_code="FORBIDDEN",
             )
-            response.status_code = 403
-            return response
 
-        # Validações de status e paid_at
-        from datetime import datetime
-
-        # Validação: status=PAID exige paid_at
         if kwargs.get("status", "").lower() == "paid" and not kwargs.get("paid_at"):
-            return (
-                jsonify(
-                    {
-                        "error": (
-                            "É obrigatório informar 'paid_at' ao marcar a transação "
-                            "como paga (status=PAID)."
-                        )
-                    }
+            return _compat_error(
+                legacy_payload={
+                    "error": (
+                        "É obrigatório informar 'paid_at' ao marcar a transação "
+                        "como paga (status=PAID)."
+                    )
+                },
+                status_code=400,
+                message=(
+                    "É obrigatório informar 'paid_at' ao marcar a transação "
+                    "como paga (status=PAID)."
                 ),
-                400,
+                error_code="VALIDATION_ERROR",
             )
 
-        # Validação: paid_at exige status=PAID
         if kwargs.get("paid_at") and kwargs.get("status", "").lower() != "paid":
-            return (
-                jsonify(
-                    {"error": "'paid_at' só pode ser definido se o status for 'PAID'."}
-                ),
-                400,
+            return _compat_error(
+                legacy_payload={
+                    "error": "'paid_at' só pode ser definido se o status for 'PAID'."
+                },
+                status_code=400,
+                message="'paid_at' só pode ser definido se o status for 'PAID'.",
+                error_code="VALIDATION_ERROR",
             )
 
-        # Validação: paid_at não pode estar no futuro
         if "paid_at" in kwargs and kwargs["paid_at"] is not None:
             if kwargs["paid_at"] > datetime.utcnow():
-                return (
-                    jsonify({"error": "'paid_at' não pode ser uma data futura."}),
-                    400,
+                return _compat_error(
+                    legacy_payload={"error": "'paid_at' não pode ser uma data futura."},
+                    status_code=400,
+                    message="'paid_at' não pode ser uma data futura.",
+                    error_code="VALIDATION_ERROR",
                 )
 
         try:
@@ -308,20 +386,26 @@ class TransactionResource(MethodResource):
 
             updated_data = serialize_transaction(transaction)
 
-            response = jsonify(
-                {
+            return _compat_success(
+                legacy_payload={
                     "message": "Transação atualizada com sucesso",
                     "transaction": updated_data,
-                }
+                },
+                status_code=200,
+                message="Transação atualizada com sucesso",
+                data={"transaction": updated_data},
             )
-            response.status_code = 200
-            return response
-
-        except Exception as e:
+        except Exception as exc:
             db.session.rollback()
-            return (
-                jsonify({"error": "Erro ao atualizar transação", "message": str(e)}),
-                500,
+            return _compat_error(
+                legacy_payload={
+                    "error": "Erro ao atualizar transação",
+                    "message": str(exc),
+                },
+                status_code=500,
+                message="Erro ao atualizar transação",
+                error_code="INTERNAL_ERROR",
+                details={"exception": str(exc)},
             )
 
     @doc(
@@ -333,6 +417,12 @@ class TransactionResource(MethodResource):
         ),
         params={
             "transaction_id": {"description": "ID da transação", "type": "string"},
+            CONTRACT_HEADER: {
+                "in": "header",
+                "description": "Opcional. Envie 'v2' para o contrato padronizado.",
+                "type": "string",
+                "required": False,
+            },
         },
         tags=["Transações"],
         security=[{"BearerAuth": []}],
@@ -350,9 +440,7 @@ class TransactionResource(MethodResource):
         jwt_data = get_jwt()
 
         if is_token_revoked(jwt_data["jti"]):
-            response = jsonify({"error": INVALID_TOKEN_MESSAGE})
-            response.status_code = 401
-            return response
+            return _invalid_token_response()
 
         user_id = get_jwt_identity()
         transaction = Transaction.query.filter_by(
@@ -360,35 +448,47 @@ class TransactionResource(MethodResource):
         ).first()
 
         if transaction is None:
-            response = jsonify({"error": "Transação não encontrada."})
-            response.status_code = 404
-            return response
+            return _compat_error(
+                legacy_payload={"error": "Transação não encontrada."},
+                status_code=404,
+                message="Transação não encontrada.",
+                error_code="NOT_FOUND",
+            )
 
         if str(transaction.user_id) != str(user_id):
-            response = jsonify(
-                {"error": "Você não tem permissão para deletar esta transação."}
+            return _compat_error(
+                legacy_payload={
+                    "error": "Você não tem permissão para deletar esta transação."
+                },
+                status_code=403,
+                message="Você não tem permissão para deletar esta transação.",
+                error_code="FORBIDDEN",
             )
-            response.status_code = 403
-            return response
 
         try:
-            # Soft delete - marca como deletada
             transaction.deleted = True
             db.session.commit()
 
-            response = jsonify(
-                {"message": "Transação deletada com sucesso (soft delete)."}
+            return _compat_success(
+                legacy_payload={
+                    "message": "Transação deletada com sucesso (soft delete)."
+                },
+                status_code=200,
+                message="Transação deletada com sucesso (soft delete).",
+                data={},
             )
-            response.status_code = 200
-            return response
-
-        except Exception as e:
+        except Exception as exc:
             db.session.rollback()
-            response = jsonify(
-                {"error": "Erro ao deletar transação", "message": str(e)}
+            return _compat_error(
+                legacy_payload={
+                    "error": "Erro ao deletar transação",
+                    "message": str(exc),
+                },
+                status_code=500,
+                message="Erro ao deletar transação",
+                error_code="INTERNAL_ERROR",
+                details={"exception": str(exc)},
             )
-            response.status_code = 500
-            return response
 
     @doc(
         description=(
@@ -398,6 +498,15 @@ class TransactionResource(MethodResource):
         ),
         tags=["Transações"],
         security=[{"BearerAuth": []}],
+        params={
+            "transaction_id": {"description": "ID da transação", "type": "string"},
+            CONTRACT_HEADER: {
+                "in": "header",
+                "description": "Opcional. Envie 'v2' para o contrato padronizado.",
+                "type": "string",
+                "required": False,
+            },
+        },
         responses={
             200: {"description": "Transação restaurada com sucesso"},
             400: {"description": "Transação não está deletada"},
@@ -411,36 +520,51 @@ class TransactionResource(MethodResource):
         verify_jwt_in_request()
         jwt_data = get_jwt()
         if is_token_revoked(jwt_data["jti"]):
-            return jsonify({"error": INVALID_TOKEN_MESSAGE}), 401
+            return _invalid_token_response()
 
         user_id = get_jwt_identity()
+        user_uuid = UUID(user_id)
 
         transaction = Transaction.query.filter_by(
-            id=transaction_id, user_id=user_id, deleted=True
+            id=transaction_id, user_id=user_uuid, deleted=True
         ).first()
         if not transaction:
-            response = jsonify({"error": "Transação não encontrada."})
-            response.status_code = 404
-            return response
+            return _compat_error(
+                legacy_payload={"error": "Transação não encontrada."},
+                status_code=404,
+                message="Transação não encontrada.",
+                error_code="NOT_FOUND",
+            )
 
         if not transaction.deleted:
-            response = jsonify({"error": "Transação não está deletada."})
-            response.status_code = 400
-            return response
+            return _compat_error(
+                legacy_payload={"error": "Transação não está deletada."},
+                status_code=400,
+                message="Transação não está deletada.",
+                error_code="VALIDATION_ERROR",
+            )
 
         try:
             transaction.deleted = False
             db.session.commit()
-            response = jsonify({"message": "Transação restaurada com sucesso"})
-            response.status_code = 200
-            return response
-        except Exception as e:
-            db.session.rollback()
-            response = jsonify(
-                {"error": "Erro ao restaurar transação", "message": str(e)}
+            return _compat_success(
+                legacy_payload={"message": "Transação restaurada com sucesso"},
+                status_code=200,
+                message="Transação restaurada com sucesso",
+                data={},
             )
-            response.status_code = 500
-            return response
+        except Exception as exc:
+            db.session.rollback()
+            return _compat_error(
+                legacy_payload={
+                    "error": "Erro ao restaurar transação",
+                    "message": str(exc),
+                },
+                status_code=500,
+                message="Erro ao restaurar transação",
+                error_code="INTERNAL_ERROR",
+                details={"exception": str(exc)},
+            )
 
     @doc(
         description=(
@@ -451,6 +575,14 @@ class TransactionResource(MethodResource):
         ),
         tags=["Transações"],
         security=[{"BearerAuth": []}],
+        params={
+            CONTRACT_HEADER: {
+                "in": "header",
+                "description": "Opcional. Envie 'v2' para o contrato padronizado.",
+                "type": "string",
+                "required": False,
+            }
+        },
         responses={
             200: {"description": "Lista de transações deletadas"},
             401: {"description": "Token inválido"},
@@ -462,29 +594,36 @@ class TransactionResource(MethodResource):
         verify_jwt_in_request()
         jwt_data = get_jwt()
         if is_token_revoked(jwt_data["jti"]):
-            response = jsonify({"error": INVALID_TOKEN_MESSAGE})
-            response.status_code = 401
-            return response
+            return _invalid_token_response()
 
         user_id = get_jwt_identity()
+        user_uuid = UUID(user_id)
 
         try:
             transactions = Transaction.query.filter_by(
-                user_id=user_id, deleted=True
+                user_id=user_uuid, deleted=True
             ).all()
+            serialized = [serialize_transaction(item) for item in transactions]
 
-            serialized = [serialize_transaction(t) for t in transactions]
-
-            response = jsonify({"deleted_transactions": serialized})
-            response.status_code = 200
-            return response
-        except Exception as e:
-            db.session.rollback()
-            response = jsonify(
-                {"error": "Erro ao buscar transações deletadas", "message": str(e)}
+            return _compat_success(
+                legacy_payload={"deleted_transactions": serialized},
+                status_code=200,
+                message="Lista de transações deletadas",
+                data={"deleted_transactions": serialized},
+                meta={"total": len(serialized)},
             )
-            response.status_code = 500
-            return response
+        except Exception as exc:
+            db.session.rollback()
+            return _compat_error(
+                legacy_payload={
+                    "error": "Erro ao buscar transações deletadas",
+                    "message": str(exc),
+                },
+                status_code=500,
+                message="Erro ao buscar transações deletadas",
+                error_code="INTERNAL_ERROR",
+                details={"exception": str(exc)},
+            )
 
     @doc(
         description=(
@@ -520,6 +659,12 @@ class TransactionResource(MethodResource):
                 "description": "Filtrar por cartão de crédito",
                 "type": "string",
             },
+            CONTRACT_HEADER: {
+                "in": "header",
+                "description": "Opcional. Envie 'v2' para o contrato padronizado.",
+                "type": "string",
+                "required": False,
+            },
         },
         responses={
             200: {"description": "Lista de transações"},
@@ -532,36 +677,50 @@ class TransactionResource(MethodResource):
         verify_jwt_in_request()
         jwt_data = get_jwt()
         if is_token_revoked(jwt_data["jti"]):
-            response = jsonify({"error": INVALID_TOKEN_MESSAGE})
-            response.status_code = 401
-            return response
+            return _invalid_token_response()
 
         user_id = get_jwt_identity()
+        user_uuid = UUID(user_id)
 
         try:
             transactions = Transaction.query.filter_by(
-                user_id=user_id, deleted=False
+                user_id=user_uuid, deleted=False
             ).all()
+            serialized = [serialize_transaction(item) for item in transactions]
+            total = len(transactions)
+            per_page = len(transactions)
 
-            serialized = [serialize_transaction(t) for t in transactions]
-
-            response = jsonify(
-                {
+            return _compat_success(
+                legacy_payload={
                     "transactions": serialized,
-                    "total": len(transactions),
+                    "total": total,
                     "page": 1,
-                    "per_page": len(transactions),
-                }
+                    "per_page": per_page,
+                },
+                status_code=200,
+                message="Lista de transações ativas",
+                data={"transactions": serialized},
+                meta={
+                    "pagination": {
+                        "total": total,
+                        "page": 1,
+                        "per_page": per_page,
+                        "pages": 1,
+                    }
+                },
             )
-            response.status_code = 200
-            return response
-        except Exception as e:
+        except Exception as exc:
             db.session.rollback()
-            response = jsonify(
-                {"error": "Erro ao buscar transações ativas", "message": str(e)}
+            return _compat_error(
+                legacy_payload={
+                    "error": "Erro ao buscar transações ativas",
+                    "message": str(exc),
+                },
+                status_code=500,
+                message="Erro ao buscar transações ativas",
+                error_code="INTERNAL_ERROR",
+                details={"exception": str(exc)},
             )
-            response.status_code = 500
-            return response
 
 
 class TransactionSummaryResource(MethodResource):
@@ -581,6 +740,12 @@ class TransactionSummaryResource(MethodResource):
                 "in": "query",
                 "type": "string",
             },
+            CONTRACT_HEADER: {
+                "in": "header",
+                "description": "Opcional. Envie 'v2' para o contrato padronizado.",
+                "type": "string",
+                "required": False,
+            },
         },
         responses={
             200: {"description": "Resumo mensal de transações"},
@@ -594,59 +759,93 @@ class TransactionSummaryResource(MethodResource):
         verify_jwt_in_request()
         jwt_data = get_jwt()
         if is_token_revoked(jwt_data["jti"]):
-            return jsonify({"error": INVALID_TOKEN_MESSAGE}), 401
+            return _invalid_token_response()
 
         user_id = get_jwt_identity()
-        month = flask.request.args.get("month")
+        user_uuid = UUID(user_id)
+        month = request.args.get("month")
         if not month:
-            return (
-                jsonify(
-                    {"error": "Parâmetro 'month' é obrigatório no formato YYYY-MM."}
-                ),
-                400,
+            return _compat_error(
+                legacy_payload={
+                    "error": "Parâmetro 'month' é obrigatório no formato YYYY-MM."
+                },
+                status_code=400,
+                message="Parâmetro 'month' é obrigatório no formato YYYY-MM.",
+                error_code="VALIDATION_ERROR",
             )
 
         try:
             year, month_number = map(int, month.split("-"))
         except ValueError:
-            return jsonify({"error": "Formato de mês inválido. Use YYYY-MM."}), 400
+            return _compat_error(
+                legacy_payload={"error": "Formato de mês inválido. Use YYYY-MM."},
+                status_code=400,
+                message="Formato de mês inválido. Use YYYY-MM.",
+                error_code="VALIDATION_ERROR",
+            )
 
         try:
             transactions = (
-                Transaction.query.filter_by(user_id=user_id, deleted=False)
+                Transaction.query.filter_by(user_id=user_uuid, deleted=False)
                 .filter(db.extract("year", Transaction.due_date) == year)
                 .filter(db.extract("month", Transaction.due_date) == month_number)
                 .all()
             )
 
             income_total = sum(
-                t.amount for t in transactions if t.type == TransactionType.INCOME
+                item.amount
+                for item in transactions
+                if item.type == TransactionType.INCOME
             )
             expense_total = sum(
-                t.amount for t in transactions if t.type == TransactionType.EXPENSE
+                item.amount
+                for item in transactions
+                if item.type == TransactionType.EXPENSE
             )
 
-            page = int(flask.request.args.get("page", 1))
-            page_size = int(flask.request.args.get("page_size", 10))
+            page = int(request.args.get("page", 1))
+            page_size = int(request.args.get("page_size", 10))
 
-            serialized = [serialize_transaction(t) for t in transactions]
-            response = jsonify(
-                {
+            serialized = [serialize_transaction(item) for item in transactions]
+            paginated = PaginatedResponse.format(
+                serialized, len(transactions), page, page_size
+            )
+
+            return _compat_success(
+                legacy_payload={
                     "month": month,
                     "income_total": float(income_total),
                     "expense_total": float(expense_total),
-                    **PaginatedResponse.format(
-                        serialized, len(transactions), page, page_size
-                    ),
-                }
+                    **paginated,
+                },
+                status_code=200,
+                message="Resumo mensal calculado com sucesso",
+                data={
+                    "month": month,
+                    "income_total": float(income_total),
+                    "expense_total": float(expense_total),
+                    "items": paginated["data"],
+                },
+                meta={
+                    "pagination": {
+                        "total": paginated["total"],
+                        "page": paginated["page"],
+                        "per_page": paginated["page_size"],
+                        "has_next_page": paginated["has_next_page"],
+                    }
+                },
             )
-            response.status_code = 200
-            return response
-        except Exception as e:
+        except Exception as exc:
             db.session.rollback()
-            return (
-                jsonify({"error": "Erro ao calcular resumo mensal", "message": str(e)}),
-                500,
+            return _compat_error(
+                legacy_payload={
+                    "error": "Erro ao calcular resumo mensal",
+                    "message": str(exc),
+                },
+                status_code=500,
+                message="Erro ao calcular resumo mensal",
+                error_code="INTERNAL_ERROR",
+                details={"exception": str(exc)},
             )
 
 
@@ -665,6 +864,12 @@ class TransactionForceDeleteResource(MethodResource):
                 "description": "ID da transação a ser removida",
                 "type": "string",
             },
+            CONTRACT_HEADER: {
+                "in": "header",
+                "description": "Opcional. Envie 'v2' para o contrato padronizado.",
+                "type": "string",
+                "required": False,
+            },
         },
         responses={
             200: {"description": "Transação removida permanentemente"},
@@ -678,9 +883,7 @@ class TransactionForceDeleteResource(MethodResource):
         verify_jwt_in_request()
         jwt_data = get_jwt()
         if is_token_revoked(jwt_data["jti"]):
-            response = jsonify({"error": INVALID_TOKEN_MESSAGE})
-            response.status_code = 401
-            return response
+            return _invalid_token_response()
 
         user_id = get_jwt_identity()
 
@@ -689,28 +892,122 @@ class TransactionForceDeleteResource(MethodResource):
         ).first()
 
         if not transaction:
-            response = jsonify(
-                {"error": "Transação não encontrada ou não está deletada."}
+            return _compat_error(
+                legacy_payload={
+                    "error": "Transação não encontrada ou não está deletada."
+                },
+                status_code=404,
+                message="Transação não encontrada ou não está deletada.",
+                error_code="NOT_FOUND",
             )
-            response.status_code = 404
-            return response
 
         try:
             db.session.delete(transaction)
             db.session.commit()
-            response = jsonify({"message": "Transação removida permanentemente."})
-            response.status_code = 200
-            return response
-        except Exception as e:
-            db.session.rollback()
-            response = jsonify(
-                {"error": "Erro ao deletar permanentemente", "message": str(e)}
+            return _compat_success(
+                legacy_payload={"message": "Transação removida permanentemente."},
+                status_code=200,
+                message="Transação removida permanentemente.",
+                data={},
             )
-            response.status_code = 500
-            return response
+        except Exception as exc:
+            db.session.rollback()
+            return _compat_error(
+                legacy_payload={
+                    "error": "Erro ao deletar permanentemente",
+                    "message": str(exc),
+                },
+                status_code=500,
+                message="Erro ao deletar permanentemente",
+                error_code="INTERNAL_ERROR",
+                details={"exception": str(exc)},
+            )
 
 
-# Registra a rota
+class TransactionDeletedResource(MethodResource):
+    @doc(
+        description=(
+            "Lista todas as transações deletadas "
+            "(soft deleted) do usuário autenticado.\n\n"
+            "Exemplo de resposta:\n"
+            "{ 'deleted_transactions': [{...}] }"
+        ),
+        tags=["Transações"],
+        security=[{"BearerAuth": []}],
+        params={
+            CONTRACT_HEADER: {
+                "in": "header",
+                "description": "Opcional. Envie 'v2' para o contrato padronizado.",
+                "type": "string",
+                "required": False,
+            }
+        },
+        responses={
+            200: {"description": "Lista de transações deletadas"},
+            401: {"description": "Token inválido"},
+            500: {"description": "Erro interno"},
+        },
+    )  # type: ignore
+    @jwt_required()  # type: ignore
+    def get(self) -> Response:
+        resource = TransactionResource()
+        return resource.get_deleted()
+
+
+class TransactionListActiveResource(MethodResource):
+    @doc(
+        description=(
+            "Lista todas as transações ativas do usuário autenticado.\n\n"
+            "Filtros disponíveis:\n"
+            "- page: número da página\n"
+            "- per_page: itens por página\n"
+            "- type: tipo da transação (income, expense)\n"
+            "- status: status da transação\n"
+            "- start_date, end_date: período (YYYY-MM-DD)\n"
+            "- tag_id, account_id, credit_card_id: filtros por relacionamento\n\n"
+            "Exemplo de resposta:\n"
+            "{ 'transactions': [...], 'total': 20, 'page': 1, 'per_page': 10 }"
+        ),
+        tags=["Transações"],
+        security=[{"BearerAuth": []}],
+        params={
+            "page": {"description": "Número da página", "type": "integer"},
+            "per_page": {"description": "Itens por página", "type": "integer"},
+            "type": {
+                "description": "Tipo da transação (income, expense)",
+                "type": "string",
+            },
+            "status": {"description": "Status da transação", "type": "string"},
+            "start_date": {
+                "description": "Data inicial (YYYY-MM-DD)",
+                "type": "string",
+            },
+            "end_date": {"description": "Data final (YYYY-MM-DD)", "type": "string"},
+            "tag_id": {"description": "Filtrar por tag", "type": "string"},
+            "account_id": {"description": "Filtrar por conta", "type": "string"},
+            "credit_card_id": {
+                "description": "Filtrar por cartão de crédito",
+                "type": "string",
+            },
+            CONTRACT_HEADER: {
+                "in": "header",
+                "description": "Opcional. Envie 'v2' para o contrato padronizado.",
+                "type": "string",
+                "required": False,
+            },
+        },
+        responses={
+            200: {"description": "Lista de transações"},
+            401: {"description": "Token inválido ou expirado"},
+            500: {"description": "Erro interno"},
+        },
+    )  # type: ignore
+    @jwt_required()  # type: ignore
+    def get(self) -> Response:
+        resource = TransactionResource()
+        return resource.get_active()
+
+
 transaction_bp.add_url_rule(
     "", view_func=TransactionResource.as_view("transactionresource")
 )
@@ -735,7 +1032,7 @@ transaction_bp.add_url_rule(
 
 transaction_bp.add_url_rule(
     "/deleted",
-    view_func=TransactionResource.as_view("transaction_list_deleted"),
+    view_func=TransactionDeletedResource.as_view("transaction_list_deleted"),
     methods=["GET"],
 )
 
@@ -753,6 +1050,6 @@ transaction_bp.add_url_rule(
 
 transaction_bp.add_url_rule(
     "/list",
-    view_func=TransactionResource.as_view("transaction_list_active"),
+    view_func=TransactionListActiveResource.as_view("transaction_list_active"),
     methods=["GET"],
 )

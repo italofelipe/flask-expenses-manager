@@ -11,6 +11,7 @@ Gerenciar carteira de investimentos do usuário:
 
 ## Blueprint
 - Prefixo: `/wallet`
+- Header opcional de contrato: `X-API-Contract: v2`
 
 ## Recursos e comportamento
 
@@ -31,6 +32,10 @@ Regras de validação efetivas:
 - Sem `ticker`:
   - `value` obrigatório
 
+Contrato de resposta:
+- Default: legado (`message`, `investment`, `error`).
+- `X-API-Contract: v2`: envelope padronizado (`success`, `message`, `data`, `error`, `meta`).
+
 ## `list_wallet_entries`
 Endpoint: `GET /wallet`
 
@@ -39,6 +44,10 @@ O que faz:
 - Ordena por `created_at desc`.
 - Ajusta payload de saída omitindo campos por tipo.
 
+Contrato v2:
+- `data.items`
+- `meta.pagination` com `total`, `page`, `per_page`, `pages`.
+
 ## `get_wallet_history`
 Endpoint: `GET /wallet/{investment_id}/history`
 
@@ -46,6 +55,10 @@ O que faz:
 - Verifica existência e autorização do investimento.
 - Lê histórico JSON (`history`) da entidade.
 - Ordena e pagina resultado.
+
+Contrato v2:
+- `data.items`
+- `meta.pagination` com `total`, `page`, `per_page`, `has_next_page`.
 
 ## `update_wallet_entry`
 Endpoint: `PUT /wallet/{investment_id}`
@@ -57,12 +70,19 @@ O que faz:
 - Recalcula `estimated_value_on_create_date` com `InvestmentService`.
 - Persiste alterações.
 
+Contrato v2:
+- sucesso em `data.investment`
+- erro com `error.code` sem quebrar contrato legado default.
+
 ## `delete_wallet_entry`
 Endpoint: `DELETE /wallet/{investment_id}`
 
 O que faz:
 - Verifica propriedade do recurso.
 - Remove registro da carteira.
+
+Contrato v2:
+- sucesso/erro no envelope padronizado.
 
 ## Dependências principais
 - `app.models.wallet.Wallet`
