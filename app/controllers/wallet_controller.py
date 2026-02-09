@@ -15,8 +15,49 @@ from app.services.investment_service import InvestmentService
 
 # Import PaginatedResponse for paginated investment history
 from app.utils.pagination import PaginatedResponse
+from app.utils.response_builder import error_payload, success_payload
 
 wallet_bp = Blueprint("wallet", __name__, url_prefix="/wallet")
+CONTRACT_HEADER = "X-API-Contract"
+CONTRACT_V2 = "v2"
+
+
+def _is_v2_contract() -> bool:
+    header_value = str(request.headers.get(CONTRACT_HEADER, "")).strip().lower()
+    return header_value == CONTRACT_V2
+
+
+def _compat_success(
+    *,
+    legacy_payload: Dict[str, Any],
+    status_code: int,
+    message: str,
+    data: Dict[str, Any],
+    meta: Dict[str, Any] | None = None,
+) -> tuple[dict[str, Any], int]:
+    if _is_v2_contract():
+        return success_payload(message=message, data=data, meta=meta), status_code
+    return legacy_payload, status_code
+
+
+def _compat_error(
+    *,
+    legacy_payload: Dict[str, Any],
+    status_code: int,
+    message: str,
+    error_code: str,
+    details: Dict[str, Any] | None = None,
+) -> tuple[dict[str, Any], int]:
+    if _is_v2_contract():
+        return (
+            error_payload(
+                message=message,
+                code=error_code,
+                details=details,
+            ),
+            status_code,
+        )
+    return legacy_payload, status_code
 
 
 @wallet_bp.route("", methods=["POST"])  # type: ignore[misc]
@@ -58,7 +99,13 @@ def add_wallet_entry() -> tuple[dict[str, Any], int]:
     try:
         validated_data = schema.load(data)
     except ValidationError as err:
-        return {"error": "Dados inválidos", "messages": str(err.messages)}, 400
+        return _compat_error(
+            legacy_payload={"error": "Dados inválidos", "messages": str(err.messages)},
+            status_code=400,
+            message="Dados inválidos",
+            error_code="VALIDATION_ERROR",
+            details={"messages": err.messages},
+        )
 
     # Calcula valor estimado
     estimated_value = InvestmentService.calculate_estimated_value(validated_data)
@@ -91,17 +138,29 @@ def add_wallet_entry() -> tuple[dict[str, Any], int]:
         else:
             # ticker: omit value
             investment_data.pop("value", None)
-        return {
+        legacy_payload = {
             "message": "Ativo cadastrado com sucesso",
             "investment": investment_data,
-        }, 201
+        }
+        return _compat_success(
+            legacy_payload=legacy_payload,
+            status_code=201,
+            message="Ativo cadastrado com sucesso",
+            data={"investment": investment_data},
+        )
     except Exception as e:
         db.session.rollback()
         import traceback
 
         print("Erro inesperado:", traceback.format_exc())
         print("Tipo:", type(e), "| Args:", e.args)
-        return {"error": "Internal Server Error", "message": str(e)}, 500
+        return _compat_error(
+            legacy_payload={"error": "Internal Server Error", "message": str(e)},
+            status_code=500,
+            message="Internal Server Error",
+            error_code="INTERNAL_ERROR",
+            details={"exception": str(e)},
+        )
 
 
 # GET /wallet - Listar investimentos do usuário com paginação
@@ -110,6 +169,14 @@ def add_wallet_entry() -> tuple[dict[str, Any], int]:
     description="Lista os investimentos cadastrados na carteira com paginação.",
     tags=["Wallet"],
     security=[{"BearerAuth": []}],
+    params={
+        "X-API-Contract": {
+            "in": "header",
+            "description": "Opcional. Envie 'v2' para o contrato padronizado.",
+            "type": "string",
+            "required": False,
+        }
+    },
     responses={
         200: {"description": "Lista paginada de investimentos"},
         401: {"description": "Token inválido"},
@@ -144,13 +211,27 @@ def list_wallet_entries(page: int, per_page: int) -> tuple[dict[str, Any], int]:
         else:
             # ticker: omit value
             item.pop("value", None)
-    return {
+    legacy_payload = {
         "items": items,
         "total": pagination.total,
         "page": pagination.page,
         "per_page": pagination.per_page,
         "pages": pagination.pages,
-    }, 200
+    }
+    return _compat_success(
+        legacy_payload=legacy_payload,
+        status_code=200,
+        message="Lista paginada de investimentos",
+        data={"items": items},
+        meta={
+            "pagination": {
+                "total": pagination.total,
+                "page": pagination.page,
+                "per_page": pagination.per_page,
+                "pages": pagination.pages,
+            }
+        },
+    )
 
 
 # GET /wallet/<uuid:investment_id>/history - Histórico paginado de um investimento
@@ -165,6 +246,12 @@ def list_wallet_entries(page: int, per_page: int) -> tuple[dict[str, Any], int]:
         "investment_id": {"description": "ID do investimento"},
         "page": {"description": "Página desejada (default: 1)"},
         "per_page": {"description": "Itens por página (default: 5, 0 para todos)"},
+        "X-API-Contract": {
+            "in": "header",
+            "description": "Opcional. Envie 'v2' para o contrato padronizado.",
+            "type": "string",
+            "required": False,
+        },
     },
     responses={
         200: {"description": "Histórico paginado"},
@@ -177,13 +264,24 @@ def list_wallet_entries(page: int, per_page: int) -> tuple[dict[str, Any], int]:
 def get_wallet_history(investment_id: UUID) -> tuple[Dict[str, Any], int]:
     """Retorna histórico de alterações de um investimento específico, paginado."""
     user_id: UUID = UUID(get_jwt_identity())
-    investment = Wallet.query.filter_by(id=str(investment_id)).first()
+    investment = Wallet.query.filter_by(id=investment_id).first()
     if not investment:
-        return {"error": "Investimento não encontrado"}, 404
+        return _compat_error(
+            legacy_payload={"error": "Investimento não encontrado"},
+            status_code=404,
+            message="Investimento não encontrado",
+            error_code="NOT_FOUND",
+        )
     if str(investment.user_id) != str(user_id):
-        return {
-            "error": "Você não tem permissão para ver o histórico deste investimento."
-        }, 403
+        return _compat_error(
+            legacy_payload={
+                "error": "Você não tem permissão para ver o histórico "
+                "deste investimento."
+            },
+            status_code=403,
+            message="Você não tem permissão para ver o histórico deste investimento.",
+            error_code="FORBIDDEN",
+        )
 
     # Parâmetros de paginação
     page = request.args.get("page", default=1, type=int)
@@ -218,7 +316,20 @@ def get_wallet_history(investment_id: UUID) -> tuple[Dict[str, Any], int]:
         page=current_page,
         page_size=current_per_page,
     )
-    return response, 200
+    return _compat_success(
+        legacy_payload=response,
+        status_code=200,
+        message="Histórico do investimento retornado com sucesso",
+        data={"items": response["data"]},
+        meta={
+            "pagination": {
+                "total": response["total"],
+                "page": response["page"],
+                "per_page": response["page_size"],
+                "has_next_page": response["has_next_page"],
+            }
+        },
+    )
 
 
 # PUT /wallet/<uuid:investment_id> - Atualizar investimento existente
@@ -227,7 +338,15 @@ def get_wallet_history(investment_id: UUID) -> tuple[Dict[str, Any], int]:
     description="Atualiza um investimento existente da carteira do usuário.",
     tags=["Wallet"],
     security=[{"BearerAuth": []}],
-    params={"investment_id": {"description": "ID do investimento"}},
+    params={
+        "investment_id": {"description": "ID do investimento"},
+        "X-API-Contract": {
+            "in": "header",
+            "description": "Opcional. Envie 'v2' para o contrato padronizado.",
+            "type": "string",
+            "required": False,
+        },
+    },
     responses={
         200: {"description": "Investimento atualizado com sucesso"},
         400: {"description": "Dados inválidos"},
@@ -241,17 +360,35 @@ def update_wallet_entry(investment_id: UUID) -> tuple[dict[str, Any], int]:
     user_id: UUID = UUID(get_jwt_identity())
     data: Dict[str, Any] = request.get_json()
 
-    investment = Wallet.query.filter_by(id=str(investment_id)).first()
+    investment = Wallet.query.filter_by(id=investment_id).first()
     if investment and str(investment.user_id) != str(user_id):
-        return {"error": "Você não tem permissão para editar este investimento."}, 403
+        return _compat_error(
+            legacy_payload={
+                "error": "Você não tem permissão para editar este investimento."
+            },
+            status_code=403,
+            message="Você não tem permissão para editar este investimento.",
+            error_code="FORBIDDEN",
+        )
     if not investment:
-        return {"error": "Investimento não encontrado"}, 404
+        return _compat_error(
+            legacy_payload={"error": "Investimento não encontrado"},
+            status_code=404,
+            message="Investimento não encontrado",
+            error_code="NOT_FOUND",
+        )
 
     schema = WalletSchema(partial=True)
     try:
         validated_data = schema.load(data, partial=True)
     except ValidationError as err:
-        return {"error": "Dados inválidos", "messages": str(err.messages)}, 400
+        return _compat_error(
+            legacy_payload={"error": "Dados inválidos", "messages": str(err.messages)},
+            status_code=400,
+            message="Dados inválidos",
+            error_code="VALIDATION_ERROR",
+            details={"messages": err.messages},
+        )
 
     _update_investment_history(investment, validated_data)
     _apply_validated_fields(investment, validated_data)
@@ -336,16 +473,28 @@ def _commit_investment_update(investment: Wallet) -> tuple[dict[str, Any], int]:
         else:
             investment_data.pop("value", None)
         investment_data["history"] = investment.history
-        return {
+        legacy_payload = {
             "message": "Investimento atualizado com sucesso",
             "investment": investment_data,
-        }, 200
+        }
+        return _compat_success(
+            legacy_payload=legacy_payload,
+            status_code=200,
+            message="Investimento atualizado com sucesso",
+            data={"investment": investment_data},
+        )
     except Exception as e:
         db.session.rollback()
         import traceback
 
         print("Erro inesperado:", traceback.format_exc())
-        return {"error": "Erro interno", "message": str(e)}, 500
+        return _compat_error(
+            legacy_payload={"error": "Erro interno", "message": str(e)},
+            status_code=500,
+            message="Erro interno",
+            error_code="INTERNAL_ERROR",
+            details={"exception": str(e)},
+        )
 
 
 # DELETE /wallet/<uuid:investment_id> - Deletar investimento existente
@@ -354,7 +503,15 @@ def _commit_investment_update(investment: Wallet) -> tuple[dict[str, Any], int]:
     description="Deleta um investimento da carteira do usuário autenticado.",
     tags=["Wallet"],
     security=[{"BearerAuth": []}],
-    params={"investment_id": {"description": "ID do investimento"}},
+    params={
+        "investment_id": {"description": "ID do investimento"},
+        "X-API-Contract": {
+            "in": "header",
+            "description": "Opcional. Envie 'v2' para o contrato padronizado.",
+            "type": "string",
+            "required": False,
+        },
+    },
     responses={
         200: {"description": "Investimento deletado com sucesso"},
         401: {"description": "Token inválido"},
@@ -363,20 +520,42 @@ def _commit_investment_update(investment: Wallet) -> tuple[dict[str, Any], int]:
     },
 )  # type: ignore[misc]
 @jwt_required()  # type: ignore[misc]
-def delete_wallet_entry(investment_id: UUID) -> tuple[dict[str, str], int]:
+def delete_wallet_entry(investment_id: UUID) -> tuple[dict[str, Any], int]:
     """Deleta um investimento existente (pertencente ao usuário autenticado)."""
     user_id: UUID = UUID(get_jwt_identity())
-    # Busca o investimento pelo ID como string
-    investment = Wallet.query.filter_by(id=str(investment_id)).first()
+    investment = Wallet.query.filter_by(id=investment_id).first()
     if not investment:
-        return {"error": "Investimento não encontrado"}, 404
+        return _compat_error(
+            legacy_payload={"error": "Investimento não encontrado"},
+            status_code=404,
+            message="Investimento não encontrado",
+            error_code="NOT_FOUND",
+        )
     # Verifica permissão de usuário
     if str(investment.user_id) != str(user_id):
-        return {"error": "Você não tem permissão para deletar este investimento."}, 403
+        return _compat_error(
+            legacy_payload={
+                "error": "Você não tem permissão para deletar este investimento."
+            },
+            status_code=403,
+            message="Você não tem permissão para deletar este investimento.",
+            error_code="FORBIDDEN",
+        )
     try:
         db.session.delete(investment)
         db.session.commit()
-        return {"message": "Investimento deletado com sucesso"}, 200
+        return _compat_success(
+            legacy_payload={"message": "Investimento deletado com sucesso"},
+            status_code=200,
+            message="Investimento deletado com sucesso",
+            data={},
+        )
     except Exception as e:
         db.session.rollback()
-        return {"error": "Erro ao deletar investimento", "message": str(e)}, 500
+        return _compat_error(
+            legacy_payload={"error": "Erro ao deletar investimento", "message": str(e)},
+            status_code=500,
+            message="Erro ao deletar investimento",
+            error_code="INTERNAL_ERROR",
+            details={"exception": str(e)},
+        )
