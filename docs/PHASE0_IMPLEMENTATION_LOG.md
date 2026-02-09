@@ -238,3 +238,16 @@
   - `unit_price` > 0
   - `fees` >= 0
 - Cobertura de testes adicionada para criação/listagem/validações/autorização.
+
+## Atualização adicional (Investimentos D1 - domínio unificado REST/GraphQL)
+- Operações de investimento passaram a usar serviço de domínio único:
+  - `app/services/investment_operation_service.py`
+- REST expandido:
+  - `PUT /wallet/{investment_id}/operations/{operation_id}`
+  - `DELETE /wallet/{investment_id}/operations/{operation_id}`
+  - `GET /wallet/{investment_id}/operations/summary`
+- GraphQL expandido no mesmo domínio:
+  - Queries: `investmentOperations`, `investmentOperationSummary`
+  - Mutations: `addInvestmentOperation`, `updateInvestmentOperation`,
+    `deleteInvestmentOperation`
+- Objetivo: evitar divergência entre canais de API e manter regras centralizadas.

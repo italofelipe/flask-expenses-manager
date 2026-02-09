@@ -29,5 +29,5 @@ O que faz:
 
 ## Fase atual
 - Fase 1 implementada: queries/mutations essenciais por domínio
-  (`auth`, `user`, `transactions`, `wallet`, `ticker`).
+  (`auth`, `user`, `transactions`, `wallet`, `ticker`, `investment_operations`).
 - Hardening de GraphQL (complexity/depth/rate-limit específico) permanece no backlog.

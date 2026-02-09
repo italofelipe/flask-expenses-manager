@@ -20,24 +20,31 @@ class InvestmentOperationSchema(Schema):
 
     @validates_schema  # type: ignore[misc]
     def validate_business_rules(self, data: Dict[str, Any], **kwargs: Any) -> None:
+        is_partial = bool(kwargs.get("partial", False))
         operation_type = str(data.get("operation_type", "")).strip().lower()
         quantity = data.get("quantity")
         unit_price = data.get("unit_price")
         fees = data.get("fees")
 
-        if operation_type not in {"buy", "sell"}:
+        if (not is_partial or "operation_type" in data) and (
+            operation_type not in {"buy", "sell"}
+        ):
             raise ValidationError(
                 "Campo 'operation_type' inválido. Use 'buy' ou 'sell'.",
                 field_name="operation_type",
             )
 
-        if quantity is None or Decimal(str(quantity)) <= 0:
+        if (not is_partial or "quantity" in data) and (
+            quantity is None or Decimal(str(quantity)) <= 0
+        ):
             raise ValidationError(
                 "Campo 'quantity' deve ser maior que zero.",
                 field_name="quantity",
             )
 
-        if unit_price is None or Decimal(str(unit_price)) <= 0:
+        if (not is_partial or "unit_price" in data) and (
+            unit_price is None or Decimal(str(unit_price)) <= 0
+        ):
             raise ValidationError(
                 "Campo 'unit_price' deve ser maior que zero.",
                 field_name="unit_price",

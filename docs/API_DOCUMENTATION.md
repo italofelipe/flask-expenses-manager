@@ -231,6 +231,9 @@ Resposta inclui:
 - `GET /wallet/{investment_id}/history`
 - `POST /wallet/{investment_id}/operations`
 - `GET /wallet/{investment_id}/operations`
+- `PUT /wallet/{investment_id}/operations/{operation_id}`
+- `DELETE /wallet/{investment_id}/operations/{operation_id}`
+- `GET /wallet/{investment_id}/operations/summary`
 - `PUT /wallet/{investment_id}`
 - `DELETE /wallet/{investment_id}`
 
@@ -265,6 +268,22 @@ Lista operações paginadas de um investimento.
 - Query params: `page`, `per_page`.
 - Com `X-API-Contract: v2`, operações em `data.items` e paginação em `meta.pagination`.
 
+### `PUT /wallet/{investment_id}/operations/{operation_id}`
+Atualiza campos da operação (parcial).
+- Mantém mesmas validações de domínio para os campos enviados.
+
+### `DELETE /wallet/{investment_id}/operations/{operation_id}`
+Remove operação do investimento.
+
+### `GET /wallet/{investment_id}/operations/summary`
+Retorna agregado das operações:
+- total de operações
+- contagem de compras/vendas
+- quantidades (`buy`, `sell`, `net`)
+- montantes brutos de compra/venda
+- preço médio de compra
+- taxas totais
+
 ### `PUT /wallet/{investment_id}`
 Atualiza item da carteira e salva histórico quando `quantity` ou `value` mudam.
 - Com `X-API-Contract: v2`, retorna envelope padronizado.
@@ -283,6 +302,8 @@ Queries iniciais:
 - `transactionDashboard`
 - `walletEntries`
 - `walletHistory`
+- `investmentOperations`
+- `investmentOperationSummary`
 - `tickers`
 
 Mutations iniciais:
@@ -295,6 +316,9 @@ Mutations iniciais:
 - `addWalletEntry`
 - `updateWalletEntry`
 - `deleteWalletEntry`
+- `addInvestmentOperation`
+- `updateInvestmentOperation`
+- `deleteInvestmentOperation`
 - `addTicker`
 - `deleteTicker`
 

@@ -143,3 +143,40 @@ def test_wallet_operation_forbidden_for_other_user(client) -> None:
     body = response.get_json()
     assert body["success"] is False
     assert body["error"]["code"] == "FORBIDDEN"
+
+
+def test_wallet_operation_update_delete_and_summary_v2(client) -> None:
+    token = _register_and_login(client, "owner-op2")
+    investment_id = _create_wallet(client, token)
+    created_response = client.post(
+        f"/wallet/{investment_id}/operations",
+        json=_operation_payload(quantity="10", unit_price="20"),
+        headers=_auth_headers(token, "v2"),
+    )
+    operation_id = created_response.get_json()["data"]["operation"]["id"]
+
+    update_response = client.put(
+        f"/wallet/{investment_id}/operations/{operation_id}",
+        json={"notes": "Atualizada", "fees": "2.00"},
+        headers=_auth_headers(token, "v2"),
+    )
+    assert update_response.status_code == 200
+    assert update_response.get_json()["data"]["operation"]["notes"] == "Atualizada"
+
+    summary_response = client.get(
+        f"/wallet/{investment_id}/operations/summary",
+        headers=_auth_headers(token, "v2"),
+    )
+    assert summary_response.status_code == 200
+    summary = summary_response.get_json()["data"]["summary"]
+    assert summary["total_operations"] == 1
+    assert summary["buy_operations"] == 1
+    assert summary["sell_operations"] == 0
+    assert summary["net_quantity"] == "10.000000"
+
+    delete_response = client.delete(
+        f"/wallet/{investment_id}/operations/{operation_id}",
+        headers=_auth_headers(token, "v2"),
+    )
+    assert delete_response.status_code == 200
+    assert delete_response.get_json()["success"] is True

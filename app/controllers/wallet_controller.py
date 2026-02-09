@@ -1,6 +1,6 @@
 from datetime import date, datetime
 from decimal import Decimal
-from typing import Any, Dict, cast
+from typing import Any, Dict
 from uuid import UUID
 
 from flask import Blueprint, request
@@ -9,10 +9,12 @@ from flask_jwt_extended import get_jwt_identity, jwt_required
 from marshmallow import ValidationError, fields
 
 from app.extensions.database import db
-from app.models.investment_operation import InvestmentOperation
 from app.models.wallet import Wallet
-from app.schemas.investment_operation_schema import InvestmentOperationSchema
 from app.schemas.wallet_schema import WalletSchema
+from app.services.investment_operation_service import (
+    InvestmentOperationError,
+    InvestmentOperationService,
+)
 from app.services.investment_service import InvestmentService
 
 # Import PaginatedResponse for paginated investment history
@@ -62,35 +64,16 @@ def _compat_error(
     return legacy_payload, status_code
 
 
-def _get_owned_investment_or_error(
-    investment_id: UUID, user_id: UUID, *, forbidden_message: str
-) -> Wallet | None:
-    investment = cast(Wallet | None, Wallet.query.filter_by(id=investment_id).first())
-    if not investment:
-        return None
-    if str(investment.user_id) != str(user_id):
-        raise PermissionError(forbidden_message)
-    return investment
-
-
-def _serialize_operation(operation: InvestmentOperation) -> Dict[str, Any]:
-    return {
-        "id": str(operation.id),
-        "wallet_id": str(operation.wallet_id),
-        "user_id": str(operation.user_id),
-        "operation_type": operation.operation_type,
-        "quantity": str(operation.quantity),
-        "unit_price": str(operation.unit_price),
-        "fees": str(operation.fees),
-        "executed_at": operation.executed_at.isoformat(),
-        "notes": operation.notes,
-        "created_at": (
-            operation.created_at.isoformat() if operation.created_at else None
-        ),
-        "updated_at": (
-            operation.updated_at.isoformat() if operation.updated_at else None
-        ),
-    }
+def _operation_error_response(
+    exc: InvestmentOperationError,
+) -> tuple[dict[str, Any], int]:
+    return _compat_error(
+        legacy_payload={"error": exc.message, "details": exc.details},
+        status_code=exc.status_code,
+        message=exc.message,
+        error_code=exc.code,
+        details=exc.details,
+    )
 
 
 @wallet_bp.route("", methods=["POST"])  # type: ignore[misc]
@@ -394,68 +377,14 @@ def get_wallet_history(investment_id: UUID) -> tuple[Dict[str, Any], int]:
 @jwt_required()  # type: ignore[misc]
 def add_investment_operation(investment_id: UUID) -> tuple[dict[str, Any], int]:
     user_id: UUID = UUID(get_jwt_identity())
-
-    try:
-        investment = _get_owned_investment_or_error(
-            investment_id,
-            user_id,
-            forbidden_message=(
-                "Você não tem permissão para adicionar operações neste investimento."
-            ),
-        )
-    except PermissionError as exc:
-        return _compat_error(
-            legacy_payload={"error": str(exc)},
-            status_code=403,
-            message=str(exc),
-            error_code="FORBIDDEN",
-        )
-
-    if not investment:
-        return _compat_error(
-            legacy_payload={"error": "Investimento não encontrado"},
-            status_code=404,
-            message="Investimento não encontrado",
-            error_code="NOT_FOUND",
-        )
-
     payload: Dict[str, Any] = request.get_json() or {}
-    schema = InvestmentOperationSchema()
     try:
-        validated_data = schema.load(payload)
-    except ValidationError as err:
-        return _compat_error(
-            legacy_payload={"error": "Dados inválidos", "messages": str(err.messages)},
-            status_code=400,
-            message="Dados inválidos",
-            error_code="VALIDATION_ERROR",
-            details={"messages": err.messages},
-        )
+        service = InvestmentOperationService(user_id)
+        operation = service.create_operation(investment_id, payload)
+    except InvestmentOperationError as exc:
+        return _operation_error_response(exc)
 
-    try:
-        operation = InvestmentOperation(
-            wallet_id=investment.id,
-            user_id=user_id,
-            operation_type=str(validated_data["operation_type"]).lower(),
-            quantity=validated_data["quantity"],
-            unit_price=validated_data["unit_price"],
-            fees=validated_data.get("fees"),
-            executed_at=validated_data["executed_at"],
-            notes=validated_data.get("notes"),
-        )
-        db.session.add(operation)
-        db.session.commit()
-    except Exception as exc:
-        db.session.rollback()
-        return _compat_error(
-            legacy_payload={"error": "Erro interno", "message": str(exc)},
-            status_code=500,
-            message="Erro interno",
-            error_code="INTERNAL_ERROR",
-            details={"exception": str(exc)},
-        )
-
-    operation_data = _serialize_operation(operation)
+    operation_data = InvestmentOperationService.serialize(operation)
     return _compat_success(
         legacy_payload={
             "message": "Operação registrada com sucesso",
@@ -507,44 +436,18 @@ def list_investment_operations(
 ) -> tuple[dict[str, Any], int]:
     user_id: UUID = UUID(get_jwt_identity())
     try:
-        investment = _get_owned_investment_or_error(
-            investment_id,
-            user_id,
-            forbidden_message=(
-                "Você não tem permissão para visualizar operações deste investimento."
-            ),
-        )
-    except PermissionError as exc:
-        return _compat_error(
-            legacy_payload={"error": str(exc)},
-            status_code=403,
-            message=str(exc),
-            error_code="FORBIDDEN",
-        )
+        service = InvestmentOperationService(user_id)
+        operations, pagination = service.list_operations(investment_id, page, per_page)
+    except InvestmentOperationError as exc:
+        return _operation_error_response(exc)
 
-    if not investment:
-        return _compat_error(
-            legacy_payload={"error": "Investimento não encontrado"},
-            status_code=404,
-            message="Investimento não encontrado",
-            error_code="NOT_FOUND",
-        )
-
-    pagination = (
-        InvestmentOperation.query.filter_by(wallet_id=investment.id, user_id=user_id)
-        .order_by(
-            InvestmentOperation.executed_at.desc(),
-            InvestmentOperation.created_at.desc(),
-        )
-        .paginate(page=page, per_page=per_page, error_out=False)
-    )
-    items = [_serialize_operation(item) for item in pagination.items]
+    items = [InvestmentOperationService.serialize(item) for item in operations]
     legacy_payload = {
         "items": items,
-        "total": pagination.total,
-        "page": pagination.page,
-        "per_page": pagination.per_page,
-        "pages": pagination.pages,
+        "total": pagination["total"],
+        "page": pagination["page"],
+        "per_page": pagination["per_page"],
+        "pages": pagination["pages"],
     }
     return _compat_success(
         legacy_payload=legacy_payload,
@@ -553,12 +456,147 @@ def list_investment_operations(
         data={"items": items},
         meta={
             "pagination": {
-                "total": pagination.total,
-                "page": pagination.page,
-                "per_page": pagination.per_page,
-                "pages": pagination.pages,
+                "total": pagination["total"],
+                "page": pagination["page"],
+                "per_page": pagination["per_page"],
+                "pages": pagination["pages"],
             }
         },
+    )
+
+
+@wallet_bp.route(  # type: ignore[misc]
+    "/<uuid:investment_id>/operations/<uuid:operation_id>", methods=["PUT"]
+)
+@doc(
+    description="Atualiza operação de investimento existente.",
+    tags=["Wallet"],
+    security=[{"BearerAuth": []}],
+    params={
+        "investment_id": {"description": "ID do investimento"},
+        "operation_id": {"description": "ID da operação"},
+        "X-API-Contract": {
+            "in": "header",
+            "description": "Opcional. Envie 'v2' para o contrato padronizado.",
+            "type": "string",
+            "required": False,
+        },
+    },
+    responses={
+        200: {"description": "Operação atualizada com sucesso"},
+        400: {"description": "Dados inválidos"},
+        401: {"description": "Token inválido"},
+        403: {"description": "Sem permissão"},
+        404: {"description": "Operação não encontrada"},
+    },
+)  # type: ignore[misc]
+@jwt_required()  # type: ignore[misc]
+def update_investment_operation(
+    investment_id: UUID, operation_id: UUID
+) -> tuple[dict[str, Any], int]:
+    user_id: UUID = UUID(get_jwt_identity())
+    payload: Dict[str, Any] = request.get_json() or {}
+
+    try:
+        service = InvestmentOperationService(user_id)
+        operation = service.update_operation(investment_id, operation_id, payload)
+    except InvestmentOperationError as exc:
+        return _operation_error_response(exc)
+
+    operation_data = InvestmentOperationService.serialize(operation)
+    return _compat_success(
+        legacy_payload={
+            "message": "Operação atualizada com sucesso",
+            "operation": operation_data,
+        },
+        status_code=200,
+        message="Operação atualizada com sucesso",
+        data={"operation": operation_data},
+    )
+
+
+@wallet_bp.route(  # type: ignore[misc]
+    "/<uuid:investment_id>/operations/<uuid:operation_id>", methods=["DELETE"]
+)
+@doc(
+    description="Remove operação de investimento.",
+    tags=["Wallet"],
+    security=[{"BearerAuth": []}],
+    params={
+        "investment_id": {"description": "ID do investimento"},
+        "operation_id": {"description": "ID da operação"},
+        "X-API-Contract": {
+            "in": "header",
+            "description": "Opcional. Envie 'v2' para o contrato padronizado.",
+            "type": "string",
+            "required": False,
+        },
+    },
+    responses={
+        200: {"description": "Operação removida com sucesso"},
+        401: {"description": "Token inválido"},
+        403: {"description": "Sem permissão"},
+        404: {"description": "Operação não encontrada"},
+    },
+)  # type: ignore[misc]
+@jwt_required()  # type: ignore[misc]
+def delete_investment_operation(
+    investment_id: UUID, operation_id: UUID
+) -> tuple[dict[str, Any], int]:
+    user_id: UUID = UUID(get_jwt_identity())
+    try:
+        service = InvestmentOperationService(user_id)
+        service.delete_operation(investment_id, operation_id)
+    except InvestmentOperationError as exc:
+        return _operation_error_response(exc)
+
+    return _compat_success(
+        legacy_payload={"message": "Operação removida com sucesso"},
+        status_code=200,
+        message="Operação removida com sucesso",
+        data={},
+    )
+
+
+@wallet_bp.route(  # type: ignore[misc]
+    "/<uuid:investment_id>/operations/summary", methods=["GET"]
+)
+@doc(
+    description="Resumo agregado das operações de um investimento.",
+    tags=["Wallet"],
+    security=[{"BearerAuth": []}],
+    params={
+        "investment_id": {"description": "ID do investimento"},
+        "X-API-Contract": {
+            "in": "header",
+            "description": "Opcional. Envie 'v2' para o contrato padronizado.",
+            "type": "string",
+            "required": False,
+        },
+    },
+    responses={
+        200: {"description": "Resumo retornado com sucesso"},
+        401: {"description": "Token inválido"},
+        403: {"description": "Sem permissão"},
+        404: {"description": "Investimento não encontrado"},
+    },
+)  # type: ignore[misc]
+@jwt_required()  # type: ignore[misc]
+def get_investment_operations_summary(
+    investment_id: UUID,
+) -> tuple[dict[str, Any], int]:
+    user_id: UUID = UUID(get_jwt_identity())
+    try:
+        service = InvestmentOperationService(user_id)
+        summary = service.get_summary(investment_id)
+    except InvestmentOperationError as exc:
+        return _operation_error_response(exc)
+
+    return _compat_success(
+        legacy_payload={"summary": summary},
+        status_code=200,
+        message="Resumo de operações retornado com sucesso",
+        data={"summary": summary},
     )
 
 

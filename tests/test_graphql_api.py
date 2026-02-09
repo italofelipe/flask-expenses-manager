@@ -204,6 +204,58 @@ def test_graphql_wallet_and_ticker_queries_mutations(client) -> None:
     wallet_body = wallet_response.get_json()
     assert "errors" not in wallet_body
     assert wallet_body["data"]["addWalletEntry"]["item"]["name"] == "Reserva"
+    investment_id = wallet_body["data"]["addWalletEntry"]["item"]["id"]
+
+    add_operation_mutation = """
+    mutation AddOperation($investmentId: UUID!, $executedAt: String!) {
+      addInvestmentOperation(
+        investmentId: $investmentId,
+        operationType: "buy",
+        quantity: "3",
+        unitPrice: "22.50",
+        fees: "1.20",
+        executedAt: $executedAt
+      ) {
+        message
+        item { id operationType quantity unitPrice fees }
+      }
+    }
+    """
+    add_operation_response = _graphql(
+        client,
+        add_operation_mutation,
+        {"investmentId": investment_id, "executedAt": "2026-02-09"},
+        token=token,
+    )
+    assert add_operation_response.status_code == 200
+    add_operation_body = add_operation_response.get_json()
+    assert "errors" not in add_operation_body
+    assert add_operation_body["data"]["addInvestmentOperation"]["item"]["quantity"] == (
+        "3.000000"
+    )
+
+    operations_query = """
+    query Operations($investmentId: UUID!) {
+      investmentOperations(investmentId: $investmentId, page: 1, perPage: 10) {
+        items { id operationType quantity unitPrice }
+        pagination { total page perPage }
+      }
+      investmentOperationSummary(investmentId: $investmentId) {
+        totalOperations
+        buyOperations
+        sellOperations
+        netQuantity
+      }
+    }
+    """
+    operations_response = _graphql(
+        client, operations_query, {"investmentId": investment_id}, token=token
+    )
+    assert operations_response.status_code == 200
+    operations_body = operations_response.get_json()
+    assert "errors" not in operations_body
+    assert operations_body["data"]["investmentOperations"]["pagination"]["total"] == 1
+    assert operations_body["data"]["investmentOperationSummary"]["buyOperations"] == 1
 
     wallet_query = """
     query WalletEntries {

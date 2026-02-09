@@ -106,6 +106,26 @@ Contrato v2:
 - `data.items`
 - `meta.pagination` com `total`, `page`, `per_page`, `pages`.
 
+## `update_investment_operation`
+Endpoint: `PUT /wallet/{investment_id}/operations/{operation_id}`
+
+O que faz:
+- Atualiza operação existente de forma parcial.
+- Reusa validação de domínio do serviço de operações.
+
+## `delete_investment_operation`
+Endpoint: `DELETE /wallet/{investment_id}/operations/{operation_id}`
+
+O que faz:
+- Remove operação específica vinculada ao investimento.
+
+## `get_investment_operations_summary`
+Endpoint: `GET /wallet/{investment_id}/operations/summary`
+
+O que faz:
+- Calcula resumo agregado das operações (`buy/sell`, quantidades e montantes).
+- Retorna métricas de posição operacional para o investimento.
+
 ## `delete_wallet_entry`
 Endpoint: `DELETE /wallet/{investment_id}`
 
@@ -122,6 +142,7 @@ Contrato v2:
 - `InvestmentService` (integração BRAPI)
 - `PaginatedResponse`
 - `InvestmentOperation` / `InvestmentOperationSchema`
+- `InvestmentOperationService` (domínio compartilhado REST/GraphQL)
 
 ## Pontos incompletos / melhorias (Fase 0)
 1. Histórico é armazenado como JSON mutável na própria linha, sem versionamento formal por tabela.

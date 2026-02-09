@@ -23,6 +23,10 @@ from app.models.transaction import Transaction, TransactionStatus, TransactionTy
 from app.models.user import User
 from app.models.user_ticker import UserTicker
 from app.models.wallet import Wallet
+from app.services.investment_operation_service import (
+    InvestmentOperationError,
+    InvestmentOperationService,
+)
 from app.services.investment_service import InvestmentService
 from app.services.transaction_analytics_service import TransactionAnalyticsService
 
@@ -300,6 +304,38 @@ class WalletListPayloadType(graphene.ObjectType):
     pagination = graphene.Field(PaginationType, required=True)
 
 
+class InvestmentOperationType(graphene.ObjectType):
+    id = graphene.ID(required=True)
+    wallet_id = graphene.ID(required=True)
+    user_id = graphene.ID(required=True)
+    operation_type = graphene.String(required=True)
+    quantity = graphene.String(required=True)
+    unit_price = graphene.String(required=True)
+    fees = graphene.String(required=True)
+    executed_at = graphene.String(required=True)
+    notes = graphene.String()
+    created_at = graphene.String()
+    updated_at = graphene.String()
+
+
+class InvestmentOperationListPayloadType(graphene.ObjectType):
+    items = graphene.List(InvestmentOperationType, required=True)
+    pagination = graphene.Field(PaginationType, required=True)
+
+
+class InvestmentOperationSummaryType(graphene.ObjectType):
+    total_operations = graphene.Int(required=True)
+    buy_operations = graphene.Int(required=True)
+    sell_operations = graphene.Int(required=True)
+    buy_quantity = graphene.String(required=True)
+    sell_quantity = graphene.String(required=True)
+    net_quantity = graphene.String(required=True)
+    gross_buy_amount = graphene.String(required=True)
+    gross_sell_amount = graphene.String(required=True)
+    average_buy_price = graphene.String(required=True)
+    total_fees = graphene.String(required=True)
+
+
 class TickerType(graphene.ObjectType):
     id = graphene.ID(required=True)
     symbol = graphene.String(required=True)
@@ -337,6 +373,16 @@ class Query(graphene.ObjectType):
         investment_id=graphene.UUID(required=True),
         page=graphene.Int(default_value=1),
         per_page=graphene.Int(default_value=5),
+    )
+    investment_operations = graphene.Field(
+        InvestmentOperationListPayloadType,
+        investment_id=graphene.UUID(required=True),
+        page=graphene.Int(default_value=1),
+        per_page=graphene.Int(default_value=10),
+    )
+    investment_operation_summary = graphene.Field(
+        InvestmentOperationSummaryType,
+        investment_id=graphene.UUID(required=True),
     )
     tickers = graphene.List(TickerType)
 
@@ -540,6 +586,47 @@ class Query(graphene.ObjectType):
             )
             for item in tickers
         ]
+
+    def resolve_investment_operations(
+        self,
+        info: graphene.ResolveInfo,
+        investment_id: UUID,
+        page: int,
+        per_page: int,
+    ) -> InvestmentOperationListPayloadType:
+        user = get_current_user_required()
+        service = InvestmentOperationService(user.id)
+        try:
+            operations, pagination = service.list_operations(
+                investment_id=investment_id, page=page, per_page=per_page
+            )
+        except InvestmentOperationError as exc:
+            raise GraphQLError(exc.message) from exc
+
+        items = [
+            InvestmentOperationType(**InvestmentOperationService.serialize(item))
+            for item in operations
+        ]
+        return InvestmentOperationListPayloadType(
+            items=items,
+            pagination=PaginationType(
+                total=pagination["total"],
+                page=pagination["page"],
+                per_page=pagination["per_page"],
+                pages=pagination["pages"],
+            ),
+        )
+
+    def resolve_investment_operation_summary(
+        self, info: graphene.ResolveInfo, investment_id: UUID
+    ) -> InvestmentOperationSummaryType:
+        user = get_current_user_required()
+        service = InvestmentOperationService(user.id)
+        try:
+            summary = service.get_summary(investment_id)
+        except InvestmentOperationError as exc:
+            raise GraphQLError(exc.message) from exc
+        return InvestmentOperationSummaryType(**summary)
 
 
 class RegisterUserMutation(graphene.Mutation):
@@ -927,6 +1014,96 @@ class DeleteWalletEntryMutation(graphene.Mutation):
         )
 
 
+class AddInvestmentOperationMutation(graphene.Mutation):
+    class Arguments:
+        investment_id = graphene.UUID(required=True)
+        operation_type = graphene.String(required=True)
+        quantity = graphene.String(required=True)
+        unit_price = graphene.String(required=True)
+        fees = graphene.String()
+        executed_at = graphene.String()
+        notes = graphene.String()
+
+    item = graphene.Field(InvestmentOperationType, required=True)
+    message = graphene.String(required=True)
+
+    def mutate(
+        self,
+        info: graphene.ResolveInfo,
+        investment_id: UUID,
+        **kwargs: Any,
+    ) -> AddInvestmentOperationMutation:
+        user = get_current_user_required()
+        service = InvestmentOperationService(user.id)
+        try:
+            operation = service.create_operation(investment_id, kwargs)
+        except InvestmentOperationError as exc:
+            raise GraphQLError(exc.message) from exc
+        return AddInvestmentOperationMutation(
+            message="Operação registrada com sucesso",
+            item=InvestmentOperationType(
+                **InvestmentOperationService.serialize(operation)
+            ),
+        )
+
+
+class UpdateInvestmentOperationMutation(graphene.Mutation):
+    class Arguments:
+        investment_id = graphene.UUID(required=True)
+        operation_id = graphene.UUID(required=True)
+        operation_type = graphene.String()
+        quantity = graphene.String()
+        unit_price = graphene.String()
+        fees = graphene.String()
+        executed_at = graphene.String()
+        notes = graphene.String()
+
+    item = graphene.Field(InvestmentOperationType, required=True)
+    message = graphene.String(required=True)
+
+    def mutate(
+        self,
+        info: graphene.ResolveInfo,
+        investment_id: UUID,
+        operation_id: UUID,
+        **kwargs: Any,
+    ) -> UpdateInvestmentOperationMutation:
+        user = get_current_user_required()
+        service = InvestmentOperationService(user.id)
+        try:
+            operation = service.update_operation(investment_id, operation_id, kwargs)
+        except InvestmentOperationError as exc:
+            raise GraphQLError(exc.message) from exc
+        return UpdateInvestmentOperationMutation(
+            message="Operação atualizada com sucesso",
+            item=InvestmentOperationType(
+                **InvestmentOperationService.serialize(operation)
+            ),
+        )
+
+
+class DeleteInvestmentOperationMutation(graphene.Mutation):
+    class Arguments:
+        investment_id = graphene.UUID(required=True)
+        operation_id = graphene.UUID(required=True)
+
+    ok = graphene.Boolean(required=True)
+    message = graphene.String(required=True)
+
+    def mutate(
+        self, info: graphene.ResolveInfo, investment_id: UUID, operation_id: UUID
+    ) -> DeleteInvestmentOperationMutation:
+        user = get_current_user_required()
+        service = InvestmentOperationService(user.id)
+        try:
+            service.delete_operation(investment_id, operation_id)
+        except InvestmentOperationError as exc:
+            raise GraphQLError(exc.message) from exc
+        return DeleteInvestmentOperationMutation(
+            ok=True, message="Operação removida com sucesso"
+        )
+
+
 class AddTickerMutation(graphene.Mutation):
     class Arguments:
         symbol = graphene.String(required=True)
@@ -996,6 +1173,9 @@ class Mutation(graphene.ObjectType):
     add_wallet_entry = AddWalletEntryMutation.Field()
     update_wallet_entry = UpdateWalletEntryMutation.Field()
     delete_wallet_entry = DeleteWalletEntryMutation.Field()
+    add_investment_operation = AddInvestmentOperationMutation.Field()
+    update_investment_operation = UpdateInvestmentOperationMutation.Field()
+    delete_investment_operation = DeleteInvestmentOperationMutation.Field()
     add_ticker = AddTickerMutation.Field()
     delete_ticker = DeleteTickerMutation.Field()
 
