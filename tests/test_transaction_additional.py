@@ -28,13 +28,15 @@ def _auth_headers(token: str, contract: str | None = None) -> dict[str, str]:
     return headers
 
 
-def _transaction_payload() -> dict[str, str]:
-    return {
+def _transaction_payload(**overrides: str) -> dict[str, str]:
+    payload = {
         "title": "Conta de água",
         "amount": "120.50",
         "type": "expense",
         "due_date": date.today().isoformat(),
     }
+    payload.update(overrides)
+    return payload
 
 
 def test_transaction_installment_create_without_dateutil_returns_500(client) -> None:
@@ -220,3 +222,69 @@ def test_transaction_summary_invalid_format_v2(client) -> None:
 
     assert response.status_code == 400
     assert response.get_json()["error"]["code"] == "VALIDATION_ERROR"
+
+
+def test_transaction_create_recurring_requires_date_range(client) -> None:
+    token = _register_and_login(client, "recurring-required-dates")
+    response = client.post(
+        "/transactions",
+        headers=_auth_headers(token, "v2"),
+        json={
+            **_transaction_payload(),
+            "is_recurring": True,
+        },
+    )
+
+    assert response.status_code == 400
+    body = response.get_json()
+    assert body["success"] is False
+    assert body["error"]["code"] == "VALIDATION_ERROR"
+
+
+def test_transaction_create_recurring_due_date_must_be_inside_range(client) -> None:
+    token = _register_and_login(client, "recurring-range")
+    response = client.post(
+        "/transactions",
+        headers=_auth_headers(token, "v2"),
+        json={
+            **_transaction_payload(due_date=date.today().isoformat()),
+            "is_recurring": True,
+            "start_date": (date.today() + timedelta(days=5)).isoformat(),
+            "end_date": (date.today() + timedelta(days=10)).isoformat(),
+        },
+    )
+
+    assert response.status_code == 400
+    body = response.get_json()
+    assert body["success"] is False
+    assert body["error"]["code"] == "VALIDATION_ERROR"
+
+
+def test_transaction_update_recurring_invalid_date_range(client) -> None:
+    token = _register_and_login(client, "recurring-update-range")
+    created = client.post(
+        "/transactions",
+        headers=_auth_headers(token, "v2"),
+        json={
+            **_transaction_payload(),
+            "is_recurring": True,
+            "start_date": date.today().isoformat(),
+            "end_date": (date.today() + timedelta(days=30)).isoformat(),
+        },
+    )
+    assert created.status_code == 201
+    transaction_id = created.get_json()["data"]["transaction"][0]["id"]
+
+    response = client.put(
+        f"/transactions/{transaction_id}",
+        headers=_auth_headers(token, "v2"),
+        json={
+            "start_date": (date.today() + timedelta(days=40)).isoformat(),
+            "end_date": (date.today() + timedelta(days=10)).isoformat(),
+        },
+    )
+
+    assert response.status_code == 400
+    body = response.get_json()
+    assert body["success"] is False
+    assert body["error"]["code"] == "VALIDATION_ERROR"

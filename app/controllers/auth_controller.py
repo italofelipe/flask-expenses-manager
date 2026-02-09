@@ -1,9 +1,17 @@
 from datetime import timedelta
-from typing import Any
+from typing import Any, Dict
 from uuid import UUID
 
-from flask import Blueprint, Response, abort, jsonify, make_response
-from flask_apispec import doc, marshal_with, use_kwargs
+from flask import (
+    Blueprint,
+    Response,
+    abort,
+    has_request_context,
+    jsonify,
+    make_response,
+    request,
+)
+from flask_apispec import doc, use_kwargs
 from flask_apispec.views import MethodResource
 from flask_jwt_extended import (
     create_access_token,
@@ -17,19 +25,72 @@ from werkzeug.security import check_password_hash, generate_password_hash
 
 from app.extensions.database import db
 from app.models.user import User
-from app.schemas.auth_schema import AuthSchema, AuthSuccessResponseSchema
-from app.schemas.error_schema import ErrorResponseSchema
+from app.schemas.auth_schema import AuthSchema
 from app.schemas.user_schemas import UserRegistrationSchema
+from app.utils.response_builder import error_payload, success_payload
 
 JSON_MIMETYPE = "application/json"
+CONTRACT_HEADER = "X-API-Contract"
+CONTRACT_V2 = "v2"
 
 auth_bp = Blueprint("auth", __name__, url_prefix="/auth")
+
+
+def _is_v2_contract() -> bool:
+    if not has_request_context():
+        return False
+    header_value = str(request.headers.get(CONTRACT_HEADER, "")).strip().lower()
+    return header_value == CONTRACT_V2
+
+
+def _compat_success(
+    *,
+    legacy_payload: Dict[str, Any],
+    status_code: int,
+    message: str,
+    data: Dict[str, Any],
+    meta: Dict[str, Any] | None = None,
+) -> Response:
+    payload = legacy_payload
+    if _is_v2_contract():
+        payload = success_payload(message=message, data=data, meta=meta)
+    return Response(
+        jsonify(payload).get_data(),
+        status=status_code,
+        mimetype=JSON_MIMETYPE,
+    )
+
+
+def _compat_error(
+    *,
+    legacy_payload: Dict[str, Any],
+    status_code: int,
+    message: str,
+    error_code: str,
+    details: Dict[str, Any] | None = None,
+) -> Response:
+    payload = legacy_payload
+    if _is_v2_contract():
+        payload = error_payload(message=message, code=error_code, details=details)
+    return Response(
+        jsonify(payload).get_data(),
+        status=status_code,
+        mimetype=JSON_MIMETYPE,
+    )
 
 
 class RegisterResource(MethodResource):
     @doc(
         description="Cria um novo usuário no sistema",
         tags=["Autenticação"],
+        params={
+            "X-API-Contract": {
+                "in": "header",
+                "description": "Opcional. Envie 'v2' para o contrato padronizado.",
+                "type": "string",
+                "required": False,
+            }
+        },
         responses={
             201: {"description": "Usuário criado com sucesso"},
             400: {"description": "Erro de validação"},
@@ -40,12 +101,11 @@ class RegisterResource(MethodResource):
     @use_kwargs(UserRegistrationSchema, location="json")  # type: ignore[misc]
     def post(self, **validated_data: Any) -> Response:
         if User.query.filter_by(email=validated_data["email"]).first():
-            return Response(
-                jsonify(
-                    {"message": "Email already registered", "data": None}
-                ).get_data(),
-                status=409,
-                mimetype=JSON_MIMETYPE,
+            return _compat_error(
+                legacy_payload={"message": "Email already registered", "data": None},
+                status_code=409,
+                message="Email already registered",
+                error_code="CONFLICT",
             )
 
         try:
@@ -59,28 +119,28 @@ class RegisterResource(MethodResource):
             db.session.flush()
             db.session.commit()
 
-            return Response(
-                jsonify(
-                    {
-                        "message": "User created successfully",
-                        "data": {
-                            "id": str(user.id),
-                            "name": user.name,
-                            "email": user.email,
-                        },
-                    }
-                ).get_data(),
-                status=201,
-                mimetype=JSON_MIMETYPE,
+            user_data = {
+                "id": str(user.id),
+                "name": user.name,
+                "email": user.email,
+            }
+            return _compat_success(
+                legacy_payload={
+                    "message": "User created successfully",
+                    "data": user_data,
+                },
+                status_code=201,
+                message="User created successfully",
+                data={"user": user_data},
             )
         except Exception as e:
             db.session.rollback()
-            return Response(
-                jsonify(
-                    {"message": "Failed to create user", "error": str(e)}
-                ).get_data(),
-                status=500,
-                mimetype=JSON_MIMETYPE,
+            return _compat_error(
+                legacy_payload={"message": "Failed to create user", "error": str(e)},
+                status_code=500,
+                message="Failed to create user",
+                error_code="INTERNAL_ERROR",
+                details={"exception": str(e)},
             )
 
 
@@ -88,6 +148,14 @@ class AuthResource(MethodResource):
     @doc(
         description="Autenticação de usuário (email ou nome devem ser fornecidos)",
         tags=["Autenticação"],
+        params={
+            "X-API-Contract": {
+                "in": "header",
+                "description": "Opcional. Envie 'v2' para o contrato padronizado.",
+                "type": "string",
+                "required": False,
+            }
+        },
         requestBody={
             "required": True,
             "content": {
@@ -108,20 +176,17 @@ class AuthResource(MethodResource):
         },
     )  # type: ignore[misc]
     @use_kwargs(AuthSchema, location="json")  # type: ignore[misc]
-    @marshal_with(AuthSuccessResponseSchema, code=200)  # type: ignore[misc]
-    @marshal_with(ErrorResponseSchema, code=400)  # type: ignore[misc]
-    @marshal_with(ErrorResponseSchema, code=401)  # type: ignore[misc]
-    @marshal_with(ErrorResponseSchema, code=500)  # type: ignore[misc]
     def post(self, **kwargs: Any) -> Response:
         email = kwargs.get("email")
         name = kwargs.get("name")
         password = kwargs.get("password")
 
         if not password or not (email or name):
-            return Response(
-                jsonify({"message": "Missing credentials"}).get_data(),
-                status=400,
-                mimetype=JSON_MIMETYPE,
+            return _compat_error(
+                legacy_payload={"message": "Missing credentials"},
+                status_code=400,
+                message="Missing credentials",
+                error_code="VALIDATION_ERROR",
             )
 
         user = (
@@ -131,10 +196,11 @@ class AuthResource(MethodResource):
         )
 
         if not user or not check_password_hash(user.password, password):
-            return Response(
-                jsonify({"message": "Invalid credentials"}).get_data(),
-                status=401,
-                mimetype=JSON_MIMETYPE,
+            return _compat_error(
+                legacy_payload={"message": "Invalid credentials"},
+                status_code=401,
+                message="Invalid credentials",
+                error_code="UNAUTHORIZED",
             )
 
         try:
@@ -145,26 +211,28 @@ class AuthResource(MethodResource):
             if user.current_jti != jti:
                 user.current_jti = jti
                 db.session.commit()
-            return Response(
-                jsonify(
-                    {
-                        "message": "Login successful",
-                        "token": token,
-                        "user": {
-                            "id": str(user.id),
-                            "name": user.name,
-                            "email": user.email,
-                        },
-                    }
-                ).get_data(),
-                status=200,
-                mimetype=JSON_MIMETYPE,
+            user_data = {
+                "id": str(user.id),
+                "name": user.name,
+                "email": user.email,
+            }
+            return _compat_success(
+                legacy_payload={
+                    "message": "Login successful",
+                    "token": token,
+                    "user": user_data,
+                },
+                status_code=200,
+                message="Login successful",
+                data={"token": token, "user": user_data},
             )
         except Exception as e:
-            return Response(
-                jsonify({"message": "Login failed", "error": str(e)}).get_data(),
-                status=500,
-                mimetype=JSON_MIMETYPE,
+            return _compat_error(
+                legacy_payload={"message": "Login failed", "error": str(e)},
+                status_code=500,
+                message="Login failed",
+                error_code="INTERNAL_ERROR",
+                details={"exception": str(e)},
             )
 
 
@@ -173,6 +241,14 @@ class LogoutResource(MethodResource):
         description="Revoga o token JWT atual (logout do usuário)",
         tags=["Autenticação"],
         security=[{"BearerAuth": []}],
+        params={
+            "X-API-Contract": {
+                "in": "header",
+                "description": "Opcional. Envie 'v2' para o contrato padronizado.",
+                "type": "string",
+                "required": False,
+            }
+        },
         responses={
             200: {"description": "Logout realizado com sucesso"},
         },
@@ -184,10 +260,11 @@ class LogoutResource(MethodResource):
         if user:
             user.current_jti = None
             db.session.commit()
-        return Response(
-            jsonify({"message": "Logout successful"}).get_data(),
-            status=200,
-            mimetype=JSON_MIMETYPE,
+        return _compat_success(
+            legacy_payload={"message": "Logout successful"},
+            status_code=200,
+            message="Logout successful",
+            data={},
         )
 
 
@@ -222,8 +299,17 @@ def handle_webargs_error(
             "(mín. 10 caracteres, 1 letra maiúscula, 1 número e 1 símbolo)."
         )
 
-    resp = make_response(
-        jsonify({"message": error_message, "errors": err.messages}), 400
-    )
+    payload: Dict[str, Any] = {
+        "message": error_message,
+        "errors": err.messages,
+    }
+    if _is_v2_contract():
+        payload = error_payload(
+            message=error_message,
+            code="VALIDATION_ERROR",
+            details={"errors": err.messages},
+        )
+
+    resp = make_response(jsonify(payload), 400)
     abort(resp)  # Levanta HTTPException para Webargs/Flask
     raise AssertionError  # Added for type completeness

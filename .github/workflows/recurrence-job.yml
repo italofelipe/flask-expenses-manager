@@ -1,0 +1,39 @@
+name: Recurrence Job
+
+on:
+  schedule:
+    - cron: "0 3 * * *"
+  workflow_dispatch:
+
+jobs:
+  generate-recurring-transactions:
+    name: Generate Recurring Transactions
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+          cache-dependency-path: requirements.txt
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Run recurrence generation script
+        env:
+          DATABASE_URL: ${{ secrets.RECURRENCE_DATABASE_URL }}
+          SECRET_KEY: ${{ secrets.RECURRENCE_SECRET_KEY }}
+          JWT_SECRET_KEY: ${{ secrets.RECURRENCE_JWT_SECRET_KEY }}
+        run: |
+          if [ -z "${DATABASE_URL}" ]; then
+            echo "RECURRENCE_DATABASE_URL não configurado. Job ignorado."
+            exit 0
+          fi
+          python scripts/generate_recurring_transactions.py

@@ -2,7 +2,7 @@ from datetime import datetime
 from typing import Any, Callable, Dict, Union, cast
 from uuid import UUID
 
-from flask import Blueprint, Response, jsonify, request
+from flask import Blueprint, Response, has_request_context, jsonify, request
 from flask_apispec import doc, use_kwargs
 from flask_apispec.views import MethodResource
 from flask_jwt_extended import get_jwt, get_jwt_identity, jwt_required
@@ -15,10 +15,80 @@ from app.models.user import User
 from app.models.wallet import Wallet
 from app.schemas.user_schemas import UserProfileSchema
 from app.utils.pagination import PaginatedResponse
+from app.utils.response_builder import error_payload, success_payload
 
 JSON_MIMETYPE = "application/json"
+CONTRACT_HEADER = "X-API-Contract"
+CONTRACT_V2 = "v2"
 
 user_bp = Blueprint("user", __name__, url_prefix="/user")
+
+
+def _is_v2_contract() -> bool:
+    if not has_request_context():
+        return False
+    header_value = str(request.headers.get(CONTRACT_HEADER, "")).strip().lower()
+    return header_value == CONTRACT_V2
+
+
+def _compat_success(
+    *,
+    legacy_payload: Dict[str, Any],
+    status_code: int,
+    message: str,
+    data: Dict[str, Any],
+    meta: Dict[str, Any] | None = None,
+) -> Response:
+    payload = legacy_payload
+    if _is_v2_contract():
+        payload = success_payload(message=message, data=data, meta=meta)
+    return Response(
+        jsonify(payload).get_data(),
+        status=status_code,
+        mimetype=JSON_MIMETYPE,
+    )
+
+
+def _compat_error(
+    *,
+    legacy_payload: Dict[str, Any],
+    status_code: int,
+    message: str,
+    error_code: str,
+    details: Dict[str, Any] | None = None,
+) -> Response:
+    payload = legacy_payload
+    if _is_v2_contract():
+        payload = error_payload(message=message, code=error_code, details=details)
+    return Response(
+        jsonify(payload).get_data(),
+        status=status_code,
+        mimetype=JSON_MIMETYPE,
+    )
+
+
+def _serialize_user_profile(user: User) -> Dict[str, Any]:
+    return {
+        "id": str(user.id),
+        "name": user.name,
+        "email": user.email,
+        "gender": user.gender,
+        "birth_date": str(user.birth_date) if user.birth_date else None,
+        "monthly_income": float(user.monthly_income) if user.monthly_income else None,
+        "net_worth": float(user.net_worth) if user.net_worth else None,
+        "monthly_expenses": (
+            float(user.monthly_expenses) if user.monthly_expenses else None
+        ),
+        "initial_investment": (
+            float(user.initial_investment) if user.initial_investment else None
+        ),
+        "monthly_investment": (
+            float(user.monthly_investment) if user.monthly_investment else None
+        ),
+        "investment_goal_date": (
+            str(user.investment_goal_date) if user.investment_goal_date else None
+        ),
+    }
 
 
 def assign_user_profile_fields(
@@ -54,10 +124,11 @@ def assign_user_profile_fields(
 def validate_user_token(user_id: UUID, jti: str) -> Union[User, Response]:
     user = User.query.get(user_id)
     if not user or not hasattr(user, "current_jti") or user.current_jti != jti:
-        return Response(
-            jsonify({"message": "Token revogado ou usuário não encontrado"}).get_data(),
-            status=401,
-            mimetype=JSON_MIMETYPE,
+        return _compat_error(
+            legacy_payload={"message": "Token revogado ou usuário não encontrado"},
+            status_code=401,
+            message="Token revogado ou usuário não encontrado",
+            error_code="UNAUTHORIZED",
         )
     return user
 
@@ -75,10 +146,11 @@ def filter_transactions(
                 Transaction.status == TransactionStatus(status.lower())
             )
         except ValueError:
-            return Response(
-                jsonify({"message": f"Status inválido: {status}"}).get_data(),
-                status=400,
-                mimetype=JSON_MIMETYPE,
+            return _compat_error(
+                legacy_payload={"message": f"Status inválido: {status}"},
+                status_code=400,
+                message=f"Status inválido: {status}",
+                error_code="VALIDATION_ERROR",
             )
 
     if month:
@@ -89,12 +161,13 @@ def filter_transactions(
                 extract("month", Transaction.due_date) == month_num,
             )
         except ValueError:
-            return Response(
-                jsonify(
-                    {"message": "Parâmetro 'month' inválido. Use o formato YYYY-MM"}
-                ).get_data(),
-                status=400,
-                mimetype=JSON_MIMETYPE,
+            return _compat_error(
+                legacy_payload={
+                    "message": "Parâmetro 'month' inválido. Use o formato YYYY-MM"
+                },
+                status_code=400,
+                message="Parâmetro 'month' inválido. Use o formato YYYY-MM",
+                error_code="VALIDATION_ERROR",
             )
 
     return query
@@ -124,6 +197,14 @@ class UserProfileResource(MethodResource):
         ),
         tags=["Usuário"],
         security=[{"BearerAuth": []}],
+        params={
+            "X-API-Contract": {
+                "in": "header",
+                "description": "Opcional. Envie 'v2' para o contrato padronizado.",
+                "type": "string",
+                "required": False,
+            }
+        },
         responses={
             200: {"description": "Perfil atualizado com sucesso"},
             400: {"description": "Erro de validação"},
@@ -139,93 +220,62 @@ class UserProfileResource(MethodResource):
         jti = get_jwt()["jti"]
         user = User.query.get(user_id)
         if not user:
-            return Response(
-                jsonify({"message": "Usuário não encontrado"}).get_data(),
-                status=404,
-                mimetype=JSON_MIMETYPE,
+            return _compat_error(
+                legacy_payload={"message": "Usuário não encontrado"},
+                status_code=404,
+                message="Usuário não encontrado",
+                error_code="NOT_FOUND",
             )
 
         if not hasattr(user, "current_jti") or user.current_jti != jti:
-            return Response(
-                jsonify({"message": "Token revogado"}).get_data(),
-                status=401,
-                mimetype=JSON_MIMETYPE,
+            return _compat_error(
+                legacy_payload={"message": "Token revogado"},
+                status_code=401,
+                message="Token revogado",
+                error_code="UNAUTHORIZED",
             )
 
         data = kwargs
 
         result = assign_user_profile_fields(user, data)
         if result["error"]:
-            return Response(
-                jsonify({"message": result["message"]}).get_data(),
-                status=400,
-                mimetype=JSON_MIMETYPE,
+            return _compat_error(
+                legacy_payload={"message": result["message"]},
+                status_code=400,
+                message=str(result["message"]),
+                error_code="VALIDATION_ERROR",
             )
 
         # Validação de dados
         errors = user.validate_profile_data()
         if errors:
-            return Response(
-                jsonify({"message": "Erro de validação", "errors": errors}).get_data(),
-                status=400,
-                mimetype=JSON_MIMETYPE,
+            return _compat_error(
+                legacy_payload={"message": "Erro de validação", "errors": errors},
+                status_code=400,
+                message="Erro de validação",
+                error_code="VALIDATION_ERROR",
+                details={"errors": errors},
             )
 
         try:
             db.session.commit()
-            return Response(
-                jsonify(
-                    {
-                        "message": "Perfil atualizado com sucesso",
-                        "data": {
-                            "id": str(user.id),
-                            "name": user.name,
-                            "email": user.email,
-                            "gender": user.gender,
-                            "birth_date": (
-                                str(user.birth_date) if user.birth_date else None
-                            ),
-                            "monthly_income": (
-                                float(user.monthly_income)
-                                if user.monthly_income
-                                else None
-                            ),
-                            "net_worth": (
-                                float(user.net_worth) if user.net_worth else None
-                            ),
-                            "monthly_expenses": (
-                                float(user.monthly_expenses)
-                                if user.monthly_expenses
-                                else None
-                            ),
-                            "initial_investment": (
-                                float(user.initial_investment)
-                                if user.initial_investment
-                                else None
-                            ),
-                            "monthly_investment": (
-                                float(user.monthly_investment)
-                                if user.monthly_investment
-                                else None
-                            ),
-                            "investment_goal_date": (
-                                str(user.investment_goal_date)
-                                if user.investment_goal_date
-                                else None
-                            ),
-                        },
-                    }
-                ).get_data(),
-                status=200,
-                mimetype=JSON_MIMETYPE,
+            user_data = _serialize_user_profile(user)
+            return _compat_success(
+                legacy_payload={
+                    "message": "Perfil atualizado com sucesso",
+                    "data": user_data,
+                },
+                status_code=200,
+                message="Perfil atualizado com sucesso",
+                data={"user": user_data},
             )
         except Exception as e:
-            return Response(
-                jsonify(
-                    {"message": "Erro ao atualizar perfil", "error": str(e)}
-                ).get_data(),
-                status=500,
-                mimetype=JSON_MIMETYPE,
+            return _compat_error(
+                legacy_payload={"message": "Erro ao atualizar perfil", "error": str(e)},
+                status_code=500,
+                message="Erro ao atualizar perfil",
+                error_code="INTERNAL_ERROR",
+                details={"exception": str(e)},
             )
 
 
@@ -249,6 +299,12 @@ class UserMeResource(MethodResource):
             "limit": {"description": "Itens por página", "type": "integer"},
             "status": {"description": "Status da transação", "type": "string"},
             "month": {"description": "Mês no formato YYYY-MM", "type": "string"},
+            "X-API-Contract": {
+                "in": "header",
+                "description": "Opcional. Envie 'v2' para o contrato padronizado.",
+                "type": "string",
+                "required": False,
+            },
         },
         responses={
             200: {"description": "Dados do usuário e transações paginadas"},
@@ -326,46 +382,35 @@ class UserMeResource(MethodResource):
             for w in wallet_items
         ]
 
-        return Response(
-            jsonify(
-                {
-                    "user": {
-                        "id": str(user.id),
-                        "name": user.name,
-                        "email": user.email,
-                        "gender": user.gender,
-                        "birth_date": str(user.birth_date) if user.birth_date else None,
-                        "monthly_income": (
-                            float(user.monthly_income) if user.monthly_income else None
-                        ),
-                        "net_worth": float(user.net_worth) if user.net_worth else None,
-                        "monthly_expenses": (
-                            float(user.monthly_expenses)
-                            if user.monthly_expenses
-                            else None
-                        ),
-                        "initial_investment": (
-                            float(user.initial_investment)
-                            if user.initial_investment
-                            else None
-                        ),
-                        "monthly_investment": (
-                            float(user.monthly_investment)
-                            if user.monthly_investment
-                            else None
-                        ),
-                        "investment_goal_date": (
-                            str(user.investment_goal_date)
-                            if user.investment_goal_date
-                            else None
-                        ),
-                    },
-                    "transactions": paginated_transactions,
-                    "wallet": wallet_data,
+        user_data = _serialize_user_profile(user)
+        legacy_payload = {
+            "user": user_data,
+            "transactions": paginated_transactions,
+            "wallet": wallet_data,
+        }
+        return _compat_success(
+            legacy_payload=legacy_payload,
+            status_code=200,
+            message="Dados do usuário retornados com sucesso",
+            data={
+                "user": user_data,
+                "transactions": {
+                    "items": paginated_transactions["data"],
+                    "total": paginated_transactions["total"],
+                    "page": paginated_transactions["page"],
+                    "per_page": paginated_transactions["page_size"],
+                    "has_next_page": paginated_transactions["has_next_page"],
+                },
+                "wallet": wallet_data,
+            },
+            meta={
+                "pagination": {
+                    "total": paginated_transactions["total"],
+                    "page": paginated_transactions["page"],
+                    "per_page": paginated_transactions["page_size"],
+                    "has_next_page": paginated_transactions["has_next_page"],
                 }
-            ).get_data(),
-            status=200,
-            mimetype=JSON_MIMETYPE,
+            },
         )
 
 

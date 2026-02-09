@@ -8,6 +8,11 @@ Gerenciar perfil do usuário autenticado e visão consolidada (`/user/me`) com d
 ## Blueprint
 - Prefixo: `/user`
 
+## Contrato de resposta
+- Header opcional: `X-API-Contract: v2`
+- Sem header: mantém payload legado atual.
+- Com `v2`: retorna envelope padronizado (`success`, `message`, `data`, `error`, `meta`).
+
 ## Helpers internos
 
 ## `assign_user_profile_fields(user, data)`
@@ -44,6 +49,10 @@ Resposta:
 - `404`: usuário não encontrado
 - `500`: erro interno
 
+Contrato v2:
+- perfil em `data.user`
+- erros com `error.code` (`VALIDATION_ERROR`, `UNAUTHORIZED`, `NOT_FOUND`)
+
 ## `UserMeResource.get`
 Endpoint: `GET /user/me`
 
@@ -52,6 +61,10 @@ O que faz:
 - Busca transações paginadas do usuário com filtros opcionais (`status`, `month`).
 - Busca itens da carteira (`Wallet`) do usuário.
 - Retorna um payload consolidado com `user`, `transactions` e `wallet`.
+
+Contrato v2:
+- dados em `data.user`, `data.transactions`, `data.wallet`
+- paginação em `meta.pagination`
 
 Query params:
 - `page` (default 1)
@@ -71,6 +84,7 @@ Query params:
 2. Parse de data manual coexistindo com validação do schema.
 3. Respostas e tratamento de erro ainda sem contrato totalmente uniforme com outros módulos.
 4. Não há endpoint dedicado para leitura simples de perfil sem transações/carteira.
+5. `GET /user/me` mantém acoplamento alto (perfil + transações + carteira em uma rota).
 
 ## Recomendação de implementação futura (sem alterar comportamento agora)
 - Criar `UserProfileService` e `UserDashboardService` para separar responsabilidades.

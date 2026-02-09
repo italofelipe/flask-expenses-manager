@@ -33,32 +33,53 @@ Fluxo atual:
 ### `POST /auth/register`
 Cria usuário com `name`, `email`, `password`.
 
+Contrato de resposta:
+- Padrão legado (default): sem envelope `success/data/meta`.
+- Novo contrato: enviar header `X-API-Contract: v2`.
+
 Resposta de sucesso:
 - `201`
+- Com `X-API-Contract: v2`, retorna envelope padronizado e usuário em `data.user`.
 
 Erros comuns:
 - `409` email já cadastrado
 - `400` erro de validação
+- Em `v2`, erros retornam `error.code` semântico (`CONFLICT`, `VALIDATION_ERROR`).
 
 ### `POST /auth/login`
 Aceita `email` ou `name` + `password`.
 
+Contrato de resposta:
+- Padrão legado (default): sem envelope `success/data/meta`.
+- Novo contrato: enviar header `X-API-Contract: v2`.
+
 Resposta de sucesso:
 - `200` com token JWT
+- Com `X-API-Contract: v2`, token fica em `data.token` e usuário em `data.user`.
 
 Erros comuns:
 - `400` credenciais ausentes
 - `401` credenciais inválidas
+- Em `v2`, erros retornam `error.code` (`VALIDATION_ERROR`, `UNAUTHORIZED`).
 
 ### `POST /auth/logout`
 Revoga a sessão atual do usuário autenticado.
 
+Contrato de resposta:
+- Padrão legado (default): `{"message": "Logout successful"}`.
+- Novo contrato: enviar header `X-API-Contract: v2`.
+
 Resposta de sucesso:
 - `200`
+- Com `X-API-Contract: v2`, retorna envelope padronizado.
 
 ## 2) User
 - `PUT /user/profile`
 - `GET /user/me`
+
+Contrato de resposta:
+- Padrão legado (default): sem envelope `success/data/meta`.
+- Novo contrato: enviar header `X-API-Contract: v2`.
 
 ### `PUT /user/profile`
 Atualiza perfil financeiro/pessoal do usuário autenticado.
@@ -75,6 +96,7 @@ Campos suportados:
 
 Resposta de sucesso:
 - `200`
+- Com `X-API-Contract: v2`, retorna envelope padronizado e perfil em `data.user`.
 
 Erros comuns:
 - `400` validação
@@ -92,6 +114,7 @@ Query params atuais:
 - `limit`
 - `status`
 - `month` (`YYYY-MM`)
+- Com `X-API-Contract: v2`, retorna envelope padronizado e paginação em `meta.pagination`.
 
 ## 3) Transactions
 - `POST /transactions`
@@ -102,6 +125,7 @@ Query params atuais:
 - `DELETE /transactions/{transaction_id}/force`
 - `GET /transactions/summary?month=YYYY-MM`
 - `GET /transactions/list`
+- `GET /transactions/expenses`
 
 Contrato de resposta:
 - Padrão legado (default): sem envelope `success/data/meta`.
@@ -114,6 +138,10 @@ Suporta:
 - tipo `income|expense`
 - status (`paid|pending|cancelled|postponed|overdue`)
 - recorrência (`is_recurring`, `start_date`, `end_date`)
+- validações de recorrência:
+  - `is_recurring=true` exige `start_date` e `end_date`
+  - `due_date` deve estar entre `start_date` e `end_date`
+  - `start_date` não pode ser maior que `end_date`
 - Com `X-API-Contract: v2`:
   - simples em `data.transaction`
   - parcelada em `data.transactions`
@@ -124,6 +152,7 @@ Atualiza campos da transação.
 Regra específica implementada:
 - Se `status=paid`, exige `paid_at`.
 - `paid_at` não pode ser no futuro.
+- Recorrência mantém consistência de intervalo (`start_date <= end_date`) e de `due_date` dentro do período quando `is_recurring=true`.
 - Com `X-API-Contract: v2`, retorna envelope padronizado.
 
 ### `DELETE /transactions/{transaction_id}`
@@ -148,7 +177,38 @@ Calcula total mensal de receitas e despesas e retorna transações do mês.
 
 ### `GET /transactions/list`
 Lista transações ativas do usuário.
+- Query params suportados:
+  - `page`, `per_page`
+  - `type` (`income|expense`)
+  - `status` (`paid|pending|cancelled|postponed|overdue`)
+  - `start_date`, `end_date` (`YYYY-MM-DD`, aplicados em `due_date`)
+  - `tag_id`, `account_id`, `credit_card_id` (UUID)
 - Com `X-API-Contract: v2`, itens em `data.transactions` e paginação em `meta.pagination`.
+
+### `GET /transactions/expenses`
+Lista despesas por período (`due_date`) com métricas agregadas do período.
+
+Regras:
+- É obrigatório enviar ao menos um parâmetro: `startDate` ou `finalDate`.
+- `startDate` e `finalDate` usam formato `YYYY-MM-DD`.
+- Se ambos forem enviados, `startDate` não pode ser maior que `finalDate`.
+
+Query params suportados:
+- `startDate`
+- `finalDate`
+- `page`, `per_page`
+- `order_by` (`due_date|created_at|amount|title`)
+- `order` (`asc|desc`)
+
+Resposta inclui:
+- lista paginada de despesas
+- contagem total de transações do período
+- contagem de receitas do período
+- contagem de despesas do período
+- Com `X-API-Contract: v2`:
+  - despesas em `data.expenses`
+  - contadores em `data.counts`
+  - paginação em `meta.pagination`
 
 ## 4) Wallet
 - `POST /wallet`
@@ -195,7 +255,7 @@ Referência de padronização (Fase 0):
 
 ## Lacunas e TODOs identificados no código (Fase 0)
 1. `transaction_controller.py` contém comentário TODO de enum para status/tipo, mas enums já existem no model e o TODO está desatualizado.
-2. `GET /transactions/list` hoje retorna todos os ativos sem aplicar filtros/paginação documentados.
+2. Geração de recorrência foi implementada em serviço/script e com job agendado no GitHub Actions (`.github/workflows/recurrence-job.yml`), dependente de secrets para conexão no banco.
 3. Não há módulo de metas financeiras implementado (`goals`).
 4. Não há CRUD exposto para `Tag`, `Account` e `CreditCard` (existem model/schema, mas sem controller).
 5. A documentação histórica citava endpoints `/ticker` e `/transaction`; o código atual usa `/wallet` e `/transactions`.

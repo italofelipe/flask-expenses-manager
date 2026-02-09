@@ -1,5 +1,5 @@
 import uuid
-from datetime import date
+from datetime import date, timedelta
 from typing import Any, Dict
 
 
@@ -36,13 +36,15 @@ def _auth_headers(token: str, contract: str | None = None) -> Dict[str, str]:
     return headers
 
 
-def _transaction_payload() -> Dict[str, Any]:
-    return {
+def _transaction_payload(**overrides: Any) -> Dict[str, Any]:
+    payload: Dict[str, Any] = {
         "title": "Conta de luz",
         "amount": "150.50",
         "type": "expense",
         "due_date": date.today().isoformat(),
     }
+    payload.update(overrides)
+    return payload
 
 
 def test_transaction_create_v1_legacy_contract(client) -> None:
@@ -162,3 +164,195 @@ def test_transaction_delete_restore_force_v2_contract(client) -> None:
     assert force_response.status_code == 200
     force_body = force_response.get_json()
     assert force_body["success"] is True
+
+
+def test_transaction_list_filters_and_pagination_v2_contract(client) -> None:
+    token = _register_and_login(client)
+
+    today = date.today()
+    responses = [
+        client.post(
+            "/transactions",
+            json=_transaction_payload(
+                title="Salario",
+                type="income",
+                status="paid",
+                due_date=(today - timedelta(days=1)).isoformat(),
+            ),
+            headers=_auth_headers(token, "v2"),
+        ),
+        client.post(
+            "/transactions",
+            json=_transaction_payload(
+                title="Mercado",
+                type="expense",
+                status="pending",
+                due_date=today.isoformat(),
+            ),
+            headers=_auth_headers(token, "v2"),
+        ),
+        client.post(
+            "/transactions",
+            json=_transaction_payload(
+                title="Freelance",
+                type="income",
+                status="pending",
+                due_date=(today + timedelta(days=1)).isoformat(),
+            ),
+            headers=_auth_headers(token, "v2"),
+        ),
+    ]
+    assert all(response.status_code == 201 for response in responses)
+
+    response = client.get(
+        (
+            "/transactions/list?page=1&per_page=1&type=income&status=pending"
+            f"&start_date={today.isoformat()}"
+            f"&end_date={(today + timedelta(days=2)).isoformat()}"
+        ),
+        headers=_auth_headers(token, "v2"),
+    )
+
+    assert response.status_code == 200
+    body = response.get_json()
+    assert body["success"] is True
+    assert body["meta"]["pagination"]["total"] == 1
+    assert body["meta"]["pagination"]["page"] == 1
+    assert body["meta"]["pagination"]["per_page"] == 1
+    assert len(body["data"]["transactions"]) == 1
+    assert body["data"]["transactions"][0]["title"] == "Freelance"
+
+
+def test_transaction_list_legacy_contract_with_pagination(client) -> None:
+    token = _register_and_login(client)
+
+    create_response = client.post(
+        "/transactions",
+        json=_transaction_payload(title="Item legado"),
+        headers=_auth_headers(token),
+    )
+    assert create_response.status_code == 201
+
+    response = client.get(
+        "/transactions/list?page=1&per_page=1",
+        headers=_auth_headers(token),
+    )
+
+    assert response.status_code == 200
+    body = response.get_json()
+    assert "success" not in body
+    assert body["page"] == 1
+    assert body["per_page"] == 1
+    assert body["total"] >= 1
+    assert len(body["transactions"]) == 1
+
+
+def test_transaction_list_invalid_status_v2_contract(client) -> None:
+    token = _register_and_login(client)
+
+    response = client.get(
+        "/transactions/list?status=invalid-status",
+        headers=_auth_headers(token, "v2"),
+    )
+
+    assert response.status_code == 400
+    body = response.get_json()
+    assert body["success"] is False
+    assert body["error"]["code"] == "VALIDATION_ERROR"
+
+
+def test_transaction_expenses_requires_period_parameter_v2_contract(client) -> None:
+    token = _register_and_login(client)
+    response = client.get(
+        "/transactions/expenses",
+        headers=_auth_headers(token, "v2"),
+    )
+
+    assert response.status_code == 400
+    body = response.get_json()
+    assert body["success"] is False
+    assert body["error"]["code"] == "VALIDATION_ERROR"
+
+
+def test_transaction_expenses_period_with_counts_and_pagination_v2_contract(
+    client,
+) -> None:
+    token = _register_and_login(client)
+    today = date.today()
+
+    payloads = [
+        _transaction_payload(
+            title="Despesa antiga",
+            type="expense",
+            due_date=(today - timedelta(days=2)).isoformat(),
+            amount="50.00",
+        ),
+        _transaction_payload(
+            title="Receita período",
+            type="income",
+            due_date=today.isoformat(),
+            amount="500.00",
+        ),
+        _transaction_payload(
+            title="Despesa período A",
+            type="expense",
+            due_date=today.isoformat(),
+            amount="120.00",
+        ),
+        _transaction_payload(
+            title="Despesa período B",
+            type="expense",
+            due_date=(today + timedelta(days=1)).isoformat(),
+            amount="80.00",
+        ),
+    ]
+    for payload in payloads:
+        created = client.post(
+            "/transactions",
+            json=payload,
+            headers=_auth_headers(token, "v2"),
+        )
+        assert created.status_code == 201
+
+    response = client.get(
+        (
+            f"/transactions/expenses?startDate={today.isoformat()}"
+            f"&finalDate={(today + timedelta(days=1)).isoformat()}"
+            "&page=1&per_page=1&order_by=amount&order=asc"
+        ),
+        headers=_auth_headers(token, "v2"),
+    )
+
+    assert response.status_code == 200
+    body = response.get_json()
+    assert body["success"] is True
+    assert body["meta"]["pagination"]["total"] == 2
+    assert body["meta"]["pagination"]["page"] == 1
+    assert body["meta"]["pagination"]["per_page"] == 1
+    assert len(body["data"]["expenses"]) == 1
+    assert body["data"]["expenses"][0]["title"] == "Despesa período B"
+    assert body["data"]["counts"]["total_transactions"] == 3
+    assert body["data"]["counts"]["income_transactions"] == 1
+    assert body["data"]["counts"]["expense_transactions"] == 2
+
+
+def test_transaction_expenses_legacy_contract(client) -> None:
+    token = _register_and_login(client)
+    created = client.post(
+        "/transactions",
+        json=_transaction_payload(type="expense", amount="100.00"),
+        headers=_auth_headers(token),
+    )
+    assert created.status_code == 201
+
+    response = client.get(
+        f"/transactions/expenses?finalDate={date.today().isoformat()}",
+        headers=_auth_headers(token),
+    )
+
+    assert response.status_code == 200
+    body = response.get_json()
+    assert "success" not in body
+    assert "expenses" in body
+    assert "counts" in body
+    assert "total_transactions" in body["counts"]

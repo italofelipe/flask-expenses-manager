@@ -1,9 +1,9 @@
-from datetime import datetime
+from datetime import date, datetime
 from decimal import Decimal
 from typing import Any, Dict
 from uuid import UUID
 
-from flask import Blueprint, Response, jsonify, request
+from flask import Blueprint, Response, has_request_context, jsonify, request
 from flask_apispec import doc, use_kwargs
 from flask_apispec.views import MethodResource
 from flask_jwt_extended import (
@@ -28,6 +28,8 @@ CONTRACT_V2 = "v2"
 
 
 def _is_v2_contract() -> bool:
+    if not has_request_context():
+        return False
     header_value = str(request.headers.get(CONTRACT_HEADER, "")).strip().lower()
     return header_value == CONTRACT_V2
 
@@ -68,6 +70,92 @@ def _compat_error(
             status_code,
         )
     return _json_response(legacy_payload, status_code)
+
+
+def _parse_positive_int(value: str | None, *, default: int, field_name: str) -> int:
+    if value is None:
+        return default
+    try:
+        parsed = int(value)
+    except ValueError as exc:
+        raise ValueError(
+            f"Parâmetro '{field_name}' inválido. Informe um inteiro positivo."
+        ) from exc
+    if parsed < 1:
+        raise ValueError(
+            f"Parâmetro '{field_name}' inválido. Informe um inteiro positivo."
+        )
+    return parsed
+
+
+def _parse_optional_uuid(value: str | None, field_name: str) -> UUID | None:
+    if not value:
+        return None
+    try:
+        return UUID(value)
+    except ValueError as exc:
+        raise ValueError(
+            f"Parâmetro '{field_name}' inválido. Informe um UUID válido."
+        ) from exc
+
+
+def _parse_optional_date(value: str | None, field_name: str) -> date | None:
+    if not value:
+        return None
+    try:
+        return datetime.strptime(value, "%Y-%m-%d").date()
+    except ValueError as exc:
+        raise ValueError(
+            f"Parâmetro '{field_name}' inválido. Use o formato YYYY-MM-DD."
+        ) from exc
+
+
+def _validate_recurring_payload(
+    *,
+    is_recurring: bool,
+    due_date: date | None,
+    start_date: date | None,
+    end_date: date | None,
+) -> str | None:
+    if not is_recurring:
+        if start_date and end_date and start_date > end_date:
+            return "Parâmetro 'start_date' não pode ser maior que 'end_date'."
+        return None
+
+    if not start_date or not end_date:
+        return (
+            "Transações recorrentes exigem 'start_date' e 'end_date' "
+            "no formato YYYY-MM-DD."
+        )
+
+    if start_date > end_date:
+        return "Parâmetro 'start_date' não pode ser maior que 'end_date'."
+
+    if due_date is None:
+        return "Transações recorrentes exigem 'due_date' no formato YYYY-MM-DD."
+
+    if due_date < start_date or due_date > end_date:
+        return "Parâmetro 'due_date' deve estar entre 'start_date' e 'end_date'."
+
+    return None
+
+
+def _resolve_transaction_ordering(order_by: str, order: str) -> Any:
+    allowed_order_by: Dict[str, Any] = {
+        "due_date": Transaction.due_date,
+        "created_at": Transaction.created_at,
+        "amount": Transaction.amount,
+        "title": Transaction.title,
+    }
+    if order_by not in allowed_order_by:
+        raise ValueError(
+            "Parâmetro 'order_by' inválido. Use due_date, created_at, amount ou title."
+        )
+    if order not in {"asc", "desc"}:
+        raise ValueError("Parâmetro 'order' inválido. Use asc ou desc.")
+
+    column = allowed_order_by[order_by]
+    return column.asc() if order == "asc" else column.desc()
 
 
 def _invalid_token_response() -> Response:
@@ -153,7 +241,7 @@ class TransactionResource(MethodResource):
     )  # type: ignore
     @jwt_required()  # type: ignore
     @use_kwargs(TransactionSchema, location="json")  # type: ignore
-    def post(self, **kwargs: Any) -> Response:
+    def post(self, **kwargs: Any) -> Response:  # noqa: C901
         verify_jwt_in_request()
         jwt_data = get_jwt()
         if is_token_revoked(jwt_data["jti"]):
@@ -163,6 +251,20 @@ class TransactionResource(MethodResource):
 
         if "type" in kwargs:
             kwargs["type"] = kwargs["type"].lower()
+
+        recurring_error = _validate_recurring_payload(
+            is_recurring=bool(kwargs.get("is_recurring", False)),
+            due_date=kwargs.get("due_date"),
+            start_date=kwargs.get("start_date"),
+            end_date=kwargs.get("end_date"),
+        )
+        if recurring_error:
+            return _compat_error(
+                legacy_payload={"error": recurring_error},
+                status_code=400,
+                message=recurring_error,
+                error_code="VALIDATION_ERROR",
+            )
 
         if kwargs.get("is_installment") and kwargs.get("installment_count"):
             from uuid import uuid4
@@ -376,6 +478,26 @@ class TransactionResource(MethodResource):
                     message="'paid_at' não pode ser uma data futura.",
                     error_code="VALIDATION_ERROR",
                 )
+
+        resolved_is_recurring = bool(
+            kwargs.get("is_recurring", transaction.is_recurring)
+        )
+        resolved_due_date = kwargs.get("due_date", transaction.due_date)
+        resolved_start_date = kwargs.get("start_date", transaction.start_date)
+        resolved_end_date = kwargs.get("end_date", transaction.end_date)
+        recurring_error = _validate_recurring_payload(
+            is_recurring=resolved_is_recurring,
+            due_date=resolved_due_date,
+            start_date=resolved_start_date,
+            end_date=resolved_end_date,
+        )
+        if recurring_error:
+            return _compat_error(
+                legacy_payload={"error": recurring_error},
+                status_code=400,
+                message=recurring_error,
+                error_code="VALIDATION_ERROR",
+            )
 
         try:
             for field, value in kwargs.items():
@@ -673,7 +795,7 @@ class TransactionResource(MethodResource):
         },
     )  # type: ignore
     @jwt_required()  # type: ignore
-    def get_active(self) -> Response:
+    def get_active(self) -> Response:  # noqa: C901
         verify_jwt_in_request()
         jwt_data = get_jwt()
         if is_token_revoked(jwt_data["jti"]):
@@ -683,18 +805,115 @@ class TransactionResource(MethodResource):
         user_uuid = UUID(user_id)
 
         try:
-            transactions = Transaction.query.filter_by(
-                user_id=user_uuid, deleted=False
-            ).all()
+            page = _parse_positive_int(
+                request.args.get("page"), default=1, field_name="page"
+            )
+            per_page = _parse_positive_int(
+                request.args.get("per_page"),
+                default=10,
+                field_name="per_page",
+            )
+
+            transaction_type = request.args.get("type")
+            status = request.args.get("status")
+            start_date = _parse_optional_date(
+                request.args.get("start_date"), "start_date"
+            )
+            end_date = _parse_optional_date(request.args.get("end_date"), "end_date")
+            tag_id = _parse_optional_uuid(request.args.get("tag_id"), "tag_id")
+            account_id = _parse_optional_uuid(
+                request.args.get("account_id"), "account_id"
+            )
+            credit_card_id = _parse_optional_uuid(
+                request.args.get("credit_card_id"), "credit_card_id"
+            )
+
+            if start_date and end_date and start_date > end_date:
+                return _compat_error(
+                    legacy_payload={
+                        "error": (
+                            "Parâmetro 'start_date' não pode ser maior que 'end_date'."
+                        )
+                    },
+                    status_code=400,
+                    message=(
+                        "Parâmetro 'start_date' não pode ser maior que 'end_date'."
+                    ),
+                    error_code="VALIDATION_ERROR",
+                )
+
+            query = Transaction.query.filter_by(user_id=user_uuid, deleted=False)
+
+            if transaction_type:
+                try:
+                    query = query.filter(
+                        Transaction.type == TransactionType(transaction_type.lower())
+                    )
+                except ValueError:
+                    return _compat_error(
+                        legacy_payload={
+                            "error": (
+                                "Parâmetro 'type' inválido. "
+                                "Use 'income' ou 'expense'."
+                            )
+                        },
+                        status_code=400,
+                        message=(
+                            "Parâmetro 'type' inválido. Use 'income' ou 'expense'."
+                        ),
+                        error_code="VALIDATION_ERROR",
+                    )
+
+            if status:
+                try:
+                    query = query.filter(
+                        Transaction.status == TransactionStatus(status.lower())
+                    )
+                except ValueError:
+                    return _compat_error(
+                        legacy_payload={
+                            "error": (
+                                "Parâmetro 'status' inválido. "
+                                "Use paid, pending, cancelled, postponed ou overdue."
+                            )
+                        },
+                        status_code=400,
+                        message=(
+                            "Parâmetro 'status' inválido. "
+                            "Use paid, pending, cancelled, postponed ou overdue."
+                        ),
+                        error_code="VALIDATION_ERROR",
+                    )
+
+            if start_date:
+                query = query.filter(Transaction.due_date >= start_date)
+            if end_date:
+                query = query.filter(Transaction.due_date <= end_date)
+            if tag_id:
+                query = query.filter(Transaction.tag_id == tag_id)
+            if account_id:
+                query = query.filter(Transaction.account_id == account_id)
+            if credit_card_id:
+                query = query.filter(Transaction.credit_card_id == credit_card_id)
+
+            total = query.count()
+            pages = (total + per_page - 1) // per_page if total else 0
+            transactions = (
+                query.order_by(
+                    Transaction.due_date.desc(), Transaction.created_at.desc()
+                )
+                .offset((page - 1) * per_page)
+                .limit(per_page)
+                .all()
+            )
+
             serialized = [serialize_transaction(item) for item in transactions]
-            total = len(transactions)
-            per_page = len(transactions)
 
             return _compat_success(
                 legacy_payload={
                     "transactions": serialized,
                     "total": total,
-                    "page": 1,
+                    "page": page,
                     "per_page": per_page,
                 },
                 status_code=200,
@@ -703,11 +922,18 @@ class TransactionResource(MethodResource):
                 meta={
                     "pagination": {
                         "total": total,
-                        "page": 1,
+                        "page": page,
                         "per_page": per_page,
-                        "pages": 1,
+                        "pages": pages,
                     }
                 },
+            )
+        except ValueError as exc:
+            return _compat_error(
+                legacy_payload={"error": str(exc)},
+                status_code=400,
+                message=str(exc),
+                error_code="VALIDATION_ERROR",
             )
         except Exception as exc:
             db.session.rollback()
@@ -1008,6 +1234,176 @@ class TransactionListActiveResource(MethodResource):
         return resource.get_active()
 
 
+class TransactionExpensePeriodResource(MethodResource):
+    @doc(
+        description=(
+            "Lista despesas por período do usuário autenticado.\n\n"
+            "Regras:\n"
+            "- É obrigatório enviar ao menos um parâmetro: startDate ou finalDate\n"
+            "- startDate e finalDate usam formato YYYY-MM-DD\n"
+            "- paginação com page e per_page\n"
+            "- ordenação com order_by e order\n\n"
+            "Métricas retornadas:\n"
+            "- total_transactions (total no período)\n"
+            "- income_transactions (receitas no período)\n"
+            "- expense_transactions (despesas no período)"
+        ),
+        tags=["Transações"],
+        security=[{"BearerAuth": []}],
+        params={
+            "startDate": {"description": "Data inicial (YYYY-MM-DD)", "type": "string"},
+            "finalDate": {"description": "Data final (YYYY-MM-DD)", "type": "string"},
+            "page": {"description": "Número da página", "type": "integer"},
+            "per_page": {"description": "Itens por página", "type": "integer"},
+            "order_by": {
+                "description": "Campo de ordenação: due_date|created_at|amount|title",
+                "type": "string",
+            },
+            "order": {"description": "Direção: asc|desc", "type": "string"},
+            CONTRACT_HEADER: {
+                "in": "header",
+                "description": "Opcional. Envie 'v2' para o contrato padronizado.",
+                "type": "string",
+                "required": False,
+            },
+        },
+        responses={
+            200: {"description": "Lista de despesas por período"},
+            400: {"description": "Parâmetros inválidos"},
+            401: {"description": "Token inválido"},
+            500: {"description": "Erro interno"},
+        },
+    )  # type: ignore[misc]
+    @jwt_required()  # type: ignore[misc]
+    def get(self) -> Response:
+        verify_jwt_in_request()
+        jwt_data = get_jwt()
+        if is_token_revoked(jwt_data["jti"]):
+            return _invalid_token_response()
+
+        user_id = get_jwt_identity()
+        user_uuid = UUID(user_id)
+
+        try:
+            start_date = _parse_optional_date(
+                request.args.get("startDate"), "startDate"
+            )
+            final_date = _parse_optional_date(
+                request.args.get("finalDate"), "finalDate"
+            )
+            if not start_date and not final_date:
+                return _compat_error(
+                    legacy_payload={
+                        "error": (
+                            "Informe ao menos um parâmetro: 'startDate' ou 'finalDate'."
+                        )
+                    },
+                    status_code=400,
+                    message=(
+                        "Informe ao menos um parâmetro: " "'startDate' ou 'finalDate'."
+                    ),
+                    error_code="VALIDATION_ERROR",
+                )
+
+            if start_date and final_date and start_date > final_date:
+                return _compat_error(
+                    legacy_payload={
+                        "error": (
+                            "Parâmetro 'startDate' não pode ser maior que "
+                            "'finalDate'."
+                        )
+                    },
+                    status_code=400,
+                    message=(
+                        "Parâmetro 'startDate' não pode ser maior que " "'finalDate'."
+                    ),
+                    error_code="VALIDATION_ERROR",
+                )
+
+            page = _parse_positive_int(
+                request.args.get("page"), default=1, field_name="page"
+            )
+            per_page = _parse_positive_int(
+                request.args.get("per_page"), default=10, field_name="per_page"
+            )
+            order_by = str(request.args.get("order_by", "due_date")).strip().lower()
+            order = str(request.args.get("order", "desc")).strip().lower()
+            ordering_clause = _resolve_transaction_ordering(order_by, order)
+
+            base_query = Transaction.query.filter_by(user_id=user_uuid, deleted=False)
+            if start_date:
+                base_query = base_query.filter(Transaction.due_date >= start_date)
+            if final_date:
+                base_query = base_query.filter(Transaction.due_date <= final_date)
+
+            total_transactions = base_query.count()
+            income_transactions = base_query.filter(
+                Transaction.type == TransactionType.INCOME
+            ).count()
+            expense_transactions = base_query.filter(
+                Transaction.type == TransactionType.EXPENSE
+            ).count()
+
+            expenses_query = base_query.filter(
+                Transaction.type == TransactionType.EXPENSE
+            )
+            total_expenses = expense_transactions
+            pages = (total_expenses + per_page - 1) // per_page if total_expenses else 0
+            expenses = (
+                expenses_query.order_by(ordering_clause)
+                .offset((page - 1) * per_page)
+                .limit(per_page)
+                .all()
+            )
+            serialized_expenses = [serialize_transaction(item) for item in expenses]
+
+            counts_payload = {
+                "total_transactions": total_transactions,
+                "income_transactions": income_transactions,
+                "expense_transactions": expense_transactions,
+            }
+
+            return _compat_success(
+                legacy_payload={
+                    "expenses": serialized_expenses,
+                    "total": total_expenses,
+                    "page": page,
+                    "per_page": per_page,
+                    "counts": counts_payload,
+                },
+                status_code=200,
+                message="Lista de despesas por período",
+                data={"expenses": serialized_expenses, "counts": counts_payload},
+                meta={
+                    "pagination": {
+                        "total": total_expenses,
+                        "page": page,
+                        "per_page": per_page,
+                        "pages": pages,
+                    }
+                },
+            )
+        except ValueError as exc:
+            return _compat_error(
+                legacy_payload={"error": str(exc)},
+                status_code=400,
+                message=str(exc),
+                error_code="VALIDATION_ERROR",
+            )
+        except Exception as exc:
+            db.session.rollback()
+            return _compat_error(
+                legacy_payload={
+                    "error": "Erro ao buscar despesas por período",
+                    "message": str(exc),
+                },
+                status_code=500,
+                message="Erro ao buscar despesas por período",
+                error_code="INTERNAL_ERROR",
+                details={"exception": str(exc)},
+            )
+
+
 transaction_bp.add_url_rule(
     "", view_func=TransactionResource.as_view("transactionresource")
 )
@@ -1051,5 +1447,11 @@ transaction_bp.add_url_rule(
 transaction_bp.add_url_rule(
     "/list",
     view_func=TransactionListActiveResource.as_view("transaction_list_active"),
+    methods=["GET"],
+)
+
+transaction_bp.add_url_rule(
+    "/expenses",
+    view_func=TransactionExpensePeriodResource.as_view("transaction_expense_period"),
     methods=["GET"],
 )

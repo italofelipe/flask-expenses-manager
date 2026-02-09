@@ -37,6 +37,10 @@ O que faz:
 - Exige JWT válido e não revogado.
 - Cria transação simples.
 - Quando `is_installment=true`, gera múltiplas transações com `installment_group_id`.
+- Valida recorrência (`is_recurring=true`):
+  - exige `start_date` e `end_date`
+  - exige `due_date` dentro do intervalo
+  - bloqueia intervalo inválido (`start_date > end_date`)
 
 Resposta:
 - `201` (simples ou parcelada)
@@ -55,6 +59,7 @@ O que faz:
   - `status=paid` exige `paid_at`
   - `paid_at` só pode existir com `status=paid`
   - `paid_at` não pode ser futuro
+  - se recorrente, mantém coerência de datas (`start_date`, `end_date`, `due_date`)
 - Contrato v2:
   - sucesso em `data.transaction`
   - erros com `error.code` (`VALIDATION_ERROR`, `FORBIDDEN`, `NOT_FOUND`)
@@ -87,12 +92,44 @@ O que faz:
 ## `TransactionResource.get_active`
 Endpoint: `GET /transactions/list`
 
-O que faz hoje:
+O que faz:
 - Retorna transações não deletadas do usuário.
-- Ponto atual:
-  - ainda não aplica filtros reais/paginação de banco apesar de documentar filtros.
+- Aplica filtros reais em nível de banco:
+  - `type` (`income|expense`)
+  - `status` (`paid|pending|cancelled|postponed|overdue`)
+  - `start_date` e `end_date` (intervalo por `due_date`)
+  - `tag_id`, `account_id`, `credit_card_id`
+- Aplica paginação real:
+  - `page` (default `1`)
+  - `per_page` (default `10`)
+- Ordena por `due_date` desc e `created_at` desc.
+- Valida parâmetros inválidos com `400` (`VALIDATION_ERROR` no contrato v2).
 - Contrato v2:
   - itens em `data.transactions`
+  - paginação em `meta.pagination`
+
+## `TransactionExpensePeriodResource.get`
+Endpoint: `GET /transactions/expenses`
+
+O que faz:
+- Lista despesas por período com base em `due_date`.
+- Regras de entrada:
+  - ao menos um parâmetro é obrigatório: `startDate` ou `finalDate`
+  - ambos aceitam formato `YYYY-MM-DD`
+  - se ambos forem enviados, valida `startDate <= finalDate`
+- Paginação:
+  - `page` (default `1`)
+  - `per_page` (default `10`)
+- Ordenação:
+  - `order_by`: `due_date|created_at|amount|title` (default `due_date`)
+  - `order`: `asc|desc` (default `desc`)
+- Métricas retornadas para o período filtrado:
+  - `total_transactions`
+  - `income_transactions`
+  - `expense_transactions`
+- Contrato v2:
+  - itens em `data.expenses`
+  - métricas em `data.counts`
   - paginação em `meta.pagination`
 
 ## `TransactionSummaryResource.get`
@@ -123,10 +160,8 @@ O que faz:
 - JWT callbacks de revogação
 
 ## Pontos incompletos / TODOs (identificados no código)
-1. `GET /transactions/list` ainda não aplica filtros/paginação reais em nível de banco.
-2. Regras de recorrência existem no payload/model, mas não há geração automática de ocorrências futuras por scheduler.
+1. Agendamento automático de recorrência foi configurado via GitHub Actions (`.github/workflows/recurrence-job.yml`), dependendo de secrets de ambiente para conexão no banco.
 
 ## Recomendação de implementação futura (sem alterar comportamento agora)
 - Extrair casos de uso para `TransactionService` com comandos explícitos (create/update/delete/restore/summary).
-- Corrigir listagem ativa com filtros de query em nível de banco.
 - Implementar recorrência com job idempotente (diário/mensal) e testes de não-duplicidade.
