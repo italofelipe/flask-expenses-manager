@@ -229,6 +229,8 @@ Resposta inclui:
 - `POST /wallet`
 - `GET /wallet`
 - `GET /wallet/{investment_id}/history`
+- `POST /wallet/{investment_id}/operations`
+- `GET /wallet/{investment_id}/operations`
 - `PUT /wallet/{investment_id}`
 - `DELETE /wallet/{investment_id}`
 
@@ -252,6 +254,16 @@ Lista carteira paginada (`page`, `per_page`).
 ### `GET /wallet/{investment_id}/history`
 Retorna histórico paginado de alterações do investimento.
 - Com `X-API-Contract: v2`, itens ficam em `data.items`.
+
+### `POST /wallet/{investment_id}/operations`
+Registra operação de investimento no ativo da carteira.
+- Campos: `operation_type` (`buy`/`sell`), `quantity`, `unit_price`, `fees` (opcional), `executed_at` (opcional), `notes` (opcional).
+- Com `X-API-Contract: v2`, retorno em `data.operation`.
+
+### `GET /wallet/{investment_id}/operations`
+Lista operações paginadas de um investimento.
+- Query params: `page`, `per_page`.
+- Com `X-API-Contract: v2`, operações em `data.items` e paginação em `meta.pagination`.
 
 ### `PUT /wallet/{investment_id}`
 Atualiza item da carteira e salva histórico quando `quantity` ou `value` mudam.

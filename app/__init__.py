@@ -23,6 +23,7 @@ from app.extensions.database import db
 from app.extensions.error_handlers import register_error_handlers
 from app.models.account import Account  # noqa: F401
 from app.models.credit_card import CreditCard  # noqa: F401
+from app.models.investment_operation import InvestmentOperation  # noqa: F401
 from app.models.tag import Tag  # noqa: F401
 
 jwt = JWTManager()

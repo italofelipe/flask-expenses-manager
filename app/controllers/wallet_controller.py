@@ -1,6 +1,6 @@
 from datetime import date, datetime
 from decimal import Decimal
-from typing import Any, Dict
+from typing import Any, Dict, cast
 from uuid import UUID
 
 from flask import Blueprint, request
@@ -9,7 +9,9 @@ from flask_jwt_extended import get_jwt_identity, jwt_required
 from marshmallow import ValidationError, fields
 
 from app.extensions.database import db
+from app.models.investment_operation import InvestmentOperation
 from app.models.wallet import Wallet
+from app.schemas.investment_operation_schema import InvestmentOperationSchema
 from app.schemas.wallet_schema import WalletSchema
 from app.services.investment_service import InvestmentService
 
@@ -58,6 +60,37 @@ def _compat_error(
             status_code,
         )
     return legacy_payload, status_code
+
+
+def _get_owned_investment_or_error(
+    investment_id: UUID, user_id: UUID, *, forbidden_message: str
+) -> Wallet | None:
+    investment = cast(Wallet | None, Wallet.query.filter_by(id=investment_id).first())
+    if not investment:
+        return None
+    if str(investment.user_id) != str(user_id):
+        raise PermissionError(forbidden_message)
+    return investment
+
+
+def _serialize_operation(operation: InvestmentOperation) -> Dict[str, Any]:
+    return {
+        "id": str(operation.id),
+        "wallet_id": str(operation.wallet_id),
+        "user_id": str(operation.user_id),
+        "operation_type": operation.operation_type,
+        "quantity": str(operation.quantity),
+        "unit_price": str(operation.unit_price),
+        "fees": str(operation.fees),
+        "executed_at": operation.executed_at.isoformat(),
+        "notes": operation.notes,
+        "created_at": (
+            operation.created_at.isoformat() if operation.created_at else None
+        ),
+        "updated_at": (
+            operation.updated_at.isoformat() if operation.updated_at else None
+        ),
+    }
 
 
 @wallet_bp.route("", methods=["POST"])  # type: ignore[misc]
@@ -327,6 +360,203 @@ def get_wallet_history(investment_id: UUID) -> tuple[Dict[str, Any], int]:
                 "page": response["page"],
                 "per_page": response["page_size"],
                 "has_next_page": response["has_next_page"],
+            }
+        },
+    )
+
+
+@wallet_bp.route(  # type: ignore[misc]
+    "/<uuid:investment_id>/operations", methods=["POST"]
+)
+@doc(
+    description=(
+        "Registra uma operação de investimento (buy/sell) para um item da carteira."
+    ),
+    tags=["Wallet"],
+    security=[{"BearerAuth": []}],
+    params={
+        "investment_id": {"description": "ID do investimento"},
+        "X-API-Contract": {
+            "in": "header",
+            "description": "Opcional. Envie 'v2' para o contrato padronizado.",
+            "type": "string",
+            "required": False,
+        },
+    },
+    responses={
+        201: {"description": "Operação criada com sucesso"},
+        400: {"description": "Dados inválidos"},
+        401: {"description": "Token inválido"},
+        403: {"description": "Sem permissão"},
+        404: {"description": "Investimento não encontrado"},
+    },
+)  # type: ignore[misc]
+@jwt_required()  # type: ignore[misc]
+def add_investment_operation(investment_id: UUID) -> tuple[dict[str, Any], int]:
+    user_id: UUID = UUID(get_jwt_identity())
+
+    try:
+        investment = _get_owned_investment_or_error(
+            investment_id,
+            user_id,
+            forbidden_message=(
+                "Você não tem permissão para adicionar operações neste investimento."
+            ),
+        )
+    except PermissionError as exc:
+        return _compat_error(
+            legacy_payload={"error": str(exc)},
+            status_code=403,
+            message=str(exc),
+            error_code="FORBIDDEN",
+        )
+
+    if not investment:
+        return _compat_error(
+            legacy_payload={"error": "Investimento não encontrado"},
+            status_code=404,
+            message="Investimento não encontrado",
+            error_code="NOT_FOUND",
+        )
+
+    payload: Dict[str, Any] = request.get_json() or {}
+    schema = InvestmentOperationSchema()
+    try:
+        validated_data = schema.load(payload)
+    except ValidationError as err:
+        return _compat_error(
+            legacy_payload={"error": "Dados inválidos", "messages": str(err.messages)},
+            status_code=400,
+            message="Dados inválidos",
+            error_code="VALIDATION_ERROR",
+            details={"messages": err.messages},
+        )
+
+    try:
+        operation = InvestmentOperation(
+            wallet_id=investment.id,
+            user_id=user_id,
+            operation_type=str(validated_data["operation_type"]).lower(),
+            quantity=validated_data["quantity"],
+            unit_price=validated_data["unit_price"],
+            fees=validated_data.get("fees"),
+            executed_at=validated_data["executed_at"],
+            notes=validated_data.get("notes"),
+        )
+        db.session.add(operation)
+        db.session.commit()
+    except Exception as exc:
+        db.session.rollback()
+        return _compat_error(
+            legacy_payload={"error": "Erro interno", "message": str(exc)},
+            status_code=500,
+            message="Erro interno",
+            error_code="INTERNAL_ERROR",
+            details={"exception": str(exc)},
+        )
+
+    operation_data = _serialize_operation(operation)
+    return _compat_success(
+        legacy_payload={
+            "message": "Operação registrada com sucesso",
+            "operation": operation_data,
+        },
+        status_code=201,
+        message="Operação registrada com sucesso",
+        data={"operation": operation_data},
+    )
+
+
+@wallet_bp.route(  # type: ignore[misc]
+    "/<uuid:investment_id>/operations", methods=["GET"]
+)
+@doc(
+    description=(
+        "Lista operações de investimento de um item da carteira com paginação."
+    ),
+    tags=["Wallet"],
+    security=[{"BearerAuth": []}],
+    params={
+        "investment_id": {"description": "ID do investimento"},
+        "page": {"description": "Página desejada (default: 1)"},
+        "per_page": {"description": "Itens por página (default: 10)"},
+        "X-API-Contract": {
+            "in": "header",
+            "description": "Opcional. Envie 'v2' para o contrato padronizado.",
+            "type": "string",
+            "required": False,
+        },
+    },
+    responses={
+        200: {"description": "Lista paginada de operações"},
+        401: {"description": "Token inválido"},
+        403: {"description": "Sem permissão"},
+        404: {"description": "Investimento não encontrado"},
+    },
+)  # type: ignore[misc]
+@use_kwargs(
+    {
+        "page": fields.Int(missing=1, validate=lambda x: x > 0),
+        "per_page": fields.Int(missing=10, validate=lambda x: 0 < x <= 100),
+    },
+    location="query",
+)  # type: ignore[misc]
+@jwt_required()  # type: ignore[misc]
+def list_investment_operations(
+    investment_id: UUID, page: int, per_page: int
+) -> tuple[dict[str, Any], int]:
+    user_id: UUID = UUID(get_jwt_identity())
+    try:
+        investment = _get_owned_investment_or_error(
+            investment_id,
+            user_id,
+            forbidden_message=(
+                "Você não tem permissão para visualizar operações deste investimento."
+            ),
+        )
+    except PermissionError as exc:
+        return _compat_error(
+            legacy_payload={"error": str(exc)},
+            status_code=403,
+            message=str(exc),
+            error_code="FORBIDDEN",
+        )
+
+    if not investment:
+        return _compat_error(
+            legacy_payload={"error": "Investimento não encontrado"},
+            status_code=404,
+            message="Investimento não encontrado",
+            error_code="NOT_FOUND",
+        )
+
+    pagination = (
+        InvestmentOperation.query.filter_by(wallet_id=investment.id, user_id=user_id)
+        .order_by(
+            InvestmentOperation.executed_at.desc(),
+            InvestmentOperation.created_at.desc(),
+        )
+        .paginate(page=page, per_page=per_page, error_out=False)
+    )
+    items = [_serialize_operation(item) for item in pagination.items]
+    legacy_payload = {
+        "items": items,
+        "total": pagination.total,
+        "page": pagination.page,
+        "per_page": pagination.per_page,
+        "pages": pagination.pages,
+    }
+    return _compat_success(
+        legacy_payload=legacy_payload,
+        status_code=200,
+        message="Lista de operações retornada com sucesso",
+        data={"items": items},
+        meta={
+            "pagination": {
+                "total": pagination.total,
+                "page": pagination.page,
+                "per_page": pagination.per_page,
+                "pages": pagination.pages,
             }
         },
     )

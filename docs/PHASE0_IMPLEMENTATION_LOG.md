@@ -224,3 +224,17 @@
   - centralização de validação de ownership de `wallet` para reduzir duplicação.
 - Objetivo: reduzir complexidade acidental, facilitar testes e manutenção incremental
   das próximas fases GraphQL.
+
+## Atualização adicional (Investimentos D1 - operações buy/sell)
+- Base inicial de operações de investimento implementada:
+  - model: `InvestmentOperation` (`buy/sell`, quantidade, preço unitário, taxas, data)
+  - endpoints:
+    - `POST /wallet/{investment_id}/operations`
+    - `GET /wallet/{investment_id}/operations`
+- Contrato legado e `v2` suportados nos novos endpoints.
+- Validações aplicadas no payload:
+  - `operation_type` obrigatório (`buy`/`sell`)
+  - `quantity` > 0
+  - `unit_price` > 0
+  - `fees` >= 0
+- Cobertura de testes adicionada para criação/listagem/validações/autorização.

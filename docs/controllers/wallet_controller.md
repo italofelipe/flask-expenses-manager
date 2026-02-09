@@ -7,6 +7,7 @@ Gerenciar carteira de investimentos do usuário:
 - cadastro de item com ticker ou valor fixo
 - listagem paginada
 - atualização com trilha de histórico
+- registro e listagem de operações (`buy`/`sell`)
 - exclusão
 
 ## Blueprint
@@ -74,6 +75,37 @@ Contrato v2:
 - sucesso em `data.investment`
 - erro com `error.code` sem quebrar contrato legado default.
 
+## `add_investment_operation`
+Endpoint: `POST /wallet/{investment_id}/operations`
+
+O que faz:
+- Verifica se o investimento existe e pertence ao usuário autenticado.
+- Valida payload com `InvestmentOperationSchema`.
+- Persiste operação (`buy`/`sell`) vinculada ao investimento.
+
+Campos aceitos:
+- `operation_type`: `buy` ou `sell`
+- `quantity`
+- `unit_price`
+- `fees` (opcional)
+- `executed_at` (opcional, default data atual)
+- `notes` (opcional)
+
+Contrato v2:
+- sucesso em `data.operation`
+- erro em `error.code`.
+
+## `list_investment_operations`
+Endpoint: `GET /wallet/{investment_id}/operations`
+
+O que faz:
+- Verifica se o investimento existe e pertence ao usuário.
+- Lista operações paginadas por `executed_at desc`.
+
+Contrato v2:
+- `data.items`
+- `meta.pagination` com `total`, `page`, `per_page`, `pages`.
+
 ## `delete_wallet_entry`
 Endpoint: `DELETE /wallet/{investment_id}`
 
@@ -89,6 +121,7 @@ Contrato v2:
 - `WalletSchema`
 - `InvestmentService` (integração BRAPI)
 - `PaginatedResponse`
+- `InvestmentOperation` / `InvestmentOperationSchema`
 
 ## Pontos incompletos / melhorias (Fase 0)
 1. Histórico é armazenado como JSON mutável na própria linha, sem versionamento formal por tabela.

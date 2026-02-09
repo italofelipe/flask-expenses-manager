@@ -25,6 +25,7 @@ from .credit_card_schema import (
     CreditCardSchema,
 )
 from .error_schema import ErrorResponseSchema
+from .investment_operation_schema import InvestmentOperationSchema
 from .tag_schema import TagListSchema, TagResponseSchema, TagSchema
 from .transaction_schema import (
     MonthlySummarySchema,
@@ -77,4 +78,6 @@ __all__ = [
     "TagListSchema",
     # Error schemas
     "ErrorResponseSchema",
+    # Investment operation schemas
+    "InvestmentOperationSchema",
 ]

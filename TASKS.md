@@ -29,7 +29,7 @@ Ultima atualizacao: 2026-02-09
 | C3 | Transacoes | Consolidar regras de parcelamento (soma exata e arredondamento final) | Done | 100% | Baixo | 497f901 | 2026-02-09 |
 | C4 | Transacoes | Criar endpoint de dashboard mensal (receitas, despesas, saldo, categorias) | Done | 100% | Baixo | pending-commit | 2026-02-09 |
 | C5 | Transacoes | Endpoint de despesas por periodo com paginacao/ordenacao/metricas | Done | 100% | Baixo | f3ef3c0 | 2026-02-09 |
-| D1 | Investimentos | Entidade de operacoes (`buy`/`sell`) com data, preco, quantidade, taxas | Todo | 0% | Alto: base necessaria para analytics confiavel |  | 2026-02-09 |
+| D1 | Investimentos | Entidade de operacoes (`buy`/`sell`) com data, preco, quantidade, taxas | In Progress | 45% | Alto: base necessaria para analytics confiavel | pending-commit | 2026-02-09 |
 | D2 | Investimentos | Calculo de custo medio por ativo e posicao atual | Todo | 0% | Alto: regra financeira sensivel |  | 2026-02-09 |
 | D3 | Investimentos | Calculo de quanto investiu no dia por data de operacao | Todo | 0% | Alto: depende de D1 |  | 2026-02-09 |
 | D4 | Investimentos | Calculo de valor atual por ativo e consolidado (BRAPI + fallback) | Todo | 0% | Alto: dependencia externa (BRAPI) |  | 2026-02-09 |
@@ -69,6 +69,7 @@ Ultima atualizacao: 2026-02-09
 | 2026-02-09 | G4 | Pipeline CI com gate de qualidade/Sonar e validacoes locais | 7f0ac66 |
 | 2026-02-09 | H1 (fase 1) | Base GraphQL criada com endpoint `/graphql` + queries/mutations iniciais por controller | pending-commit |
 | 2026-02-09 | H1/G1 | Refatoracao interna do schema GraphQL para reduzir duplicacao/complexidade sem alterar regras de negocio | pending-commit |
+| 2026-02-09 | D1 | Modelo e endpoints REST iniciais para operacoes de investimento (`/wallet/{investment_id}/operations`) + testes | pending-commit |
 | 2026-02-09 | D (observacao) | Restaurados arquivos deletados acidentalmente: ticker/carteira | n/a |
 
 ## Proxima prioridade sugerida
