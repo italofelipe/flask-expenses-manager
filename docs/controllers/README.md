@@ -6,6 +6,7 @@ Documentação técnica baseada no comportamento atual do código (as-is):
 - `/Users/italochagas/Desktop/projetos/flask/flask-template/docs/controllers/user_controller.md`
 - `/Users/italochagas/Desktop/projetos/flask/flask-template/docs/controllers/transaction_controller.md`
 - `/Users/italochagas/Desktop/projetos/flask/flask-template/docs/controllers/wallet_controller.md`
+- `/Users/italochagas/Desktop/projetos/flask/flask-template/docs/controllers/graphql_controller.md`
 
 Objetivo da Fase 0:
 - alinhar entendimento do estado atual

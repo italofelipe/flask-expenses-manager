@@ -257,6 +257,40 @@ Retorna histórico paginado de alterações do investimento.
 Atualiza item da carteira e salva histórico quando `quantity` ou `value` mudam.
 - Com `X-API-Contract: v2`, retorna envelope padronizado.
 
+## 5) GraphQL (fase 1)
+- `POST /graphql`
+- `GET /graphql` (health/check simples)
+
+Objetivo da fase 1:
+- adicionar suporte GraphQL gradual sem quebrar os endpoints REST.
+- cobrir operações essenciais por domínio.
+
+Queries iniciais:
+- `me`
+- `transactions`
+- `transactionSummary`
+- `transactionDashboard`
+- `walletEntries`
+- `walletHistory`
+- `tickers`
+
+Mutations iniciais:
+- `registerUser`
+- `login`
+- `logout`
+- `updateUserProfile`
+- `createTransaction`
+- `deleteTransaction`
+- `addWalletEntry`
+- `updateWalletEntry`
+- `deleteWalletEntry`
+- `addTicker`
+- `deleteTicker`
+
+Autenticação:
+- operações protegidas usam `Authorization: Bearer <JWT>`.
+- `registerUser` e `login` são públicas.
+
 ### `DELETE /wallet/{investment_id}`
 Remove item da carteira.
 - Com `X-API-Contract: v2`, retorna envelope padronizado.

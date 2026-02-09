@@ -27,6 +27,7 @@ class User(db.Model):
     initial_investment = db.Column(db.Numeric(10, 2), nullable=True)
     monthly_investment = db.Column(db.Numeric(10, 2), nullable=True)
     investment_goal_date = db.Column(db.Date, nullable=True)
+    tickers = db.relationship("UserTicker", back_populates="user")
 
     def __repr__(self) -> str:
         return f"<User {self.name}>"

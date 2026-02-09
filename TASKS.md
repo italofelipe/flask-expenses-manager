@@ -67,8 +67,20 @@ Ultima atualizacao: 2026-02-09
 | 2026-02-09 | C4/G1 | Refatoracao com `TransactionAnalyticsService` + suite validada sem regressao | pending-commit |
 | 2026-02-09 | G4 | Correcao de lint local (`flake8`/`pyflakes`) com pin de compatibilidade no ambiente dev | pending-commit |
 | 2026-02-09 | G4 | Pipeline CI com gate de qualidade/Sonar e validacoes locais | 7f0ac66 |
+| 2026-02-09 | H1 (fase 1) | Base GraphQL criada com endpoint `/graphql` + queries/mutations iniciais por controller | pending-commit |
 | 2026-02-09 | D (observacao) | Restaurados arquivos deletados acidentalmente: ticker/carteira | n/a |
 
 ## Proxima prioridade sugerida
 - D1: iniciar modelagem de operacoes de investimento.
 - A2: alinhar Swagger 100% com contrato atual.
+
+## Plano GraphQL por Controller
+
+| ID | Controller | Escopo GraphQL | Status | Progresso | Risco | Commit |
+|---|---|---|---|---:|---|---|
+| H1-AUTH | `auth_controller` | `registerUser`, `login`, `logout` | In Progress | 70% | Medio: manter mesma politica de token do REST | pending-commit |
+| H1-USER | `user_controller` | `me`, `updateUserProfile` | In Progress | 60% | Medio: consistencia das validacoes de perfil | pending-commit |
+| H1-TRANSACTIONS | `transaction_controller` | `transactions`, `transactionSummary`, `transactionDashboard`, `createTransaction`, `deleteTransaction` | In Progress | 55% | Alto: nao divergir das regras de recorrencia/parcelamento | pending-commit |
+| H1-WALLET | `wallet_controller` | `walletEntries`, `walletHistory`, `addWalletEntry`, `updateWalletEntry`, `deleteWalletEntry` | In Progress | 50% | Alto: consistencia de calculo e historico | pending-commit |
+| H1-TICKER | `ticker_controller` | `tickers`, `addTicker`, `deleteTicker` | In Progress | 70% | Baixo | pending-commit |
+| H1-HARDENING | `graphql_controller` | autorização fina por operação, limites de complexidade/profundidade, observabilidade | Todo | 10% | Alto: segurança/performance |  |

@@ -13,6 +13,7 @@ def register_auth_guard(app: Any) -> None:
             "registerresource",
             "authresource",
             "refreshtokenresource",
+            "execute_graphql",
             "static",
             "swaggerui.index",
             "swaggerui.static",

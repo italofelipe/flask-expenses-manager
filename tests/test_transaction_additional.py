@@ -39,7 +39,7 @@ def _transaction_payload(**overrides: str) -> dict[str, str]:
     return payload
 
 
-def test_transaction_installment_create_without_dateutil_returns_500(client) -> None:
+def test_transaction_installment_create_success(client) -> None:
     token = _register_and_login(client, "installment")
     response = client.post(
         "/transactions",
@@ -52,10 +52,14 @@ def test_transaction_installment_create_without_dateutil_returns_500(client) -> 
         },
     )
 
-    assert response.status_code == 500
+    assert response.status_code == 201
     body = response.get_json()
-    assert body["success"] is False
-    assert body["error"]["code"] == "INTERNAL_ERROR"
+    assert body["success"] is True
+    transactions = body["data"]["transactions"]
+    assert len(transactions) == 3
+    assert transactions[0]["title"].endswith("(1/3)")
+    assert transactions[1]["title"].endswith("(2/3)")
+    assert transactions[2]["title"].endswith("(3/3)")
 
 
 def test_transaction_update_requires_paid_at_when_paid(client) -> None:

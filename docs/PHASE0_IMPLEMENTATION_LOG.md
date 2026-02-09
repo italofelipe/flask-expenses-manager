@@ -194,3 +194,25 @@
   - `pyflakes==3.2.0` (compatível com `flake8==7.1.1`)
 - Validação executada:
   - `pre-commit` (black, flake8, isort, mypy) passou para os arquivos alterados.
+
+## Atualização adicional (GraphQL - fase 1, rollout gradual)
+- Base GraphQL adicionada com endpoint dedicado:
+  - `GET/POST /graphql`
+  - arquivos principais:
+    - `app/controllers/graphql_controller.py`
+    - `app/graphql/schema.py`
+    - `app/graphql/auth.py`
+- Suporte inicial por domínio/controller:
+  - Auth: `registerUser`, `login`, `logout`
+  - User: `me`, `updateUserProfile`
+  - Transactions: `transactions`, `transactionSummary`, `transactionDashboard`,
+    `createTransaction`, `deleteTransaction`
+  - Wallet: `walletEntries`, `walletHistory`, `addWalletEntry`,
+    `updateWalletEntry`, `deleteWalletEntry`
+  - Ticker: `tickers`, `addTicker`, `deleteTicker`
+- Compatibilidade:
+  - endpoints REST permanecem inalterados.
+  - GraphQL opera em paralelo com autenticação Bearer por resolver protegido.
+- Observabilidade de backlog:
+  - hardening de GraphQL (complexity/depth/rate-limit específico) ficou
+    explicitamente planejado em `TASKS.md`.
