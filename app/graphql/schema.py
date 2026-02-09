@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from datetime import date, datetime, timedelta
 from decimal import Decimal
-from typing import Any
+from typing import Any, cast
 from uuid import UUID, uuid4
 
 import graphene
@@ -25,6 +25,10 @@ from app.models.user_ticker import UserTicker
 from app.models.wallet import Wallet
 from app.services.investment_service import InvestmentService
 from app.services.transaction_analytics_service import TransactionAnalyticsService
+
+
+def _to_float_or_none(value: Any) -> float | None:
+    return float(value) if value is not None else None
 
 
 def _parse_optional_date(value: str | None, field_name: str) -> date | None:
@@ -75,6 +79,94 @@ def _wallet_to_graphql_payload(wallet: Wallet) -> dict[str, Any]:
     else:
         payload.pop("value", None)
     return payload
+
+
+def _user_to_graphql_payload(user: User) -> dict[str, Any]:
+    return {
+        "id": str(user.id),
+        "name": user.name,
+        "email": user.email,
+        "gender": user.gender,
+        "birth_date": user.birth_date.isoformat() if user.birth_date else None,
+        "monthly_income": _to_float_or_none(user.monthly_income),
+        "net_worth": _to_float_or_none(user.net_worth),
+        "monthly_expenses": _to_float_or_none(user.monthly_expenses),
+        "initial_investment": _to_float_or_none(user.initial_investment),
+        "monthly_investment": _to_float_or_none(user.monthly_investment),
+        "investment_goal_date": (
+            user.investment_goal_date.isoformat() if user.investment_goal_date else None
+        ),
+    }
+
+
+def _user_basic_auth_payload(user: User) -> dict[str, str]:
+    return {"id": str(user.id), "name": user.name, "email": user.email}
+
+
+def _paginate(total: int, page: int, per_page: int) -> PaginationType:
+    pages = (total + per_page - 1) // per_page if total else 0
+    return PaginationType(total=total, page=page, per_page=per_page, pages=pages)
+
+
+def _serialize_transaction_items(
+    transactions: list[Transaction],
+) -> list[TransactionTypeObject]:
+    return [
+        TransactionTypeObject(**serialize_transaction(item)) for item in transactions
+    ]
+
+
+def _apply_type_filter(query: Any, raw_type: str | None) -> Any:
+    if not raw_type:
+        return query
+    try:
+        return query.filter(Transaction.type == TransactionType(raw_type.lower()))
+    except ValueError as exc:
+        raise GraphQLError(
+            "Parâmetro 'type' inválido. Use 'income' ou 'expense'."
+        ) from exc
+
+
+def _apply_status_filter(query: Any, raw_status: str | None) -> Any:
+    if not raw_status:
+        return query
+    try:
+        return query.filter(Transaction.status == TransactionStatus(raw_status.lower()))
+    except ValueError as exc:
+        raise GraphQLError(
+            "Parâmetro 'status' inválido. "
+            "Use paid, pending, cancelled, postponed ou overdue."
+        ) from exc
+
+
+def _apply_due_date_range_filter(
+    query: Any,
+    start_date: str | None,
+    end_date: str | None,
+) -> Any:
+    parsed_start_date = _parse_optional_date(start_date, "start_date")
+    parsed_end_date = _parse_optional_date(end_date, "end_date")
+    if parsed_start_date and parsed_end_date and parsed_start_date > parsed_end_date:
+        raise GraphQLError("Parâmetro 'start_date' não pode ser maior que 'end_date'.")
+    if parsed_start_date:
+        query = query.filter(Transaction.due_date >= parsed_start_date)
+    if parsed_end_date:
+        query = query.filter(Transaction.due_date <= parsed_end_date)
+    return query
+
+
+def _get_owned_wallet_or_error(
+    investment_id: UUID,
+    user_id: UUID,
+    *,
+    forbidden_message: str,
+) -> Wallet:
+    investment = cast(Wallet | None, Wallet.query.filter_by(id=investment_id).first())
+    if not investment:
+        raise GraphQLError("Investimento não encontrado")
+    if str(investment.user_id) != str(user_id):
+        raise GraphQLError(forbidden_message)
+    return investment
 
 
 class UserType(graphene.ObjectType):
@@ -250,29 +342,7 @@ class Query(graphene.ObjectType):
 
     def resolve_me(self, info: graphene.ResolveInfo) -> UserType:
         user = get_current_user_required()
-        return UserType(
-            id=str(user.id),
-            name=user.name,
-            email=user.email,
-            gender=user.gender,
-            birth_date=user.birth_date.isoformat() if user.birth_date else None,
-            monthly_income=float(user.monthly_income) if user.monthly_income else None,
-            net_worth=float(user.net_worth) if user.net_worth else None,
-            monthly_expenses=(
-                float(user.monthly_expenses) if user.monthly_expenses else None
-            ),
-            initial_investment=(
-                float(user.initial_investment) if user.initial_investment else None
-            ),
-            monthly_investment=(
-                float(user.monthly_investment) if user.monthly_investment else None
-            ),
-            investment_goal_date=(
-                user.investment_goal_date.isoformat()
-                if user.investment_goal_date
-                else None
-            ),
-        )
+        return UserType(**_user_to_graphql_payload(user))
 
     def resolve_transactions(
         self,
@@ -286,61 +356,20 @@ class Query(graphene.ObjectType):
     ) -> TransactionListPayloadType:
         user = get_current_user_required()
         query = Transaction.query.filter_by(user_id=user.id, deleted=False)
-
-        if type:
-            try:
-                query = query.filter(Transaction.type == TransactionType(type.lower()))
-            except ValueError as exc:
-                raise GraphQLError(
-                    "Parâmetro 'type' inválido. Use 'income' ou 'expense'."
-                ) from exc
-
-        if status:
-            try:
-                query = query.filter(
-                    Transaction.status == TransactionStatus(status.lower())
-                )
-            except ValueError as exc:
-                raise GraphQLError(
-                    "Parâmetro 'status' inválido. "
-                    "Use paid, pending, cancelled, postponed ou overdue."
-                ) from exc
-
-        parsed_start_date = _parse_optional_date(start_date, "start_date")
-        parsed_end_date = _parse_optional_date(end_date, "end_date")
-        if (
-            parsed_start_date
-            and parsed_end_date
-            and parsed_start_date > parsed_end_date
-        ):
-            raise GraphQLError(
-                "Parâmetro 'start_date' não pode ser maior que 'end_date'."
-            )
-        if parsed_start_date:
-            query = query.filter(Transaction.due_date >= parsed_start_date)
-        if parsed_end_date:
-            query = query.filter(Transaction.due_date <= parsed_end_date)
+        query = _apply_type_filter(query, type)
+        query = _apply_status_filter(query, status)
+        query = _apply_due_date_range_filter(query, start_date, end_date)
 
         total = query.count()
-        pages = (total + per_page - 1) // per_page if total else 0
         items = (
             query.order_by(Transaction.due_date.desc(), Transaction.created_at.desc())
             .offset((page - 1) * per_page)
             .limit(per_page)
             .all()
         )
-
-        serialized = [
-            TransactionTypeObject(**serialize_transaction(item)) for item in items
-        ]
         return TransactionListPayloadType(
-            items=serialized,
-            pagination=PaginationType(
-                total=total,
-                page=page,
-                per_page=per_page,
-                pages=pages,
-            ),
+            items=_serialize_transaction_items(items),
+            pagination=_paginate(total=total, page=page, per_page=per_page),
         )
 
     def resolve_transaction_summary(
@@ -364,18 +393,12 @@ class Query(graphene.ObjectType):
         start = (page - 1) * page_size
         end = start + page_size
         paged_items = transactions[start:end]
-        pages = (total + page_size - 1) // page_size if total else 0
-        serialized = [
-            TransactionTypeObject(**serialize_transaction(item)) for item in paged_items
-        ]
         return TransactionSummaryPayloadType(
             month=month,
             income_total=float(aggregates["income_total"]),
             expense_total=float(aggregates["expense_total"]),
-            items=serialized,
-            pagination=PaginationType(
-                total=total, page=page, per_page=page_size, pages=pages
-            ),
+            items=_serialize_transaction_items(paged_items),
+            pagination=_paginate(total=total, page=page, per_page=page_size),
         )
 
     def resolve_transaction_dashboard(
@@ -440,11 +463,10 @@ class Query(graphene.ObjectType):
         ]
         return WalletListPayloadType(
             items=items,
-            pagination=PaginationType(
+            pagination=_paginate(
                 total=pagination.total,
                 page=pagination.page,
                 per_page=pagination.per_page,
-                pages=pagination.pages,
             ),
         )
 
@@ -456,13 +478,13 @@ class Query(graphene.ObjectType):
         per_page: int,
     ) -> WalletHistoryPayloadType:
         user = get_current_user_required()
-        investment = Wallet.query.filter_by(id=investment_id).first()
-        if not investment:
-            raise GraphQLError("Investimento não encontrado")
-        if str(investment.user_id) != str(user.id):
-            raise GraphQLError(
+        investment = _get_owned_wallet_or_error(
+            investment_id,
+            user.id,
+            forbidden_message=(
                 "Você não tem permissão para ver o histórico deste investimento."
-            )
+            ),
+        )
 
         history = investment.history or []
         sorted_history = sorted(
@@ -502,10 +524,7 @@ class Query(graphene.ObjectType):
         return WalletHistoryPayloadType(
             items=mapped_items,
             pagination=PaginationType(
-                total=total,
-                page=current_page,
-                per_page=current_per_page,
-                pages=pages,
+                total=total, page=current_page, per_page=current_per_page, pages=pages
             ),
         )
 
@@ -542,7 +561,7 @@ class RegisterUserMutation(graphene.Mutation):
         db.session.commit()
         return AuthPayloadType(
             message="User created successfully",
-            user=UserType(id=str(user.id), name=user.name, email=user.email),
+            user=UserType(**_user_basic_auth_payload(user)),
         )
 
 
@@ -581,7 +600,7 @@ class LoginMutation(graphene.Mutation):
         return AuthPayloadType(
             message="Login successful",
             token=token,
-            user=UserType(id=str(user.id), name=user.name, email=user.email),
+            user=UserType(**_user_basic_auth_payload(user)),
         )
 
 
@@ -621,31 +640,7 @@ class UpdateUserProfileMutation(graphene.Mutation):
             raise GraphQLError(f"Erro de validação: {errors}")
         db.session.commit()
         return UpdateUserProfileMutation(
-            user=UserType(
-                id=str(user.id),
-                name=user.name,
-                email=user.email,
-                gender=user.gender,
-                birth_date=user.birth_date.isoformat() if user.birth_date else None,
-                monthly_income=(
-                    float(user.monthly_income) if user.monthly_income else None
-                ),
-                net_worth=float(user.net_worth) if user.net_worth else None,
-                monthly_expenses=(
-                    float(user.monthly_expenses) if user.monthly_expenses else None
-                ),
-                initial_investment=(
-                    float(user.initial_investment) if user.initial_investment else None
-                ),
-                monthly_investment=(
-                    float(user.monthly_investment) if user.monthly_investment else None
-                ),
-                investment_goal_date=(
-                    user.investment_goal_date.isoformat()
-                    if user.investment_goal_date
-                    else None
-                ),
-            )
+            user=UserType(**_user_to_graphql_payload(user))
         )
 
 
@@ -852,11 +847,11 @@ class UpdateWalletEntryMutation(graphene.Mutation):
         self, info: graphene.ResolveInfo, investment_id: UUID, **kwargs: Any
     ) -> UpdateWalletEntryMutation:
         user = get_current_user_required()
-        investment = Wallet.query.filter_by(id=investment_id).first()
-        if not investment:
-            raise GraphQLError("Investimento não encontrado")
-        if str(investment.user_id) != str(user.id):
-            raise GraphQLError("Você não tem permissão para editar este investimento.")
+        investment = _get_owned_wallet_or_error(
+            investment_id,
+            user.id,
+            forbidden_message="Você não tem permissão para editar este investimento.",
+        )
 
         original_quantity = investment.quantity
         original_value = investment.value
@@ -920,11 +915,11 @@ class DeleteWalletEntryMutation(graphene.Mutation):
         self, info: graphene.ResolveInfo, investment_id: UUID
     ) -> DeleteWalletEntryMutation:
         user = get_current_user_required()
-        investment = Wallet.query.filter_by(id=investment_id).first()
-        if not investment:
-            raise GraphQLError("Investimento não encontrado")
-        if str(investment.user_id) != str(user.id):
-            raise GraphQLError("Você não tem permissão para remover este investimento.")
+        investment = _get_owned_wallet_or_error(
+            investment_id,
+            user.id,
+            forbidden_message="Você não tem permissão para remover este investimento.",
+        )
         db.session.delete(investment)
         db.session.commit()
         return DeleteWalletEntryMutation(

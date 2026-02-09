@@ -216,3 +216,11 @@
 - Observabilidade de backlog:
   - hardening de GraphQL (complexity/depth/rate-limit específico) ficou
     explicitamente planejado em `TASKS.md`.
+
+## Atualização adicional (GraphQL - refatoração de manutenibilidade)
+- Refatoração interna em `app/graphql/schema.py` sem mudança de regra de negócio:
+  - extração de helpers para serialização de usuário e paginação;
+  - extração de filtros reutilizáveis de transações (`type`, `status`, intervalo de data);
+  - centralização de validação de ownership de `wallet` para reduzir duplicação.
+- Objetivo: reduzir complexidade acidental, facilitar testes e manutenção incremental
+  das próximas fases GraphQL.

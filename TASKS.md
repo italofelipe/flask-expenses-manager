@@ -52,7 +52,7 @@ Ultima atualizacao: 2026-02-09
 | G3 | Qualidade | Enforce de cobertura minima no CI | In Progress | 80% | Baixo | 497f901, 7f0ac66 | 2026-02-09 |
 | G4 | Qualidade | Pipeline CI para lint, type-check, testes e gates de qualidade | In Progress | 85% | Baixo | 842a656, 7f0ac66 | 2026-02-09 |
 | G5 | Qualidade | Seed de dados para ambiente local | Todo | 0% | Baixo |  | 2026-02-09 |
-| H1 | Arquitetura | Adicionar suporte a GraphQL | Todo | 0% | Alto: impacto transversal na API |  | 2026-02-09 |
+| H1 | Arquitetura | Adicionar suporte a GraphQL | In Progress | 65% | Alto: impacto transversal na API | ba1f238, e12bf21 | 2026-02-09 |
 | H2 | Seguranca | Implementar rate limit por rota/usuario/IP | Todo | 0% | Alto: requisito de protecao operacional |  | 2026-02-09 |
 | H3 | Seguranca | Hardening de validacao/sanitizacao/authz/headers/auditoria | Todo | 0% | Alto: controle de risco de seguranca |  | 2026-02-09 |
 | X1 | Tech Debt | Remover/atualizar TODO desatualizado sobre enums em transacoes | Todo | 0% | Baixo: clareza de manutencao |  | 2026-02-09 |
@@ -68,6 +68,7 @@ Ultima atualizacao: 2026-02-09
 | 2026-02-09 | G4 | Correcao de lint local (`flake8`/`pyflakes`) com pin de compatibilidade no ambiente dev | pending-commit |
 | 2026-02-09 | G4 | Pipeline CI com gate de qualidade/Sonar e validacoes locais | 7f0ac66 |
 | 2026-02-09 | H1 (fase 1) | Base GraphQL criada com endpoint `/graphql` + queries/mutations iniciais por controller | pending-commit |
+| 2026-02-09 | H1/G1 | Refatoracao interna do schema GraphQL para reduzir duplicacao/complexidade sem alterar regras de negocio | pending-commit |
 | 2026-02-09 | D (observacao) | Restaurados arquivos deletados acidentalmente: ticker/carteira | n/a |
 
 ## Proxima prioridade sugerida
@@ -78,9 +79,9 @@ Ultima atualizacao: 2026-02-09
 
 | ID | Controller | Escopo GraphQL | Status | Progresso | Risco | Commit |
 |---|---|---|---|---:|---|---|
-| H1-AUTH | `auth_controller` | `registerUser`, `login`, `logout` | In Progress | 70% | Medio: manter mesma politica de token do REST | pending-commit |
-| H1-USER | `user_controller` | `me`, `updateUserProfile` | In Progress | 60% | Medio: consistencia das validacoes de perfil | pending-commit |
-| H1-TRANSACTIONS | `transaction_controller` | `transactions`, `transactionSummary`, `transactionDashboard`, `createTransaction`, `deleteTransaction` | In Progress | 55% | Alto: nao divergir das regras de recorrencia/parcelamento | pending-commit |
-| H1-WALLET | `wallet_controller` | `walletEntries`, `walletHistory`, `addWalletEntry`, `updateWalletEntry`, `deleteWalletEntry` | In Progress | 50% | Alto: consistencia de calculo e historico | pending-commit |
-| H1-TICKER | `ticker_controller` | `tickers`, `addTicker`, `deleteTicker` | In Progress | 70% | Baixo | pending-commit |
+| H1-AUTH | `auth_controller` | `registerUser`, `login`, `logout` | In Progress | 75% | Medio: manter mesma politica de token do REST | ba1f238 |
+| H1-USER | `user_controller` | `me`, `updateUserProfile` | In Progress | 70% | Medio: consistencia das validacoes de perfil | ba1f238 |
+| H1-TRANSACTIONS | `transaction_controller` | `transactions`, `transactionSummary`, `transactionDashboard`, `createTransaction`, `deleteTransaction` | In Progress | 60% | Alto: nao divergir das regras de recorrencia/parcelamento | ba1f238 |
+| H1-WALLET | `wallet_controller` | `walletEntries`, `walletHistory`, `addWalletEntry`, `updateWalletEntry`, `deleteWalletEntry` | In Progress | 60% | Alto: consistencia de calculo e historico | ba1f238 |
+| H1-TICKER | `ticker_controller` | `tickers`, `addTicker`, `deleteTicker` | In Progress | 75% | Baixo | ba1f238 |
 | H1-HARDENING | `graphql_controller` | autorização fina por operação, limites de complexidade/profundidade, observabilidade | Todo | 10% | Alto: segurança/performance |  |
