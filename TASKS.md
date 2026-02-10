@@ -71,6 +71,11 @@ Ultima atualizacao: 2026-02-10
 | I14 | Nginx/TLS | Ativar config TLS no Nginx (redirect 80->443 + headers de segurança) | Todo | 0% | Medio: depende de I13 |  | 2026-02-10 |
 | I15 | Nginx/TLS | Configurar renovação automática de certificado e validações pós-renovação | Todo | 0% | Medio: risco de expiração sem automação |  | 2026-02-10 |
 | I16 | Nginx/TLS | Checklist de validação local/AWS (DNS, SG, health, curl, logs, rollback) | In Progress | 65% | Baixo | pending-commit | 2026-02-10 |
+| R1 | Rebranding | Mapear todas ocorrências de nomenclatura legada do projeto e registrar plano de substituição para `auraxis` | Done | 100% | Baixo: mapeamento concluído em arquivos versionados | pending-commit | 2026-02-10 |
+| R2 | Rebranding | Substituir ocorrências versionadas de nomenclatura legada por `auraxis` (sem quebrar integrações externas) | Done | 100% | Medio: integrações externas podem manter identificador legado temporário | pending-commit | 2026-02-10 |
+| S1 | AWS Security | Restringir acesso e hardening de instâncias EC2 (SG, NACL, IMDSv2, SSH policy, patching baseline) | Todo | 0% | Alto: superfície de ataque de infraestrutura |  | 2026-02-10 |
+| S2 | App Security | Implementar segurança de endpoints (rate-limit, validação/sanitização de request/response, headers e authz por recurso) | Todo | 0% | Alto: risco de exploração na camada de API |  | 2026-02-10 |
+| S3 | App Security | Executar checklist OWASP no sistema (ASVS/API Top 10), corrigir gaps e formalizar evidências | Todo | 0% | Alto: risco de vulnerabilidades críticas não mapeadas |  | 2026-02-10 |
 | X1 | Tech Debt | Remover/atualizar TODO desatualizado sobre enums em transacoes | Todo | 0% | Baixo: clareza de manutencao |  | 2026-02-09 |
 
 ## Registro de progresso recente
@@ -98,10 +103,26 @@ Ultima atualizacao: 2026-02-10
 | 2026-02-09 | I1 | Backlog e análise de deploy AWS/Azure com custos, plano A/B e decisão inicial | pending-commit |
 | 2026-02-09 | I2 | Perfis DEV/PROD no Docker com compose separado, Dockerfile de produção, entrypoint com migração e proxy Nginx | pending-commit |
 | 2026-02-10 | I3/I11-I13/I16 | DNS e AWS em andamento + base Nginx/TLS implementada no repo (ACME challenge, compose com 443/certbot, runbook TLS) | pending-commit |
+| 2026-02-10 | R1/R2 | Rebranding concluído no repositório versionado: nomenclatura migrada para `auraxis` e pendências externas mapeadas | pending-commit |
 | 2026-02-09 | D (observacao) | Restaurados arquivos deletados acidentalmente: ticker/carteira | n/a |
 
 ## Proxima prioridade sugerida
-- I13/I14: emitir certificado e ativar HTTPS em `api.auraxis.com.br`.
+- S3: iniciar checklist OWASP e plano de correção (ordem definida: S3 -> S2 -> S1).
+
+## Mapeamento Rebranding (nomenclatura legada -> `auraxis`)
+
+Escopo do mapeamento em 2026-02-10 (com busca por identificadores legados e variações):
+- Versionado:
+  - documentação operacional atualizada para path padrão `/opt/auraxis`.
+- Não versionado / ambiente local:
+  - `.env`: chave de projeto SonarCloud com identificador legado (depende de migração no serviço externo).
+  - `.env`: nome de key pair AWS legado (renomeável sem impacto funcional obrigatório).
+  - `.scannerwork/report-task.txt`: referências internas de scan local (artefato temporário, não versionado).
+
+Pendências de substituição controlada:
+- Ajustar nomes externos com potencial impacto operacional antes da troca definitiva:
+  - projeto/chave no SonarCloud;
+  - nomes de key pair/recursos AWS já provisionados (somente nomenclatura, sem impacto funcional direto).
 
 ## Plano GraphQL por Controller
 

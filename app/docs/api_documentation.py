@@ -18,7 +18,7 @@ API_INFO = {
     "license": {"name": "MIT", "url": "https://opensource.org/licenses/MIT"},
     "externalDocs": {
         "description": "Documentação técnica atual (as-is)",
-        "url": "https://github.com/italofelipe/flask-template/tree/main/docs",
+        "url": "https://github.com/italofelipe/auraxis/tree/main/docs",
     },
 }
 

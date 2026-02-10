@@ -7,8 +7,8 @@
 
 ## Workflow
 Arquivo:
-- `/Users/italochagas/Desktop/projetos/flask/flask-template/.github/workflows/ci.yml`
-- `/Users/italochagas/Desktop/projetos/flask/flask-template/.github/workflows/recurrence-job.yml`
+- `/opt/auraxis/.github/workflows/ci.yml`
+- `/opt/auraxis/.github/workflows/recurrence-job.yml`
 
 Jobs:
 1. `quality`
@@ -60,7 +60,7 @@ No repositório do GitHub:
 - `SONAR_ORGANIZATION`
 
 ## Validação local de Sonar (antes do commit)
-- Script: `/Users/italochagas/Desktop/projetos/flask/flask-template/scripts/sonar_local_check.sh`
+- Script: `/opt/auraxis/scripts/sonar_local_check.sh`
 - Hook integrado no pre-commit: `sonar-local-check`
 - Comportamento:
 1. roda testes com cobertura (`coverage.xml`);
@@ -82,7 +82,7 @@ scripts/sonar_local_check.sh
 ```
 
 Validação no CI:
-- Script: `/Users/italochagas/Desktop/projetos/flask/flask-template/scripts/sonar_enforce_ci.sh`
+- Script: `/opt/auraxis/scripts/sonar_enforce_ci.sh`
 - É executado no job `sonar` após o Quality Gate.
 - O job falha automaticamente se qualquer regra de política não for atendida.
 

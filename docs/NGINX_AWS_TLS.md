@@ -57,7 +57,7 @@ Expected:
 ## Renewal (recommended)
 Use a cron entry on EC2 to renew and reload Nginx:
 ```bash
-0 3 * * * cd /opt/flask_expenses && docker compose --env-file .env.prod -f docker-compose.prod.yml run --rm certbot renew --quiet && docker compose --env-file .env.prod -f docker-compose.prod.yml exec reverse-proxy nginx -s reload
+0 3 * * * cd /opt/auraxis && docker compose --env-file .env.prod -f docker-compose.prod.yml run --rm certbot renew --quiet && docker compose --env-file .env.prod -f docker-compose.prod.yml exec reverse-proxy nginx -s reload
 ```
 
 ## Rollback

@@ -57,7 +57,7 @@ docker compose -f docker-compose.prod.yml down
 
 ## Deploy TLS (AWS)
 - Guia completo de Nginx + Certbot:
-  - `/Users/italochagas/Desktop/projetos/flask/flask-template/docs/NGINX_AWS_TLS.md`
+  - `/opt/auraxis/docs/NGINX_AWS_TLS.md`
 
 ## Endpoints reais (código atual)
 
@@ -88,15 +88,15 @@ docker compose -f docker-compose.prod.yml down
 - `DELETE /wallet/{investment_id}`
 
 ## Documentação por controller
-- `/Users/italochagas/Desktop/projetos/flask/flask-template/docs/controllers/auth_controller.md`
-- `/Users/italochagas/Desktop/projetos/flask/flask-template/docs/controllers/user_controller.md`
-- `/Users/italochagas/Desktop/projetos/flask/flask-template/docs/controllers/transaction_controller.md`
-- `/Users/italochagas/Desktop/projetos/flask/flask-template/docs/controllers/wallet_controller.md`
-- `/Users/italochagas/Desktop/projetos/flask/flask-template/docs/API_RESPONSE_CONTRACT.md` (contrato alvo de resposta)
-- `/Users/italochagas/Desktop/projetos/flask/flask-template/docs/PHASE0_RESPONSE_ADOPTION_PLAN.md` (plano de adoção sem quebra)
-- `/Users/italochagas/Desktop/projetos/flask/flask-template/docs/PHASE0_IMPLEMENTATION_LOG.md` (log das entregas da Fase 0)
-- `/Users/italochagas/Desktop/projetos/flask/flask-template/docs/TESTING.md` (setup e execução da suíte)
-- `/Users/italochagas/Desktop/projetos/flask/flask-template/docs/CI_CD.md` (pipeline CI no GitHub Actions)
+- `/opt/auraxis/docs/controllers/auth_controller.md`
+- `/opt/auraxis/docs/controllers/user_controller.md`
+- `/opt/auraxis/docs/controllers/transaction_controller.md`
+- `/opt/auraxis/docs/controllers/wallet_controller.md`
+- `/opt/auraxis/docs/API_RESPONSE_CONTRACT.md` (contrato alvo de resposta)
+- `/opt/auraxis/docs/PHASE0_RESPONSE_ADOPTION_PLAN.md` (plano de adoção sem quebra)
+- `/opt/auraxis/docs/PHASE0_IMPLEMENTATION_LOG.md` (log das entregas da Fase 0)
+- `/opt/auraxis/docs/TESTING.md` (setup e execução da suíte)
+- `/opt/auraxis/docs/CI_CD.md` (pipeline CI no GitHub Actions)
 
 ## Qualidade de código
 Hooks configurados via `.pre-commit-config.yaml`:

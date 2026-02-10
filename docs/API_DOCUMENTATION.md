@@ -402,8 +402,8 @@ Remove item da carteira.
 A API ainda não está 100% padronizada em payload de sucesso/erro entre todos os controllers.
 
 Referência de padronização (Fase 0):
-- `/Users/italochagas/Desktop/projetos/flask/flask-template/docs/API_RESPONSE_CONTRACT.md`
-- `/Users/italochagas/Desktop/projetos/flask/flask-template/docs/PHASE0_RESPONSE_ADOPTION_PLAN.md`
+- `/opt/auraxis/docs/API_RESPONSE_CONTRACT.md`
+- `/opt/auraxis/docs/PHASE0_RESPONSE_ADOPTION_PLAN.md`
 
 ## Lacunas e TODOs identificados no código (Fase 0)
 1. `transaction_controller.py` contém comentário TODO de enum para status/tipo, mas enums já existem no model e o TODO está desatualizado.

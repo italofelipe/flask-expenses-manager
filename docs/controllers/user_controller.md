@@ -1,6 +1,6 @@
 # user_controller.py
 
-Arquivo: `/Users/italochagas/Desktop/projetos/flask/flask-template/app/controllers/user_controller.py`
+Arquivo: `/opt/auraxis/app/controllers/user_controller.py`
 
 ## Responsabilidade
 Gerenciar perfil do usuário autenticado e visão consolidada (`/user/me`) com dados de transações e carteira.

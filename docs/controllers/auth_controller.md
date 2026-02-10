@@ -1,6 +1,6 @@
 # auth_controller.py
 
-Arquivo: `/Users/italochagas/Desktop/projetos/flask/flask-template/app/controllers/auth_controller.py`
+Arquivo: `/opt/auraxis/app/controllers/auth_controller.py`
 
 ## Responsabilidade
 Gerenciar autenticação e sessão JWT:

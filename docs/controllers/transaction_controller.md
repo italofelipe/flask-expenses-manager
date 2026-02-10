@@ -1,6 +1,6 @@
 # transaction_controller.py
 
-Arquivo: `/Users/italochagas/Desktop/projetos/flask/flask-template/app/controllers/transaction_controller.py`
+Arquivo: `/opt/auraxis/app/controllers/transaction_controller.py`
 
 ## Responsabilidade
 Gerenciar ciclo completo de transações financeiras:

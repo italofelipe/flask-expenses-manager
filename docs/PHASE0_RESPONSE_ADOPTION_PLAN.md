@@ -1,6 +1,6 @@
 # Fase 0 - Plano de Adoção do Contrato de Resposta
 
-Referência: `/Users/italochagas/Desktop/projetos/flask/flask-template/docs/API_RESPONSE_CONTRACT.md`
+Referência: `/opt/auraxis/docs/API_RESPONSE_CONTRACT.md`
 
 Este plano mapeia o estado atual por endpoint e define a migração para contrato padronizado sem mexer no funcionamento já existente.
 

@@ -1,6 +1,6 @@
 # wallet_controller.py
 
-Arquivo: `/Users/italochagas/Desktop/projetos/flask/flask-template/app/controllers/wallet_controller.py`
+Arquivo: `/opt/auraxis/app/controllers/wallet_controller.py`
 
 ## Responsabilidade
 Gerenciar carteira de investimentos do usuário:

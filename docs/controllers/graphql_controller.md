@@ -1,6 +1,6 @@
 # graphql_controller.py
 
-Arquivo: `/Users/italochagas/Desktop/projetos/flask/flask-template/app/controllers/graphql_controller.py`
+Arquivo: `/opt/auraxis/app/controllers/graphql_controller.py`
 
 ## Responsabilidade
 - Expor endpoint GraphQL unificado da aplicação.
