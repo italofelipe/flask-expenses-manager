@@ -53,6 +53,11 @@ docker compose -f docker-compose.prod.yml down
 - PROD:
   - Nginx/reverse proxy: `http://localhost`
   - App interno (container): `web:8000`
+  - TLS/HTTPS (quando habilitado): `https://api.auraxis.com.br`
+
+## Deploy TLS (AWS)
+- Guia completo de Nginx + Certbot:
+  - `/Users/italochagas/Desktop/projetos/flask/flask-template/docs/NGINX_AWS_TLS.md`
 
 ## Endpoints reais (código atual)
 

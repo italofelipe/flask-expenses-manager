@@ -1,6 +1,6 @@
 # Deployment Environments (DEV and PROD)
 
-Updated at: 2026-02-09
+Updated at: 2026-02-10
 
 ## Goal
 Establish explicit local/staging runtime profiles for development and production, keeping backward compatibility and reducing deployment risks.
@@ -33,6 +33,7 @@ docker compose -f docker-compose.dev.yml up --build
 - `AUTO_CREATE_DB=false` and migrations via `flask db upgrade` on startup.
 - Runs Gunicorn behind Nginx.
 - Exposes app on `localhost:80`.
+- Supports TLS with Certbot + Nginx (`443`) using shared challenge/certificate volumes.
 
 ### Commands
 ```bash
@@ -41,6 +42,16 @@ docker compose -f docker-compose.prod.yml up --build -d
 docker compose -f docker-compose.prod.yml logs -f
 docker compose -f docker-compose.prod.yml down
 ```
+
+### TLS enablement (AWS/domain)
+```bash
+./scripts/request_tls_cert.sh
+cp deploy/nginx/default.tls.conf deploy/nginx/default.conf
+docker compose --env-file .env.prod -f docker-compose.prod.yml up -d --force-recreate reverse-proxy
+```
+
+Detailed runbook:
+- `docs/NGINX_AWS_TLS.md`
 
 ## Compatibility note
 - `app/__init__.py` now gates `db.create_all()` using `AUTO_CREATE_DB`.
