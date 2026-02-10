@@ -1,4 +1,5 @@
 from datetime import date
+from decimal import Decimal
 from typing import Any, Dict
 
 
@@ -195,7 +196,7 @@ def test_graphql_wallet_and_ticker_queries_mutations(client) -> None:
         registerDate: "2026-02-09",
         shouldBeOnWallet: true
       ) {
-        item { id name value registerDate shouldBeOnWallet }
+        item { id name value registerDate shouldBeOnWallet assetClass }
       }
     }
     """
@@ -204,6 +205,7 @@ def test_graphql_wallet_and_ticker_queries_mutations(client) -> None:
     wallet_body = wallet_response.get_json()
     assert "errors" not in wallet_body
     assert wallet_body["data"]["addWalletEntry"]["item"]["name"] == "Reserva"
+    assert wallet_body["data"]["addWalletEntry"]["item"]["assetClass"] == "custom"
     investment_id = wallet_body["data"]["addWalletEntry"]["item"]["id"]
 
     add_operation_mutation = """
@@ -235,7 +237,7 @@ def test_graphql_wallet_and_ticker_queries_mutations(client) -> None:
     )
 
     operations_query = """
-    query Operations($investmentId: UUID!) {
+    query Operations($investmentId: UUID!, $date: String!) {
       investmentOperations(investmentId: $investmentId, page: 1, perPage: 10) {
         items { id operationType quantity unitPrice }
         pagination { total page perPage }
@@ -246,16 +248,44 @@ def test_graphql_wallet_and_ticker_queries_mutations(client) -> None:
         sellOperations
         netQuantity
       }
+      investmentPosition(investmentId: $investmentId) {
+        totalOperations
+        buyOperations
+        sellOperations
+        totalBuyQuantity
+        totalSellQuantity
+        currentQuantity
+        currentCostBasis
+        averageCost
+      }
+      investmentInvestedAmount(investmentId: $investmentId, date: $date) {
+        date
+        totalOperations
+        buyOperations
+        sellOperations
+        buyAmount
+        sellAmount
+        netInvestedAmount
+      }
     }
     """
     operations_response = _graphql(
-        client, operations_query, {"investmentId": investment_id}, token=token
+        client,
+        operations_query,
+        {"investmentId": investment_id, "date": "2026-02-09"},
+        token=token,
     )
     assert operations_response.status_code == 200
     operations_body = operations_response.get_json()
     assert "errors" not in operations_body
     assert operations_body["data"]["investmentOperations"]["pagination"]["total"] == 1
     assert operations_body["data"]["investmentOperationSummary"]["buyOperations"] == 1
+    assert (
+        operations_body["data"]["investmentPosition"]["currentQuantity"] == "3.000000"
+    )
+    assert Decimal(
+        operations_body["data"]["investmentInvestedAmount"]["netInvestedAmount"]
+    ) == Decimal("68.7")
 
     wallet_query = """
     query WalletEntries {
@@ -270,6 +300,123 @@ def test_graphql_wallet_and_ticker_queries_mutations(client) -> None:
     wallet_list_body = wallet_list_response.get_json()
     assert "errors" not in wallet_list_body
     assert wallet_list_body["data"]["walletEntries"]["pagination"]["total"] >= 1
+
+    valuation_query = """
+    query Valuation($investmentId: UUID!) {
+      investmentValuation(investmentId: $investmentId) {
+        investmentId
+        name
+        assetClass
+        valuationSource
+        investedAmount
+        currentValue
+        profitLossAmount
+        profitLossPercent
+      }
+      portfolioValuation {
+        summary {
+          totalInvestments
+          totalInvestedAmount
+          totalCurrentValue
+          totalProfitLoss
+          totalProfitLossPercent
+        }
+      }
+      portfolioValuationHistory(startDate: "2026-02-09", finalDate: "2026-02-09") {
+        summary {
+          startDate
+          endDate
+          totalPoints
+          totalNetInvestedAmount
+          finalCumulativeNetInvested
+        }
+        items {
+          date
+          totalOperations
+          netInvestedAmount
+          cumulativeNetInvested
+        }
+      }
+    }
+    """
+    valuation_response = _graphql(
+        client,
+        valuation_query,
+        {"investmentId": investment_id},
+        token=token,
+    )
+    assert valuation_response.status_code == 200
+    valuation_body = valuation_response.get_json()
+    assert "errors" not in valuation_body
+    assert valuation_body["data"]["investmentValuation"]["valuationSource"] == (
+        "manual_value"
+    )
+    assert valuation_body["data"]["investmentValuation"]["assetClass"] == "custom"
+    assert Decimal(valuation_body["data"]["investmentValuation"]["investedAmount"]) == (
+        Decimal("1000")
+    )
+    assert (
+        valuation_body["data"]["portfolioValuation"]["summary"]["totalInvestments"] >= 1
+    )
+    assert (
+        valuation_body["data"]["portfolioValuationHistory"]["summary"]["totalPoints"]
+        == 1
+    )
+    assert (
+        valuation_body["data"]["portfolioValuationHistory"]["items"][0][
+            "totalOperations"
+        ]
+        == 1
+    )
+
+    fixed_income_mutation = """
+    mutation AddFixedIncomeWallet {
+      addWalletEntry(
+        name: "CDB",
+        value: 1000,
+        quantity: 1,
+        assetClass: "cdb",
+        annualRate: 12,
+        registerDate: "2026-01-01",
+        shouldBeOnWallet: true
+      ) {
+        item { id assetClass annualRate }
+      }
+    }
+    """
+    fixed_income_response = _graphql(client, fixed_income_mutation, token=token)
+    assert fixed_income_response.status_code == 200
+    fixed_income_body = fixed_income_response.get_json()
+    assert "errors" not in fixed_income_body
+    fixed_income_id = fixed_income_body["data"]["addWalletEntry"]["item"]["id"]
+
+    fixed_income_valuation_query = """
+    query FixedIncomeValuation($investmentId: UUID!) {
+      investmentValuation(investmentId: $investmentId) {
+        assetClass
+        valuationSource
+        investedAmount
+        currentValue
+      }
+    }
+    """
+    fixed_income_valuation_response = _graphql(
+        client,
+        fixed_income_valuation_query,
+        {"investmentId": fixed_income_id},
+        token=token,
+    )
+    assert fixed_income_valuation_response.status_code == 200
+    fixed_income_valuation_body = fixed_income_valuation_response.get_json()
+    assert "errors" not in fixed_income_valuation_body
+    assert (
+        fixed_income_valuation_body["data"]["investmentValuation"]["assetClass"]
+        == "cdb"
+    )
+    assert (
+        fixed_income_valuation_body["data"]["investmentValuation"]["valuationSource"]
+        == "fixed_income_projection"
+    )
 
     add_ticker_mutation = """
     mutation AddTicker {

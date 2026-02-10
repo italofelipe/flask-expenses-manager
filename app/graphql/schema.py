@@ -9,6 +9,7 @@ import graphene
 from dateutil.relativedelta import relativedelta
 from flask_jwt_extended import create_access_token, get_jti
 from graphql import GraphQLError
+from marshmallow import ValidationError
 from werkzeug.security import check_password_hash, generate_password_hash
 
 from app.controllers.transaction_controller import (
@@ -23,11 +24,14 @@ from app.models.transaction import Transaction, TransactionStatus, TransactionTy
 from app.models.user import User
 from app.models.user_ticker import UserTicker
 from app.models.wallet import Wallet
+from app.schemas.wallet_schema import WalletSchema
 from app.services.investment_operation_service import (
     InvestmentOperationError,
     InvestmentOperationService,
 )
 from app.services.investment_service import InvestmentService
+from app.services.portfolio_history_service import PortfolioHistoryService
+from app.services.portfolio_valuation_service import PortfolioValuationService
 from app.services.transaction_analytics_service import TransactionAnalyticsService
 
 
@@ -68,6 +72,10 @@ def _wallet_to_graphql_payload(wallet: Wallet) -> dict[str, Any]:
         ),
         "ticker": wallet.ticker,
         "quantity": wallet.quantity,
+        "asset_class": wallet.asset_class or "custom",
+        "annual_rate": (
+            float(wallet.annual_rate) if wallet.annual_rate is not None else None
+        ),
         "register_date": wallet.register_date.isoformat(),
         "target_withdraw_date": (
             wallet.target_withdraw_date.isoformat()
@@ -282,6 +290,8 @@ class WalletType(graphene.ObjectType):
     estimated_value_on_create_date = graphene.Float()
     ticker = graphene.String()
     quantity = graphene.Int()
+    asset_class = graphene.String(required=True)
+    annual_rate = graphene.Float()
     register_date = graphene.String(required=True)
     target_withdraw_date = graphene.String()
     should_be_on_wallet = graphene.Boolean(required=True)
@@ -336,6 +346,90 @@ class InvestmentOperationSummaryType(graphene.ObjectType):
     total_fees = graphene.String(required=True)
 
 
+class InvestmentPositionType(graphene.ObjectType):
+    total_operations = graphene.Int(required=True)
+    buy_operations = graphene.Int(required=True)
+    sell_operations = graphene.Int(required=True)
+    total_buy_quantity = graphene.String(required=True)
+    total_sell_quantity = graphene.String(required=True)
+    current_quantity = graphene.String(required=True)
+    current_cost_basis = graphene.String(required=True)
+    average_cost = graphene.String(required=True)
+
+
+class InvestmentInvestedAmountType(graphene.ObjectType):
+    date = graphene.String(required=True)
+    total_operations = graphene.Int(required=True)
+    buy_operations = graphene.Int(required=True)
+    sell_operations = graphene.Int(required=True)
+    buy_amount = graphene.String(required=True)
+    sell_amount = graphene.String(required=True)
+    net_invested_amount = graphene.String(required=True)
+
+
+class PortfolioValuationItemType(graphene.ObjectType):
+    investment_id = graphene.ID(required=True)
+    name = graphene.String(required=True)
+    asset_class = graphene.String(required=True)
+    annual_rate = graphene.String()
+    ticker = graphene.String()
+    should_be_on_wallet = graphene.Boolean(required=True)
+    quantity = graphene.String(required=True)
+    unit_price = graphene.String(required=True)
+    invested_amount = graphene.String(required=True)
+    current_value = graphene.String(required=True)
+    profit_loss_amount = graphene.String(required=True)
+    profit_loss_percent = graphene.String(required=True)
+    market_price = graphene.String()
+    valuation_source = graphene.String(required=True)
+    uses_operations_quantity = graphene.Boolean(required=True)
+
+
+class PortfolioValuationSummaryType(graphene.ObjectType):
+    total_investments = graphene.Int(required=True)
+    with_market_data = graphene.Int(required=True)
+    without_market_data = graphene.Int(required=True)
+    total_invested_amount = graphene.String(required=True)
+    total_current_value = graphene.String(required=True)
+    total_profit_loss = graphene.String(required=True)
+    total_profit_loss_percent = graphene.String(required=True)
+
+
+class PortfolioValuationPayloadType(graphene.ObjectType):
+    summary = graphene.Field(PortfolioValuationSummaryType, required=True)
+    items = graphene.List(PortfolioValuationItemType, required=True)
+
+
+class PortfolioHistoryItemType(graphene.ObjectType):
+    date = graphene.String(required=True)
+    total_operations = graphene.Int(required=True)
+    buy_operations = graphene.Int(required=True)
+    sell_operations = graphene.Int(required=True)
+    buy_amount = graphene.String(required=True)
+    sell_amount = graphene.String(required=True)
+    net_invested_amount = graphene.String(required=True)
+    cumulative_net_invested = graphene.String(required=True)
+    total_current_value_estimate = graphene.String(required=True)
+    total_profit_loss_estimate = graphene.String(required=True)
+
+
+class PortfolioHistorySummaryType(graphene.ObjectType):
+    start_date = graphene.String(required=True)
+    end_date = graphene.String(required=True)
+    total_points = graphene.Int(required=True)
+    total_buy_amount = graphene.String(required=True)
+    total_sell_amount = graphene.String(required=True)
+    total_net_invested_amount = graphene.String(required=True)
+    final_cumulative_net_invested = graphene.String(required=True)
+    final_total_current_value_estimate = graphene.String(required=True)
+    final_total_profit_loss_estimate = graphene.String(required=True)
+
+
+class PortfolioHistoryPayloadType(graphene.ObjectType):
+    summary = graphene.Field(PortfolioHistorySummaryType, required=True)
+    items = graphene.List(PortfolioHistoryItemType, required=True)
+
+
 class TickerType(graphene.ObjectType):
     id = graphene.ID(required=True)
     symbol = graphene.String(required=True)
@@ -383,6 +477,25 @@ class Query(graphene.ObjectType):
     investment_operation_summary = graphene.Field(
         InvestmentOperationSummaryType,
         investment_id=graphene.UUID(required=True),
+    )
+    investment_position = graphene.Field(
+        InvestmentPositionType,
+        investment_id=graphene.UUID(required=True),
+    )
+    investment_invested_amount = graphene.Field(
+        InvestmentInvestedAmountType,
+        investment_id=graphene.UUID(required=True),
+        date=graphene.String(required=True),
+    )
+    investment_valuation = graphene.Field(
+        PortfolioValuationItemType,
+        investment_id=graphene.UUID(required=True),
+    )
+    portfolio_valuation = graphene.Field(PortfolioValuationPayloadType)
+    portfolio_valuation_history = graphene.Field(
+        PortfolioHistoryPayloadType,
+        start_date=graphene.String(),
+        final_date=graphene.String(),
     )
     tickers = graphene.List(TickerType)
 
@@ -627,6 +740,75 @@ class Query(graphene.ObjectType):
         except InvestmentOperationError as exc:
             raise GraphQLError(exc.message) from exc
         return InvestmentOperationSummaryType(**summary)
+
+    def resolve_investment_position(
+        self, info: graphene.ResolveInfo, investment_id: UUID
+    ) -> InvestmentPositionType:
+        user = get_current_user_required()
+        service = InvestmentOperationService(user.id)
+        try:
+            position = service.get_position(investment_id)
+        except InvestmentOperationError as exc:
+            raise GraphQLError(exc.message) from exc
+        return InvestmentPositionType(**position)
+
+    def resolve_investment_invested_amount(
+        self, info: graphene.ResolveInfo, investment_id: UUID, date: str
+    ) -> InvestmentInvestedAmountType:
+        user = get_current_user_required()
+        operation_date = _parse_optional_date(date, "date")
+        if operation_date is None:
+            raise GraphQLError("Parâmetro 'date' é obrigatório.")
+
+        service = InvestmentOperationService(user.id)
+        try:
+            result = service.get_invested_amount_by_date(investment_id, operation_date)
+        except InvestmentOperationError as exc:
+            raise GraphQLError(exc.message) from exc
+        return InvestmentInvestedAmountType(**result)
+
+    def resolve_investment_valuation(
+        self, info: graphene.ResolveInfo, investment_id: UUID
+    ) -> PortfolioValuationItemType:
+        user = get_current_user_required()
+        service = PortfolioValuationService(user.id)
+        try:
+            payload = service.get_investment_current_valuation(investment_id)
+        except InvestmentOperationError as exc:
+            raise GraphQLError(exc.message) from exc
+        return PortfolioValuationItemType(**payload)
+
+    def resolve_portfolio_valuation(
+        self, info: graphene.ResolveInfo
+    ) -> PortfolioValuationPayloadType:
+        user = get_current_user_required()
+        service = PortfolioValuationService(user.id)
+        payload = service.get_portfolio_current_valuation()
+        return PortfolioValuationPayloadType(
+            summary=PortfolioValuationSummaryType(**payload["summary"]),
+            items=[PortfolioValuationItemType(**item) for item in payload["items"]],
+        )
+
+    def resolve_portfolio_valuation_history(
+        self,
+        info: graphene.ResolveInfo,
+        start_date: str | None = None,
+        final_date: str | None = None,
+    ) -> PortfolioHistoryPayloadType:
+        user = get_current_user_required()
+        parsed_start_date = _parse_optional_date(start_date, "start_date")
+        parsed_final_date = _parse_optional_date(final_date, "final_date")
+        service = PortfolioHistoryService(user.id)
+        try:
+            payload = service.get_history(
+                start_date=parsed_start_date, end_date=parsed_final_date
+            )
+        except ValueError as exc:
+            raise GraphQLError(str(exc)) from exc
+        return PortfolioHistoryPayloadType(
+            summary=PortfolioHistorySummaryType(**payload["summary"]),
+            items=[PortfolioHistoryItemType(**item) for item in payload["items"]],
+        )
 
 
 class RegisterUserMutation(graphene.Mutation):
@@ -874,6 +1056,8 @@ class AddWalletEntryMutation(graphene.Mutation):
         value = graphene.Float()
         ticker = graphene.String()
         quantity = graphene.Int()
+        asset_class = graphene.String()
+        annual_rate = graphene.Float()
         register_date = graphene.String()
         target_withdraw_date = graphene.String()
         should_be_on_wallet = graphene.Boolean(required=True)
@@ -884,20 +1068,22 @@ class AddWalletEntryMutation(graphene.Mutation):
         self, info: graphene.ResolveInfo, **kwargs: Any
     ) -> AddWalletEntryMutation:
         user = get_current_user_required()
-        validated_data = {
+        raw_data = {
             "name": kwargs["name"],
             "value": kwargs.get("value"),
             "ticker": kwargs.get("ticker"),
             "quantity": kwargs.get("quantity"),
-            "register_date": _parse_optional_date(
-                kwargs.get("register_date"), "register_date"
-            )
-            or date.today(),
-            "target_withdraw_date": _parse_optional_date(
-                kwargs.get("target_withdraw_date"), "target_withdraw_date"
-            ),
+            "asset_class": kwargs.get("asset_class", "custom"),
+            "annual_rate": kwargs.get("annual_rate"),
+            "register_date": kwargs.get("register_date") or date.today().isoformat(),
+            "target_withdraw_date": kwargs.get("target_withdraw_date"),
             "should_be_on_wallet": kwargs["should_be_on_wallet"],
         }
+        schema = WalletSchema()
+        try:
+            validated_data = schema.load(raw_data)
+        except ValidationError as exc:
+            raise GraphQLError(f"Dados inválidos: {exc.messages}") from exc
         estimated_value = InvestmentService.calculate_estimated_value(validated_data)
         wallet = Wallet(
             user_id=user.id,
@@ -906,6 +1092,8 @@ class AddWalletEntryMutation(graphene.Mutation):
             estimated_value_on_create_date=estimated_value,
             ticker=validated_data.get("ticker"),
             quantity=validated_data.get("quantity"),
+            asset_class=str(validated_data.get("asset_class", "custom")).lower(),
+            annual_rate=validated_data.get("annual_rate"),
             register_date=validated_data["register_date"],
             target_withdraw_date=validated_data.get("target_withdraw_date"),
             should_be_on_wallet=validated_data["should_be_on_wallet"],
@@ -924,6 +1112,8 @@ class UpdateWalletEntryMutation(graphene.Mutation):
         value = graphene.Float()
         ticker = graphene.String()
         quantity = graphene.Int()
+        asset_class = graphene.String()
+        annual_rate = graphene.Float()
         register_date = graphene.String()
         target_withdraw_date = graphene.String()
         should_be_on_wallet = graphene.Boolean()
@@ -940,21 +1130,33 @@ class UpdateWalletEntryMutation(graphene.Mutation):
             forbidden_message="Você não tem permissão para editar este investimento.",
         )
 
+        raw_payload: dict[str, Any] = {
+            "name": kwargs.get("name"),
+            "value": kwargs.get("value"),
+            "ticker": kwargs.get("ticker"),
+            "quantity": kwargs.get("quantity"),
+            "asset_class": kwargs.get("asset_class"),
+            "annual_rate": kwargs.get("annual_rate"),
+            "register_date": kwargs.get("register_date"),
+            "target_withdraw_date": kwargs.get("target_withdraw_date"),
+            "should_be_on_wallet": kwargs.get("should_be_on_wallet"),
+        }
+        payload = {k: v for k, v in raw_payload.items() if v is not None}
+        schema = WalletSchema(partial=True)
+        try:
+            validated_data = schema.load(payload, partial=True)
+        except ValidationError as exc:
+            raise GraphQLError(f"Dados inválidos: {exc.messages}") from exc
+
         original_quantity = investment.quantity
         original_value = investment.value
-        for key in ["name", "ticker", "quantity", "should_be_on_wallet"]:
-            if key in kwargs and kwargs[key] is not None:
-                setattr(investment, key, kwargs[key])
-        if "value" in kwargs and kwargs["value"] is not None:
-            investment.value = Decimal(str(kwargs["value"]))
-        if "register_date" in kwargs and kwargs["register_date"]:
-            investment.register_date = _parse_optional_date(
-                kwargs["register_date"], "register_date"
-            )
-        if "target_withdraw_date" in kwargs:
-            investment.target_withdraw_date = _parse_optional_date(
-                kwargs.get("target_withdraw_date"), "target_withdraw_date"
-            )
+        for key, value in validated_data.items():
+            if key == "asset_class":
+                setattr(investment, key, str(value).lower())
+            elif key in {"value", "annual_rate"} and value is not None:
+                setattr(investment, key, Decimal(str(value)))
+            else:
+                setattr(investment, key, value)
 
         if investment.ticker:
             estimated_value = InvestmentService.calculate_estimated_value(

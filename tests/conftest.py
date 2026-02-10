@@ -17,6 +17,7 @@ def app(tmp_path: Path):
     os.environ["SECRET_KEY"] = "test-secret"
     os.environ["JWT_SECRET_KEY"] = "test-jwt-secret"
     os.environ["FLASK_DEBUG"] = "False"
+    os.environ["BRAPI_CACHE_TTL_SECONDS"] = "0"
 
     from app import create_app
     from app.extensions.database import db
@@ -38,3 +39,12 @@ def app(tmp_path: Path):
 @pytest.fixture
 def client(app) -> Generator:
     yield app.test_client()
+
+
+@pytest.fixture(autouse=True)
+def clear_investment_service_cache() -> Generator[None, None, None]:
+    from app.services.investment_service import InvestmentService
+
+    InvestmentService._clear_cache_for_tests()
+    yield
+    InvestmentService._clear_cache_for_tests()

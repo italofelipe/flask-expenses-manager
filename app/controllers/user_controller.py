@@ -373,6 +373,10 @@ class UserMeResource(MethodResource):
                 ),
                 "ticker": w.ticker,
                 "quantity": w.quantity,
+                "asset_class": w.asset_class,
+                "annual_rate": (
+                    float(w.annual_rate) if w.annual_rate is not None else None
+                ),
                 "target_withdraw_date": (
                     str(w.target_withdraw_date) if w.target_withdraw_date else None
                 ),

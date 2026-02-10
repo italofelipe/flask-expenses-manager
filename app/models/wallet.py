@@ -19,6 +19,8 @@ class Wallet(db.Model):
 
     ticker = db.Column(db.String(16), nullable=True)
     quantity = db.Column(db.Integer, nullable=True)
+    asset_class = db.Column(db.String(32), nullable=False, server_default="custom")
+    annual_rate = db.Column(db.Numeric(8, 4), nullable=True)
 
     register_date = db.Column(db.Date, nullable=False)
     target_withdraw_date = db.Column(db.Date, nullable=True)

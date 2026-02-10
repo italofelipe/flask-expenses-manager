@@ -234,6 +234,11 @@ Resposta inclui:
 - `PUT /wallet/{investment_id}/operations/{operation_id}`
 - `DELETE /wallet/{investment_id}/operations/{operation_id}`
 - `GET /wallet/{investment_id}/operations/summary`
+- `GET /wallet/{investment_id}/operations/position`
+- `GET /wallet/{investment_id}/operations/invested-amount`
+- `GET /wallet/{investment_id}/valuation`
+- `GET /wallet/valuation`
+- `GET /wallet/valuation/history`
 - `PUT /wallet/{investment_id}`
 - `DELETE /wallet/{investment_id}`
 
@@ -247,6 +252,10 @@ Cria item da carteira.
 Regras implementadas:
 - Com `ticker`: `quantity` obrigatório e `value` não deve ser enviado.
 - Sem `ticker`: `value` obrigatório.
+- `asset_class` suportado:
+  - mercado: `stock`, `fii`, `etf`, `bdr`, `crypto` (exigem `ticker`);
+  - renda fixa: `cdb`, `cdi`, `lci`, `lca`, `tesouro` (exigem `annual_rate`);
+  - outros: `fund`, `custom`.
 - `estimated_value_on_create_date` é calculado via BRAPI (quando há ticker) ou por `value * quantity`.
 - Com header `X-API-Contract: v2`, retorna envelope padronizado.
 
@@ -284,6 +293,60 @@ Retorna agregado das operações:
 - preço médio de compra
 - taxas totais
 
+### `GET /wallet/{investment_id}/operations/position`
+Retorna posição atual e custo médio do investimento:
+- total de operações (buy/sell)
+- quantidade total comprada e vendida
+- quantidade atual em carteira (`current_quantity`)
+- custo total da posição aberta (`current_cost_basis`)
+- custo médio da posição aberta (`average_cost`)
+
+### `GET /wallet/{investment_id}/operations/invested-amount`
+Retorna o valor investido em uma data específica:
+- query param obrigatório: `date` (`YYYY-MM-DD`)
+- total de operações do dia
+- quantidade de compras e vendas do dia
+- valor total de compras (`buy_amount`)
+- valor total de vendas (`sell_amount`)
+- valor líquido investido no dia (`net_invested_amount`)
+
+### `GET /wallet/{investment_id}/valuation`
+Retorna a valorização atual de um investimento:
+- classe de ativo (`asset_class`) e taxa anual (`annual_rate`, quando houver)
+- quantidade efetiva (priorizando quantidade calculada por operações quando existir)
+- preço unitário considerado
+- valor investido (`invested_amount`)
+- valor atual
+- P/L absoluto (`profit_loss_amount`)
+- P/L percentual (`profit_loss_percent`)
+- origem da cotação/valuation (`brapi_market_price`, `fallback_cost_basis`,
+  `fallback_estimated_on_create_date`, `manual_value`,
+  `fixed_income_projection`)
+
+### `GET /wallet/valuation`
+Retorna a valorização consolidada da carteira:
+- lista de investimentos com valuation atual
+- resumo agregado (`total_investments`, `with_market_data`,
+  `without_market_data`, `total_invested_amount`, `total_current_value`,
+  `total_profit_loss`, `total_profit_loss_percent`)
+
+### `GET /wallet/valuation/history`
+Retorna evolução diária da carteira por período:
+- query params opcionais: `startDate`, `finalDate` (`YYYY-MM-DD`)
+- sem parâmetros: usa janela padrão dos últimos 30 dias
+- resumo agregado:
+  - `total_buy_amount`
+  - `total_sell_amount`
+  - `total_net_invested_amount`
+  - `final_cumulative_net_invested`
+- série diária:
+  - operações totais/compras/vendas por dia
+  - `buy_amount`, `sell_amount`
+  - `net_invested_amount`
+  - `cumulative_net_invested`
+  - `total_current_value_estimate`
+  - `total_profit_loss_estimate`
+
 ### `PUT /wallet/{investment_id}`
 Atualiza item da carteira e salva histórico quando `quantity` ou `value` mudam.
 - Com `X-API-Contract: v2`, retorna envelope padronizado.
@@ -304,6 +367,11 @@ Queries iniciais:
 - `walletHistory`
 - `investmentOperations`
 - `investmentOperationSummary`
+- `investmentPosition`
+- `investmentInvestedAmount`
+- `investmentValuation`
+- `portfolioValuation`
+- `portfolioValuationHistory`
 - `tickers`
 
 Mutations iniciais:

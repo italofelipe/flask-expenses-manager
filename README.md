@@ -11,27 +11,48 @@ API RESTful para gestão financeira pessoal, construída com Flask, JWT e Postgr
 - PostgreSQL
 
 ## Rodando com Docker
-1. Configure o `.env` com as variáveis mínimas:
 
-```env
-POSTGRES_DB=flaskdb
-POSTGRES_USER=flaskuser
-POSTGRES_PASSWORD=flaskpass
-DB_HOST=db
-DB_PORT=5432
+### Ambiente DEV
+1. Crie o arquivo de ambiente de desenvolvimento:
+
+```bash
+cp .env.dev.example .env.dev
 ```
 
 2. Suba os containers:
 
 ```bash
-docker-compose up --build
+docker compose -f docker-compose.dev.yml up --build
+```
+
+### Ambiente PROD (local/staging)
+1. Crie o arquivo de ambiente de produção:
+
+```bash
+cp .env.prod.example .env.prod
+```
+
+2. Suba os containers:
+
+```bash
+docker compose -f docker-compose.prod.yml up --build -d
+```
+
+3. Derrube os containers:
+
+```bash
+docker compose -f docker-compose.prod.yml down
 ```
 
 ## Portas e acesso
-- App exposto no host: `http://localhost:3333`
-- Swagger UI: `http://localhost:3333/docs/`
-- OpenAPI JSON: `http://localhost:3333/docs/swagger/`
-- PostgreSQL: `localhost:5432`
+- DEV:
+  - App exposto no host: `http://localhost:3333`
+  - Swagger UI: `http://localhost:3333/docs/`
+  - OpenAPI JSON: `http://localhost:3333/docs/swagger/`
+  - PostgreSQL: `localhost:5432`
+- PROD:
+  - Nginx/reverse proxy: `http://localhost`
+  - App interno (container): `web:8000`
 
 ## Endpoints reais (código atual)
 

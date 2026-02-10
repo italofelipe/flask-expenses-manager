@@ -93,6 +93,26 @@ def test_wallet_validation_error_v2_contract(client) -> None:
     assert "messages" in body["error"]["details"]
 
 
+def test_wallet_market_asset_requires_ticker_v2_contract(client) -> None:
+    token = _register_and_login(client)
+    response = client.post(
+        "/wallet",
+        json={
+            "name": "Acao sem ticker",
+            "asset_class": "stock",
+            "value": "100.00",
+            "quantity": 1,
+            "should_be_on_wallet": True,
+        },
+        headers=_auth_headers(token, "v2"),
+    )
+
+    assert response.status_code == 400
+    body = response.get_json()
+    assert body["success"] is False
+    assert body["error"]["code"] == "VALIDATION_ERROR"
+
+
 def test_wallet_list_v2_contract_has_meta_pagination(client) -> None:
     token = _register_and_login(client)
     create_response = client.post(

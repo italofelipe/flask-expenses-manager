@@ -126,6 +126,51 @@ O que faz:
 - Calcula resumo agregado das operações (`buy/sell`, quantidades e montantes).
 - Retorna métricas de posição operacional para o investimento.
 
+## `get_investment_operations_position`
+Endpoint: `GET /wallet/{investment_id}/operations/position`
+
+O que faz:
+- Calcula posição atual do ativo com base no histórico de operações.
+- Retorna quantidade atual em carteira, custo total da posição aberta e custo médio.
+- Reaproveita `InvestmentOperationService.get_position` (mesmo domínio usado no GraphQL).
+
+## `get_invested_amount_by_date`
+Endpoint: `GET /wallet/{investment_id}/operations/invested-amount`
+
+O que faz:
+- Recebe `date` (`YYYY-MM-DD`) via query string.
+- Calcula quanto foi investido no dia para aquele investimento.
+- Retorna totais de compra/venda e o valor líquido investido no dia.
+- Reaproveita `InvestmentOperationService.get_invested_amount_by_date`.
+
+## `get_investment_valuation`
+Endpoint: `GET /wallet/{investment_id}/valuation`
+
+O que faz:
+- Retorna valuation atual de um investimento específico.
+- Usa BRAPI quando há ticker e fallback para custo de posição/valor estimado.
+- Reaproveita `PortfolioValuationService.get_investment_current_valuation`.
+
+## `get_portfolio_valuation`
+Endpoint: `GET /wallet/valuation`
+
+O que faz:
+- Retorna valuation consolidado da carteira do usuário.
+- Inclui resumo agregado e lista de itens com origem de valuation por ativo.
+- Reaproveita `PortfolioValuationService.get_portfolio_current_valuation`.
+
+## `get_portfolio_valuation_history`
+Endpoint: `GET /wallet/valuation/history`
+
+O que faz:
+- Retorna série diária de evolução por período da carteira.
+- Aceita `startDate` e `finalDate` opcionais (`YYYY-MM-DD`).
+- Se não informado, aplica janela padrão dos últimos 30 dias.
+- Retorna resumo agregado e itens diários com:
+  - compras, vendas e líquido investido;
+  - acumulado líquido investido no período.
+- Reaproveita `PortfolioHistoryService.get_history`.
+
 ## `delete_wallet_entry`
 Endpoint: `DELETE /wallet/{investment_id}`
 
@@ -140,15 +185,17 @@ Contrato v2:
 - `app.models.wallet.Wallet`
 - `WalletSchema`
 - `InvestmentService` (integração BRAPI)
+- `PortfolioHistoryService` (série temporal da carteira)
 - `PaginatedResponse`
 - `InvestmentOperation` / `InvestmentOperationSchema`
 - `InvestmentOperationService` (domínio compartilhado REST/GraphQL)
 
 ## Pontos incompletos / melhorias (Fase 0)
 1. Histórico é armazenado como JSON mutável na própria linha, sem versionamento formal por tabela.
-2. Integração BRAPI não usa timeout explícito, retry/backoff ou cache local.
+2. BRAPI agora usa timeout, retry e cache curto em memória; falta apenas estratégia
+   distribuída de cache para múltiplos workers/réplicas.
 3. Campo `quantity` no model é inteiro, o que pode limitar ativos fracionários em alguns cenários.
-4. Não há endpoint consolidado de valuation atual da carteira com P/L por ativo.
+4. Série temporal depende de disponibilidade de preço histórico no provider externo.
 5. Existem logs de erro via `print`, sem estratégia padronizada de observabilidade.
 
 ## Recomendação de implementação futura (sem alterar comportamento agora)

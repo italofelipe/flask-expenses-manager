@@ -1,0 +1,351 @@
+type Query {
+  me: UserType
+  transactions(page: Int = 1, perPage: Int = 10, type: String, status: String, startDate: String, endDate: String): TransactionListPayloadType
+  transactionSummary(month: String!, page: Int = 1, pageSize: Int = 10): TransactionSummaryPayloadType
+  transactionDashboard(month: String!): TransactionDashboardPayloadType
+  walletEntries(page: Int = 1, perPage: Int = 10): WalletListPayloadType
+  walletHistory(investmentId: UUID!, page: Int = 1, perPage: Int = 5): WalletHistoryPayloadType
+  investmentOperations(investmentId: UUID!, page: Int = 1, perPage: Int = 10): InvestmentOperationListPayloadType
+  investmentOperationSummary(investmentId: UUID!): InvestmentOperationSummaryType
+  investmentPosition(investmentId: UUID!): InvestmentPositionType
+  investmentInvestedAmount(investmentId: UUID!, date: String!): InvestmentInvestedAmountType
+  investmentValuation(investmentId: UUID!): PortfolioValuationItemType
+  portfolioValuation: PortfolioValuationPayloadType
+  portfolioValuationHistory(startDate: String, finalDate: String): PortfolioHistoryPayloadType
+  tickers: [TickerType]
+}
+
+type UserType {
+  id: ID!
+  name: String!
+  email: String!
+  gender: String
+  birthDate: String
+  monthlyIncome: Float
+  netWorth: Float
+  monthlyExpenses: Float
+  initialInvestment: Float
+  monthlyInvestment: Float
+  investmentGoalDate: String
+}
+
+type TransactionListPayloadType {
+  items: [TransactionTypeObject]!
+  pagination: PaginationType!
+}
+
+type TransactionTypeObject {
+  id: ID!
+  title: String!
+  amount: String!
+  type: String!
+  dueDate: String!
+  startDate: String
+  endDate: String
+  description: String
+  observation: String
+  isRecurring: Boolean!
+  isInstallment: Boolean!
+  installmentCount: Int
+  tagId: String
+  accountId: String
+  creditCardId: String
+  status: String!
+  currency: String!
+  createdAt: String
+  updatedAt: String
+}
+
+type PaginationType {
+  total: Int!
+  page: Int!
+  perPage: Int!
+  pages: Int
+}
+
+type TransactionSummaryPayloadType {
+  month: String!
+  incomeTotal: Float!
+  expenseTotal: Float!
+  items: [TransactionTypeObject]!
+  pagination: PaginationType!
+}
+
+type TransactionDashboardPayloadType {
+  month: String!
+  totals: DashboardTotalsType!
+  counts: DashboardCountsType!
+  topCategories: DashboardCategoriesType!
+}
+
+type DashboardTotalsType {
+  incomeTotal: Float!
+  expenseTotal: Float!
+  balance: Float!
+}
+
+type DashboardCountsType {
+  totalTransactions: Int!
+  incomeTransactions: Int!
+  expenseTransactions: Int!
+  status: DashboardStatusCountsType!
+}
+
+type DashboardStatusCountsType {
+  paid: Int!
+  pending: Int!
+  cancelled: Int!
+  postponed: Int!
+  overdue: Int!
+}
+
+type DashboardCategoriesType {
+  expense: [DashboardCategoryType]!
+  income: [DashboardCategoryType]!
+}
+
+type DashboardCategoryType {
+  tagId: String
+  categoryName: String!
+  totalAmount: Float!
+  transactionsCount: Int!
+}
+
+type WalletListPayloadType {
+  items: [WalletType]!
+  pagination: PaginationType!
+}
+
+type WalletType {
+  id: ID!
+  name: String!
+  value: Float
+  estimatedValueOnCreateDate: Float
+  ticker: String
+  quantity: Int
+  assetClass: String!
+  annualRate: Float
+  registerDate: String!
+  targetWithdrawDate: String
+  shouldBeOnWallet: Boolean!
+}
+
+type WalletHistoryPayloadType {
+  items: [WalletHistoryItemType]!
+  pagination: PaginationType!
+}
+
+type WalletHistoryItemType {
+  originalQuantity: Float
+  originalValue: Float
+  changeType: String
+  changeDate: String
+}
+
+"""
+Leverages the internal Python implementation of UUID (uuid.UUID) to provide native UUID objects
+in fields, resolvers and input.
+"""
+scalar UUID
+
+type InvestmentOperationListPayloadType {
+  items: [InvestmentOperationType]!
+  pagination: PaginationType!
+}
+
+type InvestmentOperationType {
+  id: ID!
+  walletId: ID!
+  userId: ID!
+  operationType: String!
+  quantity: String!
+  unitPrice: String!
+  fees: String!
+  executedAt: String!
+  notes: String
+  createdAt: String
+  updatedAt: String
+}
+
+type InvestmentOperationSummaryType {
+  totalOperations: Int!
+  buyOperations: Int!
+  sellOperations: Int!
+  buyQuantity: String!
+  sellQuantity: String!
+  netQuantity: String!
+  grossBuyAmount: String!
+  grossSellAmount: String!
+  averageBuyPrice: String!
+  totalFees: String!
+}
+
+type InvestmentPositionType {
+  totalOperations: Int!
+  buyOperations: Int!
+  sellOperations: Int!
+  totalBuyQuantity: String!
+  totalSellQuantity: String!
+  currentQuantity: String!
+  currentCostBasis: String!
+  averageCost: String!
+}
+
+type InvestmentInvestedAmountType {
+  date: String!
+  totalOperations: Int!
+  buyOperations: Int!
+  sellOperations: Int!
+  buyAmount: String!
+  sellAmount: String!
+  netInvestedAmount: String!
+}
+
+type PortfolioValuationItemType {
+  investmentId: ID!
+  name: String!
+  assetClass: String!
+  annualRate: String
+  ticker: String
+  shouldBeOnWallet: Boolean!
+  quantity: String!
+  unitPrice: String!
+  investedAmount: String!
+  currentValue: String!
+  profitLossAmount: String!
+  profitLossPercent: String!
+  marketPrice: String
+  valuationSource: String!
+  usesOperationsQuantity: Boolean!
+}
+
+type PortfolioValuationPayloadType {
+  summary: PortfolioValuationSummaryType!
+  items: [PortfolioValuationItemType]!
+}
+
+type PortfolioValuationSummaryType {
+  totalInvestments: Int!
+  withMarketData: Int!
+  withoutMarketData: Int!
+  totalInvestedAmount: String!
+  totalCurrentValue: String!
+  totalProfitLoss: String!
+  totalProfitLossPercent: String!
+}
+
+type PortfolioHistoryPayloadType {
+  summary: PortfolioHistorySummaryType!
+  items: [PortfolioHistoryItemType]!
+}
+
+type PortfolioHistorySummaryType {
+  startDate: String!
+  endDate: String!
+  totalPoints: Int!
+  totalBuyAmount: String!
+  totalSellAmount: String!
+  totalNetInvestedAmount: String!
+  finalCumulativeNetInvested: String!
+  finalTotalCurrentValueEstimate: String!
+  finalTotalProfitLossEstimate: String!
+}
+
+type PortfolioHistoryItemType {
+  date: String!
+  totalOperations: Int!
+  buyOperations: Int!
+  sellOperations: Int!
+  buyAmount: String!
+  sellAmount: String!
+  netInvestedAmount: String!
+  cumulativeNetInvested: String!
+  totalCurrentValueEstimate: String!
+  totalProfitLossEstimate: String!
+}
+
+type TickerType {
+  id: ID!
+  symbol: String!
+  quantity: Float!
+  type: String
+}
+
+type Mutation {
+  registerUser(email: String!, name: String!, password: String!): AuthPayloadType
+  login(email: String, name: String, password: String!): AuthPayloadType
+  logout: LogoutMutation
+  updateUserProfile(birthDate: String, gender: String, initialInvestment: Float, investmentGoalDate: String, monthlyExpenses: Float, monthlyIncome: Float, monthlyInvestment: Float, netWorth: Float): UpdateUserProfileMutation
+  createTransaction(accountId: UUID, amount: String!, creditCardId: UUID, currency: String = "BRL", description: String, dueDate: String!, endDate: String, installmentCount: Int, isInstallment: Boolean = false, isRecurring: Boolean = false, observation: String, startDate: String, status: String = "pending", tagId: UUID, title: String!, type: String!): CreateTransactionMutation
+  deleteTransaction(transactionId: UUID!): DeleteTransactionMutation
+  addWalletEntry(annualRate: Float, assetClass: String, name: String!, quantity: Int, registerDate: String, shouldBeOnWallet: Boolean!, targetWithdrawDate: String, ticker: String, value: Float): AddWalletEntryMutation
+  updateWalletEntry(annualRate: Float, assetClass: String, investmentId: UUID!, name: String, quantity: Int, registerDate: String, shouldBeOnWallet: Boolean, targetWithdrawDate: String, ticker: String, value: Float): UpdateWalletEntryMutation
+  deleteWalletEntry(investmentId: UUID!): DeleteWalletEntryMutation
+  addInvestmentOperation(executedAt: String, fees: String, investmentId: UUID!, notes: String, operationType: String!, quantity: String!, unitPrice: String!): AddInvestmentOperationMutation
+  updateInvestmentOperation(executedAt: String, fees: String, investmentId: UUID!, notes: String, operationId: UUID!, operationType: String, quantity: String, unitPrice: String): UpdateInvestmentOperationMutation
+  deleteInvestmentOperation(investmentId: UUID!, operationId: UUID!): DeleteInvestmentOperationMutation
+  addTicker(quantity: Float!, symbol: String!, type: String): AddTickerMutation
+  deleteTicker(symbol: String!): DeleteTickerMutation
+}
+
+type AuthPayloadType {
+  token: String
+  user: UserType
+  message: String!
+}
+
+type LogoutMutation {
+  ok: Boolean!
+  message: String!
+}
+
+type UpdateUserProfileMutation {
+  user: UserType!
+}
+
+type CreateTransactionMutation {
+  items: [TransactionTypeObject]!
+  message: String!
+}
+
+type DeleteTransactionMutation {
+  ok: Boolean!
+  message: String!
+}
+
+type AddWalletEntryMutation {
+  item: WalletType!
+}
+
+type UpdateWalletEntryMutation {
+  item: WalletType!
+}
+
+type DeleteWalletEntryMutation {
+  ok: Boolean!
+  message: String!
+}
+
+type AddInvestmentOperationMutation {
+  item: InvestmentOperationType!
+  message: String!
+}
+
+type UpdateInvestmentOperationMutation {
+  item: InvestmentOperationType!
+  message: String!
+}
+
+type DeleteInvestmentOperationMutation {
+  ok: Boolean!
+  message: String!
+}
+
+type AddTickerMutation {
+  item: TickerType!
+}
+
+type DeleteTickerMutation {
+  ok: Boolean!
+  message: String!
+}

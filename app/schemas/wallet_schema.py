@@ -3,6 +3,23 @@ from typing import Any, Dict
 
 from marshmallow import Schema, ValidationError, fields, validates_schema
 
+ASSET_CLASSES = {
+    "custom",
+    "stock",
+    "fii",
+    "etf",
+    "bdr",
+    "crypto",
+    "cdb",
+    "cdi",
+    "lci",
+    "lca",
+    "tesouro",
+    "fund",
+}
+MARKET_ASSET_CLASSES = {"stock", "fii", "etf", "bdr", "crypto"}
+FIXED_INCOME_ASSET_CLASSES = {"cdb", "cdi", "lci", "lca", "tesouro"}
+
 
 class WalletSchema(Schema):
     """Schema para validação de dados da carteira de investimentos."""
@@ -19,6 +36,8 @@ class WalletSchema(Schema):
     estimated_value_on_create_date = fields.Decimal(as_string=True, allow_none=True)
     ticker = fields.String(allow_none=True)
     quantity = fields.Integer(allow_none=True)
+    asset_class = fields.String(allow_none=True)
+    annual_rate = fields.Decimal(as_string=True, allow_none=True)
     register_date = fields.Date(missing=lambda: date.today())
     target_withdraw_date = fields.Date(allow_none=True)
     should_be_on_wallet = fields.Boolean(required=True)
@@ -31,6 +50,14 @@ class WalletSchema(Schema):
         has_ticker = bool(data.get("ticker"))
         has_quantity = data.get("quantity") is not None
         has_value = data.get("value") is not None
+        asset_class = str(data.get("asset_class") or "custom").strip().lower()
+        annual_rate = data.get("annual_rate")
+
+        if asset_class not in ASSET_CLASSES:
+            raise ValidationError(
+                "Campo 'asset_class' inválido.",
+                field_name="asset_class",
+            )
 
         if has_ticker and not has_quantity:
             raise ValidationError(
@@ -50,4 +77,16 @@ class WalletSchema(Schema):
             raise ValidationError(
                 "Informe o campo 'value' caso não esteja usando 'ticker'.",
                 field_name="value",
+            )
+
+        if asset_class in MARKET_ASSET_CLASSES and not has_ticker:
+            raise ValidationError(
+                "Para classes de mercado (stock/fii/etf/bdr/crypto), informe 'ticker'.",
+                field_name="ticker",
+            )
+
+        if asset_class in FIXED_INCOME_ASSET_CLASSES and annual_rate is None:
+            raise ValidationError(
+                "Campo 'annual_rate' é obrigatório para ativos de renda fixa.",
+                field_name="annual_rate",
             )

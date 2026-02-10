@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from datetime import date
 from decimal import Decimal
 from typing import Any, cast
 from uuid import UUID
@@ -140,9 +141,7 @@ class InvestmentOperationService:
 
     def get_summary(self, investment_id: UUID) -> dict[str, Any]:
         self.get_owned_investment(investment_id)
-        operations = InvestmentOperation.query.filter_by(
-            wallet_id=investment_id, user_id=self.user_id
-        ).all()
+        operations = self._get_operations_for_investment(investment_id)
 
         buy_ops = [op for op in operations if op.operation_type == "buy"]
         sell_ops = [op for op in operations if op.operation_type == "sell"]
@@ -177,6 +176,120 @@ class InvestmentOperationService:
             "average_buy_price": str(average_buy_price),
             "total_fees": str(total_fees),
         }
+
+    def get_position(self, investment_id: UUID) -> dict[str, Any]:
+        self.get_owned_investment(investment_id)
+        operations = self._get_operations_for_investment(
+            investment_id, chronological=True
+        )
+
+        current_quantity = Decimal("0")
+        current_cost_basis = Decimal("0")
+        buy_operations = 0
+        sell_operations = 0
+        total_buy_quantity = Decimal("0")
+        total_sell_quantity = Decimal("0")
+
+        for operation in operations:
+            quantity = Decimal(operation.quantity)
+            unit_price = Decimal(operation.unit_price)
+            fees = Decimal(operation.fees or 0)
+            operation_total = (quantity * unit_price) + fees
+
+            if operation.operation_type == "buy":
+                buy_operations += 1
+                total_buy_quantity += quantity
+                current_quantity += quantity
+                current_cost_basis += operation_total
+                continue
+
+            sell_operations += 1
+            total_sell_quantity += quantity
+
+            if current_quantity <= 0:
+                current_quantity -= quantity
+                continue
+
+            quantity_to_reduce = min(quantity, current_quantity)
+            average_cost_before_sell = current_cost_basis / current_quantity
+            current_cost_basis -= average_cost_before_sell * quantity_to_reduce
+            current_quantity -= quantity
+
+            if current_quantity <= 0:
+                current_quantity = Decimal("0")
+                current_cost_basis = Decimal("0")
+
+        average_cost = (
+            (current_cost_basis / current_quantity)
+            if current_quantity > 0
+            else Decimal("0")
+        )
+
+        return {
+            "total_operations": len(operations),
+            "buy_operations": buy_operations,
+            "sell_operations": sell_operations,
+            "total_buy_quantity": str(total_buy_quantity),
+            "total_sell_quantity": str(total_sell_quantity),
+            "current_quantity": str(current_quantity),
+            "current_cost_basis": str(current_cost_basis),
+            "average_cost": str(average_cost),
+        }
+
+    def get_invested_amount_by_date(
+        self, investment_id: UUID, operation_date: date
+    ) -> dict[str, Any]:
+        self.get_owned_investment(investment_id)
+        operations = cast(
+            list[InvestmentOperation],
+            InvestmentOperation.query.filter_by(
+                wallet_id=investment_id,
+                user_id=self.user_id,
+                executed_at=operation_date,
+            ).all(),
+        )
+
+        buy_operations = [op for op in operations if op.operation_type == "buy"]
+        sell_operations = [op for op in operations if op.operation_type == "sell"]
+
+        buy_amount = sum(
+            (
+                (Decimal(op.quantity) * Decimal(op.unit_price)) + Decimal(op.fees or 0)
+                for op in buy_operations
+            ),
+            Decimal("0"),
+        )
+        sell_amount = sum(
+            (
+                (Decimal(op.quantity) * Decimal(op.unit_price)) - Decimal(op.fees or 0)
+                for op in sell_operations
+            ),
+            Decimal("0"),
+        )
+        net_invested = buy_amount - sell_amount
+
+        return {
+            "date": operation_date.isoformat(),
+            "total_operations": len(operations),
+            "buy_operations": len(buy_operations),
+            "sell_operations": len(sell_operations),
+            "buy_amount": str(buy_amount),
+            "sell_amount": str(sell_amount),
+            "net_invested_amount": str(net_invested),
+        }
+
+    def _get_operations_for_investment(
+        self, investment_id: UUID, *, chronological: bool = False
+    ) -> list[InvestmentOperation]:
+        query = InvestmentOperation.query.filter_by(
+            wallet_id=investment_id, user_id=self.user_id
+        )
+        if chronological:
+            query = query.order_by(
+                InvestmentOperation.executed_at.asc(),
+                InvestmentOperation.created_at.asc(),
+            )
+        return cast(list[InvestmentOperation], query.all())
 
     @staticmethod
     def serialize(operation: InvestmentOperation) -> dict[str, Any]:

@@ -17,6 +17,8 @@ instance/
 
 # Environment variables
 .env
+.env.dev
+.env.prod
 
 # IDEs
 .vscode/

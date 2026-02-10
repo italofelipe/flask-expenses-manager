@@ -251,3 +251,95 @@
   - Mutations: `addInvestmentOperation`, `updateInvestmentOperation`,
     `deleteInvestmentOperation`
 - Objetivo: evitar divergência entre canais de API e manter regras centralizadas.
+
+## Atualização adicional (Investimentos D2 - posição atual e custo médio)
+- Serviço de domínio expandido:
+  - `InvestmentOperationService.get_position(investment_id)`
+  - cálculo determinístico em ordem cronológica para posição aberta e custo médio.
+- REST expandido:
+  - `GET /wallet/{investment_id}/operations/position`
+
+## Atualização adicional (Investimentos D6 - resiliência BRAPI)
+- `InvestmentService.get_market_price(...)` evoluído com:
+  - timeout configurável por env (`BRAPI_TIMEOUT_SECONDS`, default `3`);
+  - retry com backoff curto (`BRAPI_MAX_RETRIES`, default `2`);
+  - cache curto em memória por ticker (`BRAPI_CACHE_TTL_SECONDS`, default `60`);
+  - fallback seguro para `None` em falhas de rede/provider.
+- Retrocompatibilidade preservada:
+  - assinatura do serviço e contratos REST/GraphQL não mudaram.
+- Ajustes de testes:
+  - novos testes unitários cobrindo retry, timeout configurado e cache;
+  - isolamento entre testes com limpeza automática de cache.
+- Resultado da validação:
+  - suíte completa passou com cobertura total `86.43%` (`>=85%`).
+
+## Atualização adicional (Investimentos D7 - evolução histórica por período)
+- Novo serviço de domínio:
+  - `app/services/portfolio_history_service.py`
+- Novo endpoint REST:
+  - `GET /wallet/valuation/history`
+  - parâmetros opcionais: `startDate` e `finalDate` (`YYYY-MM-DD`)
+  - sem parâmetros: janela padrão de 30 dias
+- Nova query GraphQL:
+  - `portfolioValuationHistory(startDate, finalDate)`
+- Retornos incluem:
+  - resumo do período (`buy/sell/net` e acumulado final)
+  - série diária com total de operações e líquido investido acumulado
+- Testes adicionados:
+  - `tests/test_wallet_operations_contract.py` (REST)
+  - `tests/test_graphql_api.py` (GraphQL)
+
+## Atualização adicional (Investimentos D7 final + D8)
+- Evolução histórica (`/wallet/valuation/history` e `portfolioValuationHistory`)
+  agora inclui também:
+  - `total_current_value_estimate`
+  - `total_profit_loss_estimate`
+  - resumo final com valor atual estimado e P/L estimado do período.
+- Suporte a classes de ativo expandido na carteira:
+  - mercado: `stock`, `fii`, `etf`, `bdr`, `crypto`
+  - renda fixa: `cdb`, `cdi`, `lci`, `lca`, `tesouro`
+  - outros: `fund`, `custom`
+- Renda fixa com projeção temporal:
+  - novo campo `annual_rate` (opcional por classe; obrigatório para classes fixas),
+  - valuation com origem `fixed_income_projection`.
+- Contratos REST e GraphQL usam o mesmo domínio/validações:
+  - `WalletSchema` para validação de regras entre `asset_class`, `ticker` e `annual_rate`.
+- GraphQL expandido:
+  - Query: `investmentPosition(investmentId: UUID!)`
+- Qualidade:
+  - testes REST e GraphQL adicionados/atualizados para o novo comportamento.
+
+## Atualização adicional (Investimentos D3 - valor investido por data)
+- Serviço de domínio expandido:
+  - `InvestmentOperationService.get_invested_amount_by_date(investment_id, date)`
+- REST expandido:
+  - `GET /wallet/{investment_id}/operations/invested-amount?date=YYYY-MM-DD`
+- GraphQL expandido:
+  - Query: `investmentInvestedAmount(investmentId: UUID!, date: String!)`
+- Qualidade:
+  - testes REST e GraphQL adicionados para o cálculo diário.
+
+## Atualização adicional (Investimentos D4 - valuation atual por ativo e consolidado)
+- Novo serviço de domínio:
+  - `app/services/portfolio_valuation_service.py`
+- REST expandido:
+  - `GET /wallet/{investment_id}/valuation`
+  - `GET /wallet/valuation`
+- GraphQL expandido:
+  - Query: `investmentValuation(investmentId: UUID!)`
+  - Query: `portfolioValuation`
+- Estratégia de valuation:
+  - prioriza BRAPI para ativos com ticker;
+  - fallback para custo de posição (quando há operações) ou valor estimado/manual.
+
+## Atualização adicional (Investimentos D5 - P/L absoluto e percentual)
+- Serviço de domínio expandido:
+  - `PortfolioValuationService` passou a calcular:
+    - `invested_amount`
+    - `profit_loss_amount`
+    - `profit_loss_percent`
+- Consolidado da carteira:
+  - `total_invested_amount`
+  - `total_profit_loss`
+  - `total_profit_loss_percent`
+- Exposição REST e GraphQL reaproveita o mesmo domínio de valuation.

@@ -50,9 +50,11 @@ def create_app() -> Flask:
     Migrate(app, db)
     jwt.init_app(app)
 
-    # Cria todas as tabelas no banco de dados (apenas para ambiente de desenvolvimento)
-    with app.app_context():
-        db.create_all()
+    # Mantem retrocompatibilidade local, mas evita create_all automatico em producao.
+    auto_create_db = os.getenv("AUTO_CREATE_DB", "true").lower() == "true"
+    if auto_create_db:
+        with app.app_context():
+            db.create_all()
 
     # Configuração do Swagger (OpenAPI 3.0) com documentação melhorada
     app.config.update(

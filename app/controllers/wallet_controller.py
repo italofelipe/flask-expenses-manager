@@ -16,6 +16,8 @@ from app.services.investment_operation_service import (
     InvestmentOperationService,
 )
 from app.services.investment_service import InvestmentService
+from app.services.portfolio_history_service import PortfolioHistoryService
+from app.services.portfolio_valuation_service import PortfolioValuationService
 
 # Import PaginatedResponse for paginated investment history
 from app.utils.pagination import PaginatedResponse
@@ -74,6 +76,17 @@ def _operation_error_response(
         error_code=exc.code,
         details=exc.details,
     )
+
+
+def _parse_optional_query_date(value: str | None, field_name: str) -> date | None:
+    if not value:
+        return None
+    try:
+        return datetime.strptime(value, "%Y-%m-%d").date()
+    except ValueError:
+        raise ValueError(
+            f"Parâmetro '{field_name}' inválido. Use o formato YYYY-MM-DD."
+        )
 
 
 @wallet_bp.route("", methods=["POST"])  # type: ignore[misc]
@@ -137,6 +150,8 @@ def add_wallet_entry() -> tuple[dict[str, Any], int]:
             ],
             ticker=validated_data.get("ticker"),
             quantity=validated_data.get("quantity"),
+            asset_class=str(validated_data.get("asset_class", "custom")).lower(),
+            annual_rate=validated_data.get("annual_rate"),
             register_date=validated_data.get("register_date", date.today()),
             target_withdraw_date=validated_data.get("target_withdraw_date"),
             should_be_on_wallet=validated_data["should_be_on_wallet"],
@@ -600,6 +615,249 @@ def get_investment_operations_summary(
     )
 
 
+@wallet_bp.route(  # type: ignore[misc]
+    "/<uuid:investment_id>/operations/position", methods=["GET"]
+)
+@doc(
+    description=(
+        "Retorna posição atual e custo médio do investimento com base nas "
+        "operações registradas."
+    ),
+    tags=["Wallet"],
+    security=[{"BearerAuth": []}],
+    params={
+        "investment_id": {"description": "ID do investimento"},
+        "X-API-Contract": {
+            "in": "header",
+            "description": "Opcional. Envie 'v2' para o contrato padronizado.",
+            "type": "string",
+            "required": False,
+        },
+    },
+    responses={
+        200: {"description": "Posição retornada com sucesso"},
+        401: {"description": "Token inválido"},
+        403: {"description": "Sem permissão"},
+        404: {"description": "Investimento não encontrado"},
+    },
+)  # type: ignore[misc]
+@jwt_required()  # type: ignore[misc]
+def get_investment_operations_position(
+    investment_id: UUID,
+) -> tuple[dict[str, Any], int]:
+    user_id: UUID = UUID(get_jwt_identity())
+    try:
+        service = InvestmentOperationService(user_id)
+        position = service.get_position(investment_id)
+    except InvestmentOperationError as exc:
+        return _operation_error_response(exc)
+
+    return _compat_success(
+        legacy_payload={"position": position},
+        status_code=200,
+        message="Posição de operações retornada com sucesso",
+        data={"position": position},
+    )
+
+
+@wallet_bp.route(  # type: ignore[misc]
+    "/<uuid:investment_id>/operations/invested-amount", methods=["GET"]
+)
+@doc(
+    description=(
+        "Retorna o valor investido no dia informado, considerando operações "
+        "de compra e venda do investimento."
+    ),
+    tags=["Wallet"],
+    security=[{"BearerAuth": []}],
+    params={
+        "investment_id": {"description": "ID do investimento"},
+        "date": {
+            "description": "Data da operação no formato YYYY-MM-DD",
+            "required": True,
+        },
+        "X-API-Contract": {
+            "in": "header",
+            "description": "Opcional. Envie 'v2' para o contrato padronizado.",
+            "type": "string",
+            "required": False,
+        },
+    },
+    responses={
+        200: {"description": "Cálculo retornado com sucesso"},
+        400: {"description": "Parâmetro inválido"},
+        401: {"description": "Token inválido"},
+        403: {"description": "Sem permissão"},
+        404: {"description": "Investimento não encontrado"},
+    },
+)  # type: ignore[misc]
+@use_kwargs(  # type: ignore[misc]
+    {"date": fields.Date(required=True)},
+    location="query",
+)
+@jwt_required()  # type: ignore[misc]
+def get_invested_amount_by_date(
+    investment_id: UUID, date: date
+) -> tuple[dict[str, Any], int]:
+    user_id: UUID = UUID(get_jwt_identity())
+    try:
+        service = InvestmentOperationService(user_id)
+        result = service.get_invested_amount_by_date(investment_id, date)
+    except InvestmentOperationError as exc:
+        return _operation_error_response(exc)
+
+    return _compat_success(
+        legacy_payload={"result": result},
+        status_code=200,
+        message="Valor investido no período retornado com sucesso",
+        data={"result": result},
+    )
+
+
+@wallet_bp.route("/valuation", methods=["GET"])  # type: ignore[misc]
+@doc(
+    description=(
+        "Retorna a valorização atual consolidada da carteira do usuário, "
+        "com cálculo por investimento."
+    ),
+    tags=["Wallet"],
+    security=[{"BearerAuth": []}],
+    params={
+        "X-API-Contract": {
+            "in": "header",
+            "description": "Opcional. Envie 'v2' para o contrato padronizado.",
+            "type": "string",
+            "required": False,
+        },
+    },
+    responses={
+        200: {"description": "Valorização retornada com sucesso"},
+        401: {"description": "Token inválido"},
+    },
+)  # type: ignore[misc]
+@jwt_required()  # type: ignore[misc]
+def get_portfolio_valuation() -> tuple[dict[str, Any], int]:
+    user_id: UUID = UUID(get_jwt_identity())
+    service = PortfolioValuationService(user_id)
+    payload = service.get_portfolio_current_valuation()
+    return _compat_success(
+        legacy_payload=payload,
+        status_code=200,
+        message="Valorização da carteira retornada com sucesso",
+        data=payload,
+    )
+
+
+@wallet_bp.route("/valuation/history", methods=["GET"])  # type: ignore[misc]
+@doc(
+    description=(
+        "Retorna histórico diário de evolução da carteira por período, com "
+        "totais de compra/venda e valor líquido investido acumulado."
+    ),
+    tags=["Wallet"],
+    security=[{"BearerAuth": []}],
+    params={
+        "startDate": {
+            "in": "query",
+            "description": "Data inicial (YYYY-MM-DD). Opcional.",
+            "required": False,
+        },
+        "finalDate": {
+            "in": "query",
+            "description": "Data final (YYYY-MM-DD). Opcional.",
+            "required": False,
+        },
+        "X-API-Contract": {
+            "in": "header",
+            "description": "Opcional. Envie 'v2' para o contrato padronizado.",
+            "type": "string",
+            "required": False,
+        },
+    },
+    responses={
+        200: {"description": "Histórico retornado com sucesso"},
+        400: {"description": "Parâmetros inválidos"},
+        401: {"description": "Token inválido"},
+    },
+)  # type: ignore[misc]
+@jwt_required()  # type: ignore[misc]
+def get_portfolio_valuation_history() -> tuple[dict[str, Any], int]:
+    user_id: UUID = UUID(get_jwt_identity())
+
+    raw_start_date = request.args.get("startDate")
+    raw_final_date = request.args.get("finalDate")
+
+    try:
+        start_date = _parse_optional_query_date(raw_start_date, "startDate")
+        final_date = _parse_optional_query_date(raw_final_date, "finalDate")
+    except ValueError as exc:
+        return _compat_error(
+            legacy_payload={"error": str(exc)},
+            status_code=400,
+            message=str(exc),
+            error_code="VALIDATION_ERROR",
+        )
+
+    service = PortfolioHistoryService(user_id)
+    try:
+        payload = service.get_history(start_date=start_date, end_date=final_date)
+    except ValueError as exc:
+        return _compat_error(
+            legacy_payload={"error": str(exc)},
+            status_code=400,
+            message=str(exc),
+            error_code="VALIDATION_ERROR",
+        )
+
+    return _compat_success(
+        legacy_payload=payload,
+        status_code=200,
+        message="Histórico da carteira retornado com sucesso",
+        data=payload,
+    )
+
+
+@wallet_bp.route(  # type: ignore[misc]
+    "/<uuid:investment_id>/valuation",
+    methods=["GET"],
+)
+@doc(
+    description="Retorna a valorização atual de um investimento específico.",
+    tags=["Wallet"],
+    security=[{"BearerAuth": []}],
+    params={
+        "investment_id": {"description": "ID do investimento"},
+        "X-API-Contract": {
+            "in": "header",
+            "description": "Opcional. Envie 'v2' para o contrato padronizado.",
+            "type": "string",
+            "required": False,
+        },
+    },
+    responses={
+        200: {"description": "Valorização retornada com sucesso"},
+        401: {"description": "Token inválido"},
+        403: {"description": "Sem permissão"},
+        404: {"description": "Investimento não encontrado"},
+    },
+)  # type: ignore[misc]
+@jwt_required()  # type: ignore[misc]
+def get_investment_valuation(investment_id: UUID) -> tuple[dict[str, Any], int]:
+    user_id: UUID = UUID(get_jwt_identity())
+    service = PortfolioValuationService(user_id)
+    try:
+        valuation = service.get_investment_current_valuation(investment_id)
+    except InvestmentOperationError as exc:
+        return _operation_error_response(exc)
+
+    return _compat_success(
+        legacy_payload={"valuation": valuation},
+        status_code=200,
+        message="Valorização do investimento retornada com sucesso",
+        data={"valuation": valuation},
+    )
+
+
 # PUT /wallet/<uuid:investment_id> - Atualizar investimento existente
 @wallet_bp.route("/<uuid:investment_id>", methods=["PUT"])  # type: ignore[misc]
 @doc(
@@ -716,6 +974,9 @@ def _update_investment_history(
 def _apply_validated_fields(investment: Wallet, validated_data: Dict[str, Any]) -> None:
     """Aplica campos validados e recalcula valor estimado."""
     for field, value in validated_data.items():
+        if field == "asset_class" and value is not None:
+            setattr(investment, field, str(value).lower())
+            continue
         setattr(investment, field, value)
 
     recalc_data = {

@@ -30,4 +30,14 @@ O que faz:
 ## Fase atual
 - Fase 1 implementada: queries/mutations essenciais por domínio
   (`auth`, `user`, `transactions`, `wallet`, `ticker`, `investment_operations`).
+- No domínio de investimentos, as queries atuais incluem:
+  - `investmentOperations`
+  - `investmentOperationSummary`
+  - `investmentPosition`
+  - `investmentInvestedAmount`
+  - `investmentValuation`
+  - `portfolioValuation`
+  - `portfolioValuationHistory`
+- Mutations de carteira também suportam `assetClass` e `annualRate`
+  para classes de ativos de renda variável e renda fixa.
 - Hardening de GraphQL (complexity/depth/rate-limit específico) permanece no backlog.
