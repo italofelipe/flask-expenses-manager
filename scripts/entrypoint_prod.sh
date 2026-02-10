@@ -28,8 +28,13 @@ else:
 PY
 
 if [ "${MIGRATE_ON_START:-true}" = "true" ]; then
-  echo "Running database migrations..."
-  flask db upgrade
+  if [ -d "/app/migrations" ]; then
+    echo "Running database migrations..."
+    flask db upgrade
+  else
+    echo "Migrations folder not found. Falling back to AUTO_CREATE_DB=true."
+    export AUTO_CREATE_DB=true
+  fi
 fi
 
 echo "Starting gunicorn..."

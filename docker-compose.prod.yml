@@ -24,8 +24,8 @@ services:
     environment:
       FLASK_ENV: production
       FLASK_DEBUG: "false"
-      AUTO_CREATE_DB: "false"
-      MIGRATE_ON_START: "true"
+      AUTO_CREATE_DB: "${AUTO_CREATE_DB:-false}"
+      MIGRATE_ON_START: "${MIGRATE_ON_START:-true}"
       DB_HOST: db
       DB_PORT: 5432
       DB_NAME: ${POSTGRES_DB}
