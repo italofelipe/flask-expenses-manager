@@ -10,7 +10,7 @@ Consolidate all identified fragilities/vulnerabilities and map each one to an ac
 
 | Finding ID | Severity | Gap | Evidence (code/docs) | Backlog task |
 |---|---|---|---|---|
-| F-01 | High | Internal exception details exposed in API responses | `app/controllers/auth_controller.py`, `app/controllers/user_controller.py`, `app/controllers/wallet_controller.py`, `app/controllers/ticker_controller.py` return `str(e)` | `S4-01` |
+| F-01 | High | Internal exception details exposed in API responses | `app/controllers/auth_controller.py`, `app/controllers/user_controller.py`, `app/controllers/wallet_controller.py` retornavam `str(e)` | `S4-01` |
 | F-02 | Medium | Debug `print` and traceback leakage in runtime path | `app/middleware/auth_guard.py`, `app/controllers/wallet_controller.py`, `app/__init__.py` | `S4-02` |
 | F-03 | Medium | JWT/auth error contract inconsistency across middleware/callbacks/controllers | `app/extensions/jwt_callbacks.py`, `app/middleware/auth_guard.py` | `S4-03` |
 | F-04 | High | No explicit global request body size limits for REST routes | Global Flask app config lacks payload cap | `S4-04` |
@@ -23,7 +23,7 @@ Consolidate all identified fragilities/vulnerabilities and map each one to an ac
 | F-11 | High | Weak secret fallbacks in non-dev runtime | `config/__init__.py` defaults `SECRET_KEY=dev`, `JWT_SECRET_KEY=super-secret-key` | `S4-11` |
 | F-12 | Medium | CORS policy not explicitly configured by environment | Flask app boot has no CORS restrictions layer | `S4-12` |
 | F-13 | Medium | Lack of auditable trail for sensitive actions | No central audit logger for login/profile/transaction/wallet operations | `S4-13` |
-| F-14 | Low | Legacy/unregistered controller can create drift/confusion | `app/controllers/ticker_controller.py` not part of current registered surface | `S4-14` |
+| F-14 | Low | Legacy/unregistered controller can create drift/confusion | controlador REST legado de ticker removido do código para alinhar superfície real | `S4-14` |
 | F-15 | Medium | Security decisions not yet tied to formal threat model | No STRIDE/abuse-case artifact in docs | `S4-15` |
 | F-16 | Medium | Dependency CVE checks not enforced in CI | `.github/workflows/ci.yml` lacks dependency security scan step | `S4-16` |
 

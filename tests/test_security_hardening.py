@@ -100,6 +100,15 @@ def test_security_headers_add_hsts_when_enabled(
     assert "Strict-Transport-Security" in response.headers
 
 
+def test_legacy_ticker_routes_are_not_exposed(app: Any) -> None:
+    legacy_rules = [
+        rule.rule
+        for rule in app.url_map.iter_rules()
+        if "ticker" in rule.endpoint.lower() and rule.rule != "/graphql"
+    ]
+    assert legacy_rules == []
+
+
 def test_user_me_rejects_limit_above_max(client: Any) -> None:
     token = _register_and_login(client)
     response = client.get(

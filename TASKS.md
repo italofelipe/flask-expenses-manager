@@ -89,20 +89,20 @@ Ultima atualizacao: 2026-02-11
 | S4-11 | App Security | Remover fallback de secrets fracos em runtime não-dev e falhar startup sem segredos fortes | Done | 100% | Baixo: bloqueio de startup em runtime inseguro | pending-commit | 2026-02-11 |
 | S4-12 | App Security | Definir política CORS estrita por ambiente (origins permitidas, métodos, headers) | Done | 100% | Médio: manter allowlist por ambiente atualizada | pending-commit | 2026-02-11 |
 | S4-13 | App Security | Implementar trilha de auditoria para ações sensíveis (login, perfil, transações, carteira) | Done | 100% | Médio: trilha em logs estruturados; faltam retenção/alertas centralizados | pending-commit | 2026-02-11 |
-| S4-14 | App Security | Revisar/remover código legado não registrado (`ticker_controller`) e alinhar superfície real de API | Todo | 0% | Baixo: risco de dívida técnica e confusão operacional |  | 2026-02-11 |
+| S4-14 | App Security | Revisar/remover código legado não registrado (`ticker_controller`) e alinhar superfície real de API | Done | 100% | Baixo: controller legado removido e cobertura de não-exposição adicionada | pending-commit | 2026-02-11 |
 | S4-15 | App Security | Formalizar threat model (STRIDE + abuse cases) e critérios de aceite por risco | Todo | 0% | Medio: decisões de segurança sem baseline formal |  | 2026-02-11 |
 | S4-16 | App Security | Adicionar scan de vulnerabilidades de dependências no CI (`pip-audit`/equivalente) | Done | 100% | Baixo | pending-commit | 2026-02-11 |
 | S4-17 | App Security | Adicionar observabilidade de integrações externas (BRAPI): contadores por timeout, payload inválido e erro HTTP | Done | 100% | Médio: métricas em memória entregues; próximo passo é export para backend central (CloudWatch/Prometheus) | f2bcda1 | 2026-02-11 |
 | S5-01 | App Security | Eliminar fallback de memória para rate-limit em produção (fail-closed se Redis indisponível) | Done | 100% | Médio: fail-closed implementado; falta monitoramento/alerta de indisponibilidade (S5-02/S5-10) | pending-commit | 2026-02-11 |
 | S5-02 | App Security | Implementar trilha de auditoria persistente (DB/CloudWatch) com retenção e busca por `request_id` | In Progress | 70% | Médio: persistência em banco local concluída; retenção/alertas centralizados ainda pendentes | pending-commit | 2026-02-11 |
 | S5-03 | App Security | Aplicar autorização por recurso no domínio GraphQL (não só no transporte), com testes de ownership | In Progress | 35% | Médio: createTransaction coberto; falta expandir para outras mutações com referências relacionais | pending-commit | 2026-02-11 |
-| S5-04 | App Security | Endurecer CORS/headers por ambiente com validação de configuração no startup | Done | 100% | Baixo: política de CORS validada no startup e headers de segurança centralizados por ambiente | pending-commit | 2026-02-11 |
+| S5-04 | App Security | Endurecer CORS/headers por ambiente com validação de configuração no startup | Done | 100% | Baixo: política de CORS validada no startup e headers de segurança centralizados por ambiente | 5aa0d2c | 2026-02-11 |
 | S5-05 | App Security | Adotar rotação de secrets + source of truth (AWS SSM/Secrets Manager), removendo `.env` como primário em cloud | Todo | 0% | Alto: vazamento/expiração manual de segredos |  | 2026-02-11 |
 | S5-06 | App Security | Fechar lacunas de brute-force/account takeover (lockout progressivo, cooldown e fingerprint de IP/device) | In Progress | 45% | Médio: fase 1 entregue em login REST/GraphQL; faltam telemetria/alertas e política por usuário conhecido | pending-commit | 2026-02-11 |
-| S5-07 | App Security | Revisar endpoints legados e desativar/feature-flag rotas não suportadas (`ticker_controller`) | Todo | 0% | Médio: superfície morta aumenta risco operacional |  | 2026-02-11 |
-| S5-08 | App Security | Implementar validação de saída para evitar data leakage (campos sensíveis e debug data) | Done | 100% | Médio: sanitização central reduz leak; manter revisão contínua em novos payloads | pending-commit | 2026-02-11 |
-| S5-09 | App Security | Fortalecer proteção de banco de testes/fixtures para evitar conexões abertas e vazamento de estado | Done | 100% | Baixo: fixture isolada por ambiente e teardown forte de engine/sessão/banco temporário | pending-commit | 2026-02-11 |
-| S5-10 | App Security | Integrar SAST + secret scanning + dependabot com gate no CI (quebra build em severidade alta) | Done | 100% | Médio: gates ativos no CI; branch protection ainda deve exigir checks | pending-commit | 2026-02-11 |
+| S5-07 | App Security | Revisar endpoints legados e desativar/feature-flag rotas não suportadas (`ticker_controller`) | Done | 100% | Baixo: superfície legado removida e bloqueada por teste de não exposição | pending-commit | 2026-02-11 |
+| S5-08 | App Security | Implementar validação de saída para evitar data leakage (campos sensíveis e debug data) | Done | 100% | Médio: sanitização central reduz leak; manter revisão contínua em novos payloads | 5aa0d2c | 2026-02-11 |
+| S5-09 | App Security | Fortalecer proteção de banco de testes/fixtures para evitar conexões abertas e vazamento de estado | Done | 100% | Baixo: fixture isolada por ambiente e teardown forte de engine/sessão/banco temporário | c0f83e2 | 2026-02-11 |
+| S5-10 | App Security | Integrar SAST + secret scanning + dependabot com gate no CI (quebra build em severidade alta) | Done | 100% | Médio: gates ativos no CI; branch protection ainda deve exigir checks | c0f83e2 | 2026-02-11 |
 | X1 | Tech Debt | Remover/atualizar TODO desatualizado sobre enums em transacoes | Todo | 0% | Baixo: clareza de manutencao |  | 2026-02-09 |
 
 ## Registro de progresso recente
@@ -151,10 +151,11 @@ Ultima atualizacao: 2026-02-11
 | 2026-02-11 | S5-06 (fase 1) | Guard de login progressivo (REST + GraphQL): cooldown exponencial por fingerprint `principal+IP+user-agent`, bloqueio `429/GraphQLError` e testes dedicados | pending-commit |
 | 2026-02-11 | S4-02 | Migração de scripts operacionais (`init_db`, `generate_recurring_transactions`) para logging estruturado sem `print` | f2bcda1 |
 | 2026-02-11 | S4-17 | Observabilidade BRAPI adicionada com contadores (`timeout`, `http_error`, `invalid_payload`) + testes dedicados | f2bcda1 |
-| 2026-02-11 | S5-04 | Endurecimento de CORS/headers por ambiente: validação de startup para origins inválidas em produção e middleware de security headers com políticas por env + testes | pending-commit |
-| 2026-02-11 | S5-08 | Sanitização central de respostas REST/GraphQL para reduzir data leakage (`INTERNAL_ERROR`, campos sensíveis) + testes de regressão | pending-commit |
-| 2026-02-11 | S5-09 | Hardening da suíte de testes: isolamento de env vars por teste + teardown forte de SQLite/engine para evitar conexões abertas e vazamento de estado | pending-commit |
-| 2026-02-11 | S5-10 | CI de segurança reforçado: Bandit (SAST), Gitleaks (secret scan), Dependency Review gate (high+) e configuração Dependabot | pending-commit |
+| 2026-02-11 | S5-04 | Endurecimento de CORS/headers por ambiente: validação de startup para origins inválidas em produção e middleware de security headers com políticas por env + testes | 5aa0d2c |
+| 2026-02-11 | S5-08 | Sanitização central de respostas REST/GraphQL para reduzir data leakage (`INTERNAL_ERROR`, campos sensíveis) + testes de regressão | 5aa0d2c |
+| 2026-02-11 | S5-09 | Hardening da suíte de testes: isolamento de env vars por teste + teardown forte de SQLite/engine para evitar conexões abertas e vazamento de estado | c0f83e2 |
+| 2026-02-11 | S5-10 | CI de segurança reforçado: Bandit (SAST), Gitleaks (secret scan), Dependency Review gate (high+) e configuração Dependabot | c0f83e2 |
+| 2026-02-11 | S4-14/S5-07 | Remoção do `ticker_controller` legado não registrado, atualização de documentação de superfície e teste para garantir que rotas antigas não sejam expostas | pending-commit |
 | 2026-02-09 | D (observacao) | Restaurados arquivos deletados acidentalmente: ticker/carteira | n/a |
 
 ## Proxima prioridade sugerida
@@ -183,5 +184,5 @@ Pendências de substituição controlada:
 | H1-USER | `user_controller` | `me`, `updateUserProfile` | In Progress | 70% | Medio: consistencia das validacoes de perfil | ba1f238 |
 | H1-TRANSACTIONS | `transaction_controller` | `transactions`, `transactionSummary`, `transactionDashboard`, `createTransaction`, `deleteTransaction` | In Progress | 60% | Alto: nao divergir das regras de recorrencia/parcelamento | ba1f238 |
 | H1-WALLET | `wallet_controller` | `walletEntries`, `walletHistory`, `addWalletEntry`, `updateWalletEntry`, `deleteWalletEntry` | In Progress | 60% | Alto: consistencia de calculo e historico | ba1f238 |
-| H1-TICKER | `ticker_controller` | `tickers`, `addTicker`, `deleteTicker` | In Progress | 75% | Baixo | ba1f238 |
+| H1-TICKER | `graphql.schema` | `tickers`, `addTicker`, `deleteTicker` | In Progress | 75% | Baixo | ba1f238 |
 | H1-HARDENING | `graphql_controller` | autorização fina por operação, limites de complexidade/profundidade, observabilidade | In Progress | 45% | Alto: custo de query baseline ativo, faltam observabilidade e custo por domínio | pending-commit |

@@ -182,4 +182,4 @@
 - O projeto atual não usa Pydantic no runtime (usa Marshmallow/Webargs).
 - Existem referências na documentação para rotas/recursos que ainda não estão implementados (especialmente `ticker` separado e alguns caminhos antigos de auth/transação).
 - O módulo de metas ainda não existe e deve ser tratado como nova feature de domínio.
-- Arquivos de ticker/carteira (`app/controllers/ticker_controller.py` e `app/models/user_ticker.py`) foram restaurados após exclusão acidental e a evolução dessa área seguirá via backlog da Área D.
+- A superfície de ticker segue somente via GraphQL e domínio de carteira; o controller REST legado de ticker foi removido para evitar drift operacional.

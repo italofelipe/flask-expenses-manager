@@ -390,6 +390,9 @@ Mutations iniciais:
 - `addTicker`
 - `deleteTicker`
 
+Observação:
+- operações de ticker estão disponíveis no GraphQL; o controller REST legado de ticker foi removido para evitar superfície não suportada.
+
 Autenticação:
 - operações protegidas usam `Authorization: Bearer <JWT>`.
 - `registerUser` e `login` são públicas.
@@ -410,7 +413,7 @@ Referência de padronização (Fase 0):
 2. Geração de recorrência foi implementada em serviço/script e com job agendado no GitHub Actions (`.github/workflows/recurrence-job.yml`), dependente de secrets para conexão no banco.
 3. Não há módulo de metas financeiras implementado (`goals`).
 4. Não há CRUD exposto para `Tag`, `Account` e `CreditCard` (existem model/schema, mas sem controller).
-5. A documentação histórica citava endpoints `/ticker` e `/transaction`; o código atual usa `/wallet` e `/transactions`.
+5. A documentação histórica citava endpoints `/ticker` e `/transaction`; o código atual usa `/wallet` e `/transactions`, e o antigo `ticker_controller` REST foi removido.
 6. Projeto usa Marshmallow/Webargs em runtime; Pydantic não está implementado no fluxo atual.
 
 ## Diretrizes para próximas implementações (senior baseline)

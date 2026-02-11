@@ -29,7 +29,7 @@ O que faz:
 
 ## Fase atual
 - Fase 1 implementada: queries/mutations essenciais por domínio
-  (`auth`, `user`, `transactions`, `wallet`, `ticker`, `investment_operations`).
+  (`auth`, `user`, `transactions`, `wallet`, `ticker` via GraphQL, `investment_operations`).
 - No domínio de investimentos, as queries atuais incluem:
   - `investmentOperations`
   - `investmentOperationSummary`
