@@ -14,7 +14,7 @@ class TransactionSchema(Schema):
         dump_only=True, description="ID único da transação (gerado automaticamente)"
     )
     user_id = fields.UUID(
-        required=False, description="ID do usuário proprietário da transação"
+        dump_only=True, description="ID do usuário proprietário da transação"
     )
     title = fields.Str(
         required=True,

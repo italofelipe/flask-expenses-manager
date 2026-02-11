@@ -24,6 +24,7 @@ from app.models.transaction import Transaction, TransactionStatus, TransactionTy
 from app.models.user import User
 from app.models.user_ticker import UserTicker
 from app.models.wallet import Wallet
+from app.schemas.user_schemas import UserRegistrationSchema
 from app.schemas.wallet_schema import WalletSchema
 from app.services.investment_operation_service import (
     InvestmentOperationError,
@@ -854,10 +855,29 @@ class RegisterUserMutation(graphene.Mutation):
     def mutate(
         self, info: graphene.ResolveInfo, name: str, email: str, password: str
     ) -> AuthPayloadType:
-        if User.query.filter_by(email=email).first():
+        registration_schema = UserRegistrationSchema()
+        try:
+            validated = registration_schema.load(
+                {"name": name, "email": email, "password": password}
+            )
+        except ValidationError as exc:
+            messages = exc.messages
+            if isinstance(messages, dict):
+                flat = "; ".join(
+                    f"{field}: {', '.join(str(item) for item in errors)}"
+                    for field, errors in messages.items()
+                )
+                raise GraphQLError(flat or "Dados inválidos para registro.") from exc
+            raise GraphQLError("Dados inválidos para registro.") from exc
+
+        if User.query.filter_by(email=validated["email"]).first():
             raise GraphQLError("Email already registered")
 
-        user = User(name=name, email=email, password=generate_password_hash(password))
+        user = User(
+            name=validated["name"],
+            email=validated["email"],
+            password=generate_password_hash(validated["password"]),
+        )
         db.session.add(user)
         db.session.commit()
         return AuthPayloadType(

@@ -5,7 +5,14 @@ from decimal import ROUND_DOWN, Decimal
 from typing import Any, Dict
 from uuid import UUID
 
-from flask import Blueprint, Response, has_request_context, jsonify, request
+from flask import (
+    Blueprint,
+    Response,
+    current_app,
+    has_request_context,
+    jsonify,
+    request,
+)
 from flask_apispec import doc, use_kwargs
 from flask_apispec.views import MethodResource
 from flask_jwt_extended import (
@@ -20,6 +27,10 @@ from app.extensions.jwt_callbacks import is_token_revoked
 from app.models.transaction import Transaction, TransactionStatus, TransactionType
 from app.schemas.transaction_schema import TransactionSchema
 from app.services.transaction_analytics_service import TransactionAnalyticsService
+from app.services.transaction_reference_authorization_service import (
+    TransactionReferenceAuthorizationError,
+    enforce_transaction_reference_ownership,
+)
 from app.utils.pagination import PaginatedResponse
 from app.utils.response_builder import error_payload, success_payload
 
@@ -28,6 +39,27 @@ transaction_bp = Blueprint("transaction", __name__, url_prefix="/transactions")
 INVALID_TOKEN_MESSAGE = "Token inválido."
 CONTRACT_HEADER = "X-API-Contract"
 CONTRACT_V2 = "v2"
+MUTABLE_TRANSACTION_FIELDS = frozenset(
+    {
+        "title",
+        "description",
+        "observation",
+        "is_recurring",
+        "is_installment",
+        "installment_count",
+        "amount",
+        "currency",
+        "status",
+        "type",
+        "due_date",
+        "start_date",
+        "end_date",
+        "tag_id",
+        "account_id",
+        "credit_card_id",
+        "paid_at",
+    }
+)
 
 
 def _is_v2_contract() -> bool:
@@ -200,6 +232,50 @@ def _invalid_token_response() -> Response:
     )
 
 
+def _internal_error_response(*, message: str, log_context: str) -> Response:
+    current_app.logger.exception(log_context)
+    return _compat_error(
+        legacy_payload={"error": message},
+        status_code=500,
+        message=message,
+        error_code="INTERNAL_ERROR",
+    )
+
+
+def _enforce_transaction_reference_ownership_or_error(
+    *,
+    user_id: UUID,
+    tag_id: UUID | None,
+    account_id: UUID | None,
+    credit_card_id: UUID | None,
+) -> str | None:
+    try:
+        enforce_transaction_reference_ownership(
+            user_id=user_id,
+            tag_id=tag_id,
+            account_id=account_id,
+            credit_card_id=credit_card_id,
+        )
+    except TransactionReferenceAuthorizationError as exc:
+        return str(exc)
+    return None
+
+
+def _apply_transaction_updates(
+    transaction: Transaction, updates: dict[str, Any]
+) -> None:
+    for field, value in updates.items():
+        if field not in MUTABLE_TRANSACTION_FIELDS:
+            continue
+        if field == "type" and value is not None:
+            setattr(transaction, field, TransactionType(str(value).lower()))
+            continue
+        if field == "status" and value is not None:
+            setattr(transaction, field, TransactionStatus(str(value).lower()))
+            continue
+        setattr(transaction, field, value)
+
+
 def serialize_transaction(transaction: Transaction) -> Dict[str, Any]:
     return {
         "id": str(transaction.id),
@@ -281,6 +357,7 @@ class TransactionResource(MethodResource):
             return _invalid_token_response()
 
         user_id = get_jwt_identity()
+        user_uuid = UUID(user_id)
 
         if "type" in kwargs:
             kwargs["type"] = kwargs["type"].lower()
@@ -296,6 +373,20 @@ class TransactionResource(MethodResource):
                 legacy_payload={"error": recurring_error},
                 status_code=400,
                 message=recurring_error,
+                error_code="VALIDATION_ERROR",
+            )
+
+        reference_error = _enforce_transaction_reference_ownership_or_error(
+            user_id=user_uuid,
+            tag_id=kwargs.get("tag_id"),
+            account_id=kwargs.get("account_id"),
+            credit_card_id=kwargs.get("credit_card_id"),
+        )
+        if reference_error:
+            return _compat_error(
+                legacy_payload={"error": reference_error},
+                status_code=400,
+                message=reference_error,
                 error_code="VALIDATION_ERROR",
             )
 
@@ -318,7 +409,7 @@ class TransactionResource(MethodResource):
                 for i in range(count):
                     due = base_date + relativedelta(months=i)
                     transaction = Transaction(
-                        user_id=UUID(user_id),
+                        user_id=user_uuid,
                         title=f"{title} ({i + 1}/{count})",
                         amount=installment_amounts[i],
                         type=TransactionType(kwargs["type"]),
@@ -354,22 +445,16 @@ class TransactionResource(MethodResource):
                     message="Transações parceladas criadas com sucesso",
                     data={"transactions": created_data},
                 )
-            except Exception as exc:
+            except Exception:
                 db.session.rollback()
-                return _compat_error(
-                    legacy_payload={
-                        "error": "Erro ao criar transações parceladas",
-                        "message": str(exc),
-                    },
-                    status_code=500,
+                return _internal_error_response(
                     message="Erro ao criar transações parceladas",
-                    error_code="INTERNAL_ERROR",
-                    details={"exception": str(exc)},
+                    log_context="transaction.installment.create_failed",
                 )
 
         try:
             transaction = Transaction(
-                user_id=UUID(user_id),
+                user_id=user_uuid,
                 title=kwargs["title"],
                 amount=kwargs["amount"],
                 type=TransactionType(kwargs["type"]),
@@ -402,23 +487,20 @@ class TransactionResource(MethodResource):
                 message="Transação criada com sucesso",
                 data={"transaction": created_data},
             )
-        except Exception as exc:
+        except Exception:
             db.session.rollback()
-            return _compat_error(
-                legacy_payload={
-                    "error": "Erro ao criar transação",
-                    "message": str(exc),
-                },
-                status_code=500,
+            return _internal_error_response(
                 message="Erro ao criar transação",
-                error_code="INTERNAL_ERROR",
-                details={"exception": str(exc)},
+                log_context="transaction.create_failed",
             )
 
     @doc(
         description=(
             "Atualiza dados de uma transação existente.\n\n"
-            "Campos aceitos: qualquer campo da transação.\n"
+            "Campos aceitos: title, description, observation, is_recurring, "
+            "is_installment, installment_count, amount, currency, status, type, "
+            "due_date, start_date, end_date, tag_id, account_id, credit_card_id, "
+            "paid_at.\n"
             "Se status=PAID, é obrigatório informar paid_at.\n\n"
             "Exemplo de request:\n"
             "{ 'status': 'paid', 'paid_at': '2024-02-20T10:00:00Z' }\n\n"
@@ -455,6 +537,7 @@ class TransactionResource(MethodResource):
             return _invalid_token_response()
 
         user_id = get_jwt_identity()
+        user_uuid = UUID(user_id)
         transaction = Transaction.query.filter_by(
             id=transaction_id, deleted=False
         ).first()
@@ -476,6 +559,11 @@ class TransactionResource(MethodResource):
                 message="Você não tem permissão para editar esta transação.",
                 error_code="FORBIDDEN",
             )
+
+        if kwargs.get("type") is not None:
+            kwargs["type"] = str(kwargs["type"]).lower()
+        if kwargs.get("status") is not None:
+            kwargs["status"] = str(kwargs["status"]).lower()
 
         if kwargs.get("status", "").lower() == "paid" and not kwargs.get("paid_at"):
             return _compat_error(
@@ -532,10 +620,31 @@ class TransactionResource(MethodResource):
                 error_code="VALIDATION_ERROR",
             )
 
+        resolved_tag_id = kwargs["tag_id"] if "tag_id" in kwargs else transaction.tag_id
+        resolved_account_id = (
+            kwargs["account_id"] if "account_id" in kwargs else transaction.account_id
+        )
+        resolved_credit_card_id = (
+            kwargs["credit_card_id"]
+            if "credit_card_id" in kwargs
+            else transaction.credit_card_id
+        )
+        reference_error = _enforce_transaction_reference_ownership_or_error(
+            user_id=user_uuid,
+            tag_id=resolved_tag_id,
+            account_id=resolved_account_id,
+            credit_card_id=resolved_credit_card_id,
+        )
+        if reference_error:
+            return _compat_error(
+                legacy_payload={"error": reference_error},
+                status_code=400,
+                message=reference_error,
+                error_code="VALIDATION_ERROR",
+            )
+
         try:
-            for field, value in kwargs.items():
-                if hasattr(transaction, field):
-                    setattr(transaction, field, value)
+            _apply_transaction_updates(transaction, kwargs)
 
             db.session.commit()
 
@@ -550,17 +659,11 @@ class TransactionResource(MethodResource):
                 message="Transação atualizada com sucesso",
                 data={"transaction": updated_data},
             )
-        except Exception as exc:
+        except Exception:
             db.session.rollback()
-            return _compat_error(
-                legacy_payload={
-                    "error": "Erro ao atualizar transação",
-                    "message": str(exc),
-                },
-                status_code=500,
+            return _internal_error_response(
                 message="Erro ao atualizar transação",
-                error_code="INTERNAL_ERROR",
-                details={"exception": str(exc)},
+                log_context="transaction.update_failed",
             )
 
     @doc(
@@ -632,17 +735,11 @@ class TransactionResource(MethodResource):
                 message="Transação deletada com sucesso (soft delete).",
                 data={},
             )
-        except Exception as exc:
+        except Exception:
             db.session.rollback()
-            return _compat_error(
-                legacy_payload={
-                    "error": "Erro ao deletar transação",
-                    "message": str(exc),
-                },
-                status_code=500,
+            return _internal_error_response(
                 message="Erro ao deletar transação",
-                error_code="INTERNAL_ERROR",
-                details={"exception": str(exc)},
+                log_context="transaction.soft_delete_failed",
             )
 
     @doc(
@@ -708,17 +805,11 @@ class TransactionResource(MethodResource):
                 message="Transação restaurada com sucesso",
                 data={},
             )
-        except Exception as exc:
+        except Exception:
             db.session.rollback()
-            return _compat_error(
-                legacy_payload={
-                    "error": "Erro ao restaurar transação",
-                    "message": str(exc),
-                },
-                status_code=500,
+            return _internal_error_response(
                 message="Erro ao restaurar transação",
-                error_code="INTERNAL_ERROR",
-                details={"exception": str(exc)},
+                log_context="transaction.restore_failed",
             )
 
     @doc(
@@ -767,17 +858,11 @@ class TransactionResource(MethodResource):
                 data={"deleted_transactions": serialized},
                 meta={"total": len(serialized)},
             )
-        except Exception as exc:
+        except Exception:
             db.session.rollback()
-            return _compat_error(
-                legacy_payload={
-                    "error": "Erro ao buscar transações deletadas",
-                    "message": str(exc),
-                },
-                status_code=500,
+            return _internal_error_response(
                 message="Erro ao buscar transações deletadas",
-                error_code="INTERNAL_ERROR",
-                details={"exception": str(exc)},
+                log_context="transaction.list_deleted_failed",
             )
 
     @doc(
@@ -968,17 +1053,11 @@ class TransactionResource(MethodResource):
                 message=str(exc),
                 error_code="VALIDATION_ERROR",
             )
-        except Exception as exc:
+        except Exception:
             db.session.rollback()
-            return _compat_error(
-                legacy_payload={
-                    "error": "Erro ao buscar transações ativas",
-                    "message": str(exc),
-                },
-                status_code=500,
+            return _internal_error_response(
                 message="Erro ao buscar transações ativas",
-                error_code="INTERNAL_ERROR",
-                details={"exception": str(exc)},
+                log_context="transaction.list_active_failed",
             )
 
 
@@ -1071,17 +1150,11 @@ class TransactionSummaryResource(MethodResource):
                 message=str(exc),
                 error_code="VALIDATION_ERROR",
             )
-        except Exception as exc:
+        except Exception:
             db.session.rollback()
-            return _compat_error(
-                legacy_payload={
-                    "error": "Erro ao calcular resumo mensal",
-                    "message": str(exc),
-                },
-                status_code=500,
+            return _internal_error_response(
                 message="Erro ao calcular resumo mensal",
-                error_code="INTERNAL_ERROR",
-                details={"exception": str(exc)},
+                log_context="transaction.monthly_summary_failed",
             )
 
 
@@ -1192,17 +1265,11 @@ class TransactionMonthlyDashboardResource(MethodResource):
                 message=str(exc),
                 error_code="VALIDATION_ERROR",
             )
-        except Exception as exc:
+        except Exception:
             db.session.rollback()
-            return _compat_error(
-                legacy_payload={
-                    "error": "Erro ao calcular dashboard mensal",
-                    "message": str(exc),
-                },
-                status_code=500,
+            return _internal_error_response(
                 message="Erro ao calcular dashboard mensal",
-                error_code="INTERNAL_ERROR",
-                details={"exception": str(exc)},
+                log_context="transaction.monthly_dashboard_failed",
             )
 
 
@@ -1267,17 +1334,11 @@ class TransactionForceDeleteResource(MethodResource):
                 message="Transação removida permanentemente.",
                 data={},
             )
-        except Exception as exc:
+        except Exception:
             db.session.rollback()
-            return _compat_error(
-                legacy_payload={
-                    "error": "Erro ao deletar permanentemente",
-                    "message": str(exc),
-                },
-                status_code=500,
+            return _internal_error_response(
                 message="Erro ao deletar permanentemente",
-                error_code="INTERNAL_ERROR",
-                details={"exception": str(exc)},
+                log_context="transaction.force_delete_failed",
             )
 
 
@@ -1521,17 +1582,11 @@ class TransactionExpensePeriodResource(MethodResource):
                 message=str(exc),
                 error_code="VALIDATION_ERROR",
             )
-        except Exception as exc:
+        except Exception:
             db.session.rollback()
-            return _compat_error(
-                legacy_payload={
-                    "error": "Erro ao buscar despesas por período",
-                    "message": str(exc),
-                },
-                status_code=500,
+            return _internal_error_response(
                 message="Erro ao buscar despesas por período",
-                error_code="INTERNAL_ERROR",
-                details={"exception": str(exc)},
+                log_context="transaction.expenses_period_failed",
             )
 
 

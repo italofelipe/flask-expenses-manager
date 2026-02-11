@@ -52,6 +52,12 @@ Ultima atualizacao: 2026-02-11
 | G3 | Qualidade | Enforce de cobertura minima no CI | In Progress | 80% | Baixo | 497f901, 7f0ac66 | 2026-02-09 |
 | G4 | Qualidade | Pipeline CI para lint, type-check, testes e gates de qualidade | In Progress | 85% | Baixo | 842a656, 7f0ac66 | 2026-02-09 |
 | G5 | Qualidade | Seed de dados para ambiente local | Todo | 0% | Baixo |  | 2026-02-09 |
+| G6 | CI/Security | Reforcar pre-commit com secret scanning confiável (Gitleaks), Bandit e detecção de private keys | In Progress | 80% | Médio: risco de falso positivo em segredos de teste |  | 2026-02-11 |
+| G7 | CI/Resilience | Adicionar teste de confiabilidade de contrato OpenAPI com Schemathesis | In Progress | 75% | Médio: flakiness se escopo de fuzzing crescer sem calibração |  | 2026-02-11 |
+| G8 | CI/Quality | Adicionar gate de mutation testing (Cosmic Ray) para módulos críticos | Done | 100% | Médio: custo de execução controlado por escopo e filtro de operadores | pending-commit | 2026-02-11 |
+| G9 | CI/Security | Integrar Snyk (dependências e container) com gate condicional por `SNYK_ENABLED` | In Progress | 65% | Médio: requer `SNYK_TOKEN` e calibração de baseline |  | 2026-02-11 |
+| G10 | CI/Security | Integrar scan de imagem/container com Trivy em todo PR/push | In Progress | 75% | Médio: CVEs de base image podem bloquear merge sem política de exceção |  | 2026-02-11 |
+| G11 | CI/Governance | Formalizar política de branch protection + required checks + push protection no GitHub | Todo | 0% | Alto: sem enforcement central, gates podem ser ignorados |  | 2026-02-11 |
 | H1 | Arquitetura | Adicionar suporte a GraphQL | In Progress | 65% | Alto: impacto transversal na API | ba1f238, e12bf21 | 2026-02-09 |
 | H2 | Seguranca | Implementar rate limit por rota/usuario/IP | Done | 100% | Baixo: rate-limit por domínio com backend distribuído, fail-closed e observabilidade básica | pending-commit | 2026-02-11 |
 | H3 | Seguranca | Hardening de validacao/sanitizacao/authz/headers/auditoria | Done | 100% | Médio: baseline aplicado; evolução contínua segue para monitoramento centralizado e infraestrutura S1 | pending-commit | 2026-02-11 |
@@ -103,6 +109,18 @@ Ultima atualizacao: 2026-02-11
 | S5-08 | App Security | Implementar validação de saída para evitar data leakage (campos sensíveis e debug data) | Done | 100% | Médio: sanitização central reduz leak; manter revisão contínua em novos payloads | 5aa0d2c | 2026-02-11 |
 | S5-09 | App Security | Fortalecer proteção de banco de testes/fixtures para evitar conexões abertas e vazamento de estado | Done | 100% | Baixo: fixture isolada por ambiente e teardown forte de engine/sessão/banco temporário | c0f83e2 | 2026-02-11 |
 | S5-10 | App Security | Integrar SAST + secret scanning + dependabot com gate no CI (quebra build em severidade alta) | Done | 100% | Médio: gates ativos no CI; branch protection ainda deve exigir checks | c0f83e2 | 2026-02-11 |
+| S6-01 | App Security | Corrigir mass-assignment no `PUT /transactions/{id}` com allowlist de campos mutáveis | Done | 100% | Baixo: coberto por validação e testes de regressão | pending-commit | 2026-02-11 |
+| S6-02 | App Security | Tornar `user_id` dump-only no schema de transação e bloquear bind de ownership por payload | Done | 100% | Baixo: schema endurecido e teste de payload malicioso adicionado | pending-commit | 2026-02-11 |
+| S6-03 | App Security | Validar ownership de `tag_id/account_id/credit_card_id` no REST de transações (create/update) | Done | 100% | Baixo: validação central reaproveitada no REST | pending-commit | 2026-02-11 |
+| S6-04 | App Security | Remover vazamento de `str(exc)`/detalhes internos em controllers REST e padronizar erro seguro | In Progress | 65% | Médio: transações já saneadas; faltam demais controllers REST | pending-commit | 2026-02-11 |
+| S6-05 | App Security | Unificar política de registro REST/GraphQL (mesma validação de senha/email e normalização) | Done | 100% | Baixo: GraphQL passou a usar `UserRegistrationSchema` | pending-commit | 2026-02-11 |
+| S6-06 | App Security | Mitigar enumeração de contas em register/login (status e comportamento observável) | Todo | 0% | Médio: facilita credential stuffing orientado |  | 2026-02-11 |
+| S6-07 | App Security | Migrar login guard para backend distribuído (Redis) com política de falha explícita | Todo | 0% | Médio: proteção inconsistente em escala |  | 2026-02-11 |
+| S6-08 | App Security | Endurecer defaults de runtime (`DEBUG=False` por padrão seguro e validação de startup) | Todo | 0% | Médio: risco por configuração ausente/incompleta |  | 2026-02-11 |
+| S6-09 | App Security | Retirar sweep de retenção de auditoria do ciclo de request (job agendado/assíncrono) | Todo | 0% | Médio: impacto em latência e disponibilidade |  | 2026-02-11 |
+| S6-10 | App Security | Atualizar dependências com CVE (`Flask`, `marshmallow`) e zerar `pip-audit` runtime | Todo | 0% | Médio: exposição a CVEs conhecidos |  | 2026-02-11 |
+| S6-11 | App Security | Harden Docker de produção (non-root, multi-stage, runtime deps only) | Todo | 0% | Médio: superfície de ataque de container |  | 2026-02-11 |
+| S6-12 | App Security | Definir política de exposição de documentação em produção (`/docs`) por ambiente/autenticação | Todo | 0% | Baixo: disclosure de metadata da API |  | 2026-02-11 |
 | X1 | Tech Debt | Remover/atualizar TODO desatualizado sobre enums em transacoes | Todo | 0% | Baixo: clareza de manutencao |  | 2026-02-09 |
 
 ## Registro de progresso recente
@@ -162,9 +180,15 @@ Ultima atualizacao: 2026-02-11
 | 2026-02-11 | S5-02 | Auditoria persistente evoluída com retenção configurável (`AUDIT_RETENTION_*`), índices de consulta, serviço de busca por `request_id`, utilitário operacional (`scripts/manage_audit_events.py`) e runbook (`docs/AUDIT_TRAIL_RUNBOOK.md`) | pending-commit |
 | 2026-02-11 | S5-03 | Autorização por recurso reforçada no domínio GraphQL para fluxos por `investmentId` (queries/mutations) com validação explícita de ownership + testes de acesso cruzado | pending-commit |
 | 2026-02-11 | S5-06 | Login guard evoluído com política específica para principal conhecido (`LOGIN_GUARD_KNOWN_*`) + métricas de telemetria (`login_guard.*`) e testes de regressão REST/GraphQL | pending-commit |
+| 2026-02-11 | S6 | Reavaliação de segurança round 2 concluída com evidências locais atualizadas (`bandit`, `security_evidence_check`, `pip-audit`) e novo backlog de remediação (`S6-01..S6-12`) | n/a |
+| 2026-02-11 | S6-01/S6-02/S6-03/S6-04 | Harden transações REST: bloqueio de mass-assignment, `user_id` dump-only, validação de ownership de referências e remoção de detalhes internos de exceção em respostas 500 | pending-commit |
+| 2026-02-11 | S6-05 | Registro GraphQL alinhado ao schema de validação REST (`UserRegistrationSchema`) com normalização e política de senha forte | pending-commit |
+| 2026-02-11 | G6/G7/G8/G9/G10 | CI/pre-commit reforçados com Gitleaks+Bandit+private-key detection, job Schemathesis, gate Cosmic Ray, Trivy e Snyk condicional | pending-commit |
+| 2026-02-11 | G8 | Mutation gate migrado para Cosmic Ray com escopo crítico em CORS (`app/middleware/cors.py`), filtro de operadores ruidosos e threshold de sobrevivência 0% | pending-commit |
 | 2026-02-09 | D (observacao) | Restaurados arquivos deletados acidentalmente: ticker/carteira | n/a |
 
 ## Proxima prioridade sugerida
+- S6 (P0/P1): executar backlog de correcoes de seguranca de aplicacao (`S6-01..S6-12`) antes de avancar em novas features de infraestrutura/observabilidade.
 - S1/S3 (P1): fechar controles de infraestrutura OWASP em AWS (`S1`) e integrar exportação central de métricas/alertas de segurança (CloudWatch/Prometheus).
 
 ## Mapeamento Rebranding (nomenclatura legada -> `auraxis`)

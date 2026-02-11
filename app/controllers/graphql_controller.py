@@ -67,15 +67,12 @@ def _parse_graphql_payload() -> tuple[str, dict[str, Any] | None, str | None] | 
     return query, parsed_variables, parsed_operation_name
 
 
-@graphql_bp.route("", methods=["POST"])  # type: ignore[misc]
-def execute_graphql() -> tuple[dict[str, Any], int]:
-    try:
-        parsed_payload = _parse_graphql_payload()
-    except ValueError as exc:
-        return _graphql_error_response(message=str(exc), status_code=400)
-
-    assert parsed_payload is not None
-    query, parsed_variables, parsed_operation_name = parsed_payload
+def _enforce_graphql_policies(
+    *,
+    query: str,
+    parsed_variables: dict[str, Any] | None,
+    parsed_operation_name: str | None,
+) -> tuple[dict[str, Any], int] | None:
     security_policy = _get_security_policy()
     try:
         analyze_graphql_query(
@@ -107,13 +104,10 @@ def execute_graphql() -> tuple[dict[str, Any], int]:
             status_code=401,
         )
 
-    result = schema.execute(
-        query,
-        variable_values=parsed_variables,
-        operation_name=parsed_operation_name,
-        context_value={"request": request},
-    )
+    return None
 
+
+def _build_graphql_result_response(result: Any) -> tuple[dict[str, Any], int]:
     response: Dict[str, Any] = {}
     if result.errors:
         response["errors"] = [
@@ -126,6 +120,36 @@ def execute_graphql() -> tuple[dict[str, Any], int]:
     if result.errors and result.data is None:
         status_code = 400
     return response, status_code
+
+
+@graphql_bp.route("", methods=["POST"])  # type: ignore[misc]
+def execute_graphql() -> tuple[dict[str, Any], int]:
+    try:
+        parsed_payload = _parse_graphql_payload()
+    except ValueError as exc:
+        return _graphql_error_response(message=str(exc), status_code=400)
+
+    if parsed_payload is None:
+        return _graphql_error_response(
+            message="Campo 'query' é obrigatório.",
+            status_code=400,
+        )
+    query, parsed_variables, parsed_operation_name = parsed_payload
+    policy_error = _enforce_graphql_policies(
+        query=query,
+        parsed_variables=parsed_variables,
+        parsed_operation_name=parsed_operation_name,
+    )
+    if policy_error is not None:
+        return policy_error
+
+    result = schema.execute(
+        query,
+        variable_values=parsed_variables,
+        operation_name=parsed_operation_name,
+        context_value={"request": request},
+    )
+    return _build_graphql_result_response(result)
 
 
 def register_graphql_security(app: Flask) -> None:

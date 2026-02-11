@@ -1,147 +1,97 @@
 # CI/CD (GitHub Actions)
 
-## Objetivo atual
-- CI de qualidade e testes.
-- Análise estática no SonarQube Cloud.
-- Sem etapa de deploy por enquanto.
+Ultima atualizacao: 2026-02-11
 
-## Workflow
-Arquivo:
-- `/opt/auraxis/.github/workflows/ci.yml`
-- `/opt/auraxis/.github/workflows/recurrence-job.yml`
+## Objetivo atual
+- Garantir qualidade, segurança e confiabilidade antes de merge/deploy.
+- Manter deploy fora deste workflow por enquanto.
+
+## Workflows
+
+### 1. CI principal
+Arquivo: `.github/workflows/ci.yml`
+
+Gatilhos:
+- `push` em `main`, `develop`, `master`
+- `pull_request`
 
 Jobs:
 1. `quality`
-- `black --check .`
-- `isort --check-only .`
-- `flake8 .`
-- `mypy app`
-- `pip-audit -r requirements.txt`
-- `bandit -r app -lll -iii` (SAST com gate para severidade alta)
+- `black`, `isort`, `flake8`, `mypy`
+- `pip-audit` (dependências Python)
+- `bandit` (SAST, gate alto)
 
-Dependências instaladas no job:
-- `requirements.txt`
-- `requirements-dev.txt`
-- `pip-audit`
-- `bandit`
+2. `secret-scan`
+- `gitleaks` em todo histórico do checkout
 
-2. `tests`
-- `pytest --cov=app --cov-report=xml --cov-report=term-missing --junitxml=pytest-report.xml`
-- publica artefatos: `coverage.xml`, `pytest-report.xml`
+3. `dependency-review` (somente PR)
+- gate para novas vulnerabilidades `high+`
 
-3. `secret-scan`
-- varredura de segredos com `gitleaks/gitleaks-action`
-- falha o pipeline quando encontra segredo exposto
+4. `tests`
+- `pytest` com cobertura (`-m "not schemathesis"`)
+- gate de cobertura mínima: `--cov-fail-under=85`
+- artefatos: `coverage.xml`, `pytest-report.xml`
 
-4. `dependency-review`
-- executa em `pull_request`
-- usa `actions/dependency-review-action`
-- gate: falha se encontrar vulnerabilidade nova com severidade `high` (ou maior)
+5. `schemathesis`
+- teste de confiabilidade de contrato OpenAPI com fuzzing controlado
+- usa marker `schemathesis`
 
-5. `security-evidence`
+6. `mutation`
+- gate de mutation testing com `cosmic-ray`
+- script: `scripts/mutation_gate.sh`
+- configuração: `scripts/cosmic_ray.toml`
+
+7. `trivy`
+- scan de vulnerabilidades no filesystem do repo
+- build da imagem prod e scan de imagem
+
+8. `snyk` (condicional)
+- só roda quando `vars.SNYK_ENABLED == 'true'`
+- scan de dependências Python e de container
+
+9. `security-evidence`
 - executa `scripts/security_evidence_check.sh`
-- gera relatório de evidências OWASP S3
-- publica artefato: `reports/security/security-evidence.md`
+- publica `reports/security/security-evidence.md`
 
-6. `sonar`
-- executa scan no SonarQube Cloud usando `coverage.xml`
-- roda apenas se as variáveis/secrets obrigatórias existirem
-- após o quality gate, aplica política rígida via script:
-  - ratings `security`, `reliability`, `maintainability` devem ser `A`
-  - `bugs` abertos devem ser `0`
-  - `vulnerabilities` abertas devem ser `0`
-  - issues `CRITICAL/BLOCKER` abertas devem ser `0`
+10. `sonar`
+- scan SonarCloud + quality gate
+- enforcement adicional via `scripts/sonar_enforce_ci.sh`
 
-7. `generate-recurring-transactions` (workflow separado)
-- workflow: `recurrence-job.yml`
-- executa script `scripts/generate_recurring_transactions.py`
-- gatilhos:
-  - diário via `cron` (`0 3 * * *`)
-  - manual via `workflow_dispatch`
-- se `RECURRENCE_DATABASE_URL` não estiver configurado, job é ignorado sem falha
+### 2. Recorrência
+Arquivo: `.github/workflows/recurrence-job.yml`
+- gera transações recorrentes por cron / execução manual
 
-## Gatilhos
-- `push` em `main` e `develop`
-- `pull_request`
+## Pre-commit (local)
+Arquivo: `.pre-commit-config.yaml`
 
-## Variáveis/Secrets necessários
-No repositório do GitHub:
+Hooks ativos:
+- `black`
+- `flake8`
+- `isort`
+- `mypy`
+- `bandit` (scan `app/`, severidade alta)
+- `gitleaks` (segredos em staged)
+- `detect-private-key`
+- `sonar-local-check`
+
+## Variáveis e secrets necessários
 
 ### Secrets
 - `SONAR_TOKEN`
+- `SNYK_TOKEN` (para job `snyk`)
 - `RECURRENCE_DATABASE_URL`
 - `RECURRENCE_SECRET_KEY`
 - `RECURRENCE_JWT_SECRET_KEY`
 
-### Repository Variables
+### Variables
 - `SONAR_PROJECT_KEY`
 - `SONAR_ORGANIZATION`
+- `SNYK_ENABLED` (`true/false`)
 
-## Dependabot
-- Arquivo: `/opt/auraxis/.github/dependabot.yml`
-- Atualizações semanais para:
-  - dependências Python (`pip`)
-  - GitHub Actions
-- PRs recebem labels `dependencies` e `security`.
+## Governança recomendada (fora do repo)
+1. Habilitar branch protection exigindo checks obrigatórios.
+2. Habilitar GitHub Secret Scanning + Push Protection.
+3. Definir política de exceções de CVE (quem aprova, prazo, rastreabilidade).
 
-## Validação local de Sonar (antes do commit)
-- Script: `/opt/auraxis/scripts/sonar_local_check.sh`
-- Hook integrado no pre-commit: `sonar-local-check`
-- Comportamento:
-1. roda testes com cobertura (`coverage.xml`);
-2. roda `sonar-scanner` aguardando quality gate;
-3. consulta métricas no Sonar e falha se qualquer rating estiver abaixo de `A`:
-   - `security_rating`
-   - `reliability_rating`
-   - `sqale_rating` (maintainability)
-
-Variáveis necessárias no ambiente local:
-- `SONAR_TOKEN`
-- `SONAR_PROJECT_KEY`
-- `SONAR_ORGANIZATION`
-- opcional: `SONAR_HOST_URL` (default: `https://sonarcloud.io`)
-
-## Hardening de runtime validado no CI
-- `MAX_REQUEST_BYTES` para limitar payload global (DoS guard).
-- `SECURITY_ENFORCE_STRONG_SECRETS=true` em produção para bloquear startup inseguro.
-- `CORS_ALLOWED_ORIGINS` com allowlist por ambiente.
-- `GRAPHQL_ALLOW_INTROSPECTION=false` em produção por padrão.
-- `RATE_LIMIT_BACKEND=redis` + `RATE_LIMIT_REDIS_URL` para modo distribuído em multi-instância.
-- observabilidade de rate-limit via métricas internas `rate_limit.*` e logs estruturados de backend.
-- retenção de auditoria com `AUDIT_RETENTION_DAYS` + `AUDIT_RETENTION_SWEEP_INTERVAL_SECONDS`.
-- login guard com política dedicada para principal conhecido:
-  - `LOGIN_GUARD_KNOWN_FAILURE_THRESHOLD`
-  - `LOGIN_GUARD_KNOWN_BASE_COOLDOWN_SECONDS`
-  - `LOGIN_GUARD_KNOWN_MAX_COOLDOWN_SECONDS`
-
-Comando manual:
-```bash
-scripts/sonar_local_check.sh
-```
-
-Validação no CI:
-- Script: `/opt/auraxis/scripts/sonar_enforce_ci.sh`
-- É executado no job `sonar` após o Quality Gate.
-- O job falha automaticamente se qualquer regra de política não for atendida.
-
-Validação de evidências de segurança:
-- Script: `/opt/auraxis/scripts/security_evidence_check.sh`
-- Job CI: `security-evidence`
-- Artefato gerado: `reports/security/security-evidence.md`
-- Inclui checks de baseline para:
-  - guard de profundidade GraphQL
-  - guard de complexidade GraphQL
-
-## Observações
-- A suíte de testes usa SQLite em execução de teste (via `tests/conftest.py`).
-- Se as variáveis do Sonar não estiverem configuradas, os jobs `quality` e `tests` continuam executando normalmente.
-- O arquivo `sonar-project.properties` define as convenções-base do scanner.
-- O gate de `dependency-review` só roda em PR e complementa o `pip-audit` do job `quality`.
-- Runbooks operacionais:
-  - `/opt/auraxis/docs/RATE_LIMIT_REDIS_RUNBOOK.md`
-  - `/opt/auraxis/docs/AUDIT_TRAIL_RUNBOOK.md`
-
-## Evolução recomendada (próximos passos)
-1. Adicionar proteção de branch exigindo status checks (`quality`, `secret-scan`, `dependency-review`, `tests`, `sonar`).
-2. Incluir gate de cobertura mínima no pytest/CI.
-3. Criar workflow de CD separado quando houver ambiente de deploy.
+## Referência de estratégia
+- `docs/CI_SECURITY_RESILIENCE_PLAN.md`
