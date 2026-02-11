@@ -1,6 +1,7 @@
 from typing import Any, Dict
 
 from flask import Blueprint, Flask, current_app, request
+from graphql import GraphQLError
 
 from app.graphql import schema
 from app.graphql.authorization import (
@@ -28,6 +29,19 @@ def _graphql_error_response(
     if code is not None:
         error["extensions"] = {"code": code, "details": details or {}}
     return {"errors": [error]}, status_code
+
+
+def _format_graphql_execution_error(err: GraphQLError) -> dict[str, Any]:
+    is_debug = bool(
+        current_app.config.get("DEBUG") or current_app.config.get("TESTING")
+    )
+    if err.original_error is not None and not is_debug:
+        current_app.logger.exception("GraphQL internal execution error", exc_info=err)
+        return {
+            "message": "An unexpected error occurred.",
+            "extensions": {"code": "INTERNAL_ERROR", "details": {}},
+        }
+    return {"message": err.message}
 
 
 def _parse_graphql_payload() -> tuple[str, dict[str, Any] | None, str | None] | None:
@@ -102,7 +116,9 @@ def execute_graphql() -> tuple[dict[str, Any], int]:
 
     response: Dict[str, Any] = {}
     if result.errors:
-        response["errors"] = [{"message": err.message} for err in result.errors]
+        response["errors"] = [
+            _format_graphql_execution_error(err) for err in result.errors
+        ]
     if result.data is not None:
         response["data"] = result.data
 

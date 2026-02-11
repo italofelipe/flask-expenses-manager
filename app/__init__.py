@@ -24,6 +24,7 @@ from app.extensions.audit_trail import register_audit_trail
 from app.extensions.database import db
 from app.extensions.error_handlers import register_error_handlers
 from app.middleware.cors import register_cors
+from app.middleware.security_headers import register_security_headers
 from app.models.account import Account  # noqa: F401
 from app.models.audit_event import AuditEvent  # noqa: F401
 from app.models.credit_card import CreditCard  # noqa: F401
@@ -108,6 +109,7 @@ def create_app() -> Flask:
     register_error_handlers(app)
     register_graphql_security(app)
     register_cors(app)
+    register_security_headers(app)
     register_audit_trail(app)
 
     # Registra blueprints ANTES dos endpoints no Swagger

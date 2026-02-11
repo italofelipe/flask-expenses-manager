@@ -160,6 +160,17 @@ Variáveis de ambiente principais:
   - `SECURITY_ENFORCE_STRONG_SECRETS=true`
 - CORS por allowlist:
   - `CORS_ALLOWED_ORIGINS=https://app.auraxis.com.br,https://www.auraxis.com.br`
+  - `CORS_ALLOW_CREDENTIALS=true` (não usar `*` com credenciais)
+  - `CORS_ALLOWED_METHODS=GET,POST,PUT,PATCH,DELETE,OPTIONS`
+  - `CORS_ALLOWED_HEADERS=Authorization,Content-Type,X-API-Contract`
+  - `CORS_MAX_AGE_SECONDS=600`
+- Headers de segurança por ambiente:
+  - `SECURITY_X_FRAME_OPTIONS=SAMEORIGIN`
+  - `SECURITY_X_CONTENT_TYPE_OPTIONS=nosniff`
+  - `SECURITY_REFERRER_POLICY=strict-origin-when-cross-origin`
+  - `SECURITY_PERMISSIONS_POLICY=geolocation=(), microphone=(), camera=()`
+  - `SECURITY_HSTS_ENABLED=true` (produção)
+  - `SECURITY_HSTS_VALUE=max-age=31536000; includeSubDomains`
 - Trilha de auditoria para rotas sensíveis:
   - `AUDIT_TRAIL_ENABLED=true`
   - `AUDIT_PATH_PREFIXES=/auth/,/user/,/transactions/,/wallet,/graphql`
@@ -175,6 +186,10 @@ Variáveis de ambiente principais:
   - `brapi.http_error`
   - `brapi.invalid_payload`
   - payload de snapshot disponível internamente via `build_brapi_metrics_payload()`
+- Sanitização de resposta:
+  - Campos sensíveis (`password`, `password_hash`, `secret*`) são removidos de payloads serializados.
+  - Erros `INTERNAL_ERROR` retornam apenas `request_id` fora de DEBUG/TESTING.
+  - Erros internos de execução GraphQL retornam mensagem genérica em produção.
 
 ## Situação atual de testes
 Existe suíte configurada em `tests/` com `pytest` e setup isolado de banco para execução local.

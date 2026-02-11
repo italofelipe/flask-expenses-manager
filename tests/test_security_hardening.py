@@ -3,6 +3,12 @@ from __future__ import annotations
 import uuid
 from typing import Any
 
+import pytest
+from flask import Flask
+
+from app.middleware.cors import register_cors
+from app.middleware.security_headers import register_security_headers
+
 
 def _register_and_login(client: Any) -> str:
     suffix = uuid.uuid4().hex[:8]
@@ -47,6 +53,51 @@ def test_cors_headers_are_added_for_allowed_origin(client: Any) -> None:
     assert response.status_code == 200
     assert response.headers["Access-Control-Allow-Origin"] == "https://frontend.local"
     assert "Origin" in response.headers["Vary"]
+
+
+def test_cors_rejects_wildcard_with_credentials_in_production(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("FLASK_DEBUG", "false")
+    monkeypatch.delenv("FLASK_TESTING", raising=False)
+    monkeypatch.setenv("CORS_ALLOWED_ORIGINS", "*")
+    monkeypatch.setenv("CORS_ALLOW_CREDENTIALS", "true")
+    app = Flask(__name__)
+
+    with pytest.raises(RuntimeError, match="wildcard origin"):
+        register_cors(app)
+
+
+def test_security_headers_are_set_on_response(client: Any) -> None:
+    response = client.get(
+        "/docs/",
+        headers={"X-Forwarded-Proto": "https"},
+    )
+    assert response.status_code == 200
+    assert response.headers["X-Frame-Options"] == "SAMEORIGIN"
+    assert response.headers["X-Content-Type-Options"] == "nosniff"
+    assert response.headers["Referrer-Policy"] == "strict-origin-when-cross-origin"
+    assert "Strict-Transport-Security" not in response.headers
+
+
+def test_security_headers_add_hsts_when_enabled(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("FLASK_DEBUG", "false")
+    monkeypatch.setenv("FLASK_TESTING", "false")
+    monkeypatch.setenv("SECURITY_HSTS_ENABLED", "true")
+    app = Flask(__name__)
+
+    @app.get("/health")
+    def _health() -> tuple[str, int]:
+        return "ok", 200
+
+    register_security_headers(app)
+    test_client = app.test_client()
+
+    response = test_client.get("/health", headers={"X-Forwarded-Proto": "https"})
+    assert response.status_code == 200
+    assert "Strict-Transport-Security" in response.headers
 
 
 def test_user_me_rejects_limit_above_max(client: Any) -> None:
