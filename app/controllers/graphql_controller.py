@@ -3,6 +3,9 @@ from typing import Any
 from flask import Blueprint, Flask, current_app, request
 from graphql import GraphQLError
 
+from app.application.services.public_error_mapper_service import (
+    map_validation_exception,
+)
 from app.controllers.graphql_controller_utils import (
     build_graphql_result_response,
     graphql_error_response,
@@ -81,7 +84,16 @@ def execute_graphql() -> tuple[dict[str, Any], int]:
     try:
         parsed_payload = parse_graphql_payload(request.get_json(silent=True))
     except ValueError as exc:
-        return graphql_error_response(message=str(exc), status_code=400)
+        mapped_error = map_validation_exception(
+            exc,
+            fallback_message="Payload GraphQL inválido.",
+        )
+        return graphql_error_response(
+            message=mapped_error.message,
+            code=mapped_error.code,
+            details=mapped_error.details,
+            status_code=mapped_error.status_code,
+        )
     query, parsed_variables, parsed_operation_name = parsed_payload
     policy_error = _enforce_graphql_policies(
         query=query,

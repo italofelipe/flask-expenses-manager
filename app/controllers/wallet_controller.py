@@ -10,6 +10,10 @@ from flask_apispec import doc, use_kwargs
 from flask_jwt_extended import get_jwt_identity, jwt_required
 from marshmallow import ValidationError, fields
 
+from app.application.errors import PublicValidationError
+from app.application.services.public_error_mapper_service import (
+    map_validation_exception,
+)
 from app.extensions.database import db
 from app.models.wallet import Wallet
 from app.schemas.wallet_schema import WalletSchema
@@ -86,9 +90,24 @@ def _parse_optional_query_date(value: str | None, field_name: str) -> date | Non
     try:
         return datetime.strptime(value, "%Y-%m-%d").date()
     except ValueError:
-        raise ValueError(
+        raise PublicValidationError(
             f"Parâmetro '{field_name}' inválido. Use o formato YYYY-MM-DD."
         )
+
+
+def _validation_error_response(
+    *,
+    exc: Exception,
+    fallback_message: str,
+) -> tuple[dict[str, Any], int]:
+    mapped_error = map_validation_exception(exc, fallback_message=fallback_message)
+    return _compat_error(
+        legacy_payload={"error": mapped_error.message},
+        status_code=mapped_error.status_code,
+        message=mapped_error.message,
+        error_code=mapped_error.code,
+        details=mapped_error.details,
+    )
 
 
 @wallet_bp.route("", methods=["POST"])
@@ -782,22 +801,18 @@ def get_portfolio_valuation_history() -> tuple[dict[str, Any], int]:
         start_date = _parse_optional_query_date(raw_start_date, "startDate")
         final_date = _parse_optional_query_date(raw_final_date, "finalDate")
     except ValueError as exc:
-        return _compat_error(
-            legacy_payload={"error": str(exc)},
-            status_code=400,
-            message=str(exc),
-            error_code="VALIDATION_ERROR",
+        return _validation_error_response(
+            exc=exc,
+            fallback_message="Parâmetros de período inválidos.",
         )
 
     service = PortfolioHistoryService(user_id)
     try:
         payload = service.get_history(start_date=start_date, end_date=final_date)
     except ValueError as exc:
-        return _compat_error(
-            legacy_payload={"error": str(exc)},
-            status_code=400,
-            message=str(exc),
-            error_code="VALIDATION_ERROR",
+        return _validation_error_response(
+            exc=exc,
+            fallback_message="Período informado é inválido.",
         )
 
     return _compat_success(

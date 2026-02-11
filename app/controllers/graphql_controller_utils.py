@@ -4,6 +4,8 @@ from typing import Any, Callable
 
 from graphql import GraphQLError
 
+from app.application.errors import PublicValidationError
+
 
 def graphql_error_response(
     *,
@@ -27,17 +29,17 @@ def parse_graphql_payload(
     operation_name = payload.get("operationName")
 
     if not isinstance(query, str) or not query.strip():
-        raise ValueError("Campo 'query' é obrigatório.")
+        raise PublicValidationError("Campo 'query' é obrigatório.")
 
     parsed_variables = variables if isinstance(variables, dict) else None
     if variables is not None and parsed_variables is None:
-        raise ValueError("Campo 'variables' deve ser um objeto.")
+        raise PublicValidationError("Campo 'variables' deve ser um objeto.")
 
     parsed_operation_name = (
         operation_name if isinstance(operation_name, str) and operation_name else None
     )
     if operation_name is not None and parsed_operation_name is None:
-        raise ValueError("Campo 'operationName' deve ser uma string.")
+        raise PublicValidationError("Campo 'operationName' deve ser uma string.")
 
     return query, parsed_variables, parsed_operation_name
 

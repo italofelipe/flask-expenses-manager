@@ -18,6 +18,10 @@ from flask_jwt_extended import get_jwt, get_jwt_identity, jwt_required
 from sqlalchemy import extract
 from sqlalchemy.orm.query import Query
 
+from app.application.errors import PublicValidationError
+from app.application.services.public_error_mapper_service import (
+    map_validation_exception,
+)
 from app.extensions.database import db
 from app.models.transaction import Transaction
 from app.models.user import User
@@ -196,14 +200,30 @@ def _parse_positive_int(
     try:
         parsed = int(raw_value)
     except ValueError:
-        raise ValueError(
+        raise PublicValidationError(
             f"Parâmetro '{field_name}' inválido. Informe um inteiro positivo."
         )
     if parsed < 1 or parsed > max_value:
-        raise ValueError(
+        raise PublicValidationError(
             f"Parâmetro '{field_name}' inválido. Use um valor entre 1 e {max_value}."
         )
     return parsed
+
+
+def _validation_error_response(
+    *,
+    exc: Exception,
+    legacy_key: str = "message",
+    fallback_message: str,
+) -> Response:
+    mapped_error = map_validation_exception(exc, fallback_message=fallback_message)
+    return _compat_error(
+        legacy_payload={legacy_key: mapped_error.message},
+        status_code=mapped_error.status_code,
+        message=mapped_error.message,
+        error_code=mapped_error.code,
+        details=mapped_error.details,
+    )
 
 
 class UserProfileResource(MethodResource):
@@ -368,11 +388,9 @@ class UserMeResource(MethodResource):
                 max_value=100,
             )
         except ValueError as exc:
-            return _compat_error(
-                legacy_payload={"message": str(exc)},
-                status_code=400,
-                message=str(exc),
-                error_code="VALIDATION_ERROR",
+            return _validation_error_response(
+                exc=exc,
+                fallback_message="Parâmetros de paginação inválidos.",
             )
         status = request.args.get("status")
         month = request.args.get("month")

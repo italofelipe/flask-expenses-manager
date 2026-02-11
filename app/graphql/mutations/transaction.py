@@ -78,7 +78,10 @@ class CreateTransactionMutation(graphene.Mutation):
                 credit_card_id=credit_card_id,
             )
         except TransactionReferenceAuthorizationError as exc:
-            raise GraphQLError(str(exc)) from exc
+            message = (
+                str(exc.args[0]) if exc.args else "Referência inválida para transação."
+            )
+            raise GraphQLError(message) from exc
 
         if kwargs.get("is_installment") and kwargs.get("installment_count"):
             count = int(kwargs["installment_count"])

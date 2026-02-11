@@ -12,6 +12,9 @@ from flask_jwt_extended import (
     verify_jwt_in_request,
 )
 
+from app.application.services.public_error_mapper_service import (
+    map_validation_exception,
+)
 from app.controllers.transaction_controller_utils import (
     _compat_error,
     _compat_success,
@@ -46,6 +49,21 @@ def _guard_revoked_token() -> Response | None:
     if is_token_revoked(jwt_data["jti"]):
         return _invalid_token_response()
     return None
+
+
+def _validation_error_response(
+    *,
+    exc: Exception,
+    fallback_message: str,
+) -> Response:
+    mapped_error = map_validation_exception(exc, fallback_message=fallback_message)
+    return _compat_error(
+        legacy_payload={"error": mapped_error.message},
+        status_code=mapped_error.status_code,
+        message=mapped_error.message,
+        error_code=mapped_error.code,
+        details=mapped_error.details,
+    )
 
 
 class TransactionSummaryResource(MethodResource):
@@ -100,11 +118,9 @@ class TransactionSummaryResource(MethodResource):
                 },
             )
         except ValueError as exc:
-            return _compat_error(
-                legacy_payload={"error": str(exc)},
-                status_code=400,
-                message=str(exc),
-                error_code="VALIDATION_ERROR",
+            return _validation_error_response(
+                exc=exc,
+                fallback_message="Parâmetro de mês inválido.",
             )
         except Exception:
             db.session.rollback()
@@ -180,11 +196,9 @@ class TransactionMonthlyDashboardResource(MethodResource):
                 },
             )
         except ValueError as exc:
-            return _compat_error(
-                legacy_payload={"error": str(exc)},
-                status_code=400,
-                message=str(exc),
-                error_code="VALIDATION_ERROR",
+            return _validation_error_response(
+                exc=exc,
+                fallback_message="Parâmetro de mês inválido.",
             )
         except Exception:
             db.session.rollback()
@@ -337,11 +351,9 @@ class TransactionExpensePeriodResource(MethodResource):
                 },
             )
         except ValueError as exc:
-            return _compat_error(
-                legacy_payload={"error": str(exc)},
-                status_code=400,
-                message=str(exc),
-                error_code="VALIDATION_ERROR",
+            return _validation_error_response(
+                exc=exc,
+                fallback_message="Parâmetros de período inválidos.",
             )
         except Exception:
             db.session.rollback()
@@ -532,11 +544,9 @@ class TransactionListActiveResource(MethodResource):
                 },
             )
         except ValueError as exc:
-            return _compat_error(
-                legacy_payload={"error": str(exc)},
-                status_code=400,
-                message=str(exc),
-                error_code="VALIDATION_ERROR",
+            return _validation_error_response(
+                exc=exc,
+                fallback_message="Parâmetros de listagem inválidos.",
             )
         except Exception:
             db.session.rollback()

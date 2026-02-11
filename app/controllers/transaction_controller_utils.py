@@ -7,6 +7,7 @@ from uuid import UUID
 
 from flask import Response, current_app, has_request_context, jsonify, request
 
+from app.application.errors import PublicValidationError
 from app.models.transaction import Transaction, TransactionStatus, TransactionType
 from app.services.transaction_reference_authorization_service import (
     TransactionReferenceAuthorizationError,
@@ -91,11 +92,11 @@ def _parse_positive_int(value: str | None, *, default: int, field_name: str) -> 
     try:
         parsed = int(value)
     except ValueError as exc:
-        raise ValueError(
+        raise PublicValidationError(
             f"Parâmetro '{field_name}' inválido. Informe um inteiro positivo."
         ) from exc
     if parsed < 1:
-        raise ValueError(
+        raise PublicValidationError(
             f"Parâmetro '{field_name}' inválido. Informe um inteiro positivo."
         )
     return parsed
@@ -107,7 +108,7 @@ def _parse_optional_uuid(value: str | None, field_name: str) -> UUID | None:
     try:
         return UUID(value)
     except ValueError as exc:
-        raise ValueError(
+        raise PublicValidationError(
             f"Parâmetro '{field_name}' inválido. Informe um UUID válido."
         ) from exc
 
@@ -118,21 +119,23 @@ def _parse_optional_date(value: str | None, field_name: str) -> date | None:
     try:
         return datetime.strptime(value, "%Y-%m-%d").date()
     except ValueError as exc:
-        raise ValueError(
+        raise PublicValidationError(
             f"Parâmetro '{field_name}' inválido. Use o formato YYYY-MM-DD."
         ) from exc
 
 
 def _parse_month_param(value: str | None) -> tuple[int, int, str]:
     if not value:
-        raise ValueError("Parâmetro 'month' é obrigatório no formato YYYY-MM.")
+        raise PublicValidationError(
+            "Parâmetro 'month' é obrigatório no formato YYYY-MM."
+        )
     try:
         year, month_number = map(int, value.split("-"))
     except ValueError as exc:
-        raise ValueError("Formato de mês inválido. Use YYYY-MM.") from exc
+        raise PublicValidationError("Formato de mês inválido. Use YYYY-MM.") from exc
 
     if month_number < 1 or month_number > 12:
-        raise ValueError("Formato de mês inválido. Use YYYY-MM.")
+        raise PublicValidationError("Formato de mês inválido. Use YYYY-MM.")
 
     return year, month_number, f"{year:04d}-{month_number:02d}"
 
@@ -175,11 +178,11 @@ def _resolve_transaction_ordering(order_by: str, order: str) -> Any:
         "title": Transaction.title,
     }
     if order_by not in allowed_order_by:
-        raise ValueError(
+        raise PublicValidationError(
             "Parâmetro 'order_by' inválido. Use due_date, created_at, amount ou title."
         )
     if order not in {"asc", "desc"}:
-        raise ValueError("Parâmetro 'order' inválido. Use asc ou desc.")
+        raise PublicValidationError("Parâmetro 'order' inválido. Use asc ou desc.")
 
     column = allowed_order_by[order_by]
     return column.asc() if order == "asc" else column.desc()
@@ -187,7 +190,7 @@ def _resolve_transaction_ordering(order_by: str, order: str) -> Any:
 
 def _build_installment_amounts(total: Decimal, count: int) -> list[Decimal]:
     if count < 1:
-        raise ValueError("'installment_count' deve ser maior que zero.")
+        raise PublicValidationError("'installment_count' deve ser maior que zero.")
 
     normalized_total = total.quantize(Decimal("0.01"))
     base_amount = (normalized_total / count).quantize(
@@ -235,7 +238,9 @@ def _enforce_transaction_reference_ownership_or_error(
             credit_card_id=credit_card_id,
         )
     except TransactionReferenceAuthorizationError as exc:
-        return str(exc)
+        if exc.args:
+            return str(exc.args[0])
+        return "Referência inválida."
     return None
 
 

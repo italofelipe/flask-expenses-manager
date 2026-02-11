@@ -358,6 +358,30 @@ def test_wallet_portfolio_valuation_history_v2(client) -> None:
     assert "total_profit_loss_estimate" in first_item
 
 
+def test_wallet_history_masks_unexpected_value_error(client, monkeypatch) -> None:
+    token = _register_and_login(client, "owner-op6-value-error")
+
+    def _raise_unexpected_value_error(*_args: object, **_kwargs: object) -> object:
+        raise ValueError("sqlalchemy connection string leaked")
+
+    monkeypatch.setattr(
+        "app.controllers.wallet_controller.PortfolioHistoryService.get_history",
+        _raise_unexpected_value_error,
+    )
+
+    response = client.get(
+        "/wallet/valuation/history?startDate=2026-02-08&finalDate=2026-02-09",
+        headers=_auth_headers(token, "v2"),
+    )
+
+    assert response.status_code == 400
+    body = response.get_json()
+    serialized = str(body)
+    assert body["error"]["code"] == "VALIDATION_ERROR"
+    assert body["message"] == "Período informado é inválido."
+    assert "sqlalchemy connection string leaked" not in serialized
+
+
 def test_wallet_fixed_income_valuation_v2(client) -> None:
     token = _register_and_login(client, "owner-op7")
     register_date = (date.today() - timedelta(days=30)).isoformat()
