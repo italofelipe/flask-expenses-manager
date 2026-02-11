@@ -84,7 +84,7 @@ Ultima atualizacao: 2026-02-11
 | S4-06 | App Security | Implementar sanitização/normalização central para campos textuais de entrada | Done | 100% | Médio: expandir para todos os schemas legados | pending-commit | 2026-02-11 |
 | S4-07 | App Security | Aplicar política GraphQL deny-by-default para operações privadas e cobertura automática de autorização por resolver | Done | 100% | Baixo: transporte GraphQL já bloqueia chamadas privadas sem auth | pending-commit | 2026-02-11 |
 | S4-08 | App Security | Tornar introspecção GraphQL configurável por ambiente (desabilitar em PROD por padrão) | Done | 100% | Baixo | pending-commit | 2026-02-11 |
-| S4-09 | App Security | Endurecer consumo BRAPI (allowlist de ticker, validação estrita de resposta, fallback defensivo) | Todo | 0% | Medio: entrada externa não confiável |  | 2026-02-11 |
+| S4-09 | App Security | Endurecer consumo BRAPI (allowlist de ticker, validação estrita de resposta, fallback defensivo) | Done | 100% | Médio: validação concluída; falta telemetria por códigos de erro de provider (item S4-17) | pending-commit | 2026-02-11 |
 | S4-10 | App Security | Evoluir rate-limit e revogação de token para storage distribuído (Redis) | In Progress | 70% | Médio: rate-limit com backend Redis opcional entregue; falta observabilidade e runbook de operação | pending-commit | 2026-02-11 |
 | S4-11 | App Security | Remover fallback de secrets fracos em runtime não-dev e falhar startup sem segredos fortes | Done | 100% | Baixo: bloqueio de startup em runtime inseguro | pending-commit | 2026-02-11 |
 | S4-12 | App Security | Definir política CORS estrita por ambiente (origins permitidas, métodos, headers) | Done | 100% | Médio: manter allowlist por ambiente atualizada | pending-commit | 2026-02-11 |
@@ -92,6 +92,7 @@ Ultima atualizacao: 2026-02-11
 | S4-14 | App Security | Revisar/remover código legado não registrado (`ticker_controller`) e alinhar superfície real de API | Todo | 0% | Baixo: risco de dívida técnica e confusão operacional |  | 2026-02-11 |
 | S4-15 | App Security | Formalizar threat model (STRIDE + abuse cases) e critérios de aceite por risco | Todo | 0% | Medio: decisões de segurança sem baseline formal |  | 2026-02-11 |
 | S4-16 | App Security | Adicionar scan de vulnerabilidades de dependências no CI (`pip-audit`/equivalente) | Done | 100% | Baixo | pending-commit | 2026-02-11 |
+| S4-17 | App Security | Adicionar observabilidade de integrações externas (BRAPI): contadores por timeout, payload inválido e erro HTTP | Todo | 0% | Médio: troubleshooting ainda depende de logs ad-hoc |  | 2026-02-11 |
 | X1 | Tech Debt | Remover/atualizar TODO desatualizado sobre enums em transacoes | Todo | 0% | Baixo: clareza de manutencao |  | 2026-02-09 |
 
 ## Registro de progresso recente
@@ -131,6 +132,7 @@ Ultima atualizacao: 2026-02-11
 | 2026-02-11 | S2.3/S4 | Hardening aplicado: limite global de payload, CORS por ambiente, introspecção GraphQL configurável, sanitização central, paginação endurecida, segredos fortes obrigatórios e scan `pip-audit` no CI + testes de segurança | pending-commit |
 | 2026-02-11 | S2.4/S4-07 | GraphQL com política deny-by-default no transporte: operações privadas exigem auth, allowlist pública por ambiente (`registerUser/login`) + testes de contrato | pending-commit |
 | 2026-02-11 | S2.5/S4-10 | Rate-limit com backend distribuído opcional (Redis) + fallback automático para memória + testes de backend e documentação de env | pending-commit |
+| 2026-02-11 | S2.6/S4-09 | Hardening BRAPI: sanitização/allowlist de ticker e validação estrita de payload de cotação/histórico com fallback seguro + testes | pending-commit |
 | 2026-02-09 | D (observacao) | Restaurados arquivos deletados acidentalmente: ticker/carteira | n/a |
 
 ## Proxima prioridade sugerida

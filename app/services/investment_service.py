@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import os
+import re
 import time
 from datetime import UTC, datetime
 from typing import Any, Dict, Optional
@@ -13,6 +14,7 @@ from config import Config
 
 class InvestmentService:
     _cache: dict[str, tuple[float, Any]] = {}
+    _ticker_pattern = re.compile(r"^[A-Z0-9]{4,10}$")
 
     @staticmethod
     def _settings() -> tuple[float, int, int]:
@@ -67,10 +69,39 @@ class InvestmentService:
                 time.sleep(0.15 * (attempt + 1))
         return None
 
+    @classmethod
+    def _normalize_ticker(cls, ticker: str) -> str | None:
+        normalized = str(ticker).strip().upper()
+        if not normalized:
+            return None
+        if not cls._ticker_pattern.fullmatch(normalized):
+            return None
+        return normalized
+
+    @staticmethod
+    def _extract_market_price(payload: Any) -> float | None:
+        if not isinstance(payload, dict):
+            return None
+        results = payload.get("results")
+        if not isinstance(results, list) or not results:
+            return None
+        first_result = results[0]
+        if not isinstance(first_result, dict):
+            return None
+        raw_price = first_result.get("regularMarketPrice")
+        if not isinstance(raw_price, (int, float)):
+            return None
+        price = float(raw_price)
+        if price <= 0:
+            return None
+        return price
+
     @staticmethod
     def get_market_price(ticker: str) -> Optional[float]:
         """Consulta preço de mercado via BRAPI com timeout, retry e cache curto."""
-        normalized_ticker = ticker.upper()
+        normalized_ticker = InvestmentService._normalize_ticker(ticker)
+        if normalized_ticker is None:
+            return None
         _, _, cache_ttl_seconds = InvestmentService._settings()
 
         cached_price = InvestmentService._cache_get(
@@ -82,12 +113,9 @@ class InvestmentService:
         payload = InvestmentService._request_json(
             f"https://brapi.dev/api/quote/{normalized_ticker}"
         )
-        if not payload:
+        price = InvestmentService._extract_market_price(payload)
+        if price is None:
             return None
-        results = payload.get("results") if isinstance(payload, dict) else None
-        if not results:
-            return None
-        price = float(results[0].get("regularMarketPrice", 0))
         InvestmentService._cache_set(normalized_ticker, price, cache_ttl_seconds)
         return price
 
@@ -95,7 +123,9 @@ class InvestmentService:
     def get_historical_prices(
         ticker: str, *, start_date: str, end_date: str
     ) -> dict[str, float]:
-        normalized_ticker = ticker.upper()
+        normalized_ticker = InvestmentService._normalize_ticker(ticker)
+        if normalized_ticker is None:
+            return {}
         _, _, cache_ttl_seconds = InvestmentService._settings()
         cache_key = f"HIST:{normalized_ticker}:{start_date}:{end_date}"
         cached = InvestmentService._cache_get(cache_key, cache_ttl_seconds)
@@ -112,7 +142,11 @@ class InvestmentService:
         if not isinstance(payload, dict):
             return {}
         results = payload.get("results")
-        if not results:
+        if (
+            not isinstance(results, list)
+            or not results
+            or not isinstance(results[0], dict)
+        ):
             return {}
 
         historical_rows = results[0].get("historicalDataPrice") or []
@@ -124,7 +158,7 @@ class InvestmentService:
             if not isinstance(unix_ts, (int, float)):
                 continue
             close_price = row.get("close")
-            if close_price is None:
+            if not isinstance(close_price, (int, float)):
                 continue
             day = datetime.fromtimestamp(float(unix_ts), tz=UTC).date().isoformat()
             if day < start_date or day > end_date:
