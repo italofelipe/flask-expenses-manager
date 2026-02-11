@@ -93,5 +93,10 @@ Hooks ativos:
 2. Habilitar GitHub Secret Scanning + Push Protection.
 3. Definir política de exceções de CVE (quem aprova, prazo, rastreabilidade).
 
+## Convenções Git
+- Branches: usar padrão de conventional branch (`feat/*`, `fix/*`, `chore/*`, `refactor/*`, `docs/*`, `test/*`, `ci/*`).
+- Commits: seguir Conventional Commits (ex.: `feat(auth): ...`, `fix(ci): ...`, `chore(deps): ...`).
+- Pull requests: título alinhado com o tipo principal de mudança quando possível.
+
 ## Referência de estratégia
 - `docs/CI_SECURITY_RESILIENCE_PLAN.md`
