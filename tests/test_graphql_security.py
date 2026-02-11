@@ -58,6 +58,10 @@ def _policy(client: Any) -> GraphQLSecurityPolicy:
     return policy
 
 
+def _authz_policy(client: Any):
+    return client.application.extensions.get("graphql_authorization_policy")
+
+
 def test_graphql_rejects_query_exceeding_depth(client: Any) -> None:
     policy = _policy(client)
     policy.update_limits(max_depth=3, max_complexity=10_000, max_query_bytes=20_000)
@@ -170,3 +174,45 @@ def test_graphql_blocks_introspection_when_disabled(client: Any) -> None:
     body = response.get_json()
     error = body["errors"][0]
     assert error["extensions"]["code"] == GRAPHQL_INTROSPECTION_DISABLED
+
+
+def test_graphql_private_operation_requires_authentication(client: Any) -> None:
+    query = """
+    query Private {
+      transactions(page: 1, perPage: 10) {
+        pagination { total }
+      }
+    }
+    """
+    response = _graphql(client, query)
+
+    assert response.status_code == 401
+    body = response.get_json()
+    assert body["errors"][0]["extensions"]["code"] == "GRAPHQL_AUTH_REQUIRED"
+
+
+def test_graphql_public_mutation_allowed_without_authentication(client: Any) -> None:
+    policy = _authz_policy(client)
+    assert policy is not None
+
+    suffix = uuid.uuid4().hex[:8]
+    query = """
+    mutation Register($name: String!, $email: String!, $password: String!) {
+      registerUser(name: $name, email: $email, password: $password) {
+        message
+      }
+    }
+    """
+    response = _graphql(
+        client,
+        query,
+        variables={
+            "name": f"public-{suffix}",
+            "email": f"public-{suffix}@email.com",
+            "password": "StrongPass@123",
+        },
+    )
+
+    assert response.status_code == 200
+    body = response.get_json()
+    assert "errors" not in body

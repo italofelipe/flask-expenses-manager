@@ -143,6 +143,9 @@ Variáveis de ambiente principais:
 - `GRAPHQL_MAX_OPERATIONS=3`
 - `GRAPHQL_MAX_LIST_MULTIPLIER=50`
 - `GRAPHQL_ALLOW_INTROSPECTION=false` (recomendado em produção)
+- `GRAPHQL_PUBLIC_QUERIES=__typename`
+- `GRAPHQL_PUBLIC_MUTATIONS=registerUser,login`
+- `GRAPHQL_ALLOW_UNNAMED_OPERATIONS=false` (recomendado em produção)
 
 ## Hardening adicional de segurança
 - Limite global de payload HTTP:
