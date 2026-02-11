@@ -33,6 +33,10 @@ from app.services.investment_service import InvestmentService
 from app.services.portfolio_history_service import PortfolioHistoryService
 from app.services.portfolio_valuation_service import PortfolioValuationService
 from app.services.transaction_analytics_service import TransactionAnalyticsService
+from app.services.transaction_reference_authorization_service import (
+    TransactionReferenceAuthorizationError,
+    enforce_transaction_reference_ownership,
+)
 
 
 def _to_float_or_none(value: Any) -> float | None:
@@ -967,6 +971,18 @@ class CreateTransactionMutation(graphene.Mutation):
         tx_type = str(kwargs["type"]).lower()
         tx_status = str(kwargs.get("status", "pending")).lower()
         amount = Decimal(str(kwargs["amount"]))
+        tag_id = kwargs.get("tag_id") or kwargs.get("tagId")
+        account_id = kwargs.get("account_id") or kwargs.get("accountId")
+        credit_card_id = kwargs.get("credit_card_id") or kwargs.get("creditCardId")
+        try:
+            enforce_transaction_reference_ownership(
+                user_id=UUID(str(user.id)),
+                tag_id=tag_id,
+                account_id=account_id,
+                credit_card_id=credit_card_id,
+            )
+        except TransactionReferenceAuthorizationError as exc:
+            raise GraphQLError(str(exc)) from exc
 
         if kwargs.get("is_installment") and kwargs.get("installment_count"):
             count = int(kwargs["installment_count"])
@@ -991,9 +1007,9 @@ class CreateTransactionMutation(graphene.Mutation):
                         is_recurring=bool(kwargs.get("is_recurring", False)),
                         is_installment=True,
                         installment_count=count,
-                        tag_id=kwargs.get("tag_id"),
-                        account_id=kwargs.get("account_id"),
-                        credit_card_id=kwargs.get("credit_card_id"),
+                        tag_id=tag_id,
+                        account_id=account_id,
+                        credit_card_id=credit_card_id,
                         status=TransactionStatus(tx_status),
                         currency=str(kwargs.get("currency", "BRL")),
                         installment_group_id=group_id,
@@ -1022,9 +1038,9 @@ class CreateTransactionMutation(graphene.Mutation):
             is_recurring=bool(kwargs.get("is_recurring", False)),
             is_installment=bool(kwargs.get("is_installment", False)),
             installment_count=kwargs.get("installment_count"),
-            tag_id=kwargs.get("tag_id"),
-            account_id=kwargs.get("account_id"),
-            credit_card_id=kwargs.get("credit_card_id"),
+            tag_id=tag_id,
+            account_id=account_id,
+            credit_card_id=credit_card_id,
             status=TransactionStatus(tx_status),
             currency=str(kwargs.get("currency", "BRL")),
         )

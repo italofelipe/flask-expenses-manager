@@ -138,6 +138,9 @@ Variáveis de ambiente principais:
   - profundidade máxima
   - complexidade máxima
   - limite de operações por documento
+- Autorização por recurso em mutações sensíveis:
+  - `createTransaction` valida ownership de `tagId`, `accountId` e `creditCardId`
+    para impedir referência cruzada entre usuários.
 
 Variáveis de ambiente principais:
 - `GRAPHQL_MAX_QUERY_BYTES=20000`

@@ -95,7 +95,7 @@ Ultima atualizacao: 2026-02-11
 | S4-17 | App Security | Adicionar observabilidade de integrações externas (BRAPI): contadores por timeout, payload inválido e erro HTTP | Todo | 0% | Médio: troubleshooting ainda depende de logs ad-hoc |  | 2026-02-11 |
 | S5-01 | App Security | Eliminar fallback de memória para rate-limit em produção (fail-closed se Redis indisponível) | Done | 100% | Médio: fail-closed implementado; falta monitoramento/alerta de indisponibilidade (S5-02/S5-10) | pending-commit | 2026-02-11 |
 | S5-02 | App Security | Implementar trilha de auditoria persistente (DB/CloudWatch) com retenção e busca por `request_id` | In Progress | 70% | Médio: persistência em banco local concluída; retenção/alertas centralizados ainda pendentes | pending-commit | 2026-02-11 |
-| S5-03 | App Security | Aplicar autorização por recurso no domínio GraphQL (não só no transporte), com testes de ownership | Todo | 0% | Alto: risco de acesso indevido por resolver legado |  | 2026-02-11 |
+| S5-03 | App Security | Aplicar autorização por recurso no domínio GraphQL (não só no transporte), com testes de ownership | In Progress | 35% | Médio: createTransaction coberto; falta expandir para outras mutações com referências relacionais | pending-commit | 2026-02-11 |
 | S5-04 | App Security | Endurecer CORS/headers por ambiente com validação de configuração no startup | Todo | 0% | Médio: configuração frouxa em ambiente real expõe superfície |  | 2026-02-11 |
 | S5-05 | App Security | Adotar rotação de secrets + source of truth (AWS SSM/Secrets Manager), removendo `.env` como primário em cloud | Todo | 0% | Alto: vazamento/expiração manual de segredos |  | 2026-02-11 |
 | S5-06 | App Security | Fechar lacunas de brute-force/account takeover (lockout progressivo, cooldown e fingerprint de IP/device) | Todo | 0% | Alto: ataques de credencial stuffing |  | 2026-02-11 |
@@ -147,6 +147,7 @@ Ultima atualizacao: 2026-02-11
 | 2026-02-11 | S5-01 | Rate limit em modo fail-closed para backend Redis indisponível (retorno 503), com configuração por ambiente e testes de backend/guard | pending-commit |
 | 2026-02-11 | S5-02 (fase 1) | Persistência opcional de auditoria em tabela `audit_events` com flag de ambiente (`AUDIT_PERSISTENCE_ENABLED`) + teste de integração | pending-commit |
 | 2026-02-11 | S5-02 (fase 1.1) | Trilha de auditoria endurecida para Sonar: remoção de payload controlado por usuário dos logs e manutenção apenas de metadados seguros + ajuste de teste | pending-commit |
+| 2026-02-11 | S5-03 (fase 1) | Autorização por recurso em GraphQL `createTransaction`: valida ownership de `tagId/accountId/creditCardId` com testes negativos de referência cruzada entre usuários | pending-commit |
 | 2026-02-09 | D (observacao) | Restaurados arquivos deletados acidentalmente: ticker/carteira | n/a |
 
 ## Proxima prioridade sugerida
