@@ -142,6 +142,15 @@ Variáveis de ambiente principais:
 - `GRAPHQL_MAX_COMPLEXITY=300`
 - `GRAPHQL_MAX_OPERATIONS=3`
 - `GRAPHQL_MAX_LIST_MULTIPLIER=50`
+- `GRAPHQL_ALLOW_INTROSPECTION=false` (recomendado em produção)
+
+## Hardening adicional de segurança
+- Limite global de payload HTTP:
+  - `MAX_REQUEST_BYTES=1048576` (1MB por padrão)
+- Secrets fortes obrigatórios fora de DEV:
+  - `SECURITY_ENFORCE_STRONG_SECRETS=true`
+- CORS por allowlist:
+  - `CORS_ALLOWED_ORIGINS=https://app.auraxis.com.br,https://www.auraxis.com.br`
 
 ## Situação atual de testes
 Existe suíte configurada em `tests/` com `pytest` e setup isolado de banco para execução local.

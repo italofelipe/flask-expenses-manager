@@ -1,3 +1,5 @@
+# mypy: disable-error-code=misc
+
 from datetime import timedelta
 from typing import Any, Dict
 from uuid import UUID
@@ -6,6 +8,7 @@ from flask import (
     Blueprint,
     Response,
     abort,
+    current_app,
     has_request_context,
     jsonify,
     make_response,
@@ -97,8 +100,8 @@ class RegisterResource(MethodResource):
             409: {"description": "Email já registrado"},
             500: {"description": "Erro interno do servidor"},
         },
-    )  # type: ignore[misc]
-    @use_kwargs(UserRegistrationSchema, location="json")  # type: ignore[misc]
+    )
+    @use_kwargs(UserRegistrationSchema, location="json")
     def post(self, **validated_data: Any) -> Response:
         if User.query.filter_by(email=validated_data["email"]).first():
             return _compat_error(
@@ -133,14 +136,14 @@ class RegisterResource(MethodResource):
                 message="User created successfully",
                 data={"user": user_data},
             )
-        except Exception as e:
+        except Exception:
             db.session.rollback()
+            current_app.logger.exception("Failed to create user.")
             return _compat_error(
-                legacy_payload={"message": "Failed to create user", "error": str(e)},
+                legacy_payload={"message": "Failed to create user"},
                 status_code=500,
                 message="Failed to create user",
                 error_code="INTERNAL_ERROR",
-                details={"exception": str(e)},
             )
 
 
@@ -174,8 +177,8 @@ class AuthResource(MethodResource):
             401: {"description": "Credenciais inválidas"},
             500: {"description": "Erro interno ao efetuar login"},
         },
-    )  # type: ignore[misc]
-    @use_kwargs(AuthSchema, location="json")  # type: ignore[misc]
+    )
+    @use_kwargs(AuthSchema, location="json")
     def post(self, **kwargs: Any) -> Response:
         email = kwargs.get("email")
         name = kwargs.get("name")
@@ -226,13 +229,13 @@ class AuthResource(MethodResource):
                 message="Login successful",
                 data={"token": token, "user": user_data},
             )
-        except Exception as e:
+        except Exception:
+            current_app.logger.exception("Login failed due to unexpected error.")
             return _compat_error(
-                legacy_payload={"message": "Login failed", "error": str(e)},
+                legacy_payload={"message": "Login failed"},
                 status_code=500,
                 message="Login failed",
                 error_code="INTERNAL_ERROR",
-                details={"exception": str(e)},
             )
 
 
@@ -252,8 +255,8 @@ class LogoutResource(MethodResource):
         responses={
             200: {"description": "Logout realizado com sucesso"},
         },
-    )  # type: ignore[misc]
-    @jwt_required()  # type: ignore[misc]
+    )
+    @jwt_required()
     def post(self) -> Response:
         identity = get_jwt_identity()
         user = User.query.get(UUID(identity))
@@ -278,7 +281,7 @@ auth_bp.add_url_rule("/logout", view_func=LogoutResource.as_view("logoutresource
 # ----------------------------------------------------------------------
 # Global Webargs validation error handler
 # ----------------------------------------------------------------------
-@parser.error_handler  # type: ignore[misc]
+@parser.error_handler
 def handle_webargs_error(
     err: WebargsValidationError,
     req: Any,

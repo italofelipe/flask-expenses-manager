@@ -12,6 +12,7 @@ GRAPHQL_DEPTH_LIMIT_EXCEEDED = "GRAPHQL_DEPTH_LIMIT_EXCEEDED"
 GRAPHQL_COMPLEXITY_LIMIT_EXCEEDED = "GRAPHQL_COMPLEXITY_LIMIT_EXCEEDED"
 GRAPHQL_OPERATION_LIMIT_EXCEEDED = "GRAPHQL_OPERATION_LIMIT_EXCEEDED"
 GRAPHQL_OPERATION_NOT_FOUND = "GRAPHQL_OPERATION_NOT_FOUND"
+GRAPHQL_INTROSPECTION_DISABLED = "GRAPHQL_INTROSPECTION_DISABLED"
 
 _LIST_ARGUMENT_NAMES = {
     "first",
@@ -35,6 +36,13 @@ def _read_int_env(name: str, default: int) -> int:
     return parsed if parsed > 0 else default
 
 
+def _read_bool_env(name: str, default: bool) -> bool:
+    raw = os.getenv(name)
+    if raw is None:
+        return default
+    return raw.strip().lower() in {"1", "true", "yes", "on"}
+
+
 @dataclass
 class GraphQLSecurityPolicy:
     max_query_bytes: int
@@ -42,15 +50,21 @@ class GraphQLSecurityPolicy:
     max_complexity: int
     max_operations: int
     max_list_multiplier: int
+    allow_introspection: bool
 
     @classmethod
     def from_env(cls) -> "GraphQLSecurityPolicy":
+        default_introspection = _read_bool_env("FLASK_DEBUG", False)
         return cls(
             max_query_bytes=_read_int_env("GRAPHQL_MAX_QUERY_BYTES", 20_000),
             max_depth=_read_int_env("GRAPHQL_MAX_DEPTH", 8),
             max_complexity=_read_int_env("GRAPHQL_MAX_COMPLEXITY", 300),
             max_operations=_read_int_env("GRAPHQL_MAX_OPERATIONS", 3),
             max_list_multiplier=_read_int_env("GRAPHQL_MAX_LIST_MULTIPLIER", 50),
+            allow_introspection=_read_bool_env(
+                "GRAPHQL_ALLOW_INTROSPECTION",
+                default_introspection,
+            ),
         )
 
     def update_limits(
@@ -61,6 +75,7 @@ class GraphQLSecurityPolicy:
         max_complexity: int | None = None,
         max_operations: int | None = None,
         max_list_multiplier: int | None = None,
+        allow_introspection: bool | None = None,
     ) -> None:
         if max_query_bytes is not None:
             self.max_query_bytes = max(max_query_bytes, 1)
@@ -72,6 +87,8 @@ class GraphQLSecurityPolicy:
             self.max_operations = max(max_operations, 1)
         if max_list_multiplier is not None:
             self.max_list_multiplier = max(max_list_multiplier, 1)
+        if allow_introspection is not None:
+            self.allow_introspection = bool(allow_introspection)
 
 
 @dataclass(frozen=True)
@@ -323,6 +340,38 @@ def _enforce_depth_and_complexity_limits(
         )
 
 
+def _contains_introspection_field(selection_set: ast.SelectionSetNode | None) -> bool:
+    if selection_set is None:
+        return False
+    for selection in selection_set.selections:
+        if isinstance(selection, ast.FieldNode):
+            if selection.name.value in {"__schema", "__type"}:
+                return True
+            if _contains_introspection_field(selection.selection_set):
+                return True
+        elif isinstance(selection, ast.InlineFragmentNode):
+            if _contains_introspection_field(selection.selection_set):
+                return True
+    return False
+
+
+def _enforce_introspection_policy(
+    selected_operations: list[ast.OperationDefinitionNode],
+    policy: GraphQLSecurityPolicy,
+) -> None:
+    if policy.allow_introspection:
+        return
+    if any(
+        _contains_introspection_field(operation.selection_set)
+        for operation in selected_operations
+    ):
+        raise GraphQLSecurityViolation(
+            code=GRAPHQL_INTROSPECTION_DISABLED,
+            message="Introspecção GraphQL está desabilitada neste ambiente.",
+            details={},
+        )
+
+
 def analyze_graphql_query(
     *,
     query: str,
@@ -348,6 +397,7 @@ def analyze_graphql_query(
     fragments, operations = _collect_fragments_and_operations(document)
     _ensure_operation_count_within_limit(operations, policy)
     selected_operations = _select_operations_to_analyze(operations, operation_name)
+    _enforce_introspection_policy(selected_operations, policy)
     metrics = _calculate_metrics(
         selected_operations,
         fragments=fragments,

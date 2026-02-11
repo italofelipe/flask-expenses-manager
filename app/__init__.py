@@ -1,8 +1,9 @@
 import os
+from uuid import uuid4
 
 from apispec import APISpec
 from apispec.ext.marshmallow import MarshmallowPlugin
-from flask import Flask
+from flask import Flask, Response, g
 from flask_apispec import FlaskApiSpec
 from flask_jwt_extended import JWTManager
 from flask_marshmallow import Marshmallow
@@ -21,6 +22,7 @@ from app.controllers.wallet_controller import wallet_bp
 from app.docs.api_documentation import API_INFO, TAGS
 from app.extensions.database import db
 from app.extensions.error_handlers import register_error_handlers
+from app.middleware.cors import register_cors
 from app.models.account import Account  # noqa: F401
 from app.models.credit_card import CreditCard  # noqa: F401
 from app.models.investment_operation import InvestmentOperation  # noqa: F401
@@ -31,10 +33,8 @@ ma = Marshmallow()
 
 
 def create_app() -> Flask:
-    print("Creating Flask app")
-
     app = Flask(__name__, instance_relative_config=True)
-    from config import Config
+    from config import Config, validate_security_configuration
 
     app.config.from_object(Config)
     runtime_database_url = os.getenv("DATABASE_URL")
@@ -43,6 +43,19 @@ def create_app() -> Flask:
 
     # Carrega variáveis de ambiente com prefixo FLASK_ do .env
     app.config.from_prefixed_env()
+    app.config["MAX_CONTENT_LENGTH"] = int(
+        os.getenv("MAX_REQUEST_BYTES", str(1024 * 1024))
+    )
+    validate_security_configuration()
+
+    @app.before_request  # type: ignore[misc]
+    def bind_request_id() -> None:
+        g.request_id = uuid4().hex
+
+    @app.after_request  # type: ignore[misc]
+    def append_request_id_header(response: Response) -> Response:
+        response.headers["X-Request-Id"] = str(getattr(g, "request_id", "n/a"))
+        return response
 
     # Inicializa extensões
     db.init_app(app)
@@ -60,8 +73,8 @@ def create_app() -> Flask:
     app.config.update(
         {
             "APISPEC_SPEC": APISpec(
-                title=API_INFO["title"],
-                version=API_INFO["version"],
+                title=str(API_INFO["title"]),
+                version=str(API_INFO["version"]),
                 openapi_version="3.0.2",
                 plugins=[MarshmallowPlugin()],
                 info={
@@ -92,6 +105,7 @@ def create_app() -> Flask:
     # Registra erros globais
     register_error_handlers(app)
     register_graphql_security(app)
+    register_cors(app)
 
     # Registra blueprints ANTES dos endpoints no Swagger
     app.register_blueprint(transaction_bp)

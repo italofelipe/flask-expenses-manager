@@ -1,8 +1,17 @@
+# mypy: disable-error-code=misc
+
 from datetime import datetime
 from typing import Any, Callable, Dict, Union, cast
 from uuid import UUID
 
-from flask import Blueprint, Response, has_request_context, jsonify, request
+from flask import (
+    Blueprint,
+    Response,
+    current_app,
+    has_request_context,
+    jsonify,
+    request,
+)
 from flask_apispec import doc, use_kwargs
 from flask_apispec.views import MethodResource
 from flask_jwt_extended import get_jwt, get_jwt_identity, jwt_required
@@ -122,7 +131,7 @@ def assign_user_profile_fields(
 
 
 def validate_user_token(user_id: UUID, jti: str) -> Union[User, Response]:
-    user = User.query.get(user_id)
+    user = cast(User | None, User.query.get(user_id))
     if not user or not hasattr(user, "current_jti") or user.current_jti != jti:
         return _compat_error(
             legacy_payload={"message": "Token revogado ou usuário não encontrado"},
@@ -134,9 +143,11 @@ def validate_user_token(user_id: UUID, jti: str) -> Union[User, Response]:
 
 
 def filter_transactions(
-    user_id: UUID, status: str, month: str
-) -> Union[Query, Response]:
-    query = Transaction.query.filter_by(user_id=user_id, deleted=False)
+    user_id: UUID, status: str | None, month: str | None
+) -> Union[Query[Any], Response]:
+    query = cast(
+        Query[Any], Transaction.query.filter_by(user_id=user_id, deleted=False)
+    )
 
     if status:
         try:
@@ -171,6 +182,28 @@ def filter_transactions(
             )
 
     return query
+
+
+def _parse_positive_int(
+    raw_value: str | None,
+    *,
+    default: int,
+    field_name: str,
+    max_value: int,
+) -> int:
+    if raw_value is None:
+        return default
+    try:
+        parsed = int(raw_value)
+    except ValueError:
+        raise ValueError(
+            f"Parâmetro '{field_name}' inválido. Informe um inteiro positivo."
+        )
+    if parsed < 1 or parsed > max_value:
+        raise ValueError(
+            f"Parâmetro '{field_name}' inválido. Use um valor entre 1 e {max_value}."
+        )
+    return parsed
 
 
 class UserProfileResource(MethodResource):
@@ -212,9 +245,9 @@ class UserProfileResource(MethodResource):
             404: {"description": "Usuário não encontrado"},
             500: {"description": "Erro ao atualizar perfil"},
         },
-    )  # type: ignore[misc]
-    @jwt_required()  # type: ignore[misc]
-    @use_kwargs(UserProfileSchema(), location="json")  # type: ignore[misc]
+    )
+    @jwt_required()
+    @use_kwargs(UserProfileSchema(), location="json")
     def put(self, **kwargs: Any) -> Response:
         user_id = UUID(get_jwt_identity())
         jti = get_jwt()["jti"]
@@ -269,13 +302,13 @@ class UserProfileResource(MethodResource):
                 message="Perfil atualizado com sucesso",
                 data={"user": user_data},
             )
-        except Exception as e:
+        except Exception:
+            current_app.logger.exception("Erro ao atualizar perfil do usuário.")
             return _compat_error(
-                legacy_payload={"message": "Erro ao atualizar perfil", "error": str(e)},
+                legacy_payload={"message": "Erro ao atualizar perfil"},
                 status_code=500,
                 message="Erro ao atualizar perfil",
                 error_code="INTERNAL_ERROR",
-                details={"exception": str(e)},
             )
 
 
@@ -310,7 +343,7 @@ class UserMeResource(MethodResource):
             200: {"description": "Dados do usuário e transações paginadas"},
             401: {"description": "Token inválido ou expirado"},
         },
-    )  # type: ignore
+    )
     @cast(Callable[..., Response], jwt_required())
     def get(self) -> Response:
         user_id = UUID(get_jwt_identity())
@@ -321,8 +354,26 @@ class UserMeResource(MethodResource):
         user = user_or_response
 
         # Paginação e filtros
-        page = int(request.args.get("page", 1))
-        limit = int(request.args.get("limit", 10))
+        try:
+            page = _parse_positive_int(
+                request.args.get("page"),
+                default=1,
+                field_name="page",
+                max_value=10_000,
+            )
+            limit = _parse_positive_int(
+                request.args.get("limit"),
+                default=10,
+                field_name="limit",
+                max_value=100,
+            )
+        except ValueError as exc:
+            return _compat_error(
+                legacy_payload={"message": str(exc)},
+                status_code=400,
+                message=str(exc),
+                error_code="VALIDATION_ERROR",
+            )
         status = request.args.get("status")
         month = request.args.get("month")
 
@@ -331,7 +382,7 @@ class UserMeResource(MethodResource):
             return query_or_response
         query = query_or_response
 
-        pagination = query.order_by(Transaction.due_date.desc()).paginate(
+        pagination = cast(Any, query.order_by(Transaction.due_date.desc())).paginate(
             page=page, per_page=limit, error_out=False
         )
         transactions = [

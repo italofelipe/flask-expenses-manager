@@ -120,6 +120,17 @@ def _paginate(total: int, page: int, per_page: int) -> PaginationType:
     return PaginationType(total=total, page=page, per_page=per_page, pages=pages)
 
 
+def _validate_pagination_values(
+    page: int, per_page: int, *, max_per_page: int = 100
+) -> None:
+    if page < 1:
+        raise GraphQLError("Parâmetro 'page' inválido. Informe um inteiro positivo.")
+    if per_page < 1 or per_page > max_per_page:
+        raise GraphQLError(
+            f"Parâmetro 'per_page' inválido. Use um valor entre 1 e {max_per_page}."
+        )
+
+
 def _serialize_transaction_items(
     transactions: list[Transaction],
 ) -> list[TransactionTypeObject]:
@@ -513,6 +524,7 @@ class Query(graphene.ObjectType):
         start_date: str | None = None,
         end_date: str | None = None,
     ) -> TransactionListPayloadType:
+        _validate_pagination_values(page, per_page)
         user = get_current_user_required()
         query = Transaction.query.filter_by(user_id=user.id, deleted=False)
         query = _apply_type_filter(query, type)
@@ -538,6 +550,7 @@ class Query(graphene.ObjectType):
         page: int,
         page_size: int,
     ) -> TransactionSummaryPayloadType:
+        _validate_pagination_values(page, page_size)
         user = get_current_user_required()
         year, month_number = _parse_month(month)
         analytics = TransactionAnalyticsService(user.id)
@@ -611,6 +624,7 @@ class Query(graphene.ObjectType):
     def resolve_wallet_entries(
         self, info: graphene.ResolveInfo, page: int, per_page: int
     ) -> WalletListPayloadType:
+        _validate_pagination_values(page, per_page)
         user = get_current_user_required()
         pagination = (
             Wallet.query.filter_by(user_id=user.id)
@@ -636,6 +650,7 @@ class Query(graphene.ObjectType):
         page: int,
         per_page: int,
     ) -> WalletHistoryPayloadType:
+        _validate_pagination_values(page, per_page)
         user = get_current_user_required()
         investment = _get_owned_wallet_or_error(
             investment_id,
@@ -655,16 +670,11 @@ class Query(graphene.ObjectType):
             reverse=True,
         )
         total = len(sorted_history)
-        if per_page <= 0:
-            items = sorted_history
-            current_per_page = total or 1
-            current_page = 1
-        else:
-            start = (page - 1) * per_page
-            end = start + per_page
-            items = sorted_history[start:end]
-            current_page = page
-            current_per_page = per_page
+        start = (page - 1) * per_page
+        end = start + per_page
+        items = sorted_history[start:end]
+        current_page = page
+        current_per_page = per_page
 
         pages = (
             (total + current_per_page - 1) // current_per_page
@@ -707,6 +717,7 @@ class Query(graphene.ObjectType):
         page: int,
         per_page: int,
     ) -> InvestmentOperationListPayloadType:
+        _validate_pagination_values(page, per_page)
         user = get_current_user_required()
         service = InvestmentOperationService(user.id)
         try:

@@ -1,9 +1,11 @@
+# mypy: disable-error-code=misc
+
 from datetime import date, datetime
 from decimal import Decimal
 from typing import Any, Dict
 from uuid import UUID
 
-from flask import Blueprint, request
+from flask import Blueprint, current_app, request
 from flask_apispec import doc, use_kwargs
 from flask_jwt_extended import get_jwt_identity, jwt_required
 from marshmallow import ValidationError, fields
@@ -89,7 +91,7 @@ def _parse_optional_query_date(value: str | None, field_name: str) -> date | Non
         )
 
 
-@wallet_bp.route("", methods=["POST"])  # type: ignore[misc]
+@wallet_bp.route("", methods=["POST"])
 @doc(
     description=(
         "Adiciona um novo item à carteira do usuário.\n\n"
@@ -116,8 +118,8 @@ def _parse_optional_query_date(value: str | None, field_name: str) -> date | Non
         401: {"description": "Token inválido"},
         500: {"description": "Erro interno"},
     },
-)  # type: ignore[misc]
-@jwt_required()  # type: ignore[misc]
+)
+@jwt_required()
 def add_wallet_entry() -> tuple[dict[str, Any], int]:
     """Adiciona um novo item à carteira do usuário com validação de ticker."""
     user_id: UUID = UUID(get_jwt_identity())
@@ -179,23 +181,19 @@ def add_wallet_entry() -> tuple[dict[str, Any], int]:
             message="Ativo cadastrado com sucesso",
             data={"investment": investment_data},
         )
-    except Exception as e:
+    except Exception:
         db.session.rollback()
-        import traceback
-
-        print("Erro inesperado:", traceback.format_exc())
-        print("Tipo:", type(e), "| Args:", e.args)
+        current_app.logger.exception("Erro inesperado ao criar investimento.")
         return _compat_error(
-            legacy_payload={"error": "Internal Server Error", "message": str(e)},
+            legacy_payload={"error": "Internal Server Error"},
             status_code=500,
             message="Internal Server Error",
             error_code="INTERNAL_ERROR",
-            details={"exception": str(e)},
         )
 
 
 # GET /wallet - Listar investimentos do usuário com paginação
-@wallet_bp.route("", methods=["GET"])  # type: ignore[misc]
+@wallet_bp.route("", methods=["GET"])
 @doc(
     description="Lista os investimentos cadastrados na carteira com paginação.",
     tags=["Wallet"],
@@ -212,15 +210,15 @@ def add_wallet_entry() -> tuple[dict[str, Any], int]:
         200: {"description": "Lista paginada de investimentos"},
         401: {"description": "Token inválido"},
     },
-)  # type: ignore[misc]
+)
 @use_kwargs(
     {
         "page": fields.Int(missing=1, validate=lambda x: x > 0),
         "per_page": fields.Int(missing=10, validate=lambda x: 0 < x <= 100),
     },
     location="query",
-)  # type: ignore[misc]
-@jwt_required()  # type: ignore[misc]
+)
+@jwt_required()
 def list_wallet_entries(page: int, per_page: int) -> tuple[dict[str, Any], int]:
     """Lista paginada dos investimentos do usuário autenticado."""
     user_id: UUID = UUID(get_jwt_identity())
@@ -266,7 +264,7 @@ def list_wallet_entries(page: int, per_page: int) -> tuple[dict[str, Any], int]:
 
 
 # GET /wallet/<uuid:investment_id>/history - Histórico paginado de um investimento
-@wallet_bp.route("/<uuid:investment_id>/history", methods=["GET"])  # type: ignore[misc]
+@wallet_bp.route("/<uuid:investment_id>/history", methods=["GET"])
 @doc(
     description=(
         "Retorna o histórico de alterações de um investimento, " "paginado e ordenado."
@@ -290,8 +288,8 @@ def list_wallet_entries(page: int, per_page: int) -> tuple[dict[str, Any], int]:
         403: {"description": "Sem permissão"},
         404: {"description": "Investimento não encontrado"},
     },
-)  # type: ignore[misc]
-@jwt_required()  # type: ignore[misc]
+)
+@jwt_required()
 def get_wallet_history(investment_id: UUID) -> tuple[Dict[str, Any], int]:
     """Retorna histórico de alterações de um investimento específico, paginado."""
     user_id: UUID = UUID(get_jwt_identity())
@@ -330,16 +328,19 @@ def get_wallet_history(investment_id: UUID) -> tuple[Dict[str, Any], int]:
     total = len(sorted_history)
 
     # Seleciona página
-    if per_page <= 0:
-        items = sorted_history
-        current_per_page = total or 1
-        current_page = 1
-    else:
-        start = (page - 1) * per_page
-        end = start + per_page
-        items = sorted_history[start:end]
-        current_page = page
-        current_per_page = per_page
+    if per_page < 1 or per_page > 100:
+        return _compat_error(
+            legacy_payload={"error": "Parâmetro 'per_page' inválido. Use 1-100."},
+            status_code=400,
+            message="Parâmetro 'per_page' inválido. Use 1-100.",
+            error_code="VALIDATION_ERROR",
+        )
+
+    start = (page - 1) * per_page
+    end = start + per_page
+    items = sorted_history[start:end]
+    current_page = page
+    current_per_page = per_page
 
     response = PaginatedResponse.format(
         data=items,
@@ -363,9 +364,7 @@ def get_wallet_history(investment_id: UUID) -> tuple[Dict[str, Any], int]:
     )
 
 
-@wallet_bp.route(  # type: ignore[misc]
-    "/<uuid:investment_id>/operations", methods=["POST"]
-)
+@wallet_bp.route("/<uuid:investment_id>/operations", methods=["POST"])
 @doc(
     description=(
         "Registra uma operação de investimento (buy/sell) para um item da carteira."
@@ -388,8 +387,8 @@ def get_wallet_history(investment_id: UUID) -> tuple[Dict[str, Any], int]:
         403: {"description": "Sem permissão"},
         404: {"description": "Investimento não encontrado"},
     },
-)  # type: ignore[misc]
-@jwt_required()  # type: ignore[misc]
+)
+@jwt_required()
 def add_investment_operation(investment_id: UUID) -> tuple[dict[str, Any], int]:
     user_id: UUID = UUID(get_jwt_identity())
     payload: Dict[str, Any] = request.get_json() or {}
@@ -411,9 +410,7 @@ def add_investment_operation(investment_id: UUID) -> tuple[dict[str, Any], int]:
     )
 
 
-@wallet_bp.route(  # type: ignore[misc]
-    "/<uuid:investment_id>/operations", methods=["GET"]
-)
+@wallet_bp.route("/<uuid:investment_id>/operations", methods=["GET"])
 @doc(
     description=(
         "Lista operações de investimento de um item da carteira com paginação."
@@ -437,15 +434,15 @@ def add_investment_operation(investment_id: UUID) -> tuple[dict[str, Any], int]:
         403: {"description": "Sem permissão"},
         404: {"description": "Investimento não encontrado"},
     },
-)  # type: ignore[misc]
+)
 @use_kwargs(
     {
         "page": fields.Int(missing=1, validate=lambda x: x > 0),
         "per_page": fields.Int(missing=10, validate=lambda x: 0 < x <= 100),
     },
     location="query",
-)  # type: ignore[misc]
-@jwt_required()  # type: ignore[misc]
+)
+@jwt_required()
 def list_investment_operations(
     investment_id: UUID, page: int, per_page: int
 ) -> tuple[dict[str, Any], int]:
@@ -480,7 +477,7 @@ def list_investment_operations(
     )
 
 
-@wallet_bp.route(  # type: ignore[misc]
+@wallet_bp.route(
     "/<uuid:investment_id>/operations/<uuid:operation_id>", methods=["PUT"]
 )
 @doc(
@@ -504,8 +501,8 @@ def list_investment_operations(
         403: {"description": "Sem permissão"},
         404: {"description": "Operação não encontrada"},
     },
-)  # type: ignore[misc]
-@jwt_required()  # type: ignore[misc]
+)
+@jwt_required()
 def update_investment_operation(
     investment_id: UUID, operation_id: UUID
 ) -> tuple[dict[str, Any], int]:
@@ -530,7 +527,7 @@ def update_investment_operation(
     )
 
 
-@wallet_bp.route(  # type: ignore[misc]
+@wallet_bp.route(
     "/<uuid:investment_id>/operations/<uuid:operation_id>", methods=["DELETE"]
 )
 @doc(
@@ -553,8 +550,8 @@ def update_investment_operation(
         403: {"description": "Sem permissão"},
         404: {"description": "Operação não encontrada"},
     },
-)  # type: ignore[misc]
-@jwt_required()  # type: ignore[misc]
+)
+@jwt_required()
 def delete_investment_operation(
     investment_id: UUID, operation_id: UUID
 ) -> tuple[dict[str, Any], int]:
@@ -573,9 +570,7 @@ def delete_investment_operation(
     )
 
 
-@wallet_bp.route(  # type: ignore[misc]
-    "/<uuid:investment_id>/operations/summary", methods=["GET"]
-)
+@wallet_bp.route("/<uuid:investment_id>/operations/summary", methods=["GET"])
 @doc(
     description="Resumo agregado das operações de um investimento.",
     tags=["Wallet"],
@@ -595,8 +590,8 @@ def delete_investment_operation(
         403: {"description": "Sem permissão"},
         404: {"description": "Investimento não encontrado"},
     },
-)  # type: ignore[misc]
-@jwt_required()  # type: ignore[misc]
+)
+@jwt_required()
 def get_investment_operations_summary(
     investment_id: UUID,
 ) -> tuple[dict[str, Any], int]:
@@ -615,9 +610,7 @@ def get_investment_operations_summary(
     )
 
 
-@wallet_bp.route(  # type: ignore[misc]
-    "/<uuid:investment_id>/operations/position", methods=["GET"]
-)
+@wallet_bp.route("/<uuid:investment_id>/operations/position", methods=["GET"])
 @doc(
     description=(
         "Retorna posição atual e custo médio do investimento com base nas "
@@ -640,8 +633,8 @@ def get_investment_operations_summary(
         403: {"description": "Sem permissão"},
         404: {"description": "Investimento não encontrado"},
     },
-)  # type: ignore[misc]
-@jwt_required()  # type: ignore[misc]
+)
+@jwt_required()
 def get_investment_operations_position(
     investment_id: UUID,
 ) -> tuple[dict[str, Any], int]:
@@ -660,9 +653,7 @@ def get_investment_operations_position(
     )
 
 
-@wallet_bp.route(  # type: ignore[misc]
-    "/<uuid:investment_id>/operations/invested-amount", methods=["GET"]
-)
+@wallet_bp.route("/<uuid:investment_id>/operations/invested-amount", methods=["GET"])
 @doc(
     description=(
         "Retorna o valor investido no dia informado, considerando operações "
@@ -690,12 +681,12 @@ def get_investment_operations_position(
         403: {"description": "Sem permissão"},
         404: {"description": "Investimento não encontrado"},
     },
-)  # type: ignore[misc]
-@use_kwargs(  # type: ignore[misc]
+)
+@use_kwargs(
     {"date": fields.Date(required=True)},
     location="query",
 )
-@jwt_required()  # type: ignore[misc]
+@jwt_required()
 def get_invested_amount_by_date(
     investment_id: UUID, date: date
 ) -> tuple[dict[str, Any], int]:
@@ -714,7 +705,7 @@ def get_invested_amount_by_date(
     )
 
 
-@wallet_bp.route("/valuation", methods=["GET"])  # type: ignore[misc]
+@wallet_bp.route("/valuation", methods=["GET"])
 @doc(
     description=(
         "Retorna a valorização atual consolidada da carteira do usuário, "
@@ -734,8 +725,8 @@ def get_invested_amount_by_date(
         200: {"description": "Valorização retornada com sucesso"},
         401: {"description": "Token inválido"},
     },
-)  # type: ignore[misc]
-@jwt_required()  # type: ignore[misc]
+)
+@jwt_required()
 def get_portfolio_valuation() -> tuple[dict[str, Any], int]:
     user_id: UUID = UUID(get_jwt_identity())
     service = PortfolioValuationService(user_id)
@@ -748,7 +739,7 @@ def get_portfolio_valuation() -> tuple[dict[str, Any], int]:
     )
 
 
-@wallet_bp.route("/valuation/history", methods=["GET"])  # type: ignore[misc]
+@wallet_bp.route("/valuation/history", methods=["GET"])
 @doc(
     description=(
         "Retorna histórico diário de evolução da carteira por período, com "
@@ -779,8 +770,8 @@ def get_portfolio_valuation() -> tuple[dict[str, Any], int]:
         400: {"description": "Parâmetros inválidos"},
         401: {"description": "Token inválido"},
     },
-)  # type: ignore[misc]
-@jwt_required()  # type: ignore[misc]
+)
+@jwt_required()
 def get_portfolio_valuation_history() -> tuple[dict[str, Any], int]:
     user_id: UUID = UUID(get_jwt_identity())
 
@@ -817,7 +808,7 @@ def get_portfolio_valuation_history() -> tuple[dict[str, Any], int]:
     )
 
 
-@wallet_bp.route(  # type: ignore[misc]
+@wallet_bp.route(
     "/<uuid:investment_id>/valuation",
     methods=["GET"],
 )
@@ -840,8 +831,8 @@ def get_portfolio_valuation_history() -> tuple[dict[str, Any], int]:
         403: {"description": "Sem permissão"},
         404: {"description": "Investimento não encontrado"},
     },
-)  # type: ignore[misc]
-@jwt_required()  # type: ignore[misc]
+)
+@jwt_required()
 def get_investment_valuation(investment_id: UUID) -> tuple[dict[str, Any], int]:
     user_id: UUID = UUID(get_jwt_identity())
     service = PortfolioValuationService(user_id)
@@ -859,7 +850,7 @@ def get_investment_valuation(investment_id: UUID) -> tuple[dict[str, Any], int]:
 
 
 # PUT /wallet/<uuid:investment_id> - Atualizar investimento existente
-@wallet_bp.route("/<uuid:investment_id>", methods=["PUT"])  # type: ignore[misc]
+@wallet_bp.route("/<uuid:investment_id>", methods=["PUT"])
 @doc(
     description="Atualiza um investimento existente da carteira do usuário.",
     tags=["Wallet"],
@@ -879,8 +870,8 @@ def get_investment_valuation(investment_id: UUID) -> tuple[dict[str, Any], int]:
         401: {"description": "Token inválido"},
         404: {"description": "Investimento não encontrado"},
     },
-)  # type: ignore[misc]
-@jwt_required()  # type: ignore[misc]
+)
+@jwt_required()
 def update_wallet_entry(investment_id: UUID) -> tuple[dict[str, Any], int]:
     """Atualiza um investimento existente (pertencente ao usuário autenticado)."""
     user_id: UUID = UUID(get_jwt_identity())
@@ -1012,22 +1003,19 @@ def _commit_investment_update(investment: Wallet) -> tuple[dict[str, Any], int]:
             message="Investimento atualizado com sucesso",
             data={"investment": investment_data},
         )
-    except Exception as e:
+    except Exception:
         db.session.rollback()
-        import traceback
-
-        print("Erro inesperado:", traceback.format_exc())
+        current_app.logger.exception("Erro inesperado ao atualizar investimento.")
         return _compat_error(
-            legacy_payload={"error": "Erro interno", "message": str(e)},
+            legacy_payload={"error": "Erro interno"},
             status_code=500,
             message="Erro interno",
             error_code="INTERNAL_ERROR",
-            details={"exception": str(e)},
         )
 
 
 # DELETE /wallet/<uuid:investment_id> - Deletar investimento existente
-@wallet_bp.route("/<uuid:investment_id>", methods=["DELETE"])  # type: ignore[misc]
+@wallet_bp.route("/<uuid:investment_id>", methods=["DELETE"])
 @doc(
     description="Deleta um investimento da carteira do usuário autenticado.",
     tags=["Wallet"],
@@ -1047,8 +1035,8 @@ def _commit_investment_update(investment: Wallet) -> tuple[dict[str, Any], int]:
         403: {"description": "Sem permissão para deletar"},
         404: {"description": "Investimento não encontrado"},
     },
-)  # type: ignore[misc]
-@jwt_required()  # type: ignore[misc]
+)
+@jwt_required()
 def delete_wallet_entry(investment_id: UUID) -> tuple[dict[str, Any], int]:
     """Deleta um investimento existente (pertencente ao usuário autenticado)."""
     user_id: UUID = UUID(get_jwt_identity())
@@ -1079,12 +1067,12 @@ def delete_wallet_entry(investment_id: UUID) -> tuple[dict[str, Any], int]:
             message="Investimento deletado com sucesso",
             data={},
         )
-    except Exception as e:
+    except Exception:
         db.session.rollback()
+        current_app.logger.exception("Erro ao deletar investimento.")
         return _compat_error(
-            legacy_payload={"error": "Erro ao deletar investimento", "message": str(e)},
+            legacy_payload={"error": "Erro ao deletar investimento"},
             status_code=500,
             message="Erro ao deletar investimento",
             error_code="INTERNAL_ERROR",
-            details={"exception": str(e)},
         )

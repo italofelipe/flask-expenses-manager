@@ -16,6 +16,7 @@ Jobs:
 - `isort --check-only .`
 - `flake8 .`
 - `mypy app`
+- `pip-audit -r requirements.txt`
 
 Dependências instaladas no job:
 - `requirements.txt`
@@ -80,6 +81,12 @@ Variáveis necessárias no ambiente local:
 - `SONAR_PROJECT_KEY`
 - `SONAR_ORGANIZATION`
 - opcional: `SONAR_HOST_URL` (default: `https://sonarcloud.io`)
+
+## Hardening de runtime validado no CI
+- `MAX_REQUEST_BYTES` para limitar payload global (DoS guard).
+- `SECURITY_ENFORCE_STRONG_SECRETS=true` em produção para bloquear startup inseguro.
+- `CORS_ALLOWED_ORIGINS` com allowlist por ambiente.
+- `GRAPHQL_ALLOW_INTROSPECTION=false` em produção por padrão.
 
 Comando manual:
 ```bash

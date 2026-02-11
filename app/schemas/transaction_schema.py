@@ -1,4 +1,6 @@
-from marshmallow import Schema, fields, validate
+from marshmallow import Schema, fields, pre_load, validate
+
+from app.schemas.sanitization import sanitize_string_fields
 
 
 class TransactionSchema(Schema):
@@ -98,6 +100,28 @@ class TransactionSchema(Schema):
     updated_at = fields.DateTime(
         dump_only=True, description="Data da última atualização"
     )
+
+    @pre_load  # type: ignore[misc]
+    def sanitize_input(self, data: object, **kwargs: object) -> object:
+        sanitized = sanitize_string_fields(
+            data,
+            {
+                "title",
+                "description",
+                "observation",
+                "type",
+                "status",
+                "currency",
+            },
+        )
+        if isinstance(sanitized, dict):
+            if isinstance(sanitized.get("type"), str):
+                sanitized["type"] = str(sanitized["type"]).lower()
+            if isinstance(sanitized.get("status"), str):
+                sanitized["status"] = str(sanitized["status"]).lower()
+            if isinstance(sanitized.get("currency"), str):
+                sanitized["currency"] = str(sanitized["currency"]).upper()
+        return sanitized
 
 
 class TransactionResponseSchema(Schema):

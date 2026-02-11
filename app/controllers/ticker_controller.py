@@ -1,6 +1,6 @@
 from typing import no_type_check
 
-from flask import Blueprint, Response, jsonify, request
+from flask import Blueprint, Response, current_app, jsonify, request
 from flask_jwt_extended import get_jwt_identity, jwt_required
 from marshmallow import ValidationError
 
@@ -48,9 +48,10 @@ def add_ticker() -> Response:
         db.session.add(ticker)
         db.session.commit()
         return jsonify(schema.dump(ticker)), 201
-    except Exception as e:
+    except Exception:
         db.session.rollback()
-        return jsonify({"error": "Erro ao adicionar ticker", "message": str(e)}), 400
+        current_app.logger.exception("Erro ao adicionar ticker.")
+        return jsonify({"error": "Erro ao adicionar ticker"}), 400
 
 
 @no_type_check

@@ -1,5 +1,7 @@
 from flask_marshmallow import Marshmallow
-from marshmallow import Schema, fields, validate
+from marshmallow import Schema, fields, pre_load, validate
+
+from app.schemas.sanitization import sanitize_string_fields
 
 ma = Marshmallow()
 
@@ -34,6 +36,13 @@ class UserRegistrationSchema(Schema):
             ),
         ),
     )
+
+    @pre_load  # type: ignore[misc]
+    def sanitize_input(self, data: object, **kwargs: object) -> object:
+        sanitized = sanitize_string_fields(data, {"name", "email"})
+        if isinstance(sanitized, dict) and isinstance(sanitized.get("email"), str):
+            sanitized["email"] = str(sanitized["email"]).lower()
+        return sanitized
 
 
 class UserProfileSchema(Schema):
@@ -79,6 +88,10 @@ class UserProfileSchema(Schema):
         description="Data meta para atingir objetivo de investimento",
         example="2030-12-31",
     )
+
+    @pre_load  # type: ignore[misc]
+    def sanitize_input(self, data: object, **kwargs: object) -> object:
+        return sanitize_string_fields(data, {"gender"})
 
 
 class UserSchema(Schema):

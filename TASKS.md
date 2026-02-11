@@ -74,24 +74,24 @@ Ultima atualizacao: 2026-02-11
 | R1 | Rebranding | Mapear todas ocorrências de nomenclatura legada do projeto e registrar plano de substituição para `auraxis` | Done | 100% | Baixo: mapeamento concluído em arquivos versionados | pending-commit | 2026-02-10 |
 | R2 | Rebranding | Substituir ocorrências versionadas de nomenclatura legada por `auraxis` (sem quebrar integrações externas) | Done | 100% | Medio: integrações externas podem manter identificador legado temporário | pending-commit | 2026-02-10 |
 | S1 | AWS Security | Restringir acesso e hardening de instâncias EC2 (SG, NACL, IMDSv2, SSH policy, patching baseline) | Todo | 0% | Alto: superfície de ataque de infraestrutura |  | 2026-02-10 |
-| S2 | App Security | Implementar segurança de endpoints (rate-limit, validação/sanitização de request/response, headers e authz por recurso) | In Progress | 50% | Alto: limites de consumo ativos, pendente sanitização central e matriz de authz | pending-commit | 2026-02-11 |
+| S2 | App Security | Implementar segurança de endpoints (rate-limit, validação/sanitização de request/response, headers e authz por recurso) | In Progress | 78% | Alto: baseline forte entregue, pendente authz deny-by-default GraphQL, auditoria e storage distribuído | pending-commit | 2026-02-11 |
 | S3 | App Security | Executar checklist OWASP no sistema (ASVS/API Top 10), corrigir gaps e formalizar evidências | In Progress | 85% | Alto: risco de vulnerabilidades críticas não mapeadas | pending-commit | 2026-02-11 |
-| S4-01 | App Security | Remover vazamento de exceções em respostas (`str(e)`, `traceback`) e adotar erros genéricos com correlação | Todo | 0% | Alto: exposição de detalhes internos |  | 2026-02-11 |
-| S4-02 | App Security | Substituir `print` por logging estruturado com níveis e política de redaction | Todo | 0% | Medio: vazamento acidental e baixa auditabilidade |  | 2026-02-11 |
-| S4-03 | App Security | Padronizar callbacks JWT e middleware para contrato de erro único (v1/v2) e status codes consistentes | Todo | 0% | Medio: comportamento inconsistente em auth |  | 2026-02-11 |
-| S4-04 | App Security | Implementar limite global de tamanho de request body para endpoints REST | Todo | 0% | Alto: risco de DoS por payload grande |  | 2026-02-11 |
-| S4-05 | App Security | Endurecer paginação e limites de resposta (ex.: `limit` em `/user/me`, `per_page<=0` em histórico) | Todo | 0% | Alto: risco de consumo excessivo de recursos |  | 2026-02-11 |
-| S4-06 | App Security | Implementar sanitização/normalização central para campos textuais de entrada | Todo | 0% | Alto: risco de payload malicioso em logs/consumidores |  | 2026-02-11 |
+| S4-01 | App Security | Remover vazamento de exceções em respostas (`str(e)`, `traceback`) e adotar erros genéricos com correlação | Done | 100% | Médio: manter revisão contínua em novos endpoints | pending-commit | 2026-02-11 |
+| S4-02 | App Security | Substituir `print` por logging estruturado com níveis e política de redaction | In Progress | 85% | Médio: remanescente em scripts utilitários fora do runtime HTTP | pending-commit | 2026-02-11 |
+| S4-03 | App Security | Padronizar callbacks JWT e middleware para contrato de erro único (v1/v2) e status codes consistentes | Done | 100% | Baixo | pending-commit | 2026-02-11 |
+| S4-04 | App Security | Implementar limite global de tamanho de request body para endpoints REST | Done | 100% | Baixo: limite parametrizado por ambiente | pending-commit | 2026-02-11 |
+| S4-05 | App Security | Endurecer paginação e limites de resposta (ex.: `limit` em `/user/me`, `per_page<=0` em histórico) | Done | 100% | Baixo: limites agora explícitos em REST/GraphQL | pending-commit | 2026-02-11 |
+| S4-06 | App Security | Implementar sanitização/normalização central para campos textuais de entrada | Done | 100% | Médio: expandir para todos os schemas legados | pending-commit | 2026-02-11 |
 | S4-07 | App Security | Aplicar política GraphQL deny-by-default para operações privadas e cobertura automática de autorização por resolver | Todo | 0% | Alto: risco de exposição caso resolver novo esqueça auth |  | 2026-02-11 |
-| S4-08 | App Security | Tornar introspecção GraphQL configurável por ambiente (desabilitar em PROD por padrão) | Todo | 0% | Medio: ampliação de superfície de reconhecimento |  | 2026-02-11 |
+| S4-08 | App Security | Tornar introspecção GraphQL configurável por ambiente (desabilitar em PROD por padrão) | Done | 100% | Baixo | pending-commit | 2026-02-11 |
 | S4-09 | App Security | Endurecer consumo BRAPI (allowlist de ticker, validação estrita de resposta, fallback defensivo) | Todo | 0% | Medio: entrada externa não confiável |  | 2026-02-11 |
 | S4-10 | App Security | Evoluir rate-limit e revogação de token para storage distribuído (Redis) | Todo | 0% | Alto: controle atual in-memory não escala em múltiplas instâncias |  | 2026-02-11 |
-| S4-11 | App Security | Remover fallback de secrets fracos em runtime não-dev e falhar startup sem segredos fortes | Todo | 0% | Alto: risco de configuração insegura |  | 2026-02-11 |
-| S4-12 | App Security | Definir política CORS estrita por ambiente (origins permitidas, métodos, headers) | Todo | 0% | Medio: exposição indevida via browser clients |  | 2026-02-11 |
+| S4-11 | App Security | Remover fallback de secrets fracos em runtime não-dev e falhar startup sem segredos fortes | Done | 100% | Baixo: bloqueio de startup em runtime inseguro | pending-commit | 2026-02-11 |
+| S4-12 | App Security | Definir política CORS estrita por ambiente (origins permitidas, métodos, headers) | Done | 100% | Médio: manter allowlist por ambiente atualizada | pending-commit | 2026-02-11 |
 | S4-13 | App Security | Implementar trilha de auditoria para ações sensíveis (login, perfil, transações, carteira) | Todo | 0% | Medio: baixa rastreabilidade de incidentes |  | 2026-02-11 |
 | S4-14 | App Security | Revisar/remover código legado não registrado (`ticker_controller`) e alinhar superfície real de API | Todo | 0% | Baixo: risco de dívida técnica e confusão operacional |  | 2026-02-11 |
 | S4-15 | App Security | Formalizar threat model (STRIDE + abuse cases) e critérios de aceite por risco | Todo | 0% | Medio: decisões de segurança sem baseline formal |  | 2026-02-11 |
-| S4-16 | App Security | Adicionar scan de vulnerabilidades de dependências no CI (`pip-audit`/equivalente) | Todo | 0% | Medio: risco de CVEs não detectadas cedo |  | 2026-02-11 |
+| S4-16 | App Security | Adicionar scan de vulnerabilidades de dependências no CI (`pip-audit`/equivalente) | Done | 100% | Baixo | pending-commit | 2026-02-11 |
 | X1 | Tech Debt | Remover/atualizar TODO desatualizado sobre enums em transacoes | Todo | 0% | Baixo: clareza de manutencao |  | 2026-02-09 |
 
 ## Registro de progresso recente
@@ -128,10 +128,11 @@ Ultima atualizacao: 2026-02-11
 | 2026-02-11 | S2.1/H2 | Baseline de rate-limit para REST+GraphQL implementado (`app/middleware/rate_limit.py`) com testes dedicados (`tests/test_rate_limit.py`) e atualização do checklist OWASP | pending-commit |
 | 2026-02-11 | S2.2/H1-HARDENING | Limites de transporte GraphQL implementados (tamanho/profundidade/complexidade/operações) com política configurável (`app/graphql/security.py`) e testes (`tests/test_graphql_security.py`) | pending-commit |
 | 2026-02-11 | S3.5/H3 | Revisão de fragilidades de segurança na aplicação e mapeamento em backlog de remediação (`S4-01..S4-16`) | pending-commit |
+| 2026-02-11 | S2.3/S4 | Hardening aplicado: limite global de payload, CORS por ambiente, introspecção GraphQL configurável, sanitização central, paginação endurecida, segredos fortes obrigatórios e scan `pip-audit` no CI + testes de segurança | pending-commit |
 | 2026-02-09 | D (observacao) | Restaurados arquivos deletados acidentalmente: ticker/carteira | n/a |
 
 ## Proxima prioridade sugerida
-- S2 (P0): executar `S4-01`, `S4-04`, `S4-05`, `S4-06` e `S4-10` como pacote crítico de segurança.
+- S2 (P0): executar `S4-07`, `S4-09`, `S4-10` e `S4-13` (authz deny-by-default GraphQL, hardening BRAPI, storage distribuído, trilha de auditoria).
 
 ## Mapeamento Rebranding (nomenclatura legada -> `auraxis`)
 

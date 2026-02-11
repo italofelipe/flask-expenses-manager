@@ -1,9 +1,9 @@
 from typing import Any
 
-from flask import jsonify, request
+from flask import request
 from flask_jwt_extended import get_jwt, verify_jwt_in_request
 
-from app.extensions.jwt_callbacks import revoked_tokens
+from app.extensions.jwt_callbacks import _jwt_error_response
 
 
 def register_auth_guard(app: Any) -> None:
@@ -26,15 +26,16 @@ def register_auth_guard(app: Any) -> None:
             return
         if request.path.startswith("/docs"):
             return
-        print("ENDPOINT REQUISITADO:", request.endpoint)
         endpoint = request.endpoint.split(".")[-1]
         if endpoint in open_endpoints:
             return
 
         try:
             verify_jwt_in_request()
-            jti = get_jwt()["jti"]
-            if jti in revoked_tokens:
-                return jsonify({"message": "Token revogado"}), 401
+            get_jwt()
         except Exception:
-            return jsonify({"message": "Token inválido ou ausente"}), 401
+            return _jwt_error_response(
+                "Token inválido ou ausente",
+                code="UNAUTHORIZED",
+                status_code=401,
+            )

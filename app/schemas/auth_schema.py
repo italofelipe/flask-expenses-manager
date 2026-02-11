@@ -1,4 +1,6 @@
-from marshmallow import Schema, ValidationError, fields, validates_schema
+from marshmallow import Schema, ValidationError, fields, pre_load, validates_schema
+
+from app.schemas.sanitization import sanitize_string_fields
 
 
 class AuthSchema(Schema):
@@ -17,6 +19,13 @@ class AuthSchema(Schema):
     password = fields.String(
         required=True, description="Senha do usuário", example="minhasenha123"
     )
+
+    @pre_load  # type: ignore[misc]
+    def sanitize_input(self, data: object, **kwargs: object) -> object:
+        sanitized = sanitize_string_fields(data, {"email", "name"})
+        if isinstance(sanitized, dict) and isinstance(sanitized.get("email"), str):
+            sanitized["email"] = str(sanitized["email"]).lower()
+        return sanitized
 
     @validates_schema  # type: ignore[misc]
     def validate_identity(self, data: dict[str, str], **kwargs: object) -> None:

@@ -5,6 +5,7 @@ from typing import Any, Dict
 from app.graphql.security import (
     GRAPHQL_COMPLEXITY_LIMIT_EXCEEDED,
     GRAPHQL_DEPTH_LIMIT_EXCEEDED,
+    GRAPHQL_INTROSPECTION_DISABLED,
     GRAPHQL_OPERATION_LIMIT_EXCEEDED,
     GRAPHQL_QUERY_TOO_LARGE,
     GraphQLSecurityPolicy,
@@ -155,3 +156,17 @@ def test_graphql_rejects_query_exceeding_size_limit(client: Any) -> None:
     body = response.get_json()
     error = body["errors"][0]
     assert error["extensions"]["code"] == GRAPHQL_QUERY_TOO_LARGE
+
+
+def test_graphql_blocks_introspection_when_disabled(client: Any) -> None:
+    policy = _policy(client)
+    policy.update_limits(allow_introspection=False)
+
+    response = _graphql(
+        client, "query Introspection { __schema { queryType { name } } }"
+    )
+
+    assert response.status_code == 400
+    body = response.get_json()
+    error = body["errors"][0]
+    assert error["extensions"]["code"] == GRAPHQL_INTROSPECTION_DISABLED

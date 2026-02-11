@@ -1,6 +1,9 @@
+# mypy: disable-error-code=name-defined
+
 import enum
 from datetime import datetime
 from typing import Any
+from uuid import UUID as UUIDType
 from uuid import uuid4
 
 from sqlalchemy.dialects.postgresql import UUID
@@ -72,7 +75,7 @@ class Transaction(db.Model):
         )
 
     @staticmethod
-    def get_monthly_summary(user_id: UUID, year: int, month: int) -> dict[str, Any]:
+    def get_monthly_summary(user_id: UUIDType, year: int, month: int) -> dict[str, Any]:
         from sqlalchemy import extract, func
 
         income_total = (

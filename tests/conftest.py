@@ -17,6 +17,10 @@ def app(tmp_path: Path):
     os.environ["SECRET_KEY"] = "test-secret"
     os.environ["JWT_SECRET_KEY"] = "test-jwt-secret"
     os.environ["FLASK_DEBUG"] = "False"
+    os.environ["FLASK_TESTING"] = "true"
+    os.environ["SECURITY_ENFORCE_STRONG_SECRETS"] = "false"
+    os.environ["CORS_ALLOWED_ORIGINS"] = "https://frontend.local"
+    os.environ["GRAPHQL_ALLOW_INTROSPECTION"] = "true"
     os.environ["BRAPI_CACHE_TTL_SECONDS"] = "0"
 
     from app import create_app

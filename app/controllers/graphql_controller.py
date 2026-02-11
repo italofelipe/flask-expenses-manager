@@ -1,6 +1,6 @@
 from typing import Any, Dict
 
-from flask import Blueprint, Flask, current_app, jsonify, request
+from flask import Blueprint, Flask, current_app, request
 
 from app.graphql import schema
 from app.graphql.security import (
@@ -75,7 +75,7 @@ def execute_graphql() -> tuple[dict[str, Any], int]:
     status_code = 200
     if result.errors and result.data is None:
         status_code = 400
-    return jsonify(response), status_code
+    return response, status_code
 
 
 def register_graphql_security(app: Flask) -> None:

@@ -1,3 +1,5 @@
+# mypy: disable-error-code=no-any-return
+
 from datetime import date, datetime
 from decimal import ROUND_DOWN, Decimal
 from typing import Any, Dict

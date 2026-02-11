@@ -1,7 +1,9 @@
 from datetime import date
 from typing import Any, Dict
 
-from marshmallow import Schema, ValidationError, fields, validates_schema
+from marshmallow import Schema, ValidationError, fields, pre_load, validates_schema
+
+from app.schemas.sanitization import sanitize_string_fields
 
 ASSET_CLASSES = {
     "custom",
@@ -43,6 +45,16 @@ class WalletSchema(Schema):
     should_be_on_wallet = fields.Boolean(required=True)
     created_at = fields.DateTime(dump_only=True)
     updated_at = fields.DateTime(dump_only=True)
+
+    @pre_load  # type: ignore[misc]
+    def sanitize_input(self, data: object, **kwargs: object) -> object:
+        sanitized = sanitize_string_fields(data, {"name", "ticker", "asset_class"})
+        if isinstance(sanitized, dict):
+            if isinstance(sanitized.get("ticker"), str):
+                sanitized["ticker"] = str(sanitized["ticker"]).upper()
+            if isinstance(sanitized.get("asset_class"), str):
+                sanitized["asset_class"] = str(sanitized["asset_class"]).lower()
+        return sanitized
 
     @validates_schema  # type: ignore[misc]
     def validate_fields(self, data: Dict[str, Any], **kwargs: Any) -> None:

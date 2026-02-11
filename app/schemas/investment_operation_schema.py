@@ -2,7 +2,9 @@ from datetime import date
 from decimal import Decimal
 from typing import Any, Dict
 
-from marshmallow import Schema, ValidationError, fields, validates_schema
+from marshmallow import Schema, ValidationError, fields, pre_load, validates_schema
+
+from app.schemas.sanitization import sanitize_string_fields
 
 
 class InvestmentOperationSchema(Schema):
@@ -17,6 +19,15 @@ class InvestmentOperationSchema(Schema):
     notes = fields.String(allow_none=True)
     created_at = fields.DateTime(dump_only=True)
     updated_at = fields.DateTime(dump_only=True)
+
+    @pre_load  # type: ignore[misc]
+    def sanitize_input(self, data: object, **kwargs: object) -> object:
+        sanitized = sanitize_string_fields(data, {"operation_type", "notes"})
+        if isinstance(sanitized, dict) and isinstance(
+            sanitized.get("operation_type"), str
+        ):
+            sanitized["operation_type"] = str(sanitized["operation_type"]).lower()
+        return sanitized
 
     @validates_schema  # type: ignore[misc]
     def validate_business_rules(self, data: Dict[str, Any], **kwargs: Any) -> None:

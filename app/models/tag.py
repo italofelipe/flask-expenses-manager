@@ -1,3 +1,5 @@
+# mypy: disable-error-code=name-defined
+
 from uuid import uuid4
 
 from sqlalchemy.dialects.postgresql import UUID

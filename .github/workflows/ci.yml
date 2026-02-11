@@ -32,6 +32,10 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements.txt
           pip install -r requirements-dev.txt
+          pip install pip-audit
+
+      - name: Dependency vulnerability scan
+        run: pip-audit -r requirements.txt
 
       - name: Black (check)
         run: black --check .
