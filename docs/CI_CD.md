@@ -40,14 +40,18 @@ Jobs:
 - gate de mutation testing com `cosmic-ray`
 - script: `scripts/mutation_gate.sh`
 - configuração: `scripts/cosmic_ray.toml`
+- `test-command` usa `python -m pytest ...` (sem path hardcoded de `.venv`) para compatibilidade com CI e execução local.
 
 7. `trivy`
 - scan de vulnerabilidades no filesystem do repo
 - build da imagem prod e scan de imagem
+- imagem de produção endurecida com Docker multi-stage, usuário não-root e runtime mínimo.
+- `.dockerignore` bloqueia arquivos sensíveis (`.env*`, `*.pem`, `*.key`) para não entrarem no contexto/imagem.
 
 8. `snyk` (condicional)
 - só roda quando `vars.SNYK_ENABLED == 'true'`
 - scan de dependências Python e de container
+- actions pinadas por commit SHA imutável (evita risco de supply-chain por branch mutável).
 
 9. `security-evidence`
 - executa `scripts/security_evidence_check.sh`

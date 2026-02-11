@@ -55,8 +55,8 @@ Ultima atualizacao: 2026-02-11
 | G6 | CI/Security | Reforcar pre-commit com secret scanning confiável (Gitleaks), Bandit e detecção de private keys | In Progress | 80% | Médio: risco de falso positivo em segredos de teste |  | 2026-02-11 |
 | G7 | CI/Resilience | Adicionar teste de confiabilidade de contrato OpenAPI com Schemathesis | In Progress | 75% | Médio: flakiness se escopo de fuzzing crescer sem calibração |  | 2026-02-11 |
 | G8 | CI/Quality | Adicionar gate de mutation testing (Cosmic Ray) para módulos críticos | Done | 100% | Médio: custo de execução controlado por escopo e filtro de operadores | pending-commit | 2026-02-11 |
-| G9 | CI/Security | Integrar Snyk (dependências e container) com gate condicional por `SNYK_ENABLED` | In Progress | 65% | Médio: requer `SNYK_TOKEN` e calibração de baseline |  | 2026-02-11 |
-| G10 | CI/Security | Integrar scan de imagem/container com Trivy em todo PR/push | In Progress | 75% | Médio: CVEs de base image podem bloquear merge sem política de exceção |  | 2026-02-11 |
+| G9 | CI/Security | Integrar Snyk (dependências e container) com gate condicional por `SNYK_ENABLED` | In Progress | 85% | Baixo: actions fixadas por SHA imutável; pendente somente calibração fina de baseline/ruleset |  | 2026-02-11 |
+| G10 | CI/Security | Integrar scan de imagem/container com Trivy em todo PR/push | Done | 100% | Baixo: pipeline validado com imagem hardenizada e scan HIGH/CRITICAL limpo no baseline atual | pending-commit | 2026-02-11 |
 | G11 | CI/Governance | Formalizar política de branch protection + required checks + push protection no GitHub | Todo | 0% | Alto: sem enforcement central, gates podem ser ignorados |  | 2026-02-11 |
 | G12 | CI/Quality | Garantir paridade local do job `Quality` (script Python 3.11 + hook mypy alinhado ao CI) | Done | 100% | Baixo | pending-commit | 2026-02-11 |
 | G13 | CI/Quality | Adicionar matrix de tipagem (`mypy`) em Python 3.11 e 3.13 para reduzir regressão entre ambientes | Todo | 0% | Médio: divergência de stubs entre versões pode voltar a gerar falso positivo/falso negativo |  | 2026-02-11 |
@@ -123,7 +123,7 @@ Ultima atualizacao: 2026-02-11
 | S6-08 | App Security | Endurecer defaults de runtime (`DEBUG=False` por padrão seguro e validação de startup) | Todo | 0% | Médio: risco por configuração ausente/incompleta |  | 2026-02-11 |
 | S6-09 | App Security | Retirar sweep de retenção de auditoria do ciclo de request (job agendado/assíncrono) | Todo | 0% | Médio: impacto em latência e disponibilidade |  | 2026-02-11 |
 | S6-10 | App Security | Atualizar dependências com CVE (`Flask`, `marshmallow`) e zerar `pip-audit` runtime | Done | 100% | Baixo: gate validado com `pip-audit` sem vulnerabilidades conhecidas | afc15c7 | 2026-02-11 |
-| S6-11 | App Security | Harden Docker de produção (non-root, multi-stage, runtime deps only) | Todo | 0% | Médio: superfície de ataque de container |  | 2026-02-11 |
+| S6-11 | App Security | Harden Docker de produção (non-root, multi-stage, runtime deps only) | Done | 100% | Baixo: multi-stage + non-root + contexto sem segredos reduziram superfície e removeram CVEs críticos/altos observados | pending-commit | 2026-02-11 |
 | S6-12 | App Security | Definir política de exposição de documentação em produção (`/docs`) por ambiente/autenticação | Todo | 0% | Baixo: disclosure de metadata da API |  | 2026-02-11 |
 | X1 | Tech Debt | Remover/atualizar TODO desatualizado sobre enums em transacoes | Todo | 0% | Baixo: clareza de manutencao |  | 2026-02-09 |
 
@@ -192,6 +192,8 @@ Ultima atualizacao: 2026-02-11
 | 2026-02-11 | S6-10 | Dependências com CVE atualizadas (`Flask 3.1.1`, `marshmallow 3.26.2`, `Werkzeug 3.1.5`) e validação `pip-audit` limpa | afc15c7 |
 | 2026-02-11 | G12 | Correções de tipagem para CI (`mypy`) + alinhamento do hook local para usar ambiente real (`language: system`) + script de paridade local `scripts/run_ci_quality_local.sh` | pending-commit |
 | 2026-02-11 | G15 | Cursor Bugbot registrado em documentação de CI/CD como camada complementar de revisão de PR; estratégia de execução local e limitações formalizadas | pending-commit |
+| 2026-02-11 | G8/G9 | Hardening de CI: mutation test sem path hardcoded de `.venv` (compatível com runner GitHub) e actions Snyk fixadas por SHA imutável para reduzir risco de supply-chain | pending-commit |
+| 2026-02-11 | G10/S6-11 | Hardening de container para Trivy: Dockerfile.prod multi-stage, runtime não-root, atualização de pacotes no estágio final e exclusão de `.env/.pem/.key` no `.dockerignore`; scan local Trivy (HIGH/CRITICAL) limpo | pending-commit |
 | 2026-02-09 | D (observacao) | Restaurados arquivos deletados acidentalmente: ticker/carteira | n/a |
 
 ## Proxima prioridade sugerida

@@ -18,3 +18,9 @@ awscli-bundle.zip
 Flask - Expenses.postman_collection.json
 docs
 tests
+*.pem
+**/*.pem
+*.key
+**/*.key
+.env
+.env.*
