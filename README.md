@@ -130,6 +130,7 @@ Variáveis de ambiente principais:
 - `RATE_LIMIT_TRUST_PROXY_HEADERS=true` (recomendado em produção atrás de Nginx)
 - `RATE_LIMIT_BACKEND=redis` (em produção) ou `memory` (local/dev)
 - `RATE_LIMIT_REDIS_URL=redis://redis:6379/0` (quando backend for redis)
+- `RATE_LIMIT_FAIL_CLOSED=true` (recomendado em produção; retorna `503` se Redis indisponível)
 
 ## GraphQL hardening (baseline S2)
 - Proteções de transporte antes da execução:

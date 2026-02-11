@@ -93,7 +93,7 @@ Ultima atualizacao: 2026-02-11
 | S4-15 | App Security | Formalizar threat model (STRIDE + abuse cases) e critérios de aceite por risco | Todo | 0% | Medio: decisões de segurança sem baseline formal |  | 2026-02-11 |
 | S4-16 | App Security | Adicionar scan de vulnerabilidades de dependências no CI (`pip-audit`/equivalente) | Done | 100% | Baixo | pending-commit | 2026-02-11 |
 | S4-17 | App Security | Adicionar observabilidade de integrações externas (BRAPI): contadores por timeout, payload inválido e erro HTTP | Todo | 0% | Médio: troubleshooting ainda depende de logs ad-hoc |  | 2026-02-11 |
-| S5-01 | App Security | Eliminar fallback de memória para rate-limit em produção (fail-closed se Redis indisponível) | Todo | 0% | Alto: bypass de proteção sob falha de backend |  | 2026-02-11 |
+| S5-01 | App Security | Eliminar fallback de memória para rate-limit em produção (fail-closed se Redis indisponível) | Done | 100% | Médio: fail-closed implementado; falta monitoramento/alerta de indisponibilidade (S5-02/S5-10) | pending-commit | 2026-02-11 |
 | S5-02 | App Security | Implementar trilha de auditoria persistente (DB/CloudWatch) com retenção e busca por `request_id` | Todo | 0% | Alto: sem persistência, evidência de incidente pode se perder |  | 2026-02-11 |
 | S5-03 | App Security | Aplicar autorização por recurso no domínio GraphQL (não só no transporte), com testes de ownership | Todo | 0% | Alto: risco de acesso indevido por resolver legado |  | 2026-02-11 |
 | S5-04 | App Security | Endurecer CORS/headers por ambiente com validação de configuração no startup | Todo | 0% | Médio: configuração frouxa em ambiente real expõe superfície |  | 2026-02-11 |
@@ -144,6 +144,7 @@ Ultima atualizacao: 2026-02-11
 | 2026-02-11 | S2.5/S4-10 | Rate-limit com backend distribuído opcional (Redis) + fallback automático para memória + testes de backend e documentação de env | pending-commit |
 | 2026-02-11 | S2.6/S4-09 | Hardening BRAPI: sanitização/allowlist de ticker e validação estrita de payload de cotação/histórico com fallback seguro + testes | pending-commit |
 | 2026-02-11 | S4-13 | Trilha de auditoria adicionada para rotas sensíveis (`/auth`, `/user`, `/transactions`, `/wallet`, `/graphql`) com payload estruturado de request e testes | pending-commit |
+| 2026-02-11 | S5-01 | Rate limit em modo fail-closed para backend Redis indisponível (retorno 503), com configuração por ambiente e testes de backend/guard | pending-commit |
 | 2026-02-09 | D (observacao) | Restaurados arquivos deletados acidentalmente: ticker/carteira | n/a |
 
 ## Proxima prioridade sugerida

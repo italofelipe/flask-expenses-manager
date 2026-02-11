@@ -46,8 +46,10 @@ def _extract_user_id_safely() -> str | None:
 def _extract_client_ip() -> str | None:
     forwarded_for = request.headers.get("X-Forwarded-For", "").strip()
     if forwarded_for:
-        return forwarded_for.split(",")[0].strip()
-    return request.remote_addr
+        first_hop = forwarded_for.split(",")[0].strip()
+        return first_hop or None
+    remote_addr = request.remote_addr
+    return str(remote_addr) if remote_addr else None
 
 
 def _build_event_payload(response: Response) -> dict[str, Any]:

@@ -16,6 +16,10 @@ CONTRACT_HEADER = "X-API-Contract"
 CONTRACT_V2 = "v2"
 RATE_LIMIT_ERROR_CODE = "RATE_LIMIT_EXCEEDED"
 RATE_LIMIT_MESSAGE = "Limite de requisições excedido. Tente novamente em instantes."
+RATE_LIMIT_BACKEND_UNAVAILABLE_CODE = "RATE_LIMIT_BACKEND_UNAVAILABLE"
+RATE_LIMIT_BACKEND_UNAVAILABLE_MESSAGE = (
+    "Serviço temporariamente indisponível. Tente novamente em instantes."
+)
 
 KEY_SCOPE_IP = "ip"
 KEY_SCOPE_USER_OR_IP = "user_or_ip"
@@ -120,10 +124,18 @@ class RateLimiterService:
         rules: dict[str, RateLimitRule],
         storage: "RateLimitStorage",
         backend_name: str,
+        configured_backend: str,
+        backend_ready: bool,
+        fail_closed: bool,
+        backend_failure_reason: str | None = None,
     ) -> None:
         self._rules = rules
         self._storage = storage
         self.backend_name = backend_name
+        self.configured_backend = configured_backend
+        self.backend_ready = backend_ready
+        self.fail_closed = fail_closed
+        self.backend_failure_reason = backend_failure_reason
         self._route_rule_order: tuple[tuple[str, str], ...] = (
             ("/auth/login", "auth"),
             ("/auth/register", "auth"),
@@ -175,8 +187,28 @@ class RateLimiterService:
                 key_scope=KEY_SCOPE_USER_OR_IP,
             ),
         }
-        storage, backend_name = _build_storage_from_env()
-        return cls(rules=rules, storage=storage, backend_name=backend_name)
+        (
+            storage,
+            backend_name,
+            backend_ready,
+            configured_backend,
+            backend_failure_reason,
+        ) = _build_storage_from_env()
+        default_fail_closed = (
+            configured_backend == "redis"
+            and not _read_bool_env("FLASK_DEBUG", False)
+            and not _read_bool_env("FLASK_TESTING", False)
+        )
+        fail_closed = _read_bool_env("RATE_LIMIT_FAIL_CLOSED", default_fail_closed)
+        return cls(
+            rules=rules,
+            storage=storage,
+            backend_name=backend_name,
+            configured_backend=configured_backend,
+            backend_ready=backend_ready,
+            fail_closed=fail_closed,
+            backend_failure_reason=backend_failure_reason,
+        )
 
     def set_rule(
         self,
@@ -324,28 +356,52 @@ class RedisRateLimitStorage:
         return None
 
 
-def _build_storage_from_env() -> tuple[RateLimitStorage, str]:
+def _build_storage_from_env() -> tuple[
+    RateLimitStorage,
+    str,
+    bool,
+    str,
+    str | None,
+]:
     backend = str(os.getenv("RATE_LIMIT_BACKEND", "memory")).strip().lower()
     if backend != "redis":
-        return InMemoryRateLimitStorage(), "memory"
+        return InMemoryRateLimitStorage(), "memory", True, "memory", None
 
     redis_url = str(
         os.getenv("RATE_LIMIT_REDIS_URL", os.getenv("REDIS_URL", ""))
     ).strip()
     if not redis_url:
-        return InMemoryRateLimitStorage(), "memory"
+        return (
+            InMemoryRateLimitStorage(),
+            "memory",
+            False,
+            "redis",
+            "RATE_LIMIT_REDIS_URL not configured",
+        )
 
     try:
         import redis  # type: ignore[import-untyped]
     except Exception:
-        return InMemoryRateLimitStorage(), "memory"
+        return (
+            InMemoryRateLimitStorage(),
+            "memory",
+            False,
+            "redis",
+            "redis package unavailable",
+        )
 
     try:
         client = redis.Redis.from_url(redis_url)
         client.ping()
     except Exception:
-        return InMemoryRateLimitStorage(), "memory"
-    return RedisRateLimitStorage(client), "redis"
+        return (
+            InMemoryRateLimitStorage(),
+            "memory",
+            False,
+            "redis",
+            "redis backend unreachable",
+        )
+    return RedisRateLimitStorage(client), "redis", True, "redis", None
 
 
 def _build_rate_limited_response(decision: RateLimitDecision) -> Response:
@@ -376,6 +432,66 @@ def _build_rate_limited_response(decision: RateLimitDecision) -> Response:
     return response
 
 
+def _build_backend_unavailable_response(reason: str | None = None) -> Response:
+    details: dict[str, Any] = {}
+    if reason:
+        details["reason"] = reason
+
+    if _is_v2_contract_request():
+        payload = error_payload(
+            message=RATE_LIMIT_BACKEND_UNAVAILABLE_MESSAGE,
+            code=RATE_LIMIT_BACKEND_UNAVAILABLE_CODE,
+            details=details,
+        )
+    else:
+        payload = {
+            "message": RATE_LIMIT_BACKEND_UNAVAILABLE_MESSAGE,
+            "error": RATE_LIMIT_BACKEND_UNAVAILABLE_CODE,
+            "details": details,
+        }
+
+    response = jsonify(payload)
+    response.status_code = 503
+    response.headers["Retry-After"] = "5"
+    return response
+
+
+def _should_skip_rate_limit() -> bool:
+    if request.method == "OPTIONS":
+        return True
+    if request.path.startswith("/docs"):
+        return True
+    if request.endpoint in _SKIPPED_ENDPOINTS:
+        return True
+    return False
+
+
+def _is_fail_closed_active(limiter: RateLimiterService) -> bool:
+    return (
+        limiter.fail_closed
+        and limiter.configured_backend == "redis"
+        and not limiter.backend_ready
+    )
+
+
+def _consume_with_backend_guard(
+    limiter: RateLimiterService,
+) -> RateLimitDecision | Response | None:
+    if _is_fail_closed_active(limiter):
+        return _build_backend_unavailable_response(limiter.backend_failure_reason)
+
+    try:
+        return limiter.consume(
+            path=request.path,
+            user_subject=_extract_subject_from_bearer_token(),
+            client_ip=_get_client_ip(),
+        )
+    except Exception:
+        if limiter.fail_closed and limiter.configured_backend == "redis":
+            return _build_backend_unavailable_response("rate limit backend error")
+        return None
+
+
 def register_rate_limit_guard(app: Flask) -> None:
     if not _read_bool_env("RATE_LIMIT_ENABLED", True):
         return
@@ -384,18 +500,15 @@ def register_rate_limit_guard(app: Flask) -> None:
     app.extensions["rate_limiter"] = limiter
 
     def rate_limit_guard() -> Response | None:
-        if request.method == "OPTIONS":
-            return None
-        if request.path.startswith("/docs"):
-            return None
-        if request.endpoint in _SKIPPED_ENDPOINTS:
+        if _should_skip_rate_limit():
             return None
 
-        decision = limiter.consume(
-            path=request.path,
-            user_subject=_extract_subject_from_bearer_token(),
-            client_ip=_get_client_ip(),
-        )
+        outcome = _consume_with_backend_guard(limiter)
+        if isinstance(outcome, Response):
+            return outcome
+        if outcome is None:
+            return None
+        decision = outcome
         g.rate_limit_headers = decision.headers()
 
         if decision.allowed:
