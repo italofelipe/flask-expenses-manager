@@ -95,6 +95,9 @@ Validação de evidências de segurança:
 - Script: `/opt/auraxis/scripts/security_evidence_check.sh`
 - Job CI: `security-evidence`
 - Artefato gerado: `reports/security/security-evidence.md`
+- Inclui checks de baseline para:
+  - guard de profundidade GraphQL
+  - guard de complexidade GraphQL
 
 ## Observações
 - A suíte de testes usa SQLite em execução de teste (via `tests/conftest.py`).

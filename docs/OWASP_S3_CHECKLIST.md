@@ -10,11 +10,11 @@ Status scale: `PASS`, `PARTIAL`, `FAIL`, `N/A`.
 | API1 - Object-level authorization enforced in all user-owned resources | PARTIAL | Ownership checks present in multiple controllers; missing consolidated matrix tests | Backend | Add endpoint-level authorization tests by resource type |
 | API2 - Authentication and token lifecycle hardened | PARTIAL | JWT issuance/revocation present; no explicit rotation/runbook evidence in checklist | Backend/SRE | Add secret rotation policy + token/session hardening checks |
 | API3 - Property-level authorization and input field constraints | PARTIAL | Marshmallow validation present; no explicit field-level authorization matrix | Backend | Create allowed-fields matrix per update endpoint |
-| API4 - Resource consumption controls (rate/quotas/timeouts) | FAIL | No global rate-limit strategy for REST/GraphQL | Backend | Implement limiter baseline (S2) |
+| API4 - Resource consumption controls (rate/quotas/timeouts) | PARTIAL | Rate-limit baseline ativo e GraphQL com limites de profundidade/complexidade/tamanho/operações (`app/middleware/rate_limit.py`, `app/graphql/security.py`) | Backend | Endurecer quotas por ambiente e adicionar storage distribuído (Redis) |
 | API5 - Function-level authorization boundaries documented/tested | PARTIAL | Auth guard + resolver auth exist; no explicit operation policy map | Backend | Add policy map and negative tests |
-| API6 - Sensitive business flow abuse protections | FAIL | No anti-abuse controls on critical flows (auth/transaction creation) | Backend | Add throttling + anomaly heuristics |
+| API6 - Sensitive business flow abuse protections | PARTIAL | Fluxos críticos com throttling base (auth e transações) via regras dedicadas de rate-limit | Backend | Adicionar heurísticas de abuso, lock progressivo e observabilidade de anomalia |
 | API7 - SSRF and outbound request controls | PARTIAL | External provider call exists; no explicit allowlist/policy doc | Backend/SRE | Add outbound policy and validation |
-| API8 - Security misconfiguration controls | PARTIAL | TLS enabled, but hardening checklist and config evidence incomplete | SRE | Complete hardening controls + evidence |
+| API8 - Security misconfiguration controls | PARTIAL | TLS + baseline de limites GraphQL; faltam hardening de produção e matriz formal de configuração segura | SRE | Complete hardening controls + evidence |
 | API9 - API inventory and lifecycle management | PARTIAL | Inventory started in `OWASP_S3_INVENTORY.md` | Backend | Tie inventory to owners and CI evidence |
 | API10 - Safe consumption of third-party APIs | PARTIAL | BRAPI integration has resilience; needs stricter trust/validation policy | Backend | Add external response validation policy |
 

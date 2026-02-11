@@ -14,7 +14,7 @@ from app.controllers.auth_controller import (
     RegisterResource,
     auth_bp,
 )
-from app.controllers.graphql_controller import graphql_bp
+from app.controllers.graphql_controller import graphql_bp, register_graphql_security
 from app.controllers.transaction_controller import TransactionResource, transaction_bp
 from app.controllers.user_controller import UserMeResource, UserProfileResource, user_bp
 from app.controllers.wallet_controller import wallet_bp
@@ -91,6 +91,7 @@ def create_app() -> Flask:
 
     # Registra erros globais
     register_error_handlers(app)
+    register_graphql_security(app)
 
     # Registra blueprints ANTES dos endpoints no Swagger
     app.register_blueprint(transaction_bp)
@@ -110,7 +111,9 @@ def create_app() -> Flask:
     )
     from app.extensions.jwt_callbacks import register_jwt_callbacks
     from app.middleware.auth_guard import register_auth_guard
+    from app.middleware.rate_limit import register_rate_limit_guard
 
+    register_rate_limit_guard(app)
     register_auth_guard(app)
     register_jwt_callbacks(jwt)
 

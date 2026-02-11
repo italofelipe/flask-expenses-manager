@@ -1,0 +1,329 @@
+from __future__ import annotations
+
+import os
+import threading
+from collections import defaultdict, deque
+from dataclasses import dataclass
+from time import monotonic
+from typing import Deque
+
+from flask import Flask, Response, g, jsonify, request
+from flask_jwt_extended import decode_token
+
+from app.utils.response_builder import error_payload
+
+CONTRACT_HEADER = "X-API-Contract"
+CONTRACT_V2 = "v2"
+RATE_LIMIT_ERROR_CODE = "RATE_LIMIT_EXCEEDED"
+RATE_LIMIT_MESSAGE = "Limite de requisições excedido. Tente novamente em instantes."
+
+KEY_SCOPE_IP = "ip"
+KEY_SCOPE_USER_OR_IP = "user_or_ip"
+
+_SKIPPED_ENDPOINTS = {
+    "static",
+    "swaggerui.index",
+    "swaggerui.static",
+    "swaggerui.swagger_json",
+    "swagger-ui",
+    "swagger-ui.static",
+    "swagger-ui.swagger_json",
+}
+
+
+def _read_int_env(name: str, default: int) -> int:
+    raw = os.getenv(name)
+    if raw is None:
+        return default
+    try:
+        parsed = int(raw)
+    except ValueError:
+        return default
+    return parsed if parsed > 0 else default
+
+
+def _read_bool_env(name: str, default: bool) -> bool:
+    raw = os.getenv(name)
+    if raw is None:
+        return default
+    return raw.strip().lower() in {"1", "true", "yes", "on"}
+
+
+def _is_v2_contract_request() -> bool:
+    header_value = str(request.headers.get(CONTRACT_HEADER, "")).strip().lower()
+    return header_value == CONTRACT_V2
+
+
+def _get_client_ip() -> str:
+    trust_proxy_headers = _read_bool_env("RATE_LIMIT_TRUST_PROXY_HEADERS", False)
+    if trust_proxy_headers:
+        forwarded_for = str(request.headers.get("X-Forwarded-For", "")).strip()
+        if forwarded_for:
+            first_hop = forwarded_for.split(",")[0].strip()
+            if first_hop:
+                return first_hop
+        real_ip = str(request.headers.get("X-Real-IP", "")).strip()
+        if real_ip:
+            return real_ip
+    return str(request.remote_addr or "unknown")
+
+
+def _extract_subject_from_bearer_token() -> str | None:
+    auth_header = str(request.headers.get("Authorization", "")).strip()
+    if not auth_header.lower().startswith("bearer "):
+        return None
+    token = auth_header.split(" ", 1)[1].strip()
+    if not token:
+        return None
+
+    try:
+        decoded = decode_token(token, allow_expired=False)
+    except Exception:
+        return None
+
+    subject = decoded.get("sub")
+    if subject is None:
+        return None
+    subject_str = str(subject).strip()
+    return subject_str or None
+
+
+@dataclass(frozen=True)
+class RateLimitRule:
+    name: str
+    limit: int
+    window_seconds: int
+    key_scope: str
+
+
+@dataclass(frozen=True)
+class RateLimitDecision:
+    allowed: bool
+    rule: RateLimitRule
+    remaining: int
+    retry_after_seconds: int
+    key: str
+
+    def headers(self) -> dict[str, str]:
+        return {
+            "X-RateLimit-Limit": str(self.rule.limit),
+            "X-RateLimit-Remaining": str(self.remaining),
+            "X-RateLimit-Reset": str(self.retry_after_seconds),
+            "X-RateLimit-Rule": self.rule.name,
+        }
+
+
+class RateLimiterService:
+    def __init__(self, *, rules: dict[str, RateLimitRule]) -> None:
+        self._rules = rules
+        self._route_rule_order: tuple[tuple[str, str], ...] = (
+            ("/auth/login", "auth"),
+            ("/auth/register", "auth"),
+            ("/graphql", "graphql"),
+            ("/transactions", "transactions"),
+            ("/wallet", "wallet"),
+        )
+        self._events: dict[tuple[str, str], Deque[float]] = defaultdict(deque)
+        self._lock = threading.Lock()
+
+    @classmethod
+    def from_env(cls) -> "RateLimiterService":
+        default_window = _read_int_env("RATE_LIMIT_DEFAULT_WINDOW_SECONDS", 60)
+        rules = {
+            "auth": RateLimitRule(
+                name="auth",
+                limit=_read_int_env("RATE_LIMIT_AUTH_LIMIT", 20),
+                window_seconds=_read_int_env(
+                    "RATE_LIMIT_AUTH_WINDOW_SECONDS", default_window
+                ),
+                key_scope=KEY_SCOPE_IP,
+            ),
+            "graphql": RateLimitRule(
+                name="graphql",
+                limit=_read_int_env("RATE_LIMIT_GRAPHQL_LIMIT", 120),
+                window_seconds=_read_int_env(
+                    "RATE_LIMIT_GRAPHQL_WINDOW_SECONDS", default_window
+                ),
+                key_scope=KEY_SCOPE_USER_OR_IP,
+            ),
+            "transactions": RateLimitRule(
+                name="transactions",
+                limit=_read_int_env("RATE_LIMIT_TRANSACTIONS_LIMIT", 180),
+                window_seconds=_read_int_env(
+                    "RATE_LIMIT_TRANSACTIONS_WINDOW_SECONDS", default_window
+                ),
+                key_scope=KEY_SCOPE_USER_OR_IP,
+            ),
+            "wallet": RateLimitRule(
+                name="wallet",
+                limit=_read_int_env("RATE_LIMIT_WALLET_LIMIT", 180),
+                window_seconds=_read_int_env(
+                    "RATE_LIMIT_WALLET_WINDOW_SECONDS", default_window
+                ),
+                key_scope=KEY_SCOPE_USER_OR_IP,
+            ),
+            "default": RateLimitRule(
+                name="default",
+                limit=_read_int_env("RATE_LIMIT_DEFAULT_LIMIT", 300),
+                window_seconds=default_window,
+                key_scope=KEY_SCOPE_USER_OR_IP,
+            ),
+        }
+        return cls(rules=rules)
+
+    def set_rule(
+        self,
+        name: str,
+        *,
+        limit: int | None = None,
+        window_seconds: int | None = None,
+    ) -> None:
+        current = self._rules.get(name)
+        if current is None:
+            raise KeyError(f"Rate limit rule '{name}' not found.")
+        resolved_limit = current.limit if limit is None else max(limit, 1)
+        resolved_window = (
+            current.window_seconds if window_seconds is None else max(window_seconds, 1)
+        )
+        self._rules[name] = RateLimitRule(
+            name=current.name,
+            limit=resolved_limit,
+            window_seconds=resolved_window,
+            key_scope=current.key_scope,
+        )
+        self.reset()
+
+    def reset(self) -> None:
+        with self._lock:
+            self._events.clear()
+
+    def _resolve_rule(self, path: str) -> RateLimitRule:
+        for prefix, rule_name in self._route_rule_order:
+            if path == prefix or path.startswith(f"{prefix}/"):
+                return self._rules[rule_name]
+        return self._rules["default"]
+
+    @staticmethod
+    def _resolve_rate_limit_key(
+        *,
+        rule: RateLimitRule,
+        user_subject: str | None,
+        client_ip: str,
+    ) -> str:
+        if rule.key_scope == KEY_SCOPE_IP:
+            return f"ip:{client_ip}"
+        if user_subject:
+            return f"user:{user_subject}"
+        return f"ip:{client_ip}"
+
+    def consume(
+        self,
+        *,
+        path: str,
+        user_subject: str | None,
+        client_ip: str,
+    ) -> RateLimitDecision:
+        rule = self._resolve_rule(path)
+        key = self._resolve_rate_limit_key(
+            rule=rule,
+            user_subject=user_subject,
+            client_ip=client_ip,
+        )
+        now = monotonic()
+        bucket_key = (rule.name, key)
+
+        with self._lock:
+            events = self._events[bucket_key]
+            cutoff = now - rule.window_seconds
+            while events and events[0] <= cutoff:
+                events.popleft()
+
+            if len(events) >= rule.limit:
+                retry_after_seconds = (
+                    max(1, int(rule.window_seconds - (now - events[0])))
+                    if events
+                    else rule.window_seconds
+                )
+                return RateLimitDecision(
+                    allowed=False,
+                    rule=rule,
+                    remaining=0,
+                    retry_after_seconds=retry_after_seconds,
+                    key=key,
+                )
+
+            events.append(now)
+            remaining = max(rule.limit - len(events), 0)
+            retry_after_seconds = max(1, int(rule.window_seconds - (now - events[0])))
+            return RateLimitDecision(
+                allowed=True,
+                rule=rule,
+                remaining=remaining,
+                retry_after_seconds=retry_after_seconds,
+                key=key,
+            )
+
+
+def _build_rate_limited_response(decision: RateLimitDecision) -> Response:
+    details = {
+        "rule": decision.rule.name,
+        "limit": decision.rule.limit,
+        "window_seconds": decision.rule.window_seconds,
+        "retry_after_seconds": decision.retry_after_seconds,
+    }
+    if _is_v2_contract_request():
+        payload = error_payload(
+            message=RATE_LIMIT_MESSAGE,
+            code=RATE_LIMIT_ERROR_CODE,
+            details=details,
+        )
+    else:
+        payload = {
+            "message": "Too many requests",
+            "error": RATE_LIMIT_ERROR_CODE,
+            "details": details,
+        }
+
+    response = jsonify(payload)
+    response.status_code = 429
+    for header_name, header_value in decision.headers().items():
+        response.headers[header_name] = header_value
+    response.headers["Retry-After"] = str(decision.retry_after_seconds)
+    return response
+
+
+def register_rate_limit_guard(app: Flask) -> None:
+    if not _read_bool_env("RATE_LIMIT_ENABLED", True):
+        return
+
+    limiter = RateLimiterService.from_env()
+    app.extensions["rate_limiter"] = limiter
+
+    def rate_limit_guard() -> Response | None:
+        if request.method == "OPTIONS":
+            return None
+        if request.path.startswith("/docs"):
+            return None
+        if request.endpoint in _SKIPPED_ENDPOINTS:
+            return None
+
+        decision = limiter.consume(
+            path=request.path,
+            user_subject=_extract_subject_from_bearer_token(),
+            client_ip=_get_client_ip(),
+        )
+        g.rate_limit_headers = decision.headers()
+
+        if decision.allowed:
+            return None
+        return _build_rate_limited_response(decision)
+
+    def attach_rate_limit_headers(response: Response) -> Response:
+        headers = getattr(g, "rate_limit_headers", None)
+        if isinstance(headers, dict):
+            for header_name, header_value in headers.items():
+                response.headers[header_name] = str(header_value)
+        return response
+
+    app.before_request(rate_limit_guard)
+    app.after_request(attach_rate_limit_headers)

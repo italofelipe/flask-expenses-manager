@@ -1,6 +1,6 @@
 # OWASP S3 - Attack Surface Inventory
 
-Updated at: 2026-02-10
+Updated at: 2026-02-11
 Scope: `/app/controllers/*`, `/app/graphql/*`, auth middleware and runtime exposure.
 
 ## Objective
@@ -101,19 +101,21 @@ Create the security inventory required by `S3` as input for remediation tasks in
 - JWT required in most REST protected routes.
 - GraphQL private operations protected via resolver-level `get_current_user_required()`.
 - Global auth guard with open endpoint list for public surfaces.
+- Rate-limit baseline enabled for `/auth`, `/graphql`, `/transactions` and `/wallet`.
+- GraphQL transport now enforces query-size, depth, complexity and operation-count limits.
 - Schema validation present in multiple flows (Marshmallow/webargs).
 - TLS enabled at Nginx layer for internet-facing domains.
 
 ## Gaps Identified (to drive S2/S1)
-1. No global/API-level rate-limit and no per-endpoint throttling policy (`API4`).
-2. No GraphQL depth/complexity/query cost limits (`API4`, `API8`).
-3. No standardized request sanitization policy for free-text fields (`API3`, `API10`).
-4. Open endpoint handling is string-based and requires hardening tests (`API5`, `API8`).
-5. No formal inventory ownership metadata tied to CI evidence (`API9`).
+1. GraphQL cost model is generic and still needs domain-specific weighting (`API4`, `API8`).
+2. No standardized request sanitization policy for free-text fields (`API3`, `API10`).
+3. Open endpoint handling is string-based and requires hardening tests (`API5`, `API8`).
+4. No formal inventory ownership metadata tied to CI evidence (`API9`).
+5. Rate-limit state is in-memory only (needs distributed strategy for multi-instance scale).
 
 ## Immediate Backlog Handoff
 - S3.2: convert this inventory into a control checklist with pass/fail evidence fields.
-- S2.1: implement rate-limit baseline for REST + GraphQL transport.
-- S2.2: implement GraphQL complexity/depth constraints.
+- S2.2: evoluir custo de GraphQL para ponderação por campo sensível e domínio.
 - S2.3: enforce sanitization/normalization policy in request parsing layer.
+- S2.4: evolve rate-limit from in-memory to distributed storage (Redis or equivalent).
 - S1.1: align EC2 SG/NACL/IMDSv2 checks with exposed surfaces in this inventory.

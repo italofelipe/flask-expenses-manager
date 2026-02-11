@@ -111,6 +111,38 @@ Execução manual:
 pre-commit run --all-files
 ```
 
+## Rate limiting (baseline S2)
+- Middleware de proteção ativo para:
+  - `/auth/register` e `/auth/login` (chave por IP)
+  - `/graphql`, `/transactions/*` e `/wallet/*` (chave por usuário, com fallback IP)
+- Em excesso de requisições:
+  - status `429`
+  - headers `Retry-After`, `X-RateLimit-Limit`, `X-RateLimit-Remaining`, `X-RateLimit-Reset`, `X-RateLimit-Rule`
+
+Variáveis de ambiente principais:
+- `RATE_LIMIT_ENABLED=true`
+- `RATE_LIMIT_DEFAULT_LIMIT=300`
+- `RATE_LIMIT_DEFAULT_WINDOW_SECONDS=60`
+- `RATE_LIMIT_AUTH_LIMIT=20`
+- `RATE_LIMIT_GRAPHQL_LIMIT=120`
+- `RATE_LIMIT_TRANSACTIONS_LIMIT=180`
+- `RATE_LIMIT_WALLET_LIMIT=180`
+- `RATE_LIMIT_TRUST_PROXY_HEADERS=true` (recomendado em produção atrás de Nginx)
+
+## GraphQL hardening (baseline S2)
+- Proteções de transporte antes da execução:
+  - tamanho máximo da query
+  - profundidade máxima
+  - complexidade máxima
+  - limite de operações por documento
+
+Variáveis de ambiente principais:
+- `GRAPHQL_MAX_QUERY_BYTES=20000`
+- `GRAPHQL_MAX_DEPTH=8`
+- `GRAPHQL_MAX_COMPLEXITY=300`
+- `GRAPHQL_MAX_OPERATIONS=3`
+- `GRAPHQL_MAX_LIST_MULTIPLIER=50`
+
 ## Situação atual de testes
 Existe suíte configurada em `tests/` com `pytest` e setup isolado de banco para execução local.
 

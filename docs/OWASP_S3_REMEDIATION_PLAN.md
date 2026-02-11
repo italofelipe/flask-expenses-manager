@@ -15,8 +15,8 @@ Convert S3 findings into an execution-ready remediation sequence with priorities
 
 | Priority | Track | Control | OWASP refs | Current status | Acceptance criteria |
 |---|---|---|---|---|---|
-| P0 | S2 | Global rate limiting for REST auth + transaction + wallet endpoints | API4, API6 | Not implemented | Limits enforced per IP/user, 429 responses standardized, tests added |
-| P0 | S2 | GraphQL transport protection (depth + complexity + operation cost cap) | API4, API8 | Not implemented | Queries above threshold blocked, error contract defined, tests added |
+| P0 | S2 | Global rate limiting for REST auth + transaction + wallet endpoints | API4, API6 | Baseline implemented | Limits enforced per IP/user, 429 responses standardized, tests added |
+| P0 | S2 | GraphQL transport protection (depth + complexity + operation cost cap) | API4, API8 | Baseline implemented | Queries acima do threshold bloqueadas, contrato de erro definido e testes automatizados |
 | P0 | S2 | Sensitive flow abuse controls (login/register/createTransaction) | API2, API6 | Partial | Burst abuse blocked, lock/throttle strategy documented and tested |
 | P1 | S2 | Input sanitization/normalization policy for free-text fields | API3, API10 | Partial | Central sanitization policy implemented and tested |
 | P1 | S2 | Authorization matrix + negative tests for object/function access | API1, API5 | Partial | Matrix documented, tests cover cross-user access denial |

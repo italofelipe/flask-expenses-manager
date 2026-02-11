@@ -1,6 +1,6 @@
 # TASKS - Central de TODOs e Progresso
 
-Ultima atualizacao: 2026-02-10
+Ultima atualizacao: 2026-02-11
 
 ## Regras de uso deste arquivo
 - Este arquivo centraliza TODOs de produto, engenharia e qualidade.
@@ -53,8 +53,8 @@ Ultima atualizacao: 2026-02-10
 | G4 | Qualidade | Pipeline CI para lint, type-check, testes e gates de qualidade | In Progress | 85% | Baixo | 842a656, 7f0ac66 | 2026-02-09 |
 | G5 | Qualidade | Seed de dados para ambiente local | Todo | 0% | Baixo |  | 2026-02-09 |
 | H1 | Arquitetura | Adicionar suporte a GraphQL | In Progress | 65% | Alto: impacto transversal na API | ba1f238, e12bf21 | 2026-02-09 |
-| H2 | Seguranca | Implementar rate limit por rota/usuario/IP | Todo | 0% | Alto: requisito de protecao operacional |  | 2026-02-09 |
-| H3 | Seguranca | Hardening de validacao/sanitizacao/authz/headers/auditoria | Todo | 0% | Alto: controle de risco de seguranca |  | 2026-02-09 |
+| H2 | Seguranca | Implementar rate limit por rota/usuario/IP | In Progress | 60% | Medio: baseline entregue, falta storage distribuído e tuning por ambiente | pending-commit | 2026-02-11 |
+| H3 | Seguranca | Hardening de validacao/sanitizacao/authz/headers/auditoria | In Progress | 15% | Alto: mapeamento consolidado, implementação pendente | pending-commit | 2026-02-11 |
 | I1 | Deploy Cloud | Fechar arquitetura alvo AWS/Azure para budget de R$40/mês e registrar decisão | Done | 100% | Medio: custos podem variar por região/câmbio | pending-commit | 2026-02-09 |
 | I2 | Deploy Cloud | Preparar Docker para produção (Dockerfile prod, gunicorn, healthcheck) | Done | 100% | Medio: diferenças dev/prod podem quebrar startup | pending-commit | 2026-02-09 |
 | I3 | Deploy AWS | Provisionar ambiente base na AWS (VPC, SG, instância Lightsail/EC2) | In Progress | 70% | Medio: hardening inicial de rede e portas | pending-commit | 2026-02-10 |
@@ -74,8 +74,24 @@ Ultima atualizacao: 2026-02-10
 | R1 | Rebranding | Mapear todas ocorrências de nomenclatura legada do projeto e registrar plano de substituição para `auraxis` | Done | 100% | Baixo: mapeamento concluído em arquivos versionados | pending-commit | 2026-02-10 |
 | R2 | Rebranding | Substituir ocorrências versionadas de nomenclatura legada por `auraxis` (sem quebrar integrações externas) | Done | 100% | Medio: integrações externas podem manter identificador legado temporário | pending-commit | 2026-02-10 |
 | S1 | AWS Security | Restringir acesso e hardening de instâncias EC2 (SG, NACL, IMDSv2, SSH policy, patching baseline) | Todo | 0% | Alto: superfície de ataque de infraestrutura |  | 2026-02-10 |
-| S2 | App Security | Implementar segurança de endpoints (rate-limit, validação/sanitização de request/response, headers e authz por recurso) | Todo | 0% | Alto: risco de exploração na camada de API |  | 2026-02-10 |
-| S3 | App Security | Executar checklist OWASP no sistema (ASVS/API Top 10), corrigir gaps e formalizar evidências | In Progress | 75% | Alto: risco de vulnerabilidades críticas não mapeadas | pending-commit | 2026-02-11 |
+| S2 | App Security | Implementar segurança de endpoints (rate-limit, validação/sanitização de request/response, headers e authz por recurso) | In Progress | 50% | Alto: limites de consumo ativos, pendente sanitização central e matriz de authz | pending-commit | 2026-02-11 |
+| S3 | App Security | Executar checklist OWASP no sistema (ASVS/API Top 10), corrigir gaps e formalizar evidências | In Progress | 85% | Alto: risco de vulnerabilidades críticas não mapeadas | pending-commit | 2026-02-11 |
+| S4-01 | App Security | Remover vazamento de exceções em respostas (`str(e)`, `traceback`) e adotar erros genéricos com correlação | Todo | 0% | Alto: exposição de detalhes internos |  | 2026-02-11 |
+| S4-02 | App Security | Substituir `print` por logging estruturado com níveis e política de redaction | Todo | 0% | Medio: vazamento acidental e baixa auditabilidade |  | 2026-02-11 |
+| S4-03 | App Security | Padronizar callbacks JWT e middleware para contrato de erro único (v1/v2) e status codes consistentes | Todo | 0% | Medio: comportamento inconsistente em auth |  | 2026-02-11 |
+| S4-04 | App Security | Implementar limite global de tamanho de request body para endpoints REST | Todo | 0% | Alto: risco de DoS por payload grande |  | 2026-02-11 |
+| S4-05 | App Security | Endurecer paginação e limites de resposta (ex.: `limit` em `/user/me`, `per_page<=0` em histórico) | Todo | 0% | Alto: risco de consumo excessivo de recursos |  | 2026-02-11 |
+| S4-06 | App Security | Implementar sanitização/normalização central para campos textuais de entrada | Todo | 0% | Alto: risco de payload malicioso em logs/consumidores |  | 2026-02-11 |
+| S4-07 | App Security | Aplicar política GraphQL deny-by-default para operações privadas e cobertura automática de autorização por resolver | Todo | 0% | Alto: risco de exposição caso resolver novo esqueça auth |  | 2026-02-11 |
+| S4-08 | App Security | Tornar introspecção GraphQL configurável por ambiente (desabilitar em PROD por padrão) | Todo | 0% | Medio: ampliação de superfície de reconhecimento |  | 2026-02-11 |
+| S4-09 | App Security | Endurecer consumo BRAPI (allowlist de ticker, validação estrita de resposta, fallback defensivo) | Todo | 0% | Medio: entrada externa não confiável |  | 2026-02-11 |
+| S4-10 | App Security | Evoluir rate-limit e revogação de token para storage distribuído (Redis) | Todo | 0% | Alto: controle atual in-memory não escala em múltiplas instâncias |  | 2026-02-11 |
+| S4-11 | App Security | Remover fallback de secrets fracos em runtime não-dev e falhar startup sem segredos fortes | Todo | 0% | Alto: risco de configuração insegura |  | 2026-02-11 |
+| S4-12 | App Security | Definir política CORS estrita por ambiente (origins permitidas, métodos, headers) | Todo | 0% | Medio: exposição indevida via browser clients |  | 2026-02-11 |
+| S4-13 | App Security | Implementar trilha de auditoria para ações sensíveis (login, perfil, transações, carteira) | Todo | 0% | Medio: baixa rastreabilidade de incidentes |  | 2026-02-11 |
+| S4-14 | App Security | Revisar/remover código legado não registrado (`ticker_controller`) e alinhar superfície real de API | Todo | 0% | Baixo: risco de dívida técnica e confusão operacional |  | 2026-02-11 |
+| S4-15 | App Security | Formalizar threat model (STRIDE + abuse cases) e critérios de aceite por risco | Todo | 0% | Medio: decisões de segurança sem baseline formal |  | 2026-02-11 |
+| S4-16 | App Security | Adicionar scan de vulnerabilidades de dependências no CI (`pip-audit`/equivalente) | Todo | 0% | Medio: risco de CVEs não detectadas cedo |  | 2026-02-11 |
 | X1 | Tech Debt | Remover/atualizar TODO desatualizado sobre enums em transacoes | Todo | 0% | Baixo: clareza de manutencao |  | 2026-02-09 |
 
 ## Registro de progresso recente
@@ -109,10 +125,13 @@ Ultima atualizacao: 2026-02-10
 | 2026-02-10 | S3.2 | Checklist OWASP/ASVS iniciado com status por controle, evidências e ações (`docs/OWASP_S3_CHECKLIST.md`) | pending-commit |
 | 2026-02-10 | S3.3 | Script de evidências OWASP (`scripts/security_evidence_check.sh`) integrado ao CI com artifact (`security-evidence`) | pending-commit |
 | 2026-02-11 | S3.4 | Plano priorizado de remediação OWASP (P0/P1/P2) mapeado para S2/S1 (`docs/OWASP_S3_REMEDIATION_PLAN.md`) | pending-commit |
+| 2026-02-11 | S2.1/H2 | Baseline de rate-limit para REST+GraphQL implementado (`app/middleware/rate_limit.py`) com testes dedicados (`tests/test_rate_limit.py`) e atualização do checklist OWASP | pending-commit |
+| 2026-02-11 | S2.2/H1-HARDENING | Limites de transporte GraphQL implementados (tamanho/profundidade/complexidade/operações) com política configurável (`app/graphql/security.py`) e testes (`tests/test_graphql_security.py`) | pending-commit |
+| 2026-02-11 | S3.5/H3 | Revisão de fragilidades de segurança na aplicação e mapeamento em backlog de remediação (`S4-01..S4-16`) | pending-commit |
 | 2026-02-09 | D (observacao) | Restaurados arquivos deletados acidentalmente: ticker/carteira | n/a |
 
 ## Proxima prioridade sugerida
-- S2 (P0): iniciar rate-limit global e proteção de consumo para REST/GraphQL.
+- S2 (P0): executar `S4-01`, `S4-04`, `S4-05`, `S4-06` e `S4-10` como pacote crítico de segurança.
 
 ## Mapeamento Rebranding (nomenclatura legada -> `auraxis`)
 
@@ -138,4 +157,4 @@ Pendências de substituição controlada:
 | H1-TRANSACTIONS | `transaction_controller` | `transactions`, `transactionSummary`, `transactionDashboard`, `createTransaction`, `deleteTransaction` | In Progress | 60% | Alto: nao divergir das regras de recorrencia/parcelamento | ba1f238 |
 | H1-WALLET | `wallet_controller` | `walletEntries`, `walletHistory`, `addWalletEntry`, `updateWalletEntry`, `deleteWalletEntry` | In Progress | 60% | Alto: consistencia de calculo e historico | ba1f238 |
 | H1-TICKER | `ticker_controller` | `tickers`, `addTicker`, `deleteTicker` | In Progress | 75% | Baixo | ba1f238 |
-| H1-HARDENING | `graphql_controller` | autorização fina por operação, limites de complexidade/profundidade, observabilidade | Todo | 10% | Alto: segurança/performance |  |
+| H1-HARDENING | `graphql_controller` | autorização fina por operação, limites de complexidade/profundidade, observabilidade | In Progress | 45% | Alto: custo de query baseline ativo, faltam observabilidade e custo por domínio | pending-commit |

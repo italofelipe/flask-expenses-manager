@@ -1,6 +1,6 @@
 # OWASP Baseline (S3)
 
-Updated at: 2026-02-10
+Updated at: 2026-02-11
 Scope: Auraxis API (REST + GraphQL), deployment model (EC2 + Docker + Nginx).
 
 ## Goal
@@ -19,6 +19,7 @@ Supporting artifacts:
 - `docs/OWASP_S3_INVENTORY.md` (REST/GraphQL attack-surface inventory and OWASP focus map)
 - `docs/OWASP_S3_CHECKLIST.md` (working checklist with status/evidence/actions)
 - `docs/OWASP_S3_REMEDIATION_PLAN.md` (prioritized remediation roadmap for S2/S1)
+- `docs/SECURITY_GAP_TASK_MAP_2026-02-11.md` (fragility-to-task mapping backlog)
 - `scripts/security_evidence_check.sh` (automated baseline checks)
 - CI artifact: `reports/security/security-evidence.md`
 
@@ -29,12 +30,14 @@ Supporting artifacts:
   - TLS enabled in production and development domains via Nginx + Certbot.
   - Input validation present in multiple schemas (Marshmallow).
   - CI quality gates with lint/type/test + Sonar checks.
+  - Rate-limit baseline ativo para `/auth`, `/graphql`, `/transactions` e `/wallet`.
+  - GraphQL com limites de profundidade, complexidade, tamanho de query e operações.
 - Main gaps:
-  - No global rate limit/abuse protection in API/GraphQL.
-  - No explicit GraphQL depth/complexity limits.
+  - Rate-limit ainda em baseline in-memory (sem storage distribuído e sem tuning por ambiente).
+  - Limites GraphQL ainda sem custo por campo baseado em domínio real.
   - No centralized request sanitization strategy.
   - Incomplete security headers coverage at app/proxy boundaries.
-  - No formal OWASP evidence checklist artifacts in CI yet.
+  - Necessidade de expandir evidências OWASP para hardening operacional (S1/S2).
 
 ## OWASP API Top 10 (2023) quick status
 - API1 Broken Object Level Authorization: **Partial**
@@ -45,16 +48,16 @@ Supporting artifacts:
   - Need stronger token/session controls and secret rotation policy.
 - API3 Broken Object Property Level Authorization: **Gap**
   - Need field-level allowlist/hardening audit per update endpoint.
-- API4 Unrestricted Resource Consumption: **Gap**
-  - No rate-limit/throttling quotas yet.
+- API4 Unrestricted Resource Consumption: **Partial**
+  - Rate-limit baseline implementado; falta endurecimento de quotas e proteção distribuída.
 - API5 Broken Function Level Authorization: **Partial**
   - Auth guard exists; require explicit role/policy mapping and tests.
-- API6 Unrestricted Access to Sensitive Business Flows: **Gap**
-  - Need anti-abuse controls for sensitive operations and anomaly checks.
+- API6 Unrestricted Access to Sensitive Business Flows: **Partial**
+  - Fluxos críticos já têm throttling base; faltam heurísticas de abuso e monitoramento.
 - API7 SSRF: **Unknown/Low evidence**
   - External calls exist (market data provider). Need outbound validation/allowlist policy.
 - API8 Security Misconfiguration: **Partial**
-  - TLS present; baseline hardening pending in infra and app layers.
+  - TLS e controles de GraphQL presentes; hardening de infra/app ainda pendente.
 - API9 Improper Inventory Management: **Gap**
   - Need inventory of REST/GraphQL operations and security ownership.
 - API10 Unsafe Consumption of APIs: **Partial**
