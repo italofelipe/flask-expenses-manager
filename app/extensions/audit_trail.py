@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import json
 import os
 from typing import Any
 
@@ -104,8 +103,17 @@ def register_audit_trail(app: Flask) -> None:
             return response
 
         payload = _build_event_payload(response)
+        endpoint = request.endpoint or "unknown"
+        message = (
+            "audit_trail event=http.audit method=%s endpoint=%s "
+            "status=%s request_id=%s"
+        )
         current_app.logger.info(
-            "audit_trail %s", json.dumps(payload, ensure_ascii=True, sort_keys=True)
+            message,
+            request.method,
+            endpoint,
+            response.status_code,
+            getattr(g, "request_id", None),
         )
         if _is_audit_persistence_enabled():
             _persist_audit_event(payload)

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import importlib
 import os
 import threading
 from collections import defaultdict, deque
@@ -380,7 +381,7 @@ def _build_storage_from_env() -> tuple[
         )
 
     try:
-        import redis  # type: ignore[import-untyped]
+        redis_client_cls = getattr(importlib.import_module("redis"), "Redis")
     except Exception:
         return (
             InMemoryRateLimitStorage(),
@@ -391,7 +392,7 @@ def _build_storage_from_env() -> tuple[
         )
 
     try:
-        client = redis.Redis.from_url(redis_url)
+        client = redis_client_cls.from_url(redis_url)
         client.ping()
     except Exception:
         return (

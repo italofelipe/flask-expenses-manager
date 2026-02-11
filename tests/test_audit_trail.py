@@ -40,8 +40,10 @@ def test_register_audit_trail_logs_only_sensitive_routes(
         record.message for record in caplog.records if "audit_trail " in record.message
     ]
     assert len(audit_logs) == 1
-    assert '"path": "/auth/login"' in audit_logs[0]
-    assert '"status": 200' in audit_logs[0]
+    assert "event=http.audit" in audit_logs[0]
+    assert "method=GET" in audit_logs[0]
+    assert "endpoint=_login" in audit_logs[0]
+    assert "status=200" in audit_logs[0]
 
 
 def test_audit_trail_persists_event_when_enabled(
