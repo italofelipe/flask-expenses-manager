@@ -1,3 +1,5 @@
+# mypy: disable-error-code=name-defined
+
 from __future__ import annotations
 
 import uuid

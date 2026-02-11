@@ -20,7 +20,7 @@ class InvestmentOperationSchema(Schema):
     created_at = fields.DateTime(dump_only=True)
     updated_at = fields.DateTime(dump_only=True)
 
-    @pre_load  # type: ignore[misc]
+    @pre_load
     def sanitize_input(self, data: object, **kwargs: object) -> object:
         sanitized = sanitize_string_fields(data, {"operation_type", "notes"})
         if isinstance(sanitized, dict) and isinstance(
@@ -29,7 +29,7 @@ class InvestmentOperationSchema(Schema):
             sanitized["operation_type"] = str(sanitized["operation_type"]).lower()
         return sanitized
 
-    @validates_schema  # type: ignore[misc]
+    @validates_schema
     def validate_business_rules(self, data: Dict[str, Any], **kwargs: Any) -> None:
         is_partial = bool(kwargs.get("partial", False))
         operation_type = str(data.get("operation_type", "")).strip().lower()

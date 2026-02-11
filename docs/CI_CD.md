@@ -68,11 +68,28 @@ Hooks ativos:
 - `black`
 - `flake8`
 - `isort`
-- `mypy`
+- `mypy` (hook local `language: system`, executa `mypy app` no mesmo ambiente do desenvolvedor)
 - `bandit` (scan `app/`, severidade alta)
 - `gitleaks` (segredos em staged)
 - `detect-private-key`
 - `sonar-local-check`
+
+## Reproducao local do job Quality (CI parity)
+- Script oficial: `scripts/run_ci_quality_local.sh`
+- Modo recomendado (paridade alta com CI):
+  - `scripts/run_ci_quality_local.sh`
+  - executa em container `python:3.11-slim` e roda os mesmos gates do job `Quality`.
+- Modo alternativo (ambiente local ja preparado):
+  - `PATH=".venv/bin:$PATH" scripts/run_ci_quality_local.sh --local`
+  - roda os mesmos gates usando o ambiente local atual.
+
+Checks executados pelo script:
+- `pip-audit -r requirements.txt`
+- `black --check` (arquivos Python versionados)
+- `isort --check-only app tests config run.py run_without_db.py`
+- `flake8 app tests config run.py run_without_db.py`
+- `mypy app`
+- `bandit -r app -lll -iii`
 
 ## Variáveis e secrets necessários
 

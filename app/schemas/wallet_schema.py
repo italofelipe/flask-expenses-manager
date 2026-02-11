@@ -46,7 +46,7 @@ class WalletSchema(Schema):
     created_at = fields.DateTime(dump_only=True)
     updated_at = fields.DateTime(dump_only=True)
 
-    @pre_load  # type: ignore[misc]
+    @pre_load
     def sanitize_input(self, data: object, **kwargs: object) -> object:
         sanitized = sanitize_string_fields(data, {"name", "ticker", "asset_class"})
         if isinstance(sanitized, dict):
@@ -56,7 +56,7 @@ class WalletSchema(Schema):
                 sanitized["asset_class"] = str(sanitized["asset_class"]).lower()
         return sanitized
 
-    @validates_schema  # type: ignore[misc]
+    @validates_schema
     def validate_fields(self, data: Dict[str, Any], **kwargs: Any) -> None:
         """Valida as regras de negócio entre os campos ticker, quantity e value."""
         has_ticker = bool(data.get("ticker"))

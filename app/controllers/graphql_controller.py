@@ -122,7 +122,7 @@ def _build_graphql_result_response(result: Any) -> tuple[dict[str, Any], int]:
     return response, status_code
 
 
-@graphql_bp.route("", methods=["POST"])  # type: ignore[misc]
+@graphql_bp.route("", methods=["POST"])
 def execute_graphql() -> tuple[dict[str, Any], int]:
     try:
         parsed_payload = _parse_graphql_payload()

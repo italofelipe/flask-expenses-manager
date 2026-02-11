@@ -148,7 +148,7 @@ def register_audit_trail(app: Flask) -> None:
             ),
         )
 
-    @app.after_request  # type: ignore[misc]
+    @app.after_request
     def _emit_audit_event(response: Response) -> Response:
         if request.method == "OPTIONS":
             return response

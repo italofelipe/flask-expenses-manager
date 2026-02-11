@@ -50,7 +50,7 @@ Ultima atualizacao: 2026-02-11
 | G1 | Qualidade | Completar suite de testes por dominio | In Progress | 75% | Medio: lacunas em cenarios complexos | 497f901, f3ef3c0 | 2026-02-09 |
 | G2 | Qualidade | Testes de integracao BRAPI com mocks/fakes | In Progress | 60% | Medio: falta cenário E2E com falha real do provider | 497f901, pending-commit | 2026-02-09 |
 | G3 | Qualidade | Enforce de cobertura minima no CI | In Progress | 80% | Baixo | 497f901, 7f0ac66 | 2026-02-09 |
-| G4 | Qualidade | Pipeline CI para lint, type-check, testes e gates de qualidade | In Progress | 85% | Baixo | 842a656, 7f0ac66 | 2026-02-09 |
+| G4 | Qualidade | Pipeline CI para lint, type-check, testes e gates de qualidade | In Progress | 92% | Baixo | 842a656, 7f0ac66 | 2026-02-11 |
 | G5 | Qualidade | Seed de dados para ambiente local | Todo | 0% | Baixo |  | 2026-02-09 |
 | G6 | CI/Security | Reforcar pre-commit com secret scanning confiável (Gitleaks), Bandit e detecção de private keys | In Progress | 80% | Médio: risco de falso positivo em segredos de teste |  | 2026-02-11 |
 | G7 | CI/Resilience | Adicionar teste de confiabilidade de contrato OpenAPI com Schemathesis | In Progress | 75% | Médio: flakiness se escopo de fuzzing crescer sem calibração |  | 2026-02-11 |
@@ -58,6 +58,9 @@ Ultima atualizacao: 2026-02-11
 | G9 | CI/Security | Integrar Snyk (dependências e container) com gate condicional por `SNYK_ENABLED` | In Progress | 65% | Médio: requer `SNYK_TOKEN` e calibração de baseline |  | 2026-02-11 |
 | G10 | CI/Security | Integrar scan de imagem/container com Trivy em todo PR/push | In Progress | 75% | Médio: CVEs de base image podem bloquear merge sem política de exceção |  | 2026-02-11 |
 | G11 | CI/Governance | Formalizar política de branch protection + required checks + push protection no GitHub | Todo | 0% | Alto: sem enforcement central, gates podem ser ignorados |  | 2026-02-11 |
+| G12 | CI/Quality | Garantir paridade local do job `Quality` (script Python 3.11 + hook mypy alinhado ao CI) | Done | 100% | Baixo | pending-commit | 2026-02-11 |
+| G13 | CI/Quality | Adicionar matrix de tipagem (`mypy`) em Python 3.11 e 3.13 para reduzir regressão entre ambientes | Todo | 0% | Médio: divergência de stubs entre versões pode voltar a gerar falso positivo/falso negativo |  | 2026-02-11 |
+| G14 | CI/Quality | Avaliar lock/constraints de dependências de tooling (lint/type/security) para builds determinísticos | Todo | 0% | Médio: atualização não controlada de tooling pode quebrar gates sem mudança de código |  | 2026-02-11 |
 | H1 | Arquitetura | Adicionar suporte a GraphQL | In Progress | 65% | Alto: impacto transversal na API | ba1f238, e12bf21 | 2026-02-09 |
 | H2 | Seguranca | Implementar rate limit por rota/usuario/IP | Done | 100% | Baixo: rate-limit por domínio com backend distribuído, fail-closed e observabilidade básica | pending-commit | 2026-02-11 |
 | H3 | Seguranca | Hardening de validacao/sanitizacao/authz/headers/auditoria | Done | 100% | Médio: baseline aplicado; evolução contínua segue para monitoramento centralizado e infraestrutura S1 | pending-commit | 2026-02-11 |
@@ -118,7 +121,7 @@ Ultima atualizacao: 2026-02-11
 | S6-07 | App Security | Migrar login guard para backend distribuído (Redis) com política de falha explícita | Todo | 0% | Médio: proteção inconsistente em escala |  | 2026-02-11 |
 | S6-08 | App Security | Endurecer defaults de runtime (`DEBUG=False` por padrão seguro e validação de startup) | Todo | 0% | Médio: risco por configuração ausente/incompleta |  | 2026-02-11 |
 | S6-09 | App Security | Retirar sweep de retenção de auditoria do ciclo de request (job agendado/assíncrono) | Todo | 0% | Médio: impacto em latência e disponibilidade |  | 2026-02-11 |
-| S6-10 | App Security | Atualizar dependências com CVE (`Flask`, `marshmallow`) e zerar `pip-audit` runtime | Todo | 0% | Médio: exposição a CVEs conhecidos |  | 2026-02-11 |
+| S6-10 | App Security | Atualizar dependências com CVE (`Flask`, `marshmallow`) e zerar `pip-audit` runtime | Done | 100% | Baixo: gate validado com `pip-audit` sem vulnerabilidades conhecidas | afc15c7 | 2026-02-11 |
 | S6-11 | App Security | Harden Docker de produção (non-root, multi-stage, runtime deps only) | Todo | 0% | Médio: superfície de ataque de container |  | 2026-02-11 |
 | S6-12 | App Security | Definir política de exposição de documentação em produção (`/docs`) por ambiente/autenticação | Todo | 0% | Baixo: disclosure de metadata da API |  | 2026-02-11 |
 | X1 | Tech Debt | Remover/atualizar TODO desatualizado sobre enums em transacoes | Todo | 0% | Baixo: clareza de manutencao |  | 2026-02-09 |
@@ -185,6 +188,8 @@ Ultima atualizacao: 2026-02-11
 | 2026-02-11 | S6-05 | Registro GraphQL alinhado ao schema de validação REST (`UserRegistrationSchema`) com normalização e política de senha forte | pending-commit |
 | 2026-02-11 | G6/G7/G8/G9/G10 | CI/pre-commit reforçados com Gitleaks+Bandit+private-key detection, job Schemathesis, gate Cosmic Ray, Trivy e Snyk condicional | pending-commit |
 | 2026-02-11 | G8 | Mutation gate migrado para Cosmic Ray com escopo crítico em CORS (`app/middleware/cors.py`), filtro de operadores ruidosos e threshold de sobrevivência 0% | pending-commit |
+| 2026-02-11 | S6-10 | Dependências com CVE atualizadas (`Flask 3.1.1`, `marshmallow 3.26.2`, `Werkzeug 3.1.5`) e validação `pip-audit` limpa | afc15c7 |
+| 2026-02-11 | G12 | Correções de tipagem para CI (`mypy`) + alinhamento do hook local para usar ambiente real (`language: system`) + script de paridade local `scripts/run_ci_quality_local.sh` | pending-commit |
 | 2026-02-09 | D (observacao) | Restaurados arquivos deletados acidentalmente: ticker/carteira | n/a |
 
 ## Proxima prioridade sugerida

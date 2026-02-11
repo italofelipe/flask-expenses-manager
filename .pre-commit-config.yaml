@@ -14,15 +14,6 @@ repos:
   hooks:
   - id: isort
 
-- repo: https://github.com/pre-commit/mirrors-mypy
-  rev: v1.11.2
-  hooks:
-  - id: mypy
-    exclude: ^tests/
-    additional_dependencies:
-    - types-requests==2.32.4.20260107
-    - types-python-dateutil==2.9.0.20260124
-
 - repo: https://github.com/pycqa/bandit
   rev: 1.8.6
   hooks:
@@ -45,6 +36,11 @@ repos:
 
 - repo: local
   hooks:
+  - id: mypy
+    name: mypy
+    entry: mypy app
+    language: system
+    pass_filenames: false
   - id: sonar-local-check
     name: sonar-local-check
     entry: scripts/sonar_local_check.sh

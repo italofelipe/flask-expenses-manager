@@ -37,7 +37,7 @@ class UserRegistrationSchema(Schema):
         ),
     )
 
-    @pre_load  # type: ignore[misc]
+    @pre_load
     def sanitize_input(self, data: object, **kwargs: object) -> object:
         sanitized = sanitize_string_fields(data, {"name", "email"})
         if isinstance(sanitized, dict) and isinstance(sanitized.get("email"), str):
@@ -89,7 +89,7 @@ class UserProfileSchema(Schema):
         example="2030-12-31",
     )
 
-    @pre_load  # type: ignore[misc]
+    @pre_load
     def sanitize_input(self, data: object, **kwargs: object) -> object:
         return sanitize_string_fields(data, {"gender"})
 

@@ -101,7 +101,7 @@ class TransactionSchema(Schema):
         dump_only=True, description="Data da última atualização"
     )
 
-    @pre_load  # type: ignore[misc]
+    @pre_load
     def sanitize_input(self, data: object, **kwargs: object) -> object:
         sanitized = sanitize_string_fields(
             data,
