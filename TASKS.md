@@ -88,11 +88,21 @@ Ultima atualizacao: 2026-02-11
 | S4-10 | App Security | Evoluir rate-limit e revogação de token para storage distribuído (Redis) | In Progress | 70% | Médio: rate-limit com backend Redis opcional entregue; falta observabilidade e runbook de operação | pending-commit | 2026-02-11 |
 | S4-11 | App Security | Remover fallback de secrets fracos em runtime não-dev e falhar startup sem segredos fortes | Done | 100% | Baixo: bloqueio de startup em runtime inseguro | pending-commit | 2026-02-11 |
 | S4-12 | App Security | Definir política CORS estrita por ambiente (origins permitidas, métodos, headers) | Done | 100% | Médio: manter allowlist por ambiente atualizada | pending-commit | 2026-02-11 |
-| S4-13 | App Security | Implementar trilha de auditoria para ações sensíveis (login, perfil, transações, carteira) | Todo | 0% | Medio: baixa rastreabilidade de incidentes |  | 2026-02-11 |
+| S4-13 | App Security | Implementar trilha de auditoria para ações sensíveis (login, perfil, transações, carteira) | Done | 100% | Médio: trilha em logs estruturados; faltam retenção/alertas centralizados | pending-commit | 2026-02-11 |
 | S4-14 | App Security | Revisar/remover código legado não registrado (`ticker_controller`) e alinhar superfície real de API | Todo | 0% | Baixo: risco de dívida técnica e confusão operacional |  | 2026-02-11 |
 | S4-15 | App Security | Formalizar threat model (STRIDE + abuse cases) e critérios de aceite por risco | Todo | 0% | Medio: decisões de segurança sem baseline formal |  | 2026-02-11 |
 | S4-16 | App Security | Adicionar scan de vulnerabilidades de dependências no CI (`pip-audit`/equivalente) | Done | 100% | Baixo | pending-commit | 2026-02-11 |
 | S4-17 | App Security | Adicionar observabilidade de integrações externas (BRAPI): contadores por timeout, payload inválido e erro HTTP | Todo | 0% | Médio: troubleshooting ainda depende de logs ad-hoc |  | 2026-02-11 |
+| S5-01 | App Security | Eliminar fallback de memória para rate-limit em produção (fail-closed se Redis indisponível) | Todo | 0% | Alto: bypass de proteção sob falha de backend |  | 2026-02-11 |
+| S5-02 | App Security | Implementar trilha de auditoria persistente (DB/CloudWatch) com retenção e busca por `request_id` | Todo | 0% | Alto: sem persistência, evidência de incidente pode se perder |  | 2026-02-11 |
+| S5-03 | App Security | Aplicar autorização por recurso no domínio GraphQL (não só no transporte), com testes de ownership | Todo | 0% | Alto: risco de acesso indevido por resolver legado |  | 2026-02-11 |
+| S5-04 | App Security | Endurecer CORS/headers por ambiente com validação de configuração no startup | Todo | 0% | Médio: configuração frouxa em ambiente real expõe superfície |  | 2026-02-11 |
+| S5-05 | App Security | Adotar rotação de secrets + source of truth (AWS SSM/Secrets Manager), removendo `.env` como primário em cloud | Todo | 0% | Alto: vazamento/expiração manual de segredos |  | 2026-02-11 |
+| S5-06 | App Security | Fechar lacunas de brute-force/account takeover (lockout progressivo, cooldown e fingerprint de IP/device) | Todo | 0% | Alto: ataques de credencial stuffing |  | 2026-02-11 |
+| S5-07 | App Security | Revisar endpoints legados e desativar/feature-flag rotas não suportadas (`ticker_controller`) | Todo | 0% | Médio: superfície morta aumenta risco operacional |  | 2026-02-11 |
+| S5-08 | App Security | Implementar validação de saída para evitar data leakage (campos sensíveis e debug data) | Todo | 0% | Médio: exposição indevida em respostas/erros |  | 2026-02-11 |
+| S5-09 | App Security | Fortalecer proteção de banco de testes/fixtures para evitar conexões abertas e vazamento de estado | Todo | 0% | Médio: fragilidade de confiabilidade e falsos positivos de segurança |  | 2026-02-11 |
+| S5-10 | App Security | Integrar SAST + secret scanning + dependabot com gate no CI (quebra build em severidade alta) | Todo | 0% | Alto: vulnerabilidades podem entrar via PR sem bloqueio |  | 2026-02-11 |
 | X1 | Tech Debt | Remover/atualizar TODO desatualizado sobre enums em transacoes | Todo | 0% | Baixo: clareza de manutencao |  | 2026-02-09 |
 
 ## Registro de progresso recente
@@ -133,10 +143,11 @@ Ultima atualizacao: 2026-02-11
 | 2026-02-11 | S2.4/S4-07 | GraphQL com política deny-by-default no transporte: operações privadas exigem auth, allowlist pública por ambiente (`registerUser/login`) + testes de contrato | pending-commit |
 | 2026-02-11 | S2.5/S4-10 | Rate-limit com backend distribuído opcional (Redis) + fallback automático para memória + testes de backend e documentação de env | pending-commit |
 | 2026-02-11 | S2.6/S4-09 | Hardening BRAPI: sanitização/allowlist de ticker e validação estrita de payload de cotação/histórico com fallback seguro + testes | pending-commit |
+| 2026-02-11 | S4-13 | Trilha de auditoria adicionada para rotas sensíveis (`/auth`, `/user`, `/transactions`, `/wallet`, `/graphql`) com payload estruturado de request e testes | pending-commit |
 | 2026-02-09 | D (observacao) | Restaurados arquivos deletados acidentalmente: ticker/carteira | n/a |
 
 ## Proxima prioridade sugerida
-- S2 (P0): executar `S4-07`, `S4-09`, `S4-10` e `S4-13` (authz deny-by-default GraphQL, hardening BRAPI, storage distribuído, trilha de auditoria).
+- S2/S3 (P0): executar `S5-01`, `S5-02`, `S5-03` e `S5-06` (rate-limit fail-closed, auditoria persistente, authz por recurso no GraphQL e proteção anti takeover).
 
 ## Mapeamento Rebranding (nomenclatura legada -> `auraxis`)
 

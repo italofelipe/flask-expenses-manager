@@ -1,0 +1,83 @@
+from __future__ import annotations
+
+import json
+import os
+from typing import Any
+
+from flask import Flask, Response, current_app, g, request
+from flask_jwt_extended import get_jwt_identity, verify_jwt_in_request
+
+DEFAULT_AUDIT_PATH_PREFIXES = (
+    "/auth/",
+    "/user/",
+    "/transactions/",
+    "/wallet",
+    "/graphql",
+)
+
+
+def _is_audit_trail_enabled() -> bool:
+    return os.getenv("AUDIT_TRAIL_ENABLED", "true").lower() == "true"
+
+
+def _load_path_prefixes() -> tuple[str, ...]:
+    raw = os.getenv("AUDIT_PATH_PREFIXES", "")
+    if not raw.strip():
+        return DEFAULT_AUDIT_PATH_PREFIXES
+    items = tuple(item.strip() for item in raw.split(",") if item.strip())
+    return items or DEFAULT_AUDIT_PATH_PREFIXES
+
+
+def _is_sensitive_path(path: str, prefixes: tuple[str, ...]) -> bool:
+    return any(path.startswith(prefix) for prefix in prefixes)
+
+
+def _extract_user_id_safely() -> str | None:
+    try:
+        verify_jwt_in_request(optional=True)
+        identity = get_jwt_identity()
+        if identity is None:
+            return None
+        return str(identity)
+    except Exception:
+        return None
+
+
+def _extract_client_ip() -> str | None:
+    forwarded_for = request.headers.get("X-Forwarded-For", "").strip()
+    if forwarded_for:
+        return forwarded_for.split(",")[0].strip()
+    return request.remote_addr
+
+
+def _build_event_payload(response: Response) -> dict[str, Any]:
+    return {
+        "event": "http.audit",
+        "method": request.method,
+        "path": request.path,
+        "status": response.status_code,
+        "request_id": getattr(g, "request_id", None),
+        "user_id": _extract_user_id_safely(),
+        "ip": _extract_client_ip(),
+        "user_agent": request.headers.get("User-Agent", ""),
+    }
+
+
+def register_audit_trail(app: Flask) -> None:
+    if not _is_audit_trail_enabled():
+        return
+
+    prefixes = _load_path_prefixes()
+
+    @app.after_request  # type: ignore[misc]
+    def _emit_audit_event(response: Response) -> Response:
+        if request.method == "OPTIONS":
+            return response
+        if not _is_sensitive_path(request.path, prefixes):
+            return response
+
+        payload = _build_event_payload(response)
+        current_app.logger.info(
+            "audit_trail %s", json.dumps(payload, ensure_ascii=True, sort_keys=True)
+        )
+        return response

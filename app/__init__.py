@@ -20,6 +20,7 @@ from app.controllers.transaction_controller import TransactionResource, transact
 from app.controllers.user_controller import UserMeResource, UserProfileResource, user_bp
 from app.controllers.wallet_controller import wallet_bp
 from app.docs.api_documentation import API_INFO, TAGS
+from app.extensions.audit_trail import register_audit_trail
 from app.extensions.database import db
 from app.extensions.error_handlers import register_error_handlers
 from app.middleware.cors import register_cors
@@ -106,6 +107,7 @@ def create_app() -> Flask:
     register_error_handlers(app)
     register_graphql_security(app)
     register_cors(app)
+    register_audit_trail(app)
 
     # Registra blueprints ANTES dos endpoints no Swagger
     app.register_blueprint(transaction_bp)

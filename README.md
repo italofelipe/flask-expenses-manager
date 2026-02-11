@@ -156,6 +156,9 @@ Variáveis de ambiente principais:
   - `SECURITY_ENFORCE_STRONG_SECRETS=true`
 - CORS por allowlist:
   - `CORS_ALLOWED_ORIGINS=https://app.auraxis.com.br,https://www.auraxis.com.br`
+- Trilha de auditoria para rotas sensíveis:
+  - `AUDIT_TRAIL_ENABLED=true`
+  - `AUDIT_PATH_PREFIXES=/auth/,/user/,/transactions/,/wallet,/graphql`
 
 ## Situação atual de testes
 Existe suíte configurada em `tests/` com `pytest` e setup isolado de banco para execução local.
