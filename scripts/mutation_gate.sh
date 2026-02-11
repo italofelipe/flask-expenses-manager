@@ -9,6 +9,8 @@ PYTHON_BIN="${PYTHON_BIN:-python3}"
 if [[ -x "${ROOT_DIR}/.venv/bin/python" ]]; then
   PYTHON_BIN="${ROOT_DIR}/.venv/bin/python"
 fi
+PYTHON_DIR="$(dirname "${PYTHON_BIN}")"
+export PATH="${PYTHON_DIR}:${PATH}"
 
 MUTATION_CONFIG_FILE="${MUTATION_CONFIG_FILE:-scripts/cosmic_ray.toml}"
 MUTATION_MAX_SURVIVAL_PERCENT="${MUTATION_MAX_SURVIVAL_PERCENT:-0.0}"

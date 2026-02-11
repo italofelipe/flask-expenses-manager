@@ -228,7 +228,7 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Snyk Python dependency scan
-        uses: snyk/actions/python@master
+        uses: snyk/actions/python@9adf32b1121593767fc3c057af55b55db032dc04
         env:
           SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
         with:
@@ -240,7 +240,7 @@ jobs:
           docker build -f Dockerfile.prod -t auraxis-ci:${{ github.sha }} .
 
       - name: Snyk container scan
-        uses: snyk/actions/docker@master
+        uses: snyk/actions/docker@9adf32b1121593767fc3c057af55b55db032dc04
         env:
           SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
         with:
