@@ -107,6 +107,8 @@ Variáveis necessárias no ambiente local:
 - `CORS_ALLOWED_ORIGINS` com allowlist por ambiente.
 - `GRAPHQL_ALLOW_INTROSPECTION=false` em produção por padrão.
 - `RATE_LIMIT_BACKEND=redis` + `RATE_LIMIT_REDIS_URL` para modo distribuído em multi-instância.
+- observabilidade de rate-limit via métricas internas `rate_limit.*` e logs estruturados de backend.
+- retenção de auditoria com `AUDIT_RETENTION_DAYS` + `AUDIT_RETENTION_SWEEP_INTERVAL_SECONDS`.
 
 Comando manual:
 ```bash
@@ -131,6 +133,9 @@ Validação de evidências de segurança:
 - Se as variáveis do Sonar não estiverem configuradas, os jobs `quality` e `tests` continuam executando normalmente.
 - O arquivo `sonar-project.properties` define as convenções-base do scanner.
 - O gate de `dependency-review` só roda em PR e complementa o `pip-audit` do job `quality`.
+- Runbooks operacionais:
+  - `/opt/auraxis/docs/RATE_LIMIT_REDIS_RUNBOOK.md`
+  - `/opt/auraxis/docs/AUDIT_TRAIL_RUNBOOK.md`
 
 ## Evolução recomendada (próximos passos)
 1. Adicionar proteção de branch exigindo status checks (`quality`, `secret-scan`, `dependency-review`, `tests`, `sonar`).

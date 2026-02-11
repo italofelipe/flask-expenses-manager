@@ -85,7 +85,7 @@ Ultima atualizacao: 2026-02-11
 | S4-07 | App Security | Aplicar política GraphQL deny-by-default para operações privadas e cobertura automática de autorização por resolver | Done | 100% | Baixo: transporte GraphQL já bloqueia chamadas privadas sem auth | pending-commit | 2026-02-11 |
 | S4-08 | App Security | Tornar introspecção GraphQL configurável por ambiente (desabilitar em PROD por padrão) | Done | 100% | Baixo | pending-commit | 2026-02-11 |
 | S4-09 | App Security | Endurecer consumo BRAPI (allowlist de ticker, validação estrita de resposta, fallback defensivo) | Done | 100% | Médio: validação concluída; falta telemetria por códigos de erro de provider (item S4-17) | pending-commit | 2026-02-11 |
-| S4-10 | App Security | Evoluir rate-limit e revogação de token para storage distribuído (Redis) | In Progress | 70% | Médio: rate-limit com backend Redis opcional entregue; falta observabilidade e runbook de operação | pending-commit | 2026-02-11 |
+| S4-10 | App Security | Evoluir rate-limit e revogação de token para storage distribuído (Redis) | Done | 100% | Baixo: backend distribuído com observabilidade/runbook e helper legado de revogação alinhado ao source-of-truth persistido | pending-commit | 2026-02-11 |
 | S4-11 | App Security | Remover fallback de secrets fracos em runtime não-dev e falhar startup sem segredos fortes | Done | 100% | Baixo: bloqueio de startup em runtime inseguro | pending-commit | 2026-02-11 |
 | S4-12 | App Security | Definir política CORS estrita por ambiente (origins permitidas, métodos, headers) | Done | 100% | Médio: manter allowlist por ambiente atualizada | pending-commit | 2026-02-11 |
 | S4-13 | App Security | Implementar trilha de auditoria para ações sensíveis (login, perfil, transações, carteira) | Done | 100% | Médio: trilha em logs estruturados; faltam retenção/alertas centralizados | pending-commit | 2026-02-11 |
@@ -94,7 +94,7 @@ Ultima atualizacao: 2026-02-11
 | S4-16 | App Security | Adicionar scan de vulnerabilidades de dependências no CI (`pip-audit`/equivalente) | Done | 100% | Baixo | pending-commit | 2026-02-11 |
 | S4-17 | App Security | Adicionar observabilidade de integrações externas (BRAPI): contadores por timeout, payload inválido e erro HTTP | Done | 100% | Médio: métricas em memória entregues; próximo passo é export para backend central (CloudWatch/Prometheus) | f2bcda1 | 2026-02-11 |
 | S5-01 | App Security | Eliminar fallback de memória para rate-limit em produção (fail-closed se Redis indisponível) | Done | 100% | Médio: fail-closed implementado; falta monitoramento/alerta de indisponibilidade (S5-02/S5-10) | pending-commit | 2026-02-11 |
-| S5-02 | App Security | Implementar trilha de auditoria persistente (DB/CloudWatch) com retenção e busca por `request_id` | In Progress | 70% | Médio: persistência em banco local concluída; retenção/alertas centralizados ainda pendentes | pending-commit | 2026-02-11 |
+| S5-02 | App Security | Implementar trilha de auditoria persistente (DB/CloudWatch) com retenção e busca por `request_id` | Done | 100% | Médio: persistência + retenção + busca por `request_id` concluídas no banco local; integração CloudWatch permanece evolução de observabilidade | pending-commit | 2026-02-11 |
 | S5-03 | App Security | Aplicar autorização por recurso no domínio GraphQL (não só no transporte), com testes de ownership | In Progress | 35% | Médio: createTransaction coberto; falta expandir para outras mutações com referências relacionais | pending-commit | 2026-02-11 |
 | S5-04 | App Security | Endurecer CORS/headers por ambiente com validação de configuração no startup | Done | 100% | Baixo: política de CORS validada no startup e headers de segurança centralizados por ambiente | 5aa0d2c | 2026-02-11 |
 | S5-05 | App Security | Adotar rotação de secrets + source of truth (AWS SSM/Secrets Manager), removendo `.env` como primário em cloud | Done | 100% | Médio: script e runbook implementados; depende de IAM/SSM em cada ambiente AWS | pending-commit | 2026-02-11 |
@@ -158,10 +158,12 @@ Ultima atualizacao: 2026-02-11
 | 2026-02-11 | S4-14/S5-07 | Remoção do `ticker_controller` legado não registrado, atualização de documentação de superfície e teste para garantir que rotas antigas não sejam expostas | 805c69e |
 | 2026-02-11 | S4-15 | Threat model STRIDE + abuse cases + critérios de aceite por risco documentados (`docs/THREAT_MODEL_STRIDE.md`) | pending-commit |
 | 2026-02-11 | S5-05 | Source of truth de segredos em cloud com script de sync (`scripts/sync_cloud_secrets.py`) + runbook operacional (`docs/CLOUD_SECRETS_RUNBOOK.md`) | pending-commit |
+| 2026-02-11 | S4-10 | Rate-limit distribuído finalizado com observabilidade (`rate_limit.*`), logs de backend Redis/fail-closed, runbook operacional (`docs/RATE_LIMIT_REDIS_RUNBOOK.md`) e alinhamento do helper legado de revogação JWT ao `current_jti` persistido | pending-commit |
+| 2026-02-11 | S5-02 | Auditoria persistente evoluída com retenção configurável (`AUDIT_RETENTION_*`), índices de consulta, serviço de busca por `request_id`, utilitário operacional (`scripts/manage_audit_events.py`) e runbook (`docs/AUDIT_TRAIL_RUNBOOK.md`) | pending-commit |
 | 2026-02-09 | D (observacao) | Restaurados arquivos deletados acidentalmente: ticker/carteira | n/a |
 
 ## Proxima prioridade sugerida
-- S2/S3 (P0): executar `S5-01`, `S5-02`, `S5-03` e `S5-06` (rate-limit fail-closed, auditoria persistente, authz por recurso no GraphQL e proteção anti takeover).
+- S2/S3 (P0): executar `S5-03` e `S5-06` (authz por recurso no GraphQL e proteção anti takeover com telemetria/política por usuário conhecido).
 
 ## Mapeamento Rebranding (nomenclatura legada -> `auraxis`)
 

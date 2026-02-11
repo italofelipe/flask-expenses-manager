@@ -39,3 +39,31 @@ def build_brapi_metrics_payload() -> dict[str, Any]:
             "invalid_payloads": metrics.get("brapi.invalid_payload", 0),
         },
     }
+
+
+def build_rate_limit_metrics_payload() -> dict[str, Any]:
+    metrics = snapshot_metrics(prefix="rate_limit.")
+    return {
+        "component": "rate_limit",
+        "counters": metrics,
+        "summary": {
+            "allowed": metrics.get("rate_limit.allowed", 0),
+            "blocked": metrics.get("rate_limit.blocked", 0),
+            "backend_unavailable": metrics.get("rate_limit.backend_unavailable", 0),
+            "backend_error": metrics.get("rate_limit.backend_error", 0),
+        },
+    }
+
+
+def build_login_guard_metrics_payload() -> dict[str, Any]:
+    metrics = snapshot_metrics(prefix="login_guard.")
+    return {
+        "component": "login_guard",
+        "counters": metrics,
+        "summary": {
+            "checks_allowed": metrics.get("login_guard.check.allowed", 0),
+            "checks_blocked": metrics.get("login_guard.check.blocked", 0),
+            "failures": metrics.get("login_guard.failure", 0),
+            "successes": metrics.get("login_guard.success", 0),
+        },
+    }

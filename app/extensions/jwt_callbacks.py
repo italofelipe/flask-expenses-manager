@@ -2,8 +2,9 @@ from typing import Any, Dict
 from uuid import UUID
 
 from flask import has_request_context, jsonify, request
-from flask_jwt_extended import JWTManager
+from flask_jwt_extended import JWTManager, get_jwt_identity
 
+from app.extensions.database import db
 from app.models.user import User
 from app.utils.response_builder import error_payload
 
@@ -27,10 +28,16 @@ def _jwt_error_response(message: str, *, code: str, status_code: int) -> Any:
 
 
 def is_token_revoked(jti: str) -> bool:
-    # Revocation is enforced by token_in_blocklist_loader against
-    # persisted user.current_jti.
-    # This helper remains for backward-compatible call sites.
-    return False
+    # Keep compatibility with legacy call sites that still invoke this helper.
+    # Runtime revocation source-of-truth is persisted in user.current_jti.
+    try:
+        identity = get_jwt_identity()
+        if not identity:
+            return True
+        user = db.session.get(User, UUID(str(identity)))
+        return not user or user.current_jti != jti
+    except Exception:
+        return True
 
 
 def register_jwt_callbacks(jwt: JWTManager) -> None:
@@ -44,7 +51,7 @@ def register_jwt_callbacks(jwt: JWTManager) -> None:
         if not user_id or not jti:
             return True
 
-        user = User.query.get(UUID(user_id))
+        user = db.session.get(User, UUID(user_id))
         return not user or user.current_jti != jti
 
     @jwt.revoked_token_loader  # type: ignore[misc]

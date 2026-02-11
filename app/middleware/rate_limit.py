@@ -8,9 +8,10 @@ from dataclasses import dataclass
 from time import monotonic, time
 from typing import Any, Deque, Protocol
 
-from flask import Flask, Response, g, jsonify, request
+from flask import Flask, Response, current_app, g, jsonify, request
 from flask_jwt_extended import decode_token
 
+from app.extensions.integration_metrics import increment_metric
 from app.utils.response_builder import error_payload
 
 CONTRACT_HEADER = "X-API-Contract"
@@ -406,6 +407,8 @@ def _build_storage_from_env() -> tuple[
 
 
 def _build_rate_limited_response(decision: RateLimitDecision) -> Response:
+    increment_metric("rate_limit.blocked")
+    increment_metric(f"rate_limit.blocked.{decision.rule.name}")
     details = {
         "rule": decision.rule.name,
         "limit": decision.rule.limit,
@@ -434,6 +437,7 @@ def _build_rate_limited_response(decision: RateLimitDecision) -> Response:
 
 
 def _build_backend_unavailable_response(reason: str | None = None) -> Response:
+    increment_metric("rate_limit.backend_unavailable")
     details: dict[str, Any] = {}
     if reason:
         details["reason"] = reason
@@ -479,6 +483,12 @@ def _consume_with_backend_guard(
     limiter: RateLimiterService,
 ) -> RateLimitDecision | Response | None:
     if _is_fail_closed_active(limiter):
+        if current_app:
+            current_app.logger.warning(
+                "rate_limit_backend_unavailable configured_backend=%s reason=%s",
+                limiter.configured_backend,
+                limiter.backend_failure_reason or "unknown",
+            )
         return _build_backend_unavailable_response(limiter.backend_failure_reason)
 
     try:
@@ -488,9 +498,44 @@ def _consume_with_backend_guard(
             client_ip=_get_client_ip(),
         )
     except Exception:
+        increment_metric("rate_limit.backend_error")
+        if current_app:
+            current_app.logger.exception(
+                "rate_limit_backend_error configured_backend=%s path=%s",
+                limiter.configured_backend,
+                request.path,
+            )
         if limiter.fail_closed and limiter.configured_backend == "redis":
             return _build_backend_unavailable_response("rate limit backend error")
         return None
+
+
+def _log_rate_limit_backend_configuration(
+    app: Flask, limiter: RateLimiterService
+) -> None:
+    app.logger.info(
+        (
+            "rate_limit_backend_config configured_backend=%s "
+            "backend_name=%s ready=%s fail_closed=%s reason=%s"
+        ),
+        limiter.configured_backend,
+        limiter.backend_name,
+        limiter.backend_ready,
+        limiter.fail_closed,
+        limiter.backend_failure_reason or "none",
+    )
+    if not _is_fail_closed_active(limiter):
+        return
+    app.logger.warning(
+        "rate_limit_fail_closed_active configured_backend=%s reason=%s",
+        limiter.configured_backend,
+        limiter.backend_failure_reason or "unknown",
+    )
+
+
+def _record_allowed_decision_metrics(decision: RateLimitDecision) -> None:
+    increment_metric("rate_limit.allowed")
+    increment_metric(f"rate_limit.allowed.{decision.rule.name}")
 
 
 def register_rate_limit_guard(app: Flask) -> None:
@@ -499,6 +544,7 @@ def register_rate_limit_guard(app: Flask) -> None:
 
     limiter = RateLimiterService.from_env()
     app.extensions["rate_limiter"] = limiter
+    _log_rate_limit_backend_configuration(app, limiter)
 
     def rate_limit_guard() -> Response | None:
         if _should_skip_rate_limit():
@@ -511,6 +557,7 @@ def register_rate_limit_guard(app: Flask) -> None:
             return None
         decision = outcome
         g.rate_limit_headers = decision.headers()
+        _record_allowed_decision_metrics(decision)
 
         if decision.allowed:
             return None
