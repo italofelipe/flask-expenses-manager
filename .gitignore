@@ -53,3 +53,17 @@ pgdata/
 
 .env
 .scannerwork/
+
+# Security & QA local artifacts (não versionar)
+.coverage
+.coverage*
+.hypothesis/
+coverage.xml
+mutants/
+reports/
+*.pem
+sitecustomize.py
+awscli-bundle/
+Flask - Expenses.postman_collection.json
+docs/PROJECT_PANORAMA_REPORT_*.md
+docs/SECURITY_REASSESSMENT_*.md
