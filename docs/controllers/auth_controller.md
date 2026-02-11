@@ -40,6 +40,7 @@ Endpoint: `POST /auth/login`
 O que faz:
 - Aceita login por `email` ou `name` + `password`.
 - Aplica guard progressivo anti brute-force por fingerprint (`principal + IP + user-agent`) antes da autenticação.
+- Usa política mais restritiva para principal conhecido (usuário já existente), com thresholds/cooldown dedicados por ambiente.
 - Verifica senha com `check_password_hash`.
 - Cria JWT com expiração de 1 hora.
 - Atualiza `current_jti` do usuário para invalidar sessões antigas.
@@ -89,8 +90,8 @@ O que faz:
 ## Pontos incompletos / melhorias (Fase 0)
 1. Não há refresh token (somente access token curto).
 2. Mensagens estão mistas em português/inglês.
-3. Não há telemetria/alerta centralizado das tentativas bloqueadas para resposta a incidentes.
-4. Não há auditoria persistente específica de tentativas de autenticação (sucesso/falha) para observabilidade.
+3. Telemetria local de brute-force está disponível via métricas internas (`login_guard.*`), mas falta exportador central (CloudWatch/Prometheus) e alertas.
+4. Não há auditoria persistente específica de tentativas de autenticação (sucesso/falha) em tabela dedicada.
 
 ## Recomendação de implementação futura (sem alterar comportamento agora)
 - Extrair regras de autenticação para serviço dedicado (`AuthService`).

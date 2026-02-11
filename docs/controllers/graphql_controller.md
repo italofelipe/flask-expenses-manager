@@ -26,6 +26,8 @@ O que faz:
 - O endpoint GraphQL está liberado no `auth_guard` para permitir operações públicas
   (ex.: login/register).
 - Cada resolver protegido valida token Bearer no próprio contexto.
+- Para operações com recursos relacionais (ex.: `investmentId`), a autorização por ownership
+  também é validada no domínio GraphQL antes da execução do serviço.
 
 ## Fase atual
 - Fase 1 implementada: queries/mutations essenciais por domínio

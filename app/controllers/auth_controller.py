@@ -197,12 +197,18 @@ class AuthResource(MethodResource):
             )
 
         principal = str(email or name or "")
+        user = (
+            User.query.filter_by(email=email).first()
+            if email
+            else User.query.filter_by(name=name).first()
+        )
         login_context = build_login_attempt_context(
             principal=principal,
             remote_addr=request.remote_addr,
             user_agent=request.headers.get("User-Agent"),
             forwarded_for=request.headers.get("X-Forwarded-For"),
             real_ip=request.headers.get("X-Real-IP"),
+            known_principal=user is not None,
         )
         login_guard = get_login_attempt_guard()
         allowed, retry_after = login_guard.check(login_context)
@@ -217,12 +223,6 @@ class AuthResource(MethodResource):
                 error_code="TOO_MANY_ATTEMPTS",
                 details={"retry_after_seconds": retry_after},
             )
-
-        user = (
-            User.query.filter_by(email=email).first()
-            if email
-            else User.query.filter_by(name=name).first()
-        )
 
         if not user or not check_password_hash(user.password, password):
             login_guard.register_failure(login_context)

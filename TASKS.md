@@ -53,8 +53,8 @@ Ultima atualizacao: 2026-02-11
 | G4 | Qualidade | Pipeline CI para lint, type-check, testes e gates de qualidade | In Progress | 85% | Baixo | 842a656, 7f0ac66 | 2026-02-09 |
 | G5 | Qualidade | Seed de dados para ambiente local | Todo | 0% | Baixo |  | 2026-02-09 |
 | H1 | Arquitetura | Adicionar suporte a GraphQL | In Progress | 65% | Alto: impacto transversal na API | ba1f238, e12bf21 | 2026-02-09 |
-| H2 | Seguranca | Implementar rate limit por rota/usuario/IP | In Progress | 60% | Medio: baseline entregue, falta storage distribuído e tuning por ambiente | pending-commit | 2026-02-11 |
-| H3 | Seguranca | Hardening de validacao/sanitizacao/authz/headers/auditoria | In Progress | 15% | Alto: mapeamento consolidado, implementação pendente | pending-commit | 2026-02-11 |
+| H2 | Seguranca | Implementar rate limit por rota/usuario/IP | Done | 100% | Baixo: rate-limit por domínio com backend distribuído, fail-closed e observabilidade básica | pending-commit | 2026-02-11 |
+| H3 | Seguranca | Hardening de validacao/sanitizacao/authz/headers/auditoria | Done | 100% | Médio: baseline aplicado; evolução contínua segue para monitoramento centralizado e infraestrutura S1 | pending-commit | 2026-02-11 |
 | I1 | Deploy Cloud | Fechar arquitetura alvo AWS/Azure para budget de R$40/mês e registrar decisão | Done | 100% | Medio: custos podem variar por região/câmbio | pending-commit | 2026-02-09 |
 | I2 | Deploy Cloud | Preparar Docker para produção (Dockerfile prod, gunicorn, healthcheck) | Done | 100% | Medio: diferenças dev/prod podem quebrar startup | pending-commit | 2026-02-09 |
 | I3 | Deploy AWS | Provisionar ambiente base na AWS (VPC, SG, instância Lightsail/EC2) | In Progress | 70% | Medio: hardening inicial de rede e portas | pending-commit | 2026-02-10 |
@@ -74,8 +74,8 @@ Ultima atualizacao: 2026-02-11
 | R1 | Rebranding | Mapear todas ocorrências de nomenclatura legada do projeto e registrar plano de substituição para `auraxis` | Done | 100% | Baixo: mapeamento concluído em arquivos versionados | pending-commit | 2026-02-10 |
 | R2 | Rebranding | Substituir ocorrências versionadas de nomenclatura legada por `auraxis` (sem quebrar integrações externas) | Done | 100% | Medio: integrações externas podem manter identificador legado temporário | pending-commit | 2026-02-10 |
 | S1 | AWS Security | Restringir acesso e hardening de instâncias EC2 (SG, NACL, IMDSv2, SSH policy, patching baseline) | Todo | 0% | Alto: superfície de ataque de infraestrutura |  | 2026-02-10 |
-| S2 | App Security | Implementar segurança de endpoints (rate-limit, validação/sanitização de request/response, headers e authz por recurso) | In Progress | 78% | Alto: baseline forte entregue, pendente authz deny-by-default GraphQL, auditoria e storage distribuído | pending-commit | 2026-02-11 |
-| S3 | App Security | Executar checklist OWASP no sistema (ASVS/API Top 10), corrigir gaps e formalizar evidências | In Progress | 85% | Alto: risco de vulnerabilidades críticas não mapeadas | pending-commit | 2026-02-11 |
+| S2 | App Security | Implementar segurança de endpoints (rate-limit, validação/sanitização de request/response, headers e authz por recurso) | Done | 100% | Médio: baseline completo em aplicação; próximos passos são monitoramento centralizado e hardening de infraestrutura (S1) | pending-commit | 2026-02-11 |
+| S3 | App Security | Executar checklist OWASP no sistema (ASVS/API Top 10), corrigir gaps e formalizar evidências | In Progress | 92% | Médio: baseline e remediações de aplicação concluídas; pendências residuais concentram-se em controles de infraestrutura (S1) | pending-commit | 2026-02-11 |
 | S4-01 | App Security | Remover vazamento de exceções em respostas (`str(e)`, `traceback`) e adotar erros genéricos com correlação | Done | 100% | Médio: manter revisão contínua em novos endpoints | pending-commit | 2026-02-11 |
 | S4-02 | App Security | Substituir `print` por logging estruturado com níveis e política de redaction | Done | 100% | Baixo: runtime HTTP e scripts operacionais migrados para logging estruturado | f2bcda1 | 2026-02-11 |
 | S4-03 | App Security | Padronizar callbacks JWT e middleware para contrato de erro único (v1/v2) e status codes consistentes | Done | 100% | Baixo | pending-commit | 2026-02-11 |
@@ -95,10 +95,10 @@ Ultima atualizacao: 2026-02-11
 | S4-17 | App Security | Adicionar observabilidade de integrações externas (BRAPI): contadores por timeout, payload inválido e erro HTTP | Done | 100% | Médio: métricas em memória entregues; próximo passo é export para backend central (CloudWatch/Prometheus) | f2bcda1 | 2026-02-11 |
 | S5-01 | App Security | Eliminar fallback de memória para rate-limit em produção (fail-closed se Redis indisponível) | Done | 100% | Médio: fail-closed implementado; falta monitoramento/alerta de indisponibilidade (S5-02/S5-10) | pending-commit | 2026-02-11 |
 | S5-02 | App Security | Implementar trilha de auditoria persistente (DB/CloudWatch) com retenção e busca por `request_id` | Done | 100% | Médio: persistência + retenção + busca por `request_id` concluídas no banco local; integração CloudWatch permanece evolução de observabilidade | pending-commit | 2026-02-11 |
-| S5-03 | App Security | Aplicar autorização por recurso no domínio GraphQL (não só no transporte), com testes de ownership | In Progress | 35% | Médio: createTransaction coberto; falta expandir para outras mutações com referências relacionais | pending-commit | 2026-02-11 |
+| S5-03 | App Security | Aplicar autorização por recurso no domínio GraphQL (não só no transporte), com testes de ownership | Done | 100% | Baixo: checks explícitos de ownership para `investmentId` no domínio GraphQL + suíte de testes de acesso cruzado | pending-commit | 2026-02-11 |
 | S5-04 | App Security | Endurecer CORS/headers por ambiente com validação de configuração no startup | Done | 100% | Baixo: política de CORS validada no startup e headers de segurança centralizados por ambiente | 5aa0d2c | 2026-02-11 |
 | S5-05 | App Security | Adotar rotação de secrets + source of truth (AWS SSM/Secrets Manager), removendo `.env` como primário em cloud | Done | 100% | Médio: script e runbook implementados; depende de IAM/SSM em cada ambiente AWS | pending-commit | 2026-02-11 |
-| S5-06 | App Security | Fechar lacunas de brute-force/account takeover (lockout progressivo, cooldown e fingerprint de IP/device) | In Progress | 45% | Médio: fase 1 entregue em login REST/GraphQL; faltam telemetria/alertas e política por usuário conhecido | pending-commit | 2026-02-11 |
+| S5-06 | App Security | Fechar lacunas de brute-force/account takeover (lockout progressivo, cooldown e fingerprint de IP/device) | Done | 100% | Médio: política por usuário conhecido + telemetria local concluídas; falta exportador central de alertas (CloudWatch/Prometheus) | pending-commit | 2026-02-11 |
 | S5-07 | App Security | Revisar endpoints legados e desativar/feature-flag rotas não suportadas (`ticker_controller`) | Done | 100% | Baixo: superfície legado removida e bloqueada por teste de não exposição | 805c69e | 2026-02-11 |
 | S5-08 | App Security | Implementar validação de saída para evitar data leakage (campos sensíveis e debug data) | Done | 100% | Médio: sanitização central reduz leak; manter revisão contínua em novos payloads | 5aa0d2c | 2026-02-11 |
 | S5-09 | App Security | Fortalecer proteção de banco de testes/fixtures para evitar conexões abertas e vazamento de estado | Done | 100% | Baixo: fixture isolada por ambiente e teardown forte de engine/sessão/banco temporário | c0f83e2 | 2026-02-11 |
@@ -160,10 +160,12 @@ Ultima atualizacao: 2026-02-11
 | 2026-02-11 | S5-05 | Source of truth de segredos em cloud com script de sync (`scripts/sync_cloud_secrets.py`) + runbook operacional (`docs/CLOUD_SECRETS_RUNBOOK.md`) | pending-commit |
 | 2026-02-11 | S4-10 | Rate-limit distribuído finalizado com observabilidade (`rate_limit.*`), logs de backend Redis/fail-closed, runbook operacional (`docs/RATE_LIMIT_REDIS_RUNBOOK.md`) e alinhamento do helper legado de revogação JWT ao `current_jti` persistido | pending-commit |
 | 2026-02-11 | S5-02 | Auditoria persistente evoluída com retenção configurável (`AUDIT_RETENTION_*`), índices de consulta, serviço de busca por `request_id`, utilitário operacional (`scripts/manage_audit_events.py`) e runbook (`docs/AUDIT_TRAIL_RUNBOOK.md`) | pending-commit |
+| 2026-02-11 | S5-03 | Autorização por recurso reforçada no domínio GraphQL para fluxos por `investmentId` (queries/mutations) com validação explícita de ownership + testes de acesso cruzado | pending-commit |
+| 2026-02-11 | S5-06 | Login guard evoluído com política específica para principal conhecido (`LOGIN_GUARD_KNOWN_*`) + métricas de telemetria (`login_guard.*`) e testes de regressão REST/GraphQL | pending-commit |
 | 2026-02-09 | D (observacao) | Restaurados arquivos deletados acidentalmente: ticker/carteira | n/a |
 
 ## Proxima prioridade sugerida
-- S2/S3 (P0): executar `S5-03` e `S5-06` (authz por recurso no GraphQL e proteção anti takeover com telemetria/política por usuário conhecido).
+- S1/S3 (P1): fechar controles de infraestrutura OWASP em AWS (`S1`) e integrar exportação central de métricas/alertas de segurança (CloudWatch/Prometheus).
 
 ## Mapeamento Rebranding (nomenclatura legada -> `auraxis`)
 

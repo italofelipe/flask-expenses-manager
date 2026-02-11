@@ -70,6 +70,31 @@ def _get_user_id_by_email(app: Any, email: str) -> UUID:
         return UUID(str(user.id))
 
 
+def _create_wallet_and_get_id(client: Any, token: str, name: str) -> str:
+    mutation = """
+    mutation AddWallet($name: String!, $registerDate: String!) {
+      addWalletEntry(
+        name: $name,
+        value: 1000,
+        registerDate: $registerDate,
+        shouldBeOnWallet: true
+      ) {
+        item { id }
+      }
+    }
+    """
+    response = _graphql(
+        client,
+        mutation,
+        {"name": name, "registerDate": "2026-02-11"},
+        token=token,
+    )
+    assert response.status_code == 200
+    body = response.get_json()
+    assert body and "errors" not in body
+    return str(body["data"]["addWalletEntry"]["item"]["id"])
+
+
 @pytest.mark.parametrize(
     ("resource_field", "factory"),
     [
@@ -135,3 +160,133 @@ def test_graphql_create_transaction_denies_foreign_reference_ids(
     if "data" in body:
         assert body["data"]["createTransaction"] is None
     assert body["errors"][0]["message"].startswith("Referência inválida para")
+
+
+def test_graphql_investment_mutations_deny_foreign_investment_id(client: Any) -> None:
+    owner_token = _register_and_login(client, "graphql-owner-investment")
+    other_token = _register_and_login(client, "graphql-other-investment")
+    foreign_investment_id = _create_wallet_and_get_id(
+        client,
+        other_token,
+        "other-wallet",
+    )
+
+    add_operation_mutation = """
+    mutation AddOperation($investmentId: UUID!, $executedAt: String!) {
+      addInvestmentOperation(
+        investmentId: $investmentId,
+        operationType: "buy",
+        quantity: "1",
+        unitPrice: "10",
+        executedAt: $executedAt
+      ) {
+        message
+        item { id }
+      }
+    }
+    """
+    add_response = _graphql(
+        client,
+        add_operation_mutation,
+        {"investmentId": foreign_investment_id, "executedAt": "2026-02-11"},
+        token=owner_token,
+    )
+    add_body = add_response.get_json()
+    assert add_body is not None
+    assert "errors" in add_body
+    if "data" in add_body:
+        assert add_body["data"]["addInvestmentOperation"] is None
+    assert (
+        add_body["errors"][0]["message"]
+        == "Você não tem permissão para acessar este investimento."
+    )
+
+    update_wallet_mutation = """
+    mutation UpdateWallet($investmentId: UUID!) {
+      updateWalletEntry(investmentId: $investmentId, name: "attempted-update") {
+        item { id name }
+      }
+    }
+    """
+    update_response = _graphql(
+        client,
+        update_wallet_mutation,
+        {"investmentId": foreign_investment_id},
+        token=owner_token,
+    )
+    update_body = update_response.get_json()
+    assert update_body is not None
+    assert "errors" in update_body
+    if "data" in update_body:
+        assert update_body["data"]["updateWalletEntry"] is None
+    assert (
+        update_body["errors"][0]["message"]
+        == "Você não tem permissão para editar este investimento."
+    )
+
+    delete_wallet_mutation = """
+    mutation DeleteWallet($investmentId: UUID!) {
+      deleteWalletEntry(investmentId: $investmentId) {
+        ok
+      }
+    }
+    """
+    delete_response = _graphql(
+        client,
+        delete_wallet_mutation,
+        {"investmentId": foreign_investment_id},
+        token=owner_token,
+    )
+    delete_body = delete_response.get_json()
+    assert delete_body is not None
+    assert "errors" in delete_body
+    if "data" in delete_body:
+        assert delete_body["data"]["deleteWalletEntry"] is None
+    assert (
+        delete_body["errors"][0]["message"]
+        == "Você não tem permissão para remover este investimento."
+    )
+
+
+def test_graphql_investment_queries_deny_foreign_investment_id(client: Any) -> None:
+    owner_token = _register_and_login(client, "graphql-owner-investment-query")
+    other_token = _register_and_login(client, "graphql-other-investment-query")
+    foreign_investment_id = _create_wallet_and_get_id(
+        client,
+        other_token,
+        "other-wallet-query",
+    )
+
+    query = """
+    query ForeignInvestment($investmentId: UUID!, $date: String!) {
+      investmentOperations(investmentId: $investmentId, page: 1, perPage: 10) {
+        pagination { total }
+      }
+      investmentPosition(investmentId: $investmentId) {
+        totalOperations
+      }
+      investmentInvestedAmount(investmentId: $investmentId, date: $date) {
+        totalOperations
+      }
+      investmentValuation(investmentId: $investmentId) {
+        investmentId
+      }
+    }
+    """
+    response = _graphql(
+        client,
+        query,
+        {"investmentId": foreign_investment_id, "date": "2026-02-11"},
+        token=owner_token,
+    )
+    body = response.get_json()
+    assert body is not None
+    assert "errors" in body
+    if "data" in body:
+        assert body["data"]["investmentOperations"] is None
+        assert body["data"]["investmentPosition"] is None
+        assert body["data"]["investmentInvestedAmount"] is None
+        assert body["data"]["investmentValuation"] is None
+    assert body["errors"][0]["message"] == (
+        "Você não tem permissão para acessar este investimento."
+    )

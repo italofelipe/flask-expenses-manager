@@ -7,12 +7,15 @@ from dataclasses import dataclass
 from math import ceil
 from time import time
 
+from app.extensions.integration_metrics import increment_metric
+
 
 @dataclass(frozen=True)
 class LoginAttemptContext:
     principal: str
     client_ip: str
     user_agent: str
+    known_principal: bool = False
 
     def key(self) -> str:
         raw = f"{self.principal}|{self.client_ip}|{self.user_agent}"
@@ -32,17 +35,26 @@ class LoginAttemptGuardService:
         *,
         enabled: bool,
         failure_threshold: int,
+        known_failure_threshold: int,
         base_cooldown_seconds: int,
         max_cooldown_seconds: int,
+        known_base_cooldown_seconds: int,
+        known_max_cooldown_seconds: int,
         retention_seconds: int,
         max_keys: int,
     ) -> None:
         self._enabled = enabled
         self._failure_threshold = max(1, failure_threshold)
+        self._known_failure_threshold = max(1, known_failure_threshold)
         self._base_cooldown_seconds = max(1, base_cooldown_seconds)
         self._max_cooldown_seconds = max(
             self._base_cooldown_seconds,
             max_cooldown_seconds,
+        )
+        self._known_base_cooldown_seconds = max(1, known_base_cooldown_seconds)
+        self._known_max_cooldown_seconds = max(
+            self._known_base_cooldown_seconds,
+            known_max_cooldown_seconds,
         )
         self._retention_seconds = max(60, retention_seconds)
         self._max_keys = max(1000, max_keys)
@@ -62,10 +74,17 @@ class LoginAttemptGuardService:
             self._prune(now)
             state = self._state.get(key)
             if state is None:
+                increment_metric("login_guard.check.allowed")
+                increment_metric("login_guard.check.allowed.no_state")
                 return True, 0
             if state.blocked_until <= now:
+                increment_metric("login_guard.check.allowed")
+                increment_metric("login_guard.check.allowed.expired_block")
                 return True, 0
             retry_after = int(ceil(state.blocked_until - now))
+            increment_metric("login_guard.check.blocked")
+            suffix = "known" if context.known_principal else "unknown"
+            increment_metric(f"login_guard.check.blocked.{suffix}")
             return False, max(1, retry_after)
 
     def register_failure(self, context: LoginAttemptContext) -> int:
@@ -78,20 +97,32 @@ class LoginAttemptGuardService:
             state = self._state.setdefault(key, _State())
             if state.blocked_until > now:
                 state.updated_at = now
+                increment_metric("login_guard.failure.while_blocked")
                 return int(ceil(state.blocked_until - now))
 
             state.failures += 1
             state.updated_at = now
+            increment_metric("login_guard.failure")
+            suffix = "known" if context.known_principal else "unknown"
+            increment_metric(f"login_guard.failure.{suffix}")
 
-            if state.failures < self._failure_threshold:
+            (
+                active_failure_threshold,
+                active_base_cooldown,
+                active_max_cooldown,
+            ) = self._resolve_policy(context)
+
+            if state.failures < active_failure_threshold:
                 return 0
 
-            exponent = state.failures - self._failure_threshold
+            exponent = state.failures - active_failure_threshold
             cooldown = min(
-                self._base_cooldown_seconds * (2**exponent),
-                self._max_cooldown_seconds,
+                active_base_cooldown * (2**exponent),
+                active_max_cooldown,
             )
             state.blocked_until = now + cooldown
+            increment_metric("login_guard.cooldown.started")
+            increment_metric(f"login_guard.cooldown.started.{suffix}")
             return int(cooldown)
 
     def register_success(self, context: LoginAttemptContext) -> None:
@@ -100,6 +131,20 @@ class LoginAttemptGuardService:
         key = context.key()
         with self._lock:
             self._state.pop(key, None)
+        increment_metric("login_guard.success")
+
+    def _resolve_policy(self, context: LoginAttemptContext) -> tuple[int, int, int]:
+        if context.known_principal:
+            return (
+                self._known_failure_threshold,
+                self._known_base_cooldown_seconds,
+                self._known_max_cooldown_seconds,
+            )
+        return (
+            self._failure_threshold,
+            self._base_cooldown_seconds,
+            self._max_cooldown_seconds,
+        )
 
     def reset_for_tests(self) -> None:
         with self._lock:
@@ -162,6 +207,7 @@ def build_login_attempt_context(
     user_agent: str | None,
     forwarded_for: str | None = None,
     real_ip: str | None = None,
+    known_principal: bool = False,
 ) -> LoginAttemptContext:
     normalized_principal = principal.strip().lower()
     normalized_agent = str(user_agent or "").strip()[:512]
@@ -174,6 +220,7 @@ def build_login_attempt_context(
         principal=normalized_principal,
         client_ip=client_ip,
         user_agent=normalized_agent,
+        known_principal=known_principal,
     )
 
 
@@ -186,6 +233,10 @@ def get_login_attempt_guard() -> LoginAttemptGuardService:
         _guard = LoginAttemptGuardService(
             enabled=_read_bool_env("LOGIN_GUARD_ENABLED", True),
             failure_threshold=_read_int_env("LOGIN_GUARD_FAILURE_THRESHOLD", 5),
+            known_failure_threshold=_read_int_env(
+                "LOGIN_GUARD_KNOWN_FAILURE_THRESHOLD",
+                _read_int_env("LOGIN_GUARD_FAILURE_THRESHOLD", 5),
+            ),
             base_cooldown_seconds=_read_int_env(
                 "LOGIN_GUARD_BASE_COOLDOWN_SECONDS",
                 30,
@@ -193,6 +244,20 @@ def get_login_attempt_guard() -> LoginAttemptGuardService:
             max_cooldown_seconds=_read_int_env(
                 "LOGIN_GUARD_MAX_COOLDOWN_SECONDS",
                 900,
+            ),
+            known_base_cooldown_seconds=_read_int_env(
+                "LOGIN_GUARD_KNOWN_BASE_COOLDOWN_SECONDS",
+                _read_int_env(
+                    "LOGIN_GUARD_BASE_COOLDOWN_SECONDS",
+                    30,
+                ),
+            ),
+            known_max_cooldown_seconds=_read_int_env(
+                "LOGIN_GUARD_KNOWN_MAX_COOLDOWN_SECONDS",
+                _read_int_env(
+                    "LOGIN_GUARD_MAX_COOLDOWN_SECONDS",
+                    900,
+                ),
             ),
             retention_seconds=_read_int_env(
                 "LOGIN_GUARD_RETENTION_SECONDS",

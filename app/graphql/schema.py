@@ -200,6 +200,14 @@ def _get_owned_wallet_or_error(
     return investment
 
 
+def _assert_owned_investment_access(investment_id: UUID, user_id: UUID) -> None:
+    _get_owned_wallet_or_error(
+        investment_id,
+        user_id,
+        forbidden_message="Você não tem permissão para acessar este investimento.",
+    )
+
+
 class UserType(graphene.ObjectType):
     id = graphene.ID(required=True)
     name = graphene.String(required=True)
@@ -727,6 +735,7 @@ class Query(graphene.ObjectType):
     ) -> InvestmentOperationListPayloadType:
         _validate_pagination_values(page, per_page)
         user = get_current_user_required()
+        _assert_owned_investment_access(investment_id, user.id)
         service = InvestmentOperationService(user.id)
         try:
             operations, pagination = service.list_operations(
@@ -753,6 +762,7 @@ class Query(graphene.ObjectType):
         self, info: graphene.ResolveInfo, investment_id: UUID
     ) -> InvestmentOperationSummaryType:
         user = get_current_user_required()
+        _assert_owned_investment_access(investment_id, user.id)
         service = InvestmentOperationService(user.id)
         try:
             summary = service.get_summary(investment_id)
@@ -764,6 +774,7 @@ class Query(graphene.ObjectType):
         self, info: graphene.ResolveInfo, investment_id: UUID
     ) -> InvestmentPositionType:
         user = get_current_user_required()
+        _assert_owned_investment_access(investment_id, user.id)
         service = InvestmentOperationService(user.id)
         try:
             position = service.get_position(investment_id)
@@ -775,6 +786,7 @@ class Query(graphene.ObjectType):
         self, info: graphene.ResolveInfo, investment_id: UUID, date: str
     ) -> InvestmentInvestedAmountType:
         user = get_current_user_required()
+        _assert_owned_investment_access(investment_id, user.id)
         operation_date = _parse_optional_date(date, "date")
         if operation_date is None:
             raise GraphQLError("Parâmetro 'date' é obrigatório.")
@@ -790,6 +802,7 @@ class Query(graphene.ObjectType):
         self, info: graphene.ResolveInfo, investment_id: UUID
     ) -> PortfolioValuationItemType:
         user = get_current_user_required()
+        _assert_owned_investment_access(investment_id, user.id)
         service = PortfolioValuationService(user.id)
         try:
             payload = service.get_investment_current_valuation(investment_id)
@@ -872,6 +885,11 @@ class LoginMutation(graphene.Mutation):
             raise GraphQLError("Missing credentials")
 
         principal = str(email or name or "")
+        user = (
+            User.query.filter_by(email=email).first()
+            if email
+            else User.query.filter_by(name=name).first()
+        )
         request_obj = cast(dict[str, Any], info.context).get("request")
         headers = request_obj.headers if request_obj is not None else {}
         login_context = build_login_attempt_context(
@@ -884,6 +902,7 @@ class LoginMutation(graphene.Mutation):
             user_agent=headers.get("User-Agent") if headers else None,
             forwarded_for=headers.get("X-Forwarded-For") if headers else None,
             real_ip=headers.get("X-Real-IP") if headers else None,
+            known_principal=user is not None,
         )
         login_guard = get_login_attempt_guard()
         allowed, retry_after = login_guard.check(login_context)
@@ -896,11 +915,6 @@ class LoginMutation(graphene.Mutation):
                 },
             )
 
-        user = (
-            User.query.filter_by(email=email).first()
-            if email
-            else User.query.filter_by(name=name).first()
-        )
         if not user or not check_password_hash(user.password, password):
             login_guard.register_failure(login_context)
             raise GraphQLError("Invalid credentials")
@@ -1295,6 +1309,7 @@ class AddInvestmentOperationMutation(graphene.Mutation):
         **kwargs: Any,
     ) -> AddInvestmentOperationMutation:
         user = get_current_user_required()
+        _assert_owned_investment_access(investment_id, user.id)
         service = InvestmentOperationService(user.id)
         try:
             operation = service.create_operation(investment_id, kwargs)
@@ -1330,6 +1345,7 @@ class UpdateInvestmentOperationMutation(graphene.Mutation):
         **kwargs: Any,
     ) -> UpdateInvestmentOperationMutation:
         user = get_current_user_required()
+        _assert_owned_investment_access(investment_id, user.id)
         service = InvestmentOperationService(user.id)
         try:
             operation = service.update_operation(investment_id, operation_id, kwargs)
@@ -1355,6 +1371,7 @@ class DeleteInvestmentOperationMutation(graphene.Mutation):
         self, info: graphene.ResolveInfo, investment_id: UUID, operation_id: UUID
     ) -> DeleteInvestmentOperationMutation:
         user = get_current_user_required()
+        _assert_owned_investment_access(investment_id, user.id)
         service = InvestmentOperationService(user.id)
         try:
             service.delete_operation(investment_id, operation_id)

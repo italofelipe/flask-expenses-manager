@@ -109,6 +109,10 @@ Variáveis necessárias no ambiente local:
 - `RATE_LIMIT_BACKEND=redis` + `RATE_LIMIT_REDIS_URL` para modo distribuído em multi-instância.
 - observabilidade de rate-limit via métricas internas `rate_limit.*` e logs estruturados de backend.
 - retenção de auditoria com `AUDIT_RETENTION_DAYS` + `AUDIT_RETENTION_SWEEP_INTERVAL_SECONDS`.
+- login guard com política dedicada para principal conhecido:
+  - `LOGIN_GUARD_KNOWN_FAILURE_THRESHOLD`
+  - `LOGIN_GUARD_KNOWN_BASE_COOLDOWN_SECONDS`
+  - `LOGIN_GUARD_KNOWN_MAX_COOLDOWN_SECONDS`
 
 Comando manual:
 ```bash
