@@ -9,19 +9,36 @@ ROOT_DIR = Path(__file__).resolve().parents[1]
 if str(ROOT_DIR) not in sys.path:
     sys.path.insert(0, str(ROOT_DIR))
 
+TEST_ENV_OVERRIDES = {
+    "SECRET_KEY": "test-secret",
+    "JWT_SECRET_KEY": "test-jwt-secret",
+    "FLASK_DEBUG": "False",
+    "FLASK_TESTING": "true",
+    "SECURITY_ENFORCE_STRONG_SECRETS": "false",
+    "CORS_ALLOWED_ORIGINS": "https://frontend.local",
+    "GRAPHQL_ALLOW_INTROSPECTION": "true",
+    "BRAPI_CACHE_TTL_SECONDS": "0",
+}
+
+
+@pytest.fixture(autouse=True)
+def isolate_test_env() -> Generator[None, None, None]:
+    tracked_keys = set(TEST_ENV_OVERRIDES.keys()) | {"DATABASE_URL"}
+    original_values = {key: os.environ.get(key) for key in tracked_keys}
+    yield
+    for key, value in original_values.items():
+        if value is None:
+            os.environ.pop(key, None)
+        else:
+            os.environ[key] = value
+
 
 @pytest.fixture
 def app(tmp_path: Path):
     test_db_path = tmp_path / "test.sqlite3"
     os.environ["DATABASE_URL"] = f"sqlite:///{test_db_path}"
-    os.environ["SECRET_KEY"] = "test-secret"
-    os.environ["JWT_SECRET_KEY"] = "test-jwt-secret"
-    os.environ["FLASK_DEBUG"] = "False"
-    os.environ["FLASK_TESTING"] = "true"
-    os.environ["SECURITY_ENFORCE_STRONG_SECRETS"] = "false"
-    os.environ["CORS_ALLOWED_ORIGINS"] = "https://frontend.local"
-    os.environ["GRAPHQL_ALLOW_INTROSPECTION"] = "true"
-    os.environ["BRAPI_CACHE_TTL_SECONDS"] = "0"
+    for key, value in TEST_ENV_OVERRIDES.items():
+        os.environ[key] = value
 
     from app import create_app
     from app.extensions.database import db
@@ -38,6 +55,9 @@ def app(tmp_path: Path):
     with app.app_context():
         db.session.remove()
         db.drop_all()
+        db.engine.dispose()
+    if test_db_path.exists():
+        test_db_path.unlink()
 
 
 @pytest.fixture

@@ -104,12 +104,19 @@ Hooks configurados via `.pre-commit-config.yaml`:
 - isort
 - flake8
 - mypy
+- sonar-local-check
 
 Execução manual:
 
 ```bash
 pre-commit run --all-files
 ```
+
+CI (`.github/workflows/ci.yml`) inclui gates de segurança:
+- `pip-audit` (dependências Python)
+- `bandit` (SAST, falha em severidade alta)
+- `gitleaks` (secret scanning)
+- `dependency-review` em PR (falha com vulnerabilidade nova `high+`)
 
 ## Rate limiting (baseline S2)
 - Middleware de proteção ativo para:

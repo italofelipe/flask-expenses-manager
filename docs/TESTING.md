@@ -24,9 +24,11 @@ pytest tests/test_response_contract.py
 ## Como a suíte está configurada
 - `pytest.ini` define padrão de descoberta dos testes.
 - `tests/conftest.py` configura um banco SQLite isolado por execução de teste.
+- `tests/conftest.py` isola variáveis de ambiente por teste e restaura o estado original ao final.
 - A aplicação usa `DATABASE_URL` quando definida (ambiente de teste),
   e mantém fallback para PostgreSQL nos demais ambientes.
 
 ## Observações
 - A suíte não depende de `.env.test`.
 - Cada teste roda com schema limpo (`create_all`/`drop_all`).
+- Ao final de cada teste, a sessão SQLAlchemy é removida, o engine é `dispose()` e o arquivo SQLite temporário é limpo.

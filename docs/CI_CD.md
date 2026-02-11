@@ -17,21 +17,33 @@ Jobs:
 - `flake8 .`
 - `mypy app`
 - `pip-audit -r requirements.txt`
+- `bandit -r app -lll -iii` (SAST com gate para severidade alta)
 
 Dependências instaladas no job:
 - `requirements.txt`
 - `requirements-dev.txt`
+- `pip-audit`
+- `bandit`
 
 2. `tests`
 - `pytest --cov=app --cov-report=xml --cov-report=term-missing --junitxml=pytest-report.xml`
 - publica artefatos: `coverage.xml`, `pytest-report.xml`
 
-3. `security-evidence`
+3. `secret-scan`
+- varredura de segredos com `gitleaks/gitleaks-action`
+- falha o pipeline quando encontra segredo exposto
+
+4. `dependency-review`
+- executa em `pull_request`
+- usa `actions/dependency-review-action`
+- gate: falha se encontrar vulnerabilidade nova com severidade `high` (ou maior)
+
+5. `security-evidence`
 - executa `scripts/security_evidence_check.sh`
 - gera relatório de evidências OWASP S3
 - publica artefato: `reports/security/security-evidence.md`
 
-4. `sonar`
+6. `sonar`
 - executa scan no SonarQube Cloud usando `coverage.xml`
 - roda apenas se as variáveis/secrets obrigatórias existirem
 - após o quality gate, aplica política rígida via script:
@@ -40,7 +52,7 @@ Dependências instaladas no job:
   - `vulnerabilities` abertas devem ser `0`
   - issues `CRITICAL/BLOCKER` abertas devem ser `0`
 
-4. `generate-recurring-transactions` (workflow separado)
+7. `generate-recurring-transactions` (workflow separado)
 - workflow: `recurrence-job.yml`
 - executa script `scripts/generate_recurring_transactions.py`
 - gatilhos:
@@ -64,6 +76,13 @@ No repositório do GitHub:
 ### Repository Variables
 - `SONAR_PROJECT_KEY`
 - `SONAR_ORGANIZATION`
+
+## Dependabot
+- Arquivo: `/opt/auraxis/.github/dependabot.yml`
+- Atualizações semanais para:
+  - dependências Python (`pip`)
+  - GitHub Actions
+- PRs recebem labels `dependencies` e `security`.
 
 ## Validação local de Sonar (antes do commit)
 - Script: `/opt/auraxis/scripts/sonar_local_check.sh`
@@ -111,8 +130,9 @@ Validação de evidências de segurança:
 - A suíte de testes usa SQLite em execução de teste (via `tests/conftest.py`).
 - Se as variáveis do Sonar não estiverem configuradas, os jobs `quality` e `tests` continuam executando normalmente.
 - O arquivo `sonar-project.properties` define as convenções-base do scanner.
+- O gate de `dependency-review` só roda em PR e complementa o `pip-audit` do job `quality`.
 
 ## Evolução recomendada (próximos passos)
-1. Adicionar proteção de branch exigindo status checks (`quality`, `tests`, `sonar`).
+1. Adicionar proteção de branch exigindo status checks (`quality`, `secret-scan`, `dependency-review`, `tests`, `sonar`).
 2. Incluir gate de cobertura mínima no pytest/CI.
 3. Criar workflow de CD separado quando houver ambiente de deploy.

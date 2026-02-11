@@ -101,8 +101,8 @@ Ultima atualizacao: 2026-02-11
 | S5-06 | App Security | Fechar lacunas de brute-force/account takeover (lockout progressivo, cooldown e fingerprint de IP/device) | In Progress | 45% | Médio: fase 1 entregue em login REST/GraphQL; faltam telemetria/alertas e política por usuário conhecido | pending-commit | 2026-02-11 |
 | S5-07 | App Security | Revisar endpoints legados e desativar/feature-flag rotas não suportadas (`ticker_controller`) | Todo | 0% | Médio: superfície morta aumenta risco operacional |  | 2026-02-11 |
 | S5-08 | App Security | Implementar validação de saída para evitar data leakage (campos sensíveis e debug data) | Done | 100% | Médio: sanitização central reduz leak; manter revisão contínua em novos payloads | pending-commit | 2026-02-11 |
-| S5-09 | App Security | Fortalecer proteção de banco de testes/fixtures para evitar conexões abertas e vazamento de estado | Todo | 0% | Médio: fragilidade de confiabilidade e falsos positivos de segurança |  | 2026-02-11 |
-| S5-10 | App Security | Integrar SAST + secret scanning + dependabot com gate no CI (quebra build em severidade alta) | Todo | 0% | Alto: vulnerabilidades podem entrar via PR sem bloqueio |  | 2026-02-11 |
+| S5-09 | App Security | Fortalecer proteção de banco de testes/fixtures para evitar conexões abertas e vazamento de estado | Done | 100% | Baixo: fixture isolada por ambiente e teardown forte de engine/sessão/banco temporário | pending-commit | 2026-02-11 |
+| S5-10 | App Security | Integrar SAST + secret scanning + dependabot com gate no CI (quebra build em severidade alta) | Done | 100% | Médio: gates ativos no CI; branch protection ainda deve exigir checks | pending-commit | 2026-02-11 |
 | X1 | Tech Debt | Remover/atualizar TODO desatualizado sobre enums em transacoes | Todo | 0% | Baixo: clareza de manutencao |  | 2026-02-09 |
 
 ## Registro de progresso recente
@@ -153,6 +153,8 @@ Ultima atualizacao: 2026-02-11
 | 2026-02-11 | S4-17 | Observabilidade BRAPI adicionada com contadores (`timeout`, `http_error`, `invalid_payload`) + testes dedicados | f2bcda1 |
 | 2026-02-11 | S5-04 | Endurecimento de CORS/headers por ambiente: validação de startup para origins inválidas em produção e middleware de security headers com políticas por env + testes | pending-commit |
 | 2026-02-11 | S5-08 | Sanitização central de respostas REST/GraphQL para reduzir data leakage (`INTERNAL_ERROR`, campos sensíveis) + testes de regressão | pending-commit |
+| 2026-02-11 | S5-09 | Hardening da suíte de testes: isolamento de env vars por teste + teardown forte de SQLite/engine para evitar conexões abertas e vazamento de estado | pending-commit |
+| 2026-02-11 | S5-10 | CI de segurança reforçado: Bandit (SAST), Gitleaks (secret scan), Dependency Review gate (high+) e configuração Dependabot | pending-commit |
 | 2026-02-09 | D (observacao) | Restaurados arquivos deletados acidentalmente: ticker/carteira | n/a |
 
 ## Proxima prioridade sugerida
