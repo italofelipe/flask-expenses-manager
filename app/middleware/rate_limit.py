@@ -4,8 +4,8 @@ import os
 import threading
 from collections import defaultdict, deque
 from dataclasses import dataclass
-from time import monotonic
-from typing import Deque
+from time import monotonic, time
+from typing import Any, Deque, Protocol
 
 from flask import Flask, Response, g, jsonify, request
 from flask_jwt_extended import decode_token
@@ -114,8 +114,16 @@ class RateLimitDecision:
 
 
 class RateLimiterService:
-    def __init__(self, *, rules: dict[str, RateLimitRule]) -> None:
+    def __init__(
+        self,
+        *,
+        rules: dict[str, RateLimitRule],
+        storage: "RateLimitStorage",
+        backend_name: str,
+    ) -> None:
         self._rules = rules
+        self._storage = storage
+        self.backend_name = backend_name
         self._route_rule_order: tuple[tuple[str, str], ...] = (
             ("/auth/login", "auth"),
             ("/auth/register", "auth"),
@@ -123,8 +131,6 @@ class RateLimiterService:
             ("/transactions", "transactions"),
             ("/wallet", "wallet"),
         )
-        self._events: dict[tuple[str, str], Deque[float]] = defaultdict(deque)
-        self._lock = threading.Lock()
 
     @classmethod
     def from_env(cls) -> "RateLimiterService":
@@ -169,7 +175,8 @@ class RateLimiterService:
                 key_scope=KEY_SCOPE_USER_OR_IP,
             ),
         }
-        return cls(rules=rules)
+        storage, backend_name = _build_storage_from_env()
+        return cls(rules=rules, storage=storage, backend_name=backend_name)
 
     def set_rule(
         self,
@@ -194,8 +201,7 @@ class RateLimiterService:
         self.reset()
 
     def reset(self) -> None:
-        with self._lock:
-            self._events.clear()
+        self._storage.reset()
 
     def _resolve_rule(self, path: str) -> RateLimitRule:
         for prefix, rule_name in self._route_rule_order:
@@ -229,39 +235,117 @@ class RateLimiterService:
             user_subject=user_subject,
             client_ip=client_ip,
         )
-        now = monotonic()
-        bucket_key = (rule.name, key)
+        consumed, retry_after_seconds = self._storage.consume(
+            rule_name=rule.name,
+            key=key,
+            window_seconds=rule.window_seconds,
+        )
+        allowed = consumed <= rule.limit
+        remaining = max(rule.limit - min(consumed, rule.limit), 0)
+        return RateLimitDecision(
+            allowed=allowed,
+            rule=rule,
+            remaining=remaining,
+            retry_after_seconds=max(1, retry_after_seconds),
+            key=key,
+        )
 
+
+class RateLimitStorage(Protocol):
+    def consume(
+        self,
+        *,
+        rule_name: str,
+        key: str,
+        window_seconds: int,
+    ) -> tuple[int, int]:
+        pass
+
+    def reset(self) -> None:
+        pass
+
+
+class InMemoryRateLimitStorage:
+    def __init__(self) -> None:
+        self._events: dict[tuple[str, str], Deque[float]] = defaultdict(deque)
+        self._lock = threading.Lock()
+
+    def consume(
+        self,
+        *,
+        rule_name: str,
+        key: str,
+        window_seconds: int,
+    ) -> tuple[int, int]:
+        now = monotonic()
+        bucket_key = (rule_name, key)
         with self._lock:
             events = self._events[bucket_key]
-            cutoff = now - rule.window_seconds
+            cutoff = now - window_seconds
             while events and events[0] <= cutoff:
                 events.popleft()
-
-            if len(events) >= rule.limit:
-                retry_after_seconds = (
-                    max(1, int(rule.window_seconds - (now - events[0])))
-                    if events
-                    else rule.window_seconds
-                )
-                return RateLimitDecision(
-                    allowed=False,
-                    rule=rule,
-                    remaining=0,
-                    retry_after_seconds=retry_after_seconds,
-                    key=key,
-                )
-
             events.append(now)
-            remaining = max(rule.limit - len(events), 0)
-            retry_after_seconds = max(1, int(rule.window_seconds - (now - events[0])))
-            return RateLimitDecision(
-                allowed=True,
-                rule=rule,
-                remaining=remaining,
-                retry_after_seconds=retry_after_seconds,
-                key=key,
-            )
+            retry_after_seconds = max(1, int(window_seconds - (now - events[0])))
+            return len(events), retry_after_seconds
+
+    def reset(self) -> None:
+        with self._lock:
+            self._events.clear()
+
+
+class RedisRateLimitStorage:
+    def __init__(self, client: Any, *, key_prefix: str = "auraxis:rate-limit") -> None:
+        self._client = client
+        self._key_prefix = key_prefix
+
+    def _window_slot(self, window_seconds: int) -> tuple[int, int]:
+        now_seconds = int(time())
+        slot = now_seconds // window_seconds
+        retry_after_seconds = max(1, window_seconds - (now_seconds % window_seconds))
+        return slot, retry_after_seconds
+
+    def consume(
+        self,
+        *,
+        rule_name: str,
+        key: str,
+        window_seconds: int,
+    ) -> tuple[int, int]:
+        slot, retry_after_seconds = self._window_slot(window_seconds)
+        redis_key = f"{self._key_prefix}:{rule_name}:{key}:{slot}"
+        consumed = int(self._client.incr(redis_key))
+        if consumed == 1:
+            self._client.expire(redis_key, window_seconds + 2)
+        return consumed, retry_after_seconds
+
+    def reset(self) -> None:
+        # No-op for Redis backend in runtime paths.
+        # Keys expire naturally by TTL.
+        return None
+
+
+def _build_storage_from_env() -> tuple[RateLimitStorage, str]:
+    backend = str(os.getenv("RATE_LIMIT_BACKEND", "memory")).strip().lower()
+    if backend != "redis":
+        return InMemoryRateLimitStorage(), "memory"
+
+    redis_url = str(
+        os.getenv("RATE_LIMIT_REDIS_URL", os.getenv("REDIS_URL", ""))
+    ).strip()
+    if not redis_url:
+        return InMemoryRateLimitStorage(), "memory"
+
+    try:
+        import redis  # type: ignore[import-untyped]
+    except Exception:
+        return InMemoryRateLimitStorage(), "memory"
+
+    try:
+        client = redis.Redis.from_url(redis_url)
+        client.ping()
+    except Exception:
+        return InMemoryRateLimitStorage(), "memory"
+    return RedisRateLimitStorage(client), "redis"
 
 
 def _build_rate_limited_response(decision: RateLimitDecision) -> Response:

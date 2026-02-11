@@ -85,7 +85,7 @@ Ultima atualizacao: 2026-02-11
 | S4-07 | App Security | Aplicar política GraphQL deny-by-default para operações privadas e cobertura automática de autorização por resolver | Done | 100% | Baixo: transporte GraphQL já bloqueia chamadas privadas sem auth | pending-commit | 2026-02-11 |
 | S4-08 | App Security | Tornar introspecção GraphQL configurável por ambiente (desabilitar em PROD por padrão) | Done | 100% | Baixo | pending-commit | 2026-02-11 |
 | S4-09 | App Security | Endurecer consumo BRAPI (allowlist de ticker, validação estrita de resposta, fallback defensivo) | Todo | 0% | Medio: entrada externa não confiável |  | 2026-02-11 |
-| S4-10 | App Security | Evoluir rate-limit e revogação de token para storage distribuído (Redis) | Todo | 0% | Alto: controle atual in-memory não escala em múltiplas instâncias |  | 2026-02-11 |
+| S4-10 | App Security | Evoluir rate-limit e revogação de token para storage distribuído (Redis) | In Progress | 70% | Médio: rate-limit com backend Redis opcional entregue; falta observabilidade e runbook de operação | pending-commit | 2026-02-11 |
 | S4-11 | App Security | Remover fallback de secrets fracos em runtime não-dev e falhar startup sem segredos fortes | Done | 100% | Baixo: bloqueio de startup em runtime inseguro | pending-commit | 2026-02-11 |
 | S4-12 | App Security | Definir política CORS estrita por ambiente (origins permitidas, métodos, headers) | Done | 100% | Médio: manter allowlist por ambiente atualizada | pending-commit | 2026-02-11 |
 | S4-13 | App Security | Implementar trilha de auditoria para ações sensíveis (login, perfil, transações, carteira) | Todo | 0% | Medio: baixa rastreabilidade de incidentes |  | 2026-02-11 |
@@ -130,6 +130,7 @@ Ultima atualizacao: 2026-02-11
 | 2026-02-11 | S3.5/H3 | Revisão de fragilidades de segurança na aplicação e mapeamento em backlog de remediação (`S4-01..S4-16`) | pending-commit |
 | 2026-02-11 | S2.3/S4 | Hardening aplicado: limite global de payload, CORS por ambiente, introspecção GraphQL configurável, sanitização central, paginação endurecida, segredos fortes obrigatórios e scan `pip-audit` no CI + testes de segurança | pending-commit |
 | 2026-02-11 | S2.4/S4-07 | GraphQL com política deny-by-default no transporte: operações privadas exigem auth, allowlist pública por ambiente (`registerUser/login`) + testes de contrato | pending-commit |
+| 2026-02-11 | S2.5/S4-10 | Rate-limit com backend distribuído opcional (Redis) + fallback automático para memória + testes de backend e documentação de env | pending-commit |
 | 2026-02-09 | D (observacao) | Restaurados arquivos deletados acidentalmente: ticker/carteira | n/a |
 
 ## Proxima prioridade sugerida

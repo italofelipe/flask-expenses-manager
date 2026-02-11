@@ -87,6 +87,7 @@ Variáveis necessárias no ambiente local:
 - `SECURITY_ENFORCE_STRONG_SECRETS=true` em produção para bloquear startup inseguro.
 - `CORS_ALLOWED_ORIGINS` com allowlist por ambiente.
 - `GRAPHQL_ALLOW_INTROSPECTION=false` em produção por padrão.
+- `RATE_LIMIT_BACKEND=redis` + `RATE_LIMIT_REDIS_URL` para modo distribuído em multi-instância.
 
 Comando manual:
 ```bash
