@@ -98,7 +98,7 @@ Ultima atualizacao: 2026-02-11
 | S5-03 | App Security | Aplicar autorização por recurso no domínio GraphQL (não só no transporte), com testes de ownership | In Progress | 35% | Médio: createTransaction coberto; falta expandir para outras mutações com referências relacionais | pending-commit | 2026-02-11 |
 | S5-04 | App Security | Endurecer CORS/headers por ambiente com validação de configuração no startup | Todo | 0% | Médio: configuração frouxa em ambiente real expõe superfície |  | 2026-02-11 |
 | S5-05 | App Security | Adotar rotação de secrets + source of truth (AWS SSM/Secrets Manager), removendo `.env` como primário em cloud | Todo | 0% | Alto: vazamento/expiração manual de segredos |  | 2026-02-11 |
-| S5-06 | App Security | Fechar lacunas de brute-force/account takeover (lockout progressivo, cooldown e fingerprint de IP/device) | Todo | 0% | Alto: ataques de credencial stuffing |  | 2026-02-11 |
+| S5-06 | App Security | Fechar lacunas de brute-force/account takeover (lockout progressivo, cooldown e fingerprint de IP/device) | In Progress | 45% | Médio: fase 1 entregue em login REST/GraphQL; faltam telemetria/alertas e política por usuário conhecido | pending-commit | 2026-02-11 |
 | S5-07 | App Security | Revisar endpoints legados e desativar/feature-flag rotas não suportadas (`ticker_controller`) | Todo | 0% | Médio: superfície morta aumenta risco operacional |  | 2026-02-11 |
 | S5-08 | App Security | Implementar validação de saída para evitar data leakage (campos sensíveis e debug data) | Todo | 0% | Médio: exposição indevida em respostas/erros |  | 2026-02-11 |
 | S5-09 | App Security | Fortalecer proteção de banco de testes/fixtures para evitar conexões abertas e vazamento de estado | Todo | 0% | Médio: fragilidade de confiabilidade e falsos positivos de segurança |  | 2026-02-11 |
@@ -148,6 +148,7 @@ Ultima atualizacao: 2026-02-11
 | 2026-02-11 | S5-02 (fase 1) | Persistência opcional de auditoria em tabela `audit_events` com flag de ambiente (`AUDIT_PERSISTENCE_ENABLED`) + teste de integração | pending-commit |
 | 2026-02-11 | S5-02 (fase 1.1) | Trilha de auditoria endurecida para Sonar: remoção de payload controlado por usuário dos logs e manutenção apenas de metadados seguros + ajuste de teste | pending-commit |
 | 2026-02-11 | S5-03 (fase 1) | Autorização por recurso em GraphQL `createTransaction`: valida ownership de `tagId/accountId/creditCardId` com testes negativos de referência cruzada entre usuários | pending-commit |
+| 2026-02-11 | S5-06 (fase 1) | Guard de login progressivo (REST + GraphQL): cooldown exponencial por fingerprint `principal+IP+user-agent`, bloqueio `429/GraphQLError` e testes dedicados | pending-commit |
 | 2026-02-09 | D (observacao) | Restaurados arquivos deletados acidentalmente: ticker/carteira | n/a |
 
 ## Proxima prioridade sugerida

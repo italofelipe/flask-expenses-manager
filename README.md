@@ -164,6 +164,12 @@ Variáveis de ambiente principais:
   - `AUDIT_TRAIL_ENABLED=true`
   - `AUDIT_PATH_PREFIXES=/auth/,/user/,/transactions/,/wallet,/graphql`
   - `AUDIT_PERSISTENCE_ENABLED=true` (recomendado em produção para persistência em `audit_events`)
+- Proteção progressiva de login (brute-force/account takeover):
+  - `LOGIN_GUARD_ENABLED=true`
+  - `LOGIN_GUARD_FAILURE_THRESHOLD=5`
+  - `LOGIN_GUARD_BASE_COOLDOWN_SECONDS=30`
+  - `LOGIN_GUARD_MAX_COOLDOWN_SECONDS=900`
+  - `LOGIN_GUARD_TRUST_PROXY_HEADERS=true` (recomendado em produção atrás de Nginx)
 
 ## Situação atual de testes
 Existe suíte configurada em `tests/` com `pytest` e setup isolado de banco para execução local.

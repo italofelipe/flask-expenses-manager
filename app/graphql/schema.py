@@ -30,6 +30,10 @@ from app.services.investment_operation_service import (
     InvestmentOperationService,
 )
 from app.services.investment_service import InvestmentService
+from app.services.login_attempt_guard_service import (
+    build_login_attempt_context,
+    get_login_attempt_guard,
+)
 from app.services.portfolio_history_service import PortfolioHistoryService
 from app.services.portfolio_valuation_service import PortfolioValuationService
 from app.services.transaction_analytics_service import TransactionAnalyticsService
@@ -866,14 +870,42 @@ class LoginMutation(graphene.Mutation):
     ) -> AuthPayloadType:
         if not (email or name):
             raise GraphQLError("Missing credentials")
+
+        principal = str(email or name or "")
+        request_obj = cast(dict[str, Any], info.context).get("request")
+        headers = request_obj.headers if request_obj is not None else {}
+        login_context = build_login_attempt_context(
+            principal=principal,
+            remote_addr=(
+                getattr(request_obj, "remote_addr", None)
+                if request_obj is not None
+                else None
+            ),
+            user_agent=headers.get("User-Agent") if headers else None,
+            forwarded_for=headers.get("X-Forwarded-For") if headers else None,
+            real_ip=headers.get("X-Real-IP") if headers else None,
+        )
+        login_guard = get_login_attempt_guard()
+        allowed, retry_after = login_guard.check(login_context)
+        if not allowed:
+            raise GraphQLError(
+                "Too many login attempts. Try again later.",
+                extensions={
+                    "code": "TOO_MANY_ATTEMPTS",
+                    "retry_after_seconds": retry_after,
+                },
+            )
+
         user = (
             User.query.filter_by(email=email).first()
             if email
             else User.query.filter_by(name=name).first()
         )
         if not user or not check_password_hash(user.password, password):
+            login_guard.register_failure(login_context)
             raise GraphQLError("Invalid credentials")
 
+        login_guard.register_success(login_context)
         token = create_access_token(
             identity=str(user.id), expires_delta=timedelta(hours=1)
         )

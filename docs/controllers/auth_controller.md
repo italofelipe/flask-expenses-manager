@@ -39,6 +39,7 @@ Endpoint: `POST /auth/login`
 
 O que faz:
 - Aceita login por `email` ou `name` + `password`.
+- Aplica guard progressivo anti brute-force por fingerprint (`principal + IP + user-agent`) antes da autenticação.
 - Verifica senha com `check_password_hash`.
 - Cria JWT com expiração de 1 hora.
 - Atualiza `current_jti` do usuário para invalidar sessões antigas.
@@ -48,6 +49,7 @@ Resposta:
 - `200`: token + dados do usuário
 - `400`: credenciais ausentes
 - `401`: credenciais inválidas
+- `429`: excesso de tentativas de login (cooldown ativo)
 - `500`: erro interno
 
 Contrato:
@@ -87,8 +89,8 @@ O que faz:
 ## Pontos incompletos / melhorias (Fase 0)
 1. Não há refresh token (somente access token curto).
 2. Mensagens estão mistas em português/inglês.
-3. Não há limitação explícita de tentativas de login (rate limit / anti brute-force).
-4. Não há auditoria de tentativas de autenticação (sucesso/falha) para observabilidade.
+3. Não há telemetria/alerta centralizado das tentativas bloqueadas para resposta a incidentes.
+4. Não há auditoria persistente específica de tentativas de autenticação (sucesso/falha) para observabilidade.
 
 ## Recomendação de implementação futura (sem alterar comportamento agora)
 - Extrair regras de autenticação para serviço dedicado (`AuthService`).

@@ -30,6 +30,10 @@ from app.extensions.database import db
 from app.models.user import User
 from app.schemas.auth_schema import AuthSchema
 from app.schemas.user_schemas import UserRegistrationSchema
+from app.services.login_attempt_guard_service import (
+    build_login_attempt_context,
+    get_login_attempt_guard,
+)
 from app.utils.response_builder import error_payload, success_payload
 
 JSON_MIMETYPE = "application/json"
@@ -192,6 +196,28 @@ class AuthResource(MethodResource):
                 error_code="VALIDATION_ERROR",
             )
 
+        principal = str(email or name or "")
+        login_context = build_login_attempt_context(
+            principal=principal,
+            remote_addr=request.remote_addr,
+            user_agent=request.headers.get("User-Agent"),
+            forwarded_for=request.headers.get("X-Forwarded-For"),
+            real_ip=request.headers.get("X-Real-IP"),
+        )
+        login_guard = get_login_attempt_guard()
+        allowed, retry_after = login_guard.check(login_context)
+        if not allowed:
+            return _compat_error(
+                legacy_payload={
+                    "message": "Too many login attempts. Try again later.",
+                    "retry_after_seconds": retry_after,
+                },
+                status_code=429,
+                message="Too many login attempts. Try again later.",
+                error_code="TOO_MANY_ATTEMPTS",
+                details={"retry_after_seconds": retry_after},
+            )
+
         user = (
             User.query.filter_by(email=email).first()
             if email
@@ -199,6 +225,7 @@ class AuthResource(MethodResource):
         )
 
         if not user or not check_password_hash(user.password, password):
+            login_guard.register_failure(login_context)
             return _compat_error(
                 legacy_payload={"message": "Invalid credentials"},
                 status_code=401,
@@ -207,6 +234,7 @@ class AuthResource(MethodResource):
             )
 
         try:
+            login_guard.register_success(login_context)
             token = create_access_token(
                 identity=str(user.id), expires_delta=timedelta(hours=1)
             )
