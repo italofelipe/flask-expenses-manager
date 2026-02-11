@@ -77,7 +77,7 @@ Ultima atualizacao: 2026-02-11
 | S2 | App Security | Implementar segurança de endpoints (rate-limit, validação/sanitização de request/response, headers e authz por recurso) | In Progress | 78% | Alto: baseline forte entregue, pendente authz deny-by-default GraphQL, auditoria e storage distribuído | pending-commit | 2026-02-11 |
 | S3 | App Security | Executar checklist OWASP no sistema (ASVS/API Top 10), corrigir gaps e formalizar evidências | In Progress | 85% | Alto: risco de vulnerabilidades críticas não mapeadas | pending-commit | 2026-02-11 |
 | S4-01 | App Security | Remover vazamento de exceções em respostas (`str(e)`, `traceback`) e adotar erros genéricos com correlação | Done | 100% | Médio: manter revisão contínua em novos endpoints | pending-commit | 2026-02-11 |
-| S4-02 | App Security | Substituir `print` por logging estruturado com níveis e política de redaction | In Progress | 85% | Médio: remanescente em scripts utilitários fora do runtime HTTP | pending-commit | 2026-02-11 |
+| S4-02 | App Security | Substituir `print` por logging estruturado com níveis e política de redaction | Done | 100% | Baixo: runtime HTTP e scripts operacionais migrados para logging estruturado | pending-commit | 2026-02-11 |
 | S4-03 | App Security | Padronizar callbacks JWT e middleware para contrato de erro único (v1/v2) e status codes consistentes | Done | 100% | Baixo | pending-commit | 2026-02-11 |
 | S4-04 | App Security | Implementar limite global de tamanho de request body para endpoints REST | Done | 100% | Baixo: limite parametrizado por ambiente | pending-commit | 2026-02-11 |
 | S4-05 | App Security | Endurecer paginação e limites de resposta (ex.: `limit` em `/user/me`, `per_page<=0` em histórico) | Done | 100% | Baixo: limites agora explícitos em REST/GraphQL | pending-commit | 2026-02-11 |
@@ -92,7 +92,7 @@ Ultima atualizacao: 2026-02-11
 | S4-14 | App Security | Revisar/remover código legado não registrado (`ticker_controller`) e alinhar superfície real de API | Todo | 0% | Baixo: risco de dívida técnica e confusão operacional |  | 2026-02-11 |
 | S4-15 | App Security | Formalizar threat model (STRIDE + abuse cases) e critérios de aceite por risco | Todo | 0% | Medio: decisões de segurança sem baseline formal |  | 2026-02-11 |
 | S4-16 | App Security | Adicionar scan de vulnerabilidades de dependências no CI (`pip-audit`/equivalente) | Done | 100% | Baixo | pending-commit | 2026-02-11 |
-| S4-17 | App Security | Adicionar observabilidade de integrações externas (BRAPI): contadores por timeout, payload inválido e erro HTTP | Todo | 0% | Médio: troubleshooting ainda depende de logs ad-hoc |  | 2026-02-11 |
+| S4-17 | App Security | Adicionar observabilidade de integrações externas (BRAPI): contadores por timeout, payload inválido e erro HTTP | Done | 100% | Médio: métricas em memória entregues; próximo passo é export para backend central (CloudWatch/Prometheus) | pending-commit | 2026-02-11 |
 | S5-01 | App Security | Eliminar fallback de memória para rate-limit em produção (fail-closed se Redis indisponível) | Done | 100% | Médio: fail-closed implementado; falta monitoramento/alerta de indisponibilidade (S5-02/S5-10) | pending-commit | 2026-02-11 |
 | S5-02 | App Security | Implementar trilha de auditoria persistente (DB/CloudWatch) com retenção e busca por `request_id` | In Progress | 70% | Médio: persistência em banco local concluída; retenção/alertas centralizados ainda pendentes | pending-commit | 2026-02-11 |
 | S5-03 | App Security | Aplicar autorização por recurso no domínio GraphQL (não só no transporte), com testes de ownership | In Progress | 35% | Médio: createTransaction coberto; falta expandir para outras mutações com referências relacionais | pending-commit | 2026-02-11 |
@@ -149,6 +149,8 @@ Ultima atualizacao: 2026-02-11
 | 2026-02-11 | S5-02 (fase 1.1) | Trilha de auditoria endurecida para Sonar: remoção de payload controlado por usuário dos logs e manutenção apenas de metadados seguros + ajuste de teste | pending-commit |
 | 2026-02-11 | S5-03 (fase 1) | Autorização por recurso em GraphQL `createTransaction`: valida ownership de `tagId/accountId/creditCardId` com testes negativos de referência cruzada entre usuários | pending-commit |
 | 2026-02-11 | S5-06 (fase 1) | Guard de login progressivo (REST + GraphQL): cooldown exponencial por fingerprint `principal+IP+user-agent`, bloqueio `429/GraphQLError` e testes dedicados | pending-commit |
+| 2026-02-11 | S4-02 | Migração de scripts operacionais (`init_db`, `generate_recurring_transactions`) para logging estruturado sem `print` | pending-commit |
+| 2026-02-11 | S4-17 | Observabilidade BRAPI adicionada com contadores (`timeout`, `http_error`, `invalid_payload`) + testes dedicados | pending-commit |
 | 2026-02-09 | D (observacao) | Restaurados arquivos deletados acidentalmente: ticker/carteira | n/a |
 
 ## Proxima prioridade sugerida

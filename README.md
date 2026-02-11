@@ -170,6 +170,11 @@ Variáveis de ambiente principais:
   - `LOGIN_GUARD_BASE_COOLDOWN_SECONDS=30`
   - `LOGIN_GUARD_MAX_COOLDOWN_SECONDS=900`
   - `LOGIN_GUARD_TRUST_PROXY_HEADERS=true` (recomendado em produção atrás de Nginx)
+- Observabilidade BRAPI (contadores de integração):
+  - `brapi.timeout`
+  - `brapi.http_error`
+  - `brapi.invalid_payload`
+  - payload de snapshot disponível internamente via `build_brapi_metrics_payload()`
 
 ## Situação atual de testes
 Existe suíte configurada em `tests/` com `pytest` e setup isolado de banco para execução local.

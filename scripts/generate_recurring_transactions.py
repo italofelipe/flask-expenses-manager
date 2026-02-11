@@ -1,7 +1,11 @@
+import logging
 from datetime import date
 
 from app import create_app
 from app.services.recurrence_service import RecurrenceService
+
+logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
+logger = logging.getLogger(__name__)
 
 
 def main() -> None:
@@ -10,7 +14,7 @@ def main() -> None:
         created = RecurrenceService.generate_missing_occurrences(
             reference_date=date.today()
         )
-        print(f"Recurring transactions created: {created}")
+        logger.info("Recurring transactions created=%s", created)
 
 
 if __name__ == "__main__":

@@ -7,8 +7,10 @@ from datetime import UTC, datetime
 from typing import Any, Dict, Optional
 
 import requests
+from flask import current_app, has_app_context
 from requests.exceptions import RequestException
 
+from app.extensions.integration_metrics import increment_metric
 from config import Config
 
 
@@ -47,6 +49,17 @@ class InvestmentService:
         cls._cache.clear()
 
     @staticmethod
+    def _record_brapi_event(event: str, *, detail: str | None = None) -> None:
+        metric_name = f"brapi.{event}"
+        increment_metric(metric_name)
+        if has_app_context():
+            current_app.logger.warning(
+                "integration_event provider=brapi event=%s detail=%s",
+                event,
+                detail or "",
+            )
+
+    @staticmethod
     def _request_json(
         endpoint: str, *, params: dict[str, Any] | None = None
     ) -> Any | None:
@@ -63,7 +76,19 @@ class InvestmentService:
                 )
                 resp.raise_for_status()
                 return resp.json()
-            except RequestException:
+            except RequestException as exc:
+                if isinstance(exc, requests.exceptions.Timeout):
+                    InvestmentService._record_brapi_event("timeout", detail=endpoint)
+                elif isinstance(exc, requests.exceptions.HTTPError):
+                    InvestmentService._record_brapi_event(
+                        "http_error",
+                        detail=endpoint,
+                    )
+                else:
+                    InvestmentService._record_brapi_event(
+                        "request_error",
+                        detail=endpoint,
+                    )
                 if attempt == attempts - 1:
                     return None
                 time.sleep(0.15 * (attempt + 1))
@@ -101,6 +126,7 @@ class InvestmentService:
         """Consulta preço de mercado via BRAPI com timeout, retry e cache curto."""
         normalized_ticker = InvestmentService._normalize_ticker(ticker)
         if normalized_ticker is None:
+            InvestmentService._record_brapi_event("invalid_ticker")
             return None
         _, _, cache_ttl_seconds = InvestmentService._settings()
 
@@ -115,6 +141,10 @@ class InvestmentService:
         )
         price = InvestmentService._extract_market_price(payload)
         if price is None:
+            InvestmentService._record_brapi_event(
+                "invalid_payload",
+                detail=f"market_price:{normalized_ticker}",
+            )
             return None
         InvestmentService._cache_set(normalized_ticker, price, cache_ttl_seconds)
         return price
@@ -125,6 +155,7 @@ class InvestmentService:
     ) -> dict[str, float]:
         normalized_ticker = InvestmentService._normalize_ticker(ticker)
         if normalized_ticker is None:
+            InvestmentService._record_brapi_event("invalid_ticker")
             return {}
         _, _, cache_ttl_seconds = InvestmentService._settings()
         cache_key = f"HIST:{normalized_ticker}:{start_date}:{end_date}"
@@ -140,6 +171,10 @@ class InvestmentService:
             },
         )
         if not isinstance(payload, dict):
+            InvestmentService._record_brapi_event(
+                "invalid_payload",
+                detail=f"historical:{normalized_ticker}",
+            )
             return {}
         results = payload.get("results")
         if (
@@ -147,6 +182,10 @@ class InvestmentService:
             or not results
             or not isinstance(results[0], dict)
         ):
+            InvestmentService._record_brapi_event(
+                "invalid_payload",
+                detail=f"historical:{normalized_ticker}",
+            )
             return {}
 
         historical_rows = results[0].get("historicalDataPrice") or []
