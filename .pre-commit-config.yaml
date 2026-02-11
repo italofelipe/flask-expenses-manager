@@ -38,7 +38,7 @@ repos:
   hooks:
   - id: mypy
     name: mypy
-    entry: mypy app
+    entry: bash -c '.venv/bin/mypy app || python -m mypy app'
     language: system
     pass_filenames: false
   - id: sonar-local-check
