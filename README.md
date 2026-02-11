@@ -58,6 +58,8 @@ docker compose -f docker-compose.prod.yml down
 ## Deploy TLS (AWS)
 - Guia completo de Nginx + Certbot:
   - `/opt/auraxis/docs/NGINX_AWS_TLS.md`
+- Segredos em cloud (SSM/Secrets Manager):
+  - `/opt/auraxis/docs/CLOUD_SECRETS_RUNBOOK.md`
 
 ## Endpoints reais (código atual)
 
@@ -197,6 +199,8 @@ Variáveis de ambiente principais:
   - Campos sensíveis (`password`, `password_hash`, `secret*`) são removidos de payloads serializados.
   - Erros `INTERNAL_ERROR` retornam apenas `request_id` fora de DEBUG/TESTING.
   - Erros internos de execução GraphQL retornam mensagem genérica em produção.
+- Threat model:
+  - baseline STRIDE + abuse cases em `/opt/auraxis/docs/THREAT_MODEL_STRIDE.md`.
 
 ## Situação atual de testes
 Existe suíte configurada em `tests/` com `pytest` e setup isolado de banco para execução local.

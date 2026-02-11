@@ -61,3 +61,11 @@ Detailed runbook:
 ## Security note
 - Never commit `.env.dev`/`.env.prod` with real secrets.
 - Prefer GitHub Actions secrets + runtime environment configuration for CI/CD and production.
+- For cloud runtime, prefer AWS SSM/Secrets Manager as source of truth and generate `.env.runtime`:
+```bash
+python3 scripts/sync_cloud_secrets.py --backend ssm --ssm-path /auraxis/prod --output .env.runtime
+docker compose --env-file .env.runtime -f docker-compose.prod.yml up -d --build
+```
+
+Runbook:
+- `docs/CLOUD_SECRETS_RUNBOOK.md`
