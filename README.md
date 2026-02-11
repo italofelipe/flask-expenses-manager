@@ -160,6 +160,7 @@ Variáveis de ambiente principais:
 - Trilha de auditoria para rotas sensíveis:
   - `AUDIT_TRAIL_ENABLED=true`
   - `AUDIT_PATH_PREFIXES=/auth/,/user/,/transactions/,/wallet,/graphql`
+  - `AUDIT_PERSISTENCE_ENABLED=true` (recomendado em produção para persistência em `audit_events`)
 
 ## Situação atual de testes
 Existe suíte configurada em `tests/` com `pytest` e setup isolado de banco para execução local.
