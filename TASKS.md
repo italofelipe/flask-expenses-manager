@@ -61,6 +61,7 @@ Ultima atualizacao: 2026-02-11
 | G12 | CI/Quality | Garantir paridade local do job `Quality` (script Python 3.11 + hook mypy alinhado ao CI) | Done | 100% | Baixo | pending-commit | 2026-02-11 |
 | G13 | CI/Quality | Adicionar matrix de tipagem (`mypy`) em Python 3.11 e 3.13 para reduzir regressão entre ambientes | Todo | 0% | Médio: divergência de stubs entre versões pode voltar a gerar falso positivo/falso negativo |  | 2026-02-11 |
 | G14 | CI/Quality | Avaliar lock/constraints de dependências de tooling (lint/type/security) para builds determinísticos | Todo | 0% | Médio: atualização não controlada de tooling pode quebrar gates sem mudança de código |  | 2026-02-11 |
+| G15 | CI/Review | Integrar Cursor Bugbot como camada de revisão automática de PR + calibrar obrigatoriedade no ruleset | In Progress | 35% | Médio: risco de falso positivo se exigido sem período de calibração |  | 2026-02-11 |
 | H1 | Arquitetura | Adicionar suporte a GraphQL | In Progress | 65% | Alto: impacto transversal na API | ba1f238, e12bf21 | 2026-02-09 |
 | H2 | Seguranca | Implementar rate limit por rota/usuario/IP | Done | 100% | Baixo: rate-limit por domínio com backend distribuído, fail-closed e observabilidade básica | pending-commit | 2026-02-11 |
 | H3 | Seguranca | Hardening de validacao/sanitizacao/authz/headers/auditoria | Done | 100% | Médio: baseline aplicado; evolução contínua segue para monitoramento centralizado e infraestrutura S1 | pending-commit | 2026-02-11 |
@@ -190,6 +191,7 @@ Ultima atualizacao: 2026-02-11
 | 2026-02-11 | G8 | Mutation gate migrado para Cosmic Ray com escopo crítico em CORS (`app/middleware/cors.py`), filtro de operadores ruidosos e threshold de sobrevivência 0% | pending-commit |
 | 2026-02-11 | S6-10 | Dependências com CVE atualizadas (`Flask 3.1.1`, `marshmallow 3.26.2`, `Werkzeug 3.1.5`) e validação `pip-audit` limpa | afc15c7 |
 | 2026-02-11 | G12 | Correções de tipagem para CI (`mypy`) + alinhamento do hook local para usar ambiente real (`language: system`) + script de paridade local `scripts/run_ci_quality_local.sh` | pending-commit |
+| 2026-02-11 | G15 | Cursor Bugbot registrado em documentação de CI/CD como camada complementar de revisão de PR; estratégia de execução local e limitações formalizadas | pending-commit |
 | 2026-02-09 | D (observacao) | Restaurados arquivos deletados acidentalmente: ticker/carteira | n/a |
 
 ## Proxima prioridade sugerida

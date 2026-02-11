@@ -57,6 +57,11 @@ Jobs:
 - scan SonarCloud + quality gate
 - enforcement adicional via `scripts/sonar_enforce_ci.sh`
 
+11. `Cursor Bugbot` (GitHub App)
+- revisão automática adicional de PR com comentários de potenciais bugs/riscos.
+- funciona como camada complementar aos gates determinísticos (lint, testes, SAST, dependency scan).
+- recomendação: tornar check obrigatório no ruleset somente após 1-2 semanas de calibração de ruído/falso positivo.
+
 ### 2. Recorrência
 Arquivo: `.github/workflows/recurrence-job.yml`
 - gera transações recorrentes por cron / execução manual
@@ -90,6 +95,15 @@ Checks executados pelo script:
 - `flake8 app tests config run.py run_without_db.py`
 - `mypy app`
 - `bandit -r app -lll -iii`
+
+## Cursor Bugbot: execução local
+- hoje não existe runner local oficial do GitHub App `Cursor Bugbot` equivalente ao comportamento de comentário em PR.
+- o fluxo local recomendado é:
+  1. `PATH=".venv/bin:$PATH" pre-commit run -a`
+  2. `scripts/run_ci_quality_local.sh` (Python 3.11 em Docker)
+  3. `PATH=".venv/bin:$PATH" pytest -m "not schemathesis" --cov=app --cov-fail-under=85`
+- para validação real do Bugbot, a execução continua sendo via PR no GitHub.
+- `act` pode simular jobs de GitHub Actions localmente, mas não simula checks de GitHub Apps externos (como Bugbot).
 
 ## Variáveis e secrets necessários
 
