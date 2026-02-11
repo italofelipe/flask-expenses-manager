@@ -3,6 +3,21 @@ set -euo pipefail
 
 SONAR_HOST_URL="${SONAR_HOST_URL:-https://sonarcloud.io}"
 
+normalize_env_var() {
+  local value="$1"
+  printf '%s' "$value" | tr -d '\r\n' | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//'
+}
+
+urlencode() {
+  local raw="$1"
+  python3 - "$raw" <<'PY'
+import sys
+import urllib.parse
+
+print(urllib.parse.quote(sys.argv[1], safe=""))
+PY
+}
+
 required_vars=(
   "SONAR_TOKEN"
   "SONAR_PROJECT_KEY"
@@ -15,23 +30,53 @@ for var_name in "${required_vars[@]}"; do
   fi
 done
 
-SONAR_BRANCH="${SONAR_BRANCH:-}"
-BRANCH_QUERY=""
-if [[ -n "$SONAR_BRANCH" ]]; then
-  BRANCH_QUERY="&branch=${SONAR_BRANCH}"
+SONAR_TOKEN="$(normalize_env_var "${SONAR_TOKEN}")"
+SONAR_PROJECT_KEY="$(normalize_env_var "${SONAR_PROJECT_KEY}")"
+SONAR_BRANCH="$(normalize_env_var "${SONAR_BRANCH:-}")"
+SONAR_PULL_REQUEST="$(normalize_env_var "${SONAR_PULL_REQUEST:-}")"
+
+SONAR_SELECTOR_QUERY=""
+if [[ -n "$SONAR_PULL_REQUEST" ]]; then
+  SONAR_SELECTOR_QUERY="&pullRequest=$(urlencode "${SONAR_PULL_REQUEST}")"
+elif [[ -n "$SONAR_BRANCH" ]]; then
+  SONAR_SELECTOR_QUERY="&branch=$(urlencode "${SONAR_BRANCH}")"
 fi
+SONAR_AUTH_HEADER="Authorization: Basic $(printf '%s:' "${SONAR_TOKEN}" | base64 | tr -d '\n')"
 
-quality_gate_json="$(curl -sf -u "${SONAR_TOKEN}:" \
-  "${SONAR_HOST_URL}/api/qualitygates/project_status?projectKey=${SONAR_PROJECT_KEY}${BRANCH_QUERY}")"
+sonar_get() {
+  local endpoint="$1"
+  local url="${SONAR_HOST_URL}${endpoint}${SONAR_SELECTOR_QUERY}"
+  local body_file
+  body_file="$(mktemp)"
+  local http_status
+  http_status="$(curl -sS -H "${SONAR_AUTH_HEADER}" -o "${body_file}" -w "%{http_code}" "${url}")"
 
-measures_json="$(curl -sf -u "${SONAR_TOKEN}:" \
-  "${SONAR_HOST_URL}/api/measures/component?component=${SONAR_PROJECT_KEY}&metricKeys=security_rating,reliability_rating,sqale_rating,bugs,vulnerabilities,code_smells,coverage,duplicated_lines_density${BRANCH_QUERY}")"
+  if [[ ! "${http_status}" =~ ^2 ]]; then
+    echo "Sonar API request failed (${http_status}) for: ${endpoint}" >&2
+    echo "Selector query: ${SONAR_SELECTOR_QUERY:-<none>}" >&2
+    echo "Response body:" >&2
+    cat "${body_file}" >&2
+    rm -f "${body_file}"
+    exit 1
+  fi
 
-critical_blocker_json="$(curl -sf -u "${SONAR_TOKEN}:" \
-  "${SONAR_HOST_URL}/api/issues/search?componentKeys=${SONAR_PROJECT_KEY}&severities=BLOCKER,CRITICAL&resolved=false&ps=1${BRANCH_QUERY}")"
+  cat "${body_file}"
+  rm -f "${body_file}"
+}
 
-bug_vuln_json="$(curl -sf -u "${SONAR_TOKEN}:" \
-  "${SONAR_HOST_URL}/api/issues/search?componentKeys=${SONAR_PROJECT_KEY}&types=BUG,VULNERABILITY&resolved=false&ps=1${BRANCH_QUERY}")"
+quality_gate_json="$(sonar_get "/api/qualitygates/project_status?projectKey=${SONAR_PROJECT_KEY}")"
+
+measures_json="$(
+  sonar_get "/api/measures/component?component=${SONAR_PROJECT_KEY}&metricKeys=security_rating,reliability_rating,sqale_rating,bugs,vulnerabilities,code_smells,coverage,duplicated_lines_density"
+)"
+
+critical_blocker_json="$(
+  sonar_get "/api/issues/search?componentKeys=${SONAR_PROJECT_KEY}&severities=BLOCKER,CRITICAL&resolved=false&ps=1"
+)"
+
+bug_vuln_json="$(
+  sonar_get "/api/issues/search?componentKeys=${SONAR_PROJECT_KEY}&types=BUG,VULNERABILITY&resolved=false&ps=1"
+)"
 
 QUALITY_GATE_JSON="$quality_gate_json" \
 MEASURES_JSON="$measures_json" \
