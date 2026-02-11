@@ -26,6 +26,9 @@ from webargs import ValidationError as WebargsValidationError
 from webargs.flaskparser import parser
 from werkzeug.security import check_password_hash, generate_password_hash
 
+from app.application.services.auth_security_policy_service import (
+    get_auth_security_policy,
+)
 from app.extensions.database import db
 from app.models.user import User
 from app.schemas.auth_schema import AuthSchema
@@ -86,6 +89,10 @@ def _compat_error(
     )
 
 
+def _registration_ack_payload(message: str) -> Dict[str, Any]:
+    return {"message": message, "data": {}}
+
+
 class RegisterResource(MethodResource):
     @doc(
         description="Cria um novo usuário no sistema",
@@ -107,11 +114,25 @@ class RegisterResource(MethodResource):
     )
     @use_kwargs(UserRegistrationSchema, location="json")
     def post(self, **validated_data: Any) -> Response:
-        if User.query.filter_by(email=validated_data["email"]).first():
+        auth_policy = get_auth_security_policy()
+        duplicate_user = User.query.filter_by(email=validated_data["email"]).first()
+        if duplicate_user:
+            if auth_policy.registration.conceal_conflict:
+                return _compat_success(
+                    legacy_payload=_registration_ack_payload(
+                        auth_policy.registration.accepted_message
+                    ),
+                    status_code=201,
+                    message=auth_policy.registration.accepted_message,
+                    data={},
+                )
             return _compat_error(
-                legacy_payload={"message": "Email already registered", "data": None},
+                legacy_payload={
+                    "message": auth_policy.registration.conflict_message,
+                    "data": None,
+                },
                 status_code=409,
-                message="Email already registered",
+                message=auth_policy.registration.conflict_message,
                 error_code="CONFLICT",
             )
 
@@ -126,6 +147,16 @@ class RegisterResource(MethodResource):
             db.session.flush()
             db.session.commit()
 
+            if auth_policy.registration.conceal_conflict:
+                return _compat_success(
+                    legacy_payload=_registration_ack_payload(
+                        auth_policy.registration.accepted_message
+                    ),
+                    status_code=201,
+                    message=auth_policy.registration.accepted_message,
+                    data={},
+                )
+
             user_data = {
                 "id": str(user.id),
                 "name": user.name,
@@ -133,11 +164,11 @@ class RegisterResource(MethodResource):
             }
             return _compat_success(
                 legacy_payload={
-                    "message": "User created successfully",
+                    "message": auth_policy.registration.created_message,
                     "data": user_data,
                 },
                 status_code=201,
-                message="User created successfully",
+                message=auth_policy.registration.created_message,
                 data={"user": user_data},
             )
         except Exception:
@@ -208,7 +239,10 @@ class AuthResource(MethodResource):
             user_agent=request.headers.get("User-Agent"),
             forwarded_for=request.headers.get("X-Forwarded-For"),
             real_ip=request.headers.get("X-Real-IP"),
-            known_principal=user is not None,
+            known_principal=(
+                user is not None
+                and get_auth_security_policy().login_guard.expose_known_principal
+            ),
         )
         login_guard = get_login_attempt_guard()
         allowed, retry_after = login_guard.check(login_context)

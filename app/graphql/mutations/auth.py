@@ -9,6 +9,9 @@ from graphql import GraphQLError
 from marshmallow import ValidationError
 from werkzeug.security import check_password_hash, generate_password_hash
 
+from app.application.services.auth_security_policy_service import (
+    get_auth_security_policy,
+)
 from app.controllers.user_controller import assign_user_profile_fields
 from app.extensions.database import db
 from app.graphql.auth import get_current_user_required
@@ -33,6 +36,7 @@ class RegisterUserMutation(graphene.Mutation):
     def mutate(
         self, info: graphene.ResolveInfo, name: str, email: str, password: str
     ) -> AuthPayloadType:
+        auth_policy = get_auth_security_policy()
         registration_schema = UserRegistrationSchema()
         try:
             validated = registration_schema.load(
@@ -48,8 +52,13 @@ class RegisterUserMutation(graphene.Mutation):
                 raise GraphQLError(flat or "Dados inválidos para registro.") from exc
             raise GraphQLError("Dados inválidos para registro.") from exc
 
-        if User.query.filter_by(email=validated["email"]).first():
-            raise GraphQLError("Email already registered")
+        duplicate_user = User.query.filter_by(email=validated["email"]).first()
+        if duplicate_user:
+            if auth_policy.registration.conceal_conflict:
+                return AuthPayloadType(
+                    message=auth_policy.registration.accepted_message,
+                )
+            raise GraphQLError(auth_policy.registration.conflict_message)
 
         user = User(
             name=validated["name"],
@@ -58,8 +67,12 @@ class RegisterUserMutation(graphene.Mutation):
         )
         db.session.add(user)
         db.session.commit()
+        if auth_policy.registration.conceal_conflict:
+            return AuthPayloadType(
+                message=auth_policy.registration.accepted_message,
+            )
         return AuthPayloadType(
-            message="User created successfully",
+            message=auth_policy.registration.created_message,
             user=UserType(**_user_basic_auth_payload(user)),
         )
 
@@ -79,6 +92,7 @@ class LoginMutation(graphene.Mutation):
         email: str | None = None,
         name: str | None = None,
     ) -> AuthPayloadType:
+        auth_policy = get_auth_security_policy()
         if not (email or name):
             raise GraphQLError("Missing credentials")
 
@@ -100,7 +114,9 @@ class LoginMutation(graphene.Mutation):
             user_agent=headers.get("User-Agent") if headers else None,
             forwarded_for=headers.get("X-Forwarded-For") if headers else None,
             real_ip=headers.get("X-Real-IP") if headers else None,
-            known_principal=user is not None,
+            known_principal=(
+                user is not None and auth_policy.login_guard.expose_known_principal
+            ),
         )
         login_guard = get_login_attempt_guard()
         allowed, retry_after = login_guard.check(login_context)
