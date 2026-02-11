@@ -84,3 +84,11 @@ def test_execute_graphql_rejects_invalid_payload_shape(client) -> None:
     assert response.status_code == 400
     body = response.get_json()
     assert body["errors"][0]["message"] == "Campo 'variables' deve ser um objeto."
+
+
+def test_execute_graphql_rejects_empty_query_payload(client) -> None:
+    response = client.post("/graphql", json={"query": "   "})
+
+    assert response.status_code == 400
+    body = response.get_json()
+    assert body["errors"][0]["message"] == "Campo 'query' é obrigatório."

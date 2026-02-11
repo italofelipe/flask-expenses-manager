@@ -64,7 +64,7 @@ check_contains "deploy/nginx/default.tls.conf" "X-Content-Type-Options" "X-Conte
   echo "## API security controls"
 } >>"${REPORT_FILE}"
 
-check_contains "app/controllers/graphql_controller.py" "Campo 'query' é obrigatório" "GraphQL rejects empty query payload"
+check_contains "app/controllers/graphql_controller_utils.py" "Campo 'query' é obrigatório" "GraphQL rejects empty query payload"
 check_contains "app/graphql/security.py" "GRAPHQL_DEPTH_LIMIT_EXCEEDED" "GraphQL depth limit guard implemented"
 check_contains "app/graphql/security.py" "GRAPHQL_COMPLEXITY_LIMIT_EXCEEDED" "GraphQL complexity limit guard implemented"
 check_contains "app/middleware/auth_guard.py" "verify_jwt_in_request\(\)" "Global auth guard verifies JWT for protected routes"

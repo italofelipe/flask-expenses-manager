@@ -1,4 +1,4 @@
-FROM python:3.13-slim-bookworm AS builder
+FROM python:3.13-slim-trixie AS builder
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
@@ -20,7 +20,7 @@ RUN pip install --upgrade pip \
     && pip install -r requirements.txt gunicorn
 
 
-FROM python:3.13-slim-bookworm AS runtime
+FROM python:3.13-slim-trixie AS runtime
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
