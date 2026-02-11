@@ -55,6 +55,10 @@ def test_transaction_endpoints_return_401_when_token_is_revoked(
         "app.controllers.transaction_controller.is_token_revoked",
         lambda _jti: True,
     )
+    monkeypatch.setattr(
+        "app.controllers.transaction_report_resources.is_token_revoked",
+        lambda _jti: True,
+    )
 
     scenarios = [
         ("POST", "/transactions", _transaction_payload()),
@@ -163,7 +167,7 @@ def test_transaction_summary_and_dashboard_handle_analytics_failures(
             raise RuntimeError("analytics unavailable")
 
     monkeypatch.setattr(
-        "app.controllers.transaction_controller.TransactionAnalyticsService",
+        "app.controllers.transaction_report_resources.TransactionAnalyticsService",
         _BrokenAnalyticsService,
     )
 

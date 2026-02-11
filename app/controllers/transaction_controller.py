@@ -1,11 +1,13 @@
 # mypy: disable-error-code=no-any-return
 
+from __future__ import annotations
+
 from datetime import datetime
 from decimal import Decimal
 from typing import Any
 from uuid import UUID
 
-from flask import Blueprint, Response, request
+from flask import Blueprint, Response
 from flask_apispec import doc, use_kwargs
 from flask_apispec.views import MethodResource
 from flask_jwt_extended import (
@@ -16,7 +18,6 @@ from flask_jwt_extended import (
 )
 
 from app.controllers.transaction_controller_utils import (
-    CONTRACT_HEADER,
     _apply_transaction_updates,
     _build_installment_amounts,
     _compat_error,
@@ -24,71 +25,47 @@ from app.controllers.transaction_controller_utils import (
     _enforce_transaction_reference_ownership_or_error,
     _internal_error_response,
     _invalid_token_response,
-    _parse_month_param,
-    _parse_optional_date,
-    _parse_optional_uuid,
-    _parse_positive_int,
-    _resolve_transaction_ordering,
     _validate_recurring_payload,
     serialize_transaction,
+)
+from app.controllers.transaction_openapi import (
+    TRANSACTION_CREATE_DOC,
+    TRANSACTION_SOFT_DELETE_DOC,
+    TRANSACTION_UPDATE_DOC,
+)
+from app.controllers.transaction_report_resources import (
+    TransactionDeletedResource,
+    TransactionExpensePeriodResource,
+    TransactionForceDeleteResource,
+    TransactionListActiveResource,
+    TransactionMonthlyDashboardResource,
+    TransactionRestoreResource,
+    TransactionSummaryResource,
 )
 from app.extensions.database import db
 from app.extensions.jwt_callbacks import is_token_revoked
 from app.models.transaction import Transaction, TransactionStatus, TransactionType
 from app.schemas.transaction_schema import TransactionSchema
-from app.services.transaction_analytics_service import TransactionAnalyticsService
-from app.utils.pagination import PaginatedResponse
 
 transaction_bp = Blueprint("transaction", __name__, url_prefix="/transactions")
 
 
+def _guard_revoked_token() -> Response | None:
+    verify_jwt_in_request()
+    jwt_data = get_jwt()
+    if is_token_revoked(jwt_data["jti"]):
+        return _invalid_token_response()
+    return None
+
+
 class TransactionResource(MethodResource):
-    @doc(
-        description=(
-            "Cria uma nova transação.\n\n"
-            "Campos obrigatórios: title, amount, type, due_date.\n"
-            """Campos opcionais: description, observation,
-            is_recurring, is_installment, installment_count,
-            currency, status, tag_id, account_id, credit_card_id.\n"""
-            "Se is_installment=True, informe installment_count.\n"
-            "Se is_recurring=True, informe start_date, end_date.\n\n"
-            "Exemplo de request:\n"
-            """{ 'title': 'Conta de luz',
-            'amount': '150.50',
-            'type': 'expense',
-            'due_date': '2024-02-15',
-            'is_installment': True,
-            'installment_count': 12,
-            'is_recurring': True,
-            'start_date': '2024-01-01',
-            'end_date': '2024-12-31' }\n\n"""
-            "Exemplo de resposta:\n"
-            "{ 'message': 'Transação criada com sucesso', 'transaction': [{...}] }"
-        ),
-        tags=["Transações"],
-        security=[{"BearerAuth": []}],
-        params={
-            CONTRACT_HEADER: {
-                "in": "header",
-                "description": "Opcional. Envie 'v2' para o contrato padronizado.",
-                "type": "string",
-                "required": False,
-            }
-        },
-        responses={
-            201: {"description": "Transação criada com sucesso"},
-            400: {"description": "Erro de validação"},
-            401: {"description": "Token inválido"},
-            500: {"description": "Erro interno"},
-        },
-    )  # type: ignore
-    @jwt_required()  # type: ignore
-    @use_kwargs(TransactionSchema, location="json")  # type: ignore
+    @doc(**TRANSACTION_CREATE_DOC)  # type: ignore[misc]
+    @jwt_required()  # type: ignore[misc]
+    @use_kwargs(TransactionSchema, location="json")  # type: ignore[misc]
     def post(self, **kwargs: Any) -> Response:  # noqa: C901
-        verify_jwt_in_request()
-        jwt_data = get_jwt()
-        if is_token_revoked(jwt_data["jti"]):
-            return _invalid_token_response()
+        token_error = _guard_revoked_token()
+        if token_error is not None:
+            return token_error
 
         user_id = get_jwt_identity()
         user_uuid = UUID(user_id)
@@ -211,7 +188,6 @@ class TransactionResource(MethodResource):
             db.session.commit()
 
             created_data = [serialize_transaction(transaction)]
-
             return _compat_success(
                 legacy_payload={
                     "message": "Transação criada com sucesso",
@@ -228,47 +204,13 @@ class TransactionResource(MethodResource):
                 log_context="transaction.create_failed",
             )
 
-    @doc(
-        description=(
-            "Atualiza dados de uma transação existente.\n\n"
-            "Campos aceitos: title, description, observation, is_recurring, "
-            "is_installment, installment_count, amount, currency, status, type, "
-            "due_date, start_date, end_date, tag_id, account_id, credit_card_id, "
-            "paid_at.\n"
-            "Se status=PAID, é obrigatório informar paid_at.\n\n"
-            "Exemplo de request:\n"
-            "{ 'status': 'paid', 'paid_at': '2024-02-20T10:00:00Z' }\n\n"
-            "Exemplo de resposta:\n"
-            "{ 'message': 'Transação atualizada com sucesso', 'transaction': {...} }"
-        ),
-        tags=["Transações"],
-        security=[{"BearerAuth": []}],
-        params={
-            "transaction_id": {"description": "ID da transação", "type": "string"},
-            CONTRACT_HEADER: {
-                "in": "header",
-                "description": "Opcional. Envie 'v2' para o contrato padronizado.",
-                "type": "string",
-                "required": False,
-            },
-        },
-        responses={
-            200: {"description": "Transação atualizada com sucesso"},
-            400: {"description": "Erro de validação"},
-            401: {"description": "Token inválido"},
-            403: {"description": "Sem permissão"},
-            404: {"description": "Transação não encontrada"},
-            500: {"description": "Erro interno"},
-        },
-    )  # type: ignore
-    @jwt_required()  # type: ignore
-    @use_kwargs(TransactionSchema(partial=True), location="json")  # type: ignore
+    @doc(**TRANSACTION_UPDATE_DOC)  # type: ignore[misc]
+    @jwt_required()  # type: ignore[misc]
+    @use_kwargs(TransactionSchema(partial=True), location="json")  # type: ignore[misc]
     def put(self, transaction_id: UUID, **kwargs: Any) -> Response:  # noqa: C901
-        verify_jwt_in_request()
-        jwt_data = get_jwt()
-
-        if is_token_revoked(jwt_data["jti"]):
-            return _invalid_token_response()
+        token_error = _guard_revoked_token()
+        if token_error is not None:
+            return token_error
 
         user_id = get_jwt_identity()
         user_uuid = UUID(user_id)
@@ -379,11 +321,9 @@ class TransactionResource(MethodResource):
 
         try:
             _apply_transaction_updates(transaction, kwargs)
-
             db.session.commit()
 
             updated_data = serialize_transaction(transaction)
-
             return _compat_success(
                 legacy_payload={
                     "message": "Transação atualizada com sucesso",
@@ -400,39 +340,12 @@ class TransactionResource(MethodResource):
                 log_context="transaction.update_failed",
             )
 
-    @doc(
-        description=(
-            "Deleta (soft delete) uma transação.\n\n"
-            "A transação não é removida do banco, apenas marcada como deletada.\n\n"
-            "Exemplo de resposta:\n"
-            "{ 'message': 'Transação deletada com sucesso (soft delete).' }"
-        ),
-        params={
-            "transaction_id": {"description": "ID da transação", "type": "string"},
-            CONTRACT_HEADER: {
-                "in": "header",
-                "description": "Opcional. Envie 'v2' para o contrato padronizado.",
-                "type": "string",
-                "required": False,
-            },
-        },
-        tags=["Transações"],
-        security=[{"BearerAuth": []}],
-        responses={
-            200: {"description": "Transação deletada com sucesso"},
-            401: {"description": "Token inválido"},
-            403: {"description": "Sem permissão"},
-            404: {"description": "Transação não encontrada"},
-            500: {"description": "Erro interno"},
-        },
-    )  # type: ignore
-    @jwt_required()  # type: ignore
+    @doc(**TRANSACTION_SOFT_DELETE_DOC)  # type: ignore[misc]
+    @jwt_required()  # type: ignore[misc]
     def delete(self, transaction_id: UUID) -> Response:
-        verify_jwt_in_request()
-        jwt_data = get_jwt()
-
-        if is_token_revoked(jwt_data["jti"]):
-            return _invalid_token_response()
+        token_error = _guard_revoked_token()
+        if token_error is not None:
+            return token_error
 
         user_id = get_jwt_identity()
         transaction = Transaction.query.filter_by(
@@ -476,845 +389,6 @@ class TransactionResource(MethodResource):
                 log_context="transaction.soft_delete_failed",
             )
 
-    @doc(
-        description=(
-            "Restaura uma transação deletada logicamente.\n\n"
-            "Exemplo de resposta:\n"
-            "{ 'message': 'Transação restaurada com sucesso' }"
-        ),
-        tags=["Transações"],
-        security=[{"BearerAuth": []}],
-        params={
-            "transaction_id": {"description": "ID da transação", "type": "string"},
-            CONTRACT_HEADER: {
-                "in": "header",
-                "description": "Opcional. Envie 'v2' para o contrato padronizado.",
-                "type": "string",
-                "required": False,
-            },
-        },
-        responses={
-            200: {"description": "Transação restaurada com sucesso"},
-            400: {"description": "Transação não está deletada"},
-            401: {"description": "Token inválido"},
-            404: {"description": "Transação não encontrada"},
-            500: {"description": "Erro interno"},
-        },
-    )  # type: ignore
-    @jwt_required()  # type: ignore
-    def patch(self, transaction_id: UUID) -> Response:
-        verify_jwt_in_request()
-        jwt_data = get_jwt()
-        if is_token_revoked(jwt_data["jti"]):
-            return _invalid_token_response()
-
-        user_id = get_jwt_identity()
-        user_uuid = UUID(user_id)
-
-        transaction = Transaction.query.filter_by(
-            id=transaction_id, user_id=user_uuid, deleted=True
-        ).first()
-        if not transaction:
-            return _compat_error(
-                legacy_payload={"error": "Transação não encontrada."},
-                status_code=404,
-                message="Transação não encontrada.",
-                error_code="NOT_FOUND",
-            )
-
-        try:
-            transaction.deleted = False
-            db.session.commit()
-            return _compat_success(
-                legacy_payload={"message": "Transação restaurada com sucesso"},
-                status_code=200,
-                message="Transação restaurada com sucesso",
-                data={},
-            )
-        except Exception:
-            db.session.rollback()
-            return _internal_error_response(
-                message="Erro ao restaurar transação",
-                log_context="transaction.restore_failed",
-            )
-
-    @doc(
-        description=(
-            "Lista todas as transações deletadas "
-            "(soft deleted) do usuário autenticado.\n\n"
-            "Exemplo de resposta:\n"
-            "{ 'deleted_transactions': [{...}] }"
-        ),
-        tags=["Transações"],
-        security=[{"BearerAuth": []}],
-        params={
-            CONTRACT_HEADER: {
-                "in": "header",
-                "description": "Opcional. Envie 'v2' para o contrato padronizado.",
-                "type": "string",
-                "required": False,
-            }
-        },
-        responses={
-            200: {"description": "Lista de transações deletadas"},
-            401: {"description": "Token inválido"},
-            500: {"description": "Erro interno"},
-        },
-    )  # type: ignore
-    @jwt_required()  # type: ignore
-    def get_deleted(self) -> Response:
-        verify_jwt_in_request()
-        jwt_data = get_jwt()
-        if is_token_revoked(jwt_data["jti"]):
-            return _invalid_token_response()
-
-        user_id = get_jwt_identity()
-        user_uuid = UUID(user_id)
-
-        try:
-            transactions = Transaction.query.filter_by(
-                user_id=user_uuid, deleted=True
-            ).all()
-            serialized = [serialize_transaction(item) for item in transactions]
-
-            return _compat_success(
-                legacy_payload={"deleted_transactions": serialized},
-                status_code=200,
-                message="Lista de transações deletadas",
-                data={"deleted_transactions": serialized},
-                meta={"total": len(serialized)},
-            )
-        except Exception:
-            db.session.rollback()
-            return _internal_error_response(
-                message="Erro ao buscar transações deletadas",
-                log_context="transaction.list_deleted_failed",
-            )
-
-    @doc(
-        description=(
-            "Lista todas as transações ativas do usuário autenticado.\n\n"
-            "Filtros disponíveis:\n"
-            "- page: número da página\n"
-            "- per_page: itens por página\n"
-            "- type: tipo da transação (income, expense)\n"
-            "- status: status da transação\n"
-            "- start_date, end_date: período (YYYY-MM-DD)\n"
-            "- tag_id, account_id, credit_card_id: filtros por relacionamento\n\n"
-            "Exemplo de resposta:\n"
-            "{ 'transactions': [...], 'total': 20, 'page': 1, 'per_page': 10 }"
-        ),
-        tags=["Transações"],
-        security=[{"BearerAuth": []}],
-        params={
-            "page": {"description": "Número da página", "type": "integer"},
-            "per_page": {"description": "Itens por página", "type": "integer"},
-            "type": {
-                "description": "Tipo da transação (income, expense)",
-                "type": "string",
-            },
-            "status": {"description": "Status da transação", "type": "string"},
-            "start_date": {
-                "description": "Data inicial (YYYY-MM-DD)",
-                "type": "string",
-            },
-            "end_date": {"description": "Data final (YYYY-MM-DD)", "type": "string"},
-            "tag_id": {"description": "Filtrar por tag", "type": "string"},
-            "account_id": {"description": "Filtrar por conta", "type": "string"},
-            "credit_card_id": {
-                "description": "Filtrar por cartão de crédito",
-                "type": "string",
-            },
-            CONTRACT_HEADER: {
-                "in": "header",
-                "description": "Opcional. Envie 'v2' para o contrato padronizado.",
-                "type": "string",
-                "required": False,
-            },
-        },
-        responses={
-            200: {"description": "Lista de transações"},
-            401: {"description": "Token inválido ou expirado"},
-            500: {"description": "Erro interno"},
-        },
-    )  # type: ignore
-    @jwt_required()  # type: ignore
-    def get_active(self) -> Response:  # noqa: C901
-        verify_jwt_in_request()
-        jwt_data = get_jwt()
-        if is_token_revoked(jwt_data["jti"]):
-            return _invalid_token_response()
-
-        user_id = get_jwt_identity()
-        user_uuid = UUID(user_id)
-
-        try:
-            page = _parse_positive_int(
-                request.args.get("page"), default=1, field_name="page"
-            )
-            per_page = _parse_positive_int(
-                request.args.get("per_page"),
-                default=10,
-                field_name="per_page",
-            )
-
-            transaction_type = request.args.get("type")
-            status = request.args.get("status")
-            start_date = _parse_optional_date(
-                request.args.get("start_date"), "start_date"
-            )
-            end_date = _parse_optional_date(request.args.get("end_date"), "end_date")
-            tag_id = _parse_optional_uuid(request.args.get("tag_id"), "tag_id")
-            account_id = _parse_optional_uuid(
-                request.args.get("account_id"), "account_id"
-            )
-            credit_card_id = _parse_optional_uuid(
-                request.args.get("credit_card_id"), "credit_card_id"
-            )
-
-            if start_date and end_date and start_date > end_date:
-                return _compat_error(
-                    legacy_payload={
-                        "error": (
-                            "Parâmetro 'start_date' não pode ser maior que 'end_date'."
-                        )
-                    },
-                    status_code=400,
-                    message=(
-                        "Parâmetro 'start_date' não pode ser maior que 'end_date'."
-                    ),
-                    error_code="VALIDATION_ERROR",
-                )
-
-            query = Transaction.query.filter_by(user_id=user_uuid, deleted=False)
-
-            if transaction_type:
-                try:
-                    query = query.filter(
-                        Transaction.type == TransactionType(transaction_type.lower())
-                    )
-                except ValueError:
-                    return _compat_error(
-                        legacy_payload={
-                            "error": (
-                                "Parâmetro 'type' inválido. "
-                                "Use 'income' ou 'expense'."
-                            )
-                        },
-                        status_code=400,
-                        message=(
-                            "Parâmetro 'type' inválido. Use 'income' ou 'expense'."
-                        ),
-                        error_code="VALIDATION_ERROR",
-                    )
-
-            if status:
-                try:
-                    query = query.filter(
-                        Transaction.status == TransactionStatus(status.lower())
-                    )
-                except ValueError:
-                    return _compat_error(
-                        legacy_payload={
-                            "error": (
-                                "Parâmetro 'status' inválido. "
-                                "Use paid, pending, cancelled, postponed ou overdue."
-                            )
-                        },
-                        status_code=400,
-                        message=(
-                            "Parâmetro 'status' inválido. "
-                            "Use paid, pending, cancelled, postponed ou overdue."
-                        ),
-                        error_code="VALIDATION_ERROR",
-                    )
-
-            if start_date:
-                query = query.filter(Transaction.due_date >= start_date)
-            if end_date:
-                query = query.filter(Transaction.due_date <= end_date)
-            if tag_id:
-                query = query.filter(Transaction.tag_id == tag_id)
-            if account_id:
-                query = query.filter(Transaction.account_id == account_id)
-            if credit_card_id:
-                query = query.filter(Transaction.credit_card_id == credit_card_id)
-
-            total = query.count()
-            pages = (total + per_page - 1) // per_page if total else 0
-            transactions = (
-                query.order_by(
-                    Transaction.due_date.desc(), Transaction.created_at.desc()
-                )
-                .offset((page - 1) * per_page)
-                .limit(per_page)
-                .all()
-            )
-
-            serialized = [serialize_transaction(item) for item in transactions]
-
-            return _compat_success(
-                legacy_payload={
-                    "transactions": serialized,
-                    "total": total,
-                    "page": page,
-                    "per_page": per_page,
-                },
-                status_code=200,
-                message="Lista de transações ativas",
-                data={"transactions": serialized},
-                meta={
-                    "pagination": {
-                        "total": total,
-                        "page": page,
-                        "per_page": per_page,
-                        "pages": pages,
-                    }
-                },
-            )
-        except ValueError as exc:
-            return _compat_error(
-                legacy_payload={"error": str(exc)},
-                status_code=400,
-                message=str(exc),
-                error_code="VALIDATION_ERROR",
-            )
-        except Exception:
-            db.session.rollback()
-            return _internal_error_response(
-                message="Erro ao buscar transações ativas",
-                log_context="transaction.list_active_failed",
-            )
-
-
-class TransactionSummaryResource(MethodResource):
-    @doc(
-        description=(
-            "Resumo mensal das transações (total de receitas e despesas).\n\n"
-            "Parâmetro obrigatório: month=YYYY-MM.\n\n"
-            "Exemplo de resposta:\n"
-            "{ 'month': '2024-02', 'income_total': 5000.00, "
-            "'expense_total': 3000.00, ... }"
-        ),
-        tags=["Transações"],
-        security=[{"BearerAuth": []}],
-        params={
-            "month": {
-                "description": "Formato YYYY-MM (ex: 2025-04)",
-                "in": "query",
-                "type": "string",
-            },
-            CONTRACT_HEADER: {
-                "in": "header",
-                "description": "Opcional. Envie 'v2' para o contrato padronizado.",
-                "type": "string",
-                "required": False,
-            },
-        },
-        responses={
-            200: {"description": "Resumo mensal de transações"},
-            400: {"description": "Parâmetro inválido"},
-            401: {"description": "Token inválido"},
-            500: {"description": "Erro interno"},
-        },
-    )  # type: ignore
-    @jwt_required()  # type: ignore
-    def get(self) -> Response:
-        verify_jwt_in_request()
-        jwt_data = get_jwt()
-        if is_token_revoked(jwt_data["jti"]):
-            return _invalid_token_response()
-
-        user_id = get_jwt_identity()
-        user_uuid = UUID(user_id)
-        try:
-            year, month_number, month = _parse_month_param(request.args.get("month"))
-            analytics = TransactionAnalyticsService(user_uuid)
-            transactions = analytics.get_month_transactions(
-                year=year, month_number=month_number
-            )
-            aggregates = analytics.get_month_aggregates(
-                year=year, month_number=month_number
-            )
-
-            page = int(request.args.get("page", 1))
-            page_size = int(request.args.get("page_size", 10))
-
-            serialized = [serialize_transaction(item) for item in transactions]
-            paginated = PaginatedResponse.format(
-                serialized, len(transactions), page, page_size
-            )
-
-            return _compat_success(
-                legacy_payload={
-                    "month": month,
-                    "income_total": float(aggregates["income_total"]),
-                    "expense_total": float(aggregates["expense_total"]),
-                    **paginated,
-                },
-                status_code=200,
-                message="Resumo mensal calculado com sucesso",
-                data={
-                    "month": month,
-                    "income_total": float(aggregates["income_total"]),
-                    "expense_total": float(aggregates["expense_total"]),
-                    "items": paginated["data"],
-                },
-                meta={
-                    "pagination": {
-                        "total": paginated["total"],
-                        "page": paginated["page"],
-                        "per_page": paginated["page_size"],
-                        "has_next_page": paginated["has_next_page"],
-                    }
-                },
-            )
-        except ValueError as exc:
-            return _compat_error(
-                legacy_payload={"error": str(exc)},
-                status_code=400,
-                message=str(exc),
-                error_code="VALIDATION_ERROR",
-            )
-        except Exception:
-            db.session.rollback()
-            return _internal_error_response(
-                message="Erro ao calcular resumo mensal",
-                log_context="transaction.monthly_summary_failed",
-            )
-
-
-class TransactionMonthlyDashboardResource(MethodResource):
-    @doc(
-        description=(
-            "Dashboard mensal de transações com totais, contagens e categorias "
-            "principais.\n\n"
-            "Parâmetro obrigatório: month=YYYY-MM.\n\n"
-            "Métricas retornadas:\n"
-            "- income_total, expense_total, balance\n"
-            "- contagens por tipo e por status\n"
-            "- top categorias de despesas e receitas"
-        ),
-        tags=["Transações"],
-        security=[{"BearerAuth": []}],
-        params={
-            "month": {
-                "description": "Formato YYYY-MM (ex: 2025-04)",
-                "in": "query",
-                "type": "string",
-            },
-            CONTRACT_HEADER: {
-                "in": "header",
-                "description": "Opcional. Envie 'v2' para o contrato padronizado.",
-                "type": "string",
-                "required": False,
-            },
-        },
-        responses={
-            200: {"description": "Dashboard mensal de transações"},
-            400: {"description": "Parâmetro inválido"},
-            401: {"description": "Token inválido"},
-            500: {"description": "Erro interno"},
-        },
-    )  # type: ignore[misc]
-    @jwt_required()  # type: ignore[misc]
-    def get(self) -> Response:
-        verify_jwt_in_request()
-        jwt_data = get_jwt()
-        if is_token_revoked(jwt_data["jti"]):
-            return _invalid_token_response()
-
-        user_id = get_jwt_identity()
-        user_uuid = UUID(user_id)
-
-        try:
-            year, month_number, month = _parse_month_param(request.args.get("month"))
-            analytics = TransactionAnalyticsService(user_uuid)
-            aggregates = analytics.get_month_aggregates(
-                year=year,
-                month_number=month_number,
-            )
-            status_counts = analytics.get_status_counts(
-                year=year, month_number=month_number
-            )
-            top_expense_categories = analytics.get_top_categories(
-                year=year,
-                month_number=month_number,
-                transaction_type=TransactionType.EXPENSE,
-            )
-            top_income_categories = analytics.get_top_categories(
-                year=year,
-                month_number=month_number,
-                transaction_type=TransactionType.INCOME,
-            )
-
-            return _compat_success(
-                legacy_payload={
-                    "month": month,
-                    "income_total": float(aggregates["income_total"]),
-                    "expense_total": float(aggregates["expense_total"]),
-                    "balance": float(aggregates["balance"]),
-                    "counts": {
-                        "total_transactions": aggregates["total_transactions"],
-                        "income_transactions": aggregates["income_transactions"],
-                        "expense_transactions": aggregates["expense_transactions"],
-                        "status": status_counts,
-                    },
-                    "top_expense_categories": top_expense_categories,
-                    "top_income_categories": top_income_categories,
-                },
-                status_code=200,
-                message="Dashboard mensal calculado com sucesso",
-                data={
-                    "month": month,
-                    "totals": {
-                        "income_total": float(aggregates["income_total"]),
-                        "expense_total": float(aggregates["expense_total"]),
-                        "balance": float(aggregates["balance"]),
-                    },
-                    "counts": {
-                        "total_transactions": aggregates["total_transactions"],
-                        "income_transactions": aggregates["income_transactions"],
-                        "expense_transactions": aggregates["expense_transactions"],
-                        "status": status_counts,
-                    },
-                    "top_categories": {
-                        "expense": top_expense_categories,
-                        "income": top_income_categories,
-                    },
-                },
-            )
-        except ValueError as exc:
-            return _compat_error(
-                legacy_payload={"error": str(exc)},
-                status_code=400,
-                message=str(exc),
-                error_code="VALIDATION_ERROR",
-            )
-        except Exception:
-            db.session.rollback()
-            return _internal_error_response(
-                message="Erro ao calcular dashboard mensal",
-                log_context="transaction.monthly_dashboard_failed",
-            )
-
-
-class TransactionForceDeleteResource(MethodResource):
-    @doc(
-        description=(
-            "Remove permanentemente uma transação deletada (soft deleted).\n\n"
-            "Só pode ser usada em transações já marcadas como deletadas.\n\n"
-            "Exemplo de resposta:\n"
-            "{ 'message': 'Transação removida permanentemente.' }"
-        ),
-        tags=["Transações"],
-        security=[{"BearerAuth": []}],
-        params={
-            "transaction_id": {
-                "description": "ID da transação a ser removida",
-                "type": "string",
-            },
-            CONTRACT_HEADER: {
-                "in": "header",
-                "description": "Opcional. Envie 'v2' para o contrato padronizado.",
-                "type": "string",
-                "required": False,
-            },
-        },
-        responses={
-            200: {"description": "Transação removida permanentemente"},
-            401: {"description": "Token inválido"},
-            404: {"description": "Transação não encontrada ou não está deletada"},
-            500: {"description": "Erro interno"},
-        },
-    )  # type: ignore
-    @jwt_required()  # type: ignore
-    def delete(self, transaction_id: UUID) -> Response:
-        verify_jwt_in_request()
-        jwt_data = get_jwt()
-        if is_token_revoked(jwt_data["jti"]):
-            return _invalid_token_response()
-
-        user_id = get_jwt_identity()
-
-        transaction = Transaction.query.filter_by(
-            id=transaction_id, user_id=UUID(user_id), deleted=True
-        ).first()
-
-        if not transaction:
-            return _compat_error(
-                legacy_payload={
-                    "error": "Transação não encontrada ou não está deletada."
-                },
-                status_code=404,
-                message="Transação não encontrada ou não está deletada.",
-                error_code="NOT_FOUND",
-            )
-
-        try:
-            db.session.delete(transaction)
-            db.session.commit()
-            return _compat_success(
-                legacy_payload={"message": "Transação removida permanentemente."},
-                status_code=200,
-                message="Transação removida permanentemente.",
-                data={},
-            )
-        except Exception:
-            db.session.rollback()
-            return _internal_error_response(
-                message="Erro ao deletar permanentemente",
-                log_context="transaction.force_delete_failed",
-            )
-
-
-class TransactionDeletedResource(MethodResource):
-    @doc(
-        description=(
-            "Lista todas as transações deletadas "
-            "(soft deleted) do usuário autenticado.\n\n"
-            "Exemplo de resposta:\n"
-            "{ 'deleted_transactions': [{...}] }"
-        ),
-        tags=["Transações"],
-        security=[{"BearerAuth": []}],
-        params={
-            CONTRACT_HEADER: {
-                "in": "header",
-                "description": "Opcional. Envie 'v2' para o contrato padronizado.",
-                "type": "string",
-                "required": False,
-            }
-        },
-        responses={
-            200: {"description": "Lista de transações deletadas"},
-            401: {"description": "Token inválido"},
-            500: {"description": "Erro interno"},
-        },
-    )  # type: ignore
-    @jwt_required()  # type: ignore
-    def get(self) -> Response:
-        resource = TransactionResource()
-        return resource.get_deleted()
-
-
-class TransactionListActiveResource(MethodResource):
-    @doc(
-        description=(
-            "Lista todas as transações ativas do usuário autenticado.\n\n"
-            "Filtros disponíveis:\n"
-            "- page: número da página\n"
-            "- per_page: itens por página\n"
-            "- type: tipo da transação (income, expense)\n"
-            "- status: status da transação\n"
-            "- start_date, end_date: período (YYYY-MM-DD)\n"
-            "- tag_id, account_id, credit_card_id: filtros por relacionamento\n\n"
-            "Exemplo de resposta:\n"
-            "{ 'transactions': [...], 'total': 20, 'page': 1, 'per_page': 10 }"
-        ),
-        tags=["Transações"],
-        security=[{"BearerAuth": []}],
-        params={
-            "page": {"description": "Número da página", "type": "integer"},
-            "per_page": {"description": "Itens por página", "type": "integer"},
-            "type": {
-                "description": "Tipo da transação (income, expense)",
-                "type": "string",
-            },
-            "status": {"description": "Status da transação", "type": "string"},
-            "start_date": {
-                "description": "Data inicial (YYYY-MM-DD)",
-                "type": "string",
-            },
-            "end_date": {"description": "Data final (YYYY-MM-DD)", "type": "string"},
-            "tag_id": {"description": "Filtrar por tag", "type": "string"},
-            "account_id": {"description": "Filtrar por conta", "type": "string"},
-            "credit_card_id": {
-                "description": "Filtrar por cartão de crédito",
-                "type": "string",
-            },
-            CONTRACT_HEADER: {
-                "in": "header",
-                "description": "Opcional. Envie 'v2' para o contrato padronizado.",
-                "type": "string",
-                "required": False,
-            },
-        },
-        responses={
-            200: {"description": "Lista de transações"},
-            401: {"description": "Token inválido ou expirado"},
-            500: {"description": "Erro interno"},
-        },
-    )  # type: ignore
-    @jwt_required()  # type: ignore
-    def get(self) -> Response:
-        resource = TransactionResource()
-        return resource.get_active()
-
-
-class TransactionExpensePeriodResource(MethodResource):
-    @doc(
-        description=(
-            "Lista despesas por período do usuário autenticado.\n\n"
-            "Regras:\n"
-            "- É obrigatório enviar ao menos um parâmetro: startDate ou finalDate\n"
-            "- startDate e finalDate usam formato YYYY-MM-DD\n"
-            "- paginação com page e per_page\n"
-            "- ordenação com order_by e order\n\n"
-            "Métricas retornadas:\n"
-            "- total_transactions (total no período)\n"
-            "- income_transactions (receitas no período)\n"
-            "- expense_transactions (despesas no período)"
-        ),
-        tags=["Transações"],
-        security=[{"BearerAuth": []}],
-        params={
-            "startDate": {"description": "Data inicial (YYYY-MM-DD)", "type": "string"},
-            "finalDate": {"description": "Data final (YYYY-MM-DD)", "type": "string"},
-            "page": {"description": "Número da página", "type": "integer"},
-            "per_page": {"description": "Itens por página", "type": "integer"},
-            "order_by": {
-                "description": "Campo de ordenação: due_date|created_at|amount|title",
-                "type": "string",
-            },
-            "order": {"description": "Direção: asc|desc", "type": "string"},
-            CONTRACT_HEADER: {
-                "in": "header",
-                "description": "Opcional. Envie 'v2' para o contrato padronizado.",
-                "type": "string",
-                "required": False,
-            },
-        },
-        responses={
-            200: {"description": "Lista de despesas por período"},
-            400: {"description": "Parâmetros inválidos"},
-            401: {"description": "Token inválido"},
-            500: {"description": "Erro interno"},
-        },
-    )  # type: ignore[misc]
-    @jwt_required()  # type: ignore[misc]
-    def get(self) -> Response:
-        verify_jwt_in_request()
-        jwt_data = get_jwt()
-        if is_token_revoked(jwt_data["jti"]):
-            return _invalid_token_response()
-
-        user_id = get_jwt_identity()
-        user_uuid = UUID(user_id)
-
-        try:
-            start_date = _parse_optional_date(
-                request.args.get("startDate"), "startDate"
-            )
-            final_date = _parse_optional_date(
-                request.args.get("finalDate"), "finalDate"
-            )
-            if not start_date and not final_date:
-                return _compat_error(
-                    legacy_payload={
-                        "error": (
-                            "Informe ao menos um parâmetro: 'startDate' ou 'finalDate'."
-                        )
-                    },
-                    status_code=400,
-                    message=(
-                        "Informe ao menos um parâmetro: " "'startDate' ou 'finalDate'."
-                    ),
-                    error_code="VALIDATION_ERROR",
-                )
-
-            if start_date and final_date and start_date > final_date:
-                return _compat_error(
-                    legacy_payload={
-                        "error": (
-                            "Parâmetro 'startDate' não pode ser maior que "
-                            "'finalDate'."
-                        )
-                    },
-                    status_code=400,
-                    message=(
-                        "Parâmetro 'startDate' não pode ser maior que " "'finalDate'."
-                    ),
-                    error_code="VALIDATION_ERROR",
-                )
-
-            page = _parse_positive_int(
-                request.args.get("page"), default=1, field_name="page"
-            )
-            per_page = _parse_positive_int(
-                request.args.get("per_page"), default=10, field_name="per_page"
-            )
-            order_by = str(request.args.get("order_by", "due_date")).strip().lower()
-            order = str(request.args.get("order", "desc")).strip().lower()
-            ordering_clause = _resolve_transaction_ordering(order_by, order)
-
-            base_query = Transaction.query.filter_by(user_id=user_uuid, deleted=False)
-            if start_date:
-                base_query = base_query.filter(Transaction.due_date >= start_date)
-            if final_date:
-                base_query = base_query.filter(Transaction.due_date <= final_date)
-
-            total_transactions = base_query.count()
-            income_transactions = base_query.filter(
-                Transaction.type == TransactionType.INCOME
-            ).count()
-            expense_transactions = base_query.filter(
-                Transaction.type == TransactionType.EXPENSE
-            ).count()
-
-            expenses_query = base_query.filter(
-                Transaction.type == TransactionType.EXPENSE
-            )
-            total_expenses = expense_transactions
-            pages = (total_expenses + per_page - 1) // per_page if total_expenses else 0
-            expenses = (
-                expenses_query.order_by(ordering_clause)
-                .offset((page - 1) * per_page)
-                .limit(per_page)
-                .all()
-            )
-            serialized_expenses = [serialize_transaction(item) for item in expenses]
-
-            counts_payload = {
-                "total_transactions": total_transactions,
-                "income_transactions": income_transactions,
-                "expense_transactions": expense_transactions,
-            }
-
-            return _compat_success(
-                legacy_payload={
-                    "expenses": serialized_expenses,
-                    "total": total_expenses,
-                    "page": page,
-                    "per_page": per_page,
-                    "counts": counts_payload,
-                },
-                status_code=200,
-                message="Lista de despesas por período",
-                data={"expenses": serialized_expenses, "counts": counts_payload},
-                meta={
-                    "pagination": {
-                        "total": total_expenses,
-                        "page": page,
-                        "per_page": per_page,
-                        "pages": pages,
-                    }
-                },
-            )
-        except ValueError as exc:
-            return _compat_error(
-                legacy_payload={"error": str(exc)},
-                status_code=400,
-                message=str(exc),
-                error_code="VALIDATION_ERROR",
-            )
-        except Exception:
-            db.session.rollback()
-            return _internal_error_response(
-                message="Erro ao buscar despesas por período",
-                log_context="transaction.expenses_period_failed",
-            )
-
 
 transaction_bp.add_url_rule(
     "", view_func=TransactionResource.as_view("transactionresource")
@@ -1334,7 +408,7 @@ transaction_bp.add_url_rule(
 
 transaction_bp.add_url_rule(
     "/restore/<uuid:transaction_id>",
-    view_func=TransactionResource.as_view("transaction_restore"),
+    view_func=TransactionRestoreResource.as_view("transaction_restore"),
     methods=["PATCH"],
 )
 
