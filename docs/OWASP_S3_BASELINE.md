@@ -15,6 +15,13 @@ This document records the initial OWASP baseline and implementation backlog.
   - code/documentation review (current repository state)
   - runtime/deployment observations already validated in AWS dev/prod setup
 
+Supporting artifacts:
+- `docs/OWASP_S3_INVENTORY.md` (REST/GraphQL attack-surface inventory and OWASP focus map)
+- `docs/OWASP_S3_CHECKLIST.md` (working checklist with status/evidence/actions)
+- `docs/OWASP_S3_REMEDIATION_PLAN.md` (prioritized remediation roadmap for S2/S1)
+- `scripts/security_evidence_check.sh` (automated baseline checks)
+- CI artifact: `reports/security/security-evidence.md`
+
 ## Baseline Summary
 - Current maturity: **partial**.
 - Existing positives:
@@ -70,6 +77,15 @@ This document records the initial OWASP baseline and implementation backlog.
 2. S3.2 OWASP checklist as actionable controls with acceptance criteria.
 3. S3.3 Security test plan (unit/integration) and CI evidence artifacts.
 4. S3.4 Prioritized remediation list feeding S2 (app controls) and S1 (infra controls).
+
+## S3.3 Progress
+- Implemented `scripts/security_evidence_check.sh` to assert baseline controls and emit evidence report.
+- Integrated CI job `security-evidence` in `.github/workflows/ci.yml`.
+- Evidence artifact published in CI as `security-evidence`.
+
+## S3.4 Progress
+- Prioritized remediation plan created in `docs/OWASP_S3_REMEDIATION_PLAN.md`.
+- Backlog structured by risk/priority and mapped to S2 (app controls) and S1 (infra controls).
 
 ## Exit criteria for S3
 - Complete OWASP/API checklist with status per control.

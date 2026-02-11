@@ -83,10 +83,29 @@ jobs:
           name: pytest-report
           path: pytest-report.xml
 
+  security-evidence:
+    name: Security Evidence (S3)
+    runs-on: ubuntu-latest
+    needs: tests
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Run security evidence checks
+        run: |
+          bash scripts/security_evidence_check.sh
+
+      - name: Upload security evidence artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: security-evidence
+          path: reports/security/security-evidence.md
+
   sonar:
     name: SonarQube Cloud
     runs-on: ubuntu-latest
-    needs: tests
+    needs: [tests, security-evidence]
     if: ${{ vars.SONAR_PROJECT_KEY != '' && vars.SONAR_ORGANIZATION != '' }}
 
     steps:

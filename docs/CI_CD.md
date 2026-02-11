@@ -25,7 +25,12 @@ Dependências instaladas no job:
 - `pytest --cov=app --cov-report=xml --cov-report=term-missing --junitxml=pytest-report.xml`
 - publica artefatos: `coverage.xml`, `pytest-report.xml`
 
-3. `sonar`
+3. `security-evidence`
+- executa `scripts/security_evidence_check.sh`
+- gera relatório de evidências OWASP S3
+- publica artefato: `reports/security/security-evidence.md`
+
+4. `sonar`
 - executa scan no SonarQube Cloud usando `coverage.xml`
 - roda apenas se as variáveis/secrets obrigatórias existirem
 - após o quality gate, aplica política rígida via script:
@@ -85,6 +90,11 @@ Validação no CI:
 - Script: `/opt/auraxis/scripts/sonar_enforce_ci.sh`
 - É executado no job `sonar` após o Quality Gate.
 - O job falha automaticamente se qualquer regra de política não for atendida.
+
+Validação de evidências de segurança:
+- Script: `/opt/auraxis/scripts/security_evidence_check.sh`
+- Job CI: `security-evidence`
+- Artefato gerado: `reports/security/security-evidence.md`
 
 ## Observações
 - A suíte de testes usa SQLite em execução de teste (via `tests/conftest.py`).
