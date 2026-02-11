@@ -20,14 +20,14 @@ class AuthSchema(Schema):
         required=True, description="Senha do usuário", example="minhasenha123"
     )
 
-    @pre_load  # type: ignore[misc]
+    @pre_load
     def sanitize_input(self, data: object, **kwargs: object) -> object:
         sanitized = sanitize_string_fields(data, {"email", "name"})
         if isinstance(sanitized, dict) and isinstance(sanitized.get("email"), str):
             sanitized["email"] = str(sanitized["email"]).lower()
         return sanitized
 
-    @validates_schema  # type: ignore[misc]
+    @validates_schema
     def validate_identity(self, data: dict[str, str], **kwargs: object) -> None:
         if not data.get("email") and not data.get("name"):
             raise ValidationError("Either 'email' or 'name' must be provided.")

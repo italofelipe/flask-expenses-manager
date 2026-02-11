@@ -4,5 +4,8 @@ pyflakes==3.2.0
 isort==5.13.2
 mypy==1.11.2
 pre-commit==4.3.0
+bandit==1.8.6
+cosmic-ray==8.4.3
+schemathesis==3.35.0
 types-requests==2.32.4.20260107
 types-python-dateutil==2.9.0.20260124

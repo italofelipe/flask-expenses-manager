@@ -14,17 +14,33 @@ repos:
   hooks:
   - id: isort
 
-- repo: https://github.com/pre-commit/mirrors-mypy
-  rev: v1.11.2
+- repo: https://github.com/pycqa/bandit
+  rev: 1.8.6
   hooks:
-  - id: mypy
-    exclude: ^tests/
-    additional_dependencies:
-    - types-requests==2.32.4.20260107
-    - types-python-dateutil==2.9.0.20260124
+  - id: bandit
+    name: bandit (app high severity gate)
+    args: ["-q", "-r", "app", "-lll", "-iii"]
+    pass_filenames: false
+
+- repo: https://github.com/gitleaks/gitleaks
+  rev: v8.28.0
+  hooks:
+  - id: gitleaks
+    args: ["--staged", "--redact", "--verbose"]
+    pass_filenames: false
+
+- repo: https://github.com/pre-commit/pre-commit-hooks
+  rev: v5.0.0
+  hooks:
+  - id: detect-private-key
 
 - repo: local
   hooks:
+  - id: mypy
+    name: mypy
+    entry: bash -c '.venv/bin/mypy app || python -m mypy app'
+    language: system
+    pass_filenames: false
   - id: sonar-local-check
     name: sonar-local-check
     entry: scripts/sonar_local_check.sh

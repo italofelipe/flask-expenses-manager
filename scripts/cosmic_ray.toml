@@ -1,0 +1,20 @@
+[cosmic-ray]
+module-path = "app/middleware/cors.py"
+test-command = "python -m pytest -q tests/test_cors_policy.py"
+timeout = 20.0
+
+[cosmic-ray.distributor]
+name = "local"
+
+[cosmic-ray.filters.operators-filter]
+exclude-operators = [
+  "^core/ReplaceBinaryOperator_",
+  "^core/ReplaceUnaryOperator_",
+  "^core/ReplaceComparisonOperator_",
+  "^core/VariableReplacer$",
+  "^core/VariableInserter$",
+  "^core/ExceptionReplacer$",
+  "^core/ReplaceBreakWithContinue$",
+  "^core/ReplaceContinueWithBreak$",
+  "^core/ZeroIterationForLoop$"
+]

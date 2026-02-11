@@ -18,7 +18,7 @@ def _http_status_to_error_code(status_code: int) -> str:
 
 
 def register_error_handlers(app: Flask) -> None:
-    @app.errorhandler(RequestEntityTooLarge)  # type: ignore[misc]
+    @app.errorhandler(RequestEntityTooLarge)
     def handle_request_too_large(e: RequestEntityTooLarge) -> Response:
         payload = error_payload(
             message="Request body is too large.",
@@ -27,7 +27,7 @@ def register_error_handlers(app: Flask) -> None:
         )
         return json_response(payload, status_code=413)
 
-    @app.errorhandler(APIError)  # type: ignore[misc]
+    @app.errorhandler(APIError)
     def handle_api_error(e: APIError) -> Response:
         payload = error_payload(
             message=e.message,
@@ -36,7 +36,7 @@ def register_error_handlers(app: Flask) -> None:
         )
         return json_response(payload, status_code=e.status_code)
 
-    @app.errorhandler(HTTPException)  # type: ignore[misc]
+    @app.errorhandler(HTTPException)
     def handle_http_exception(e: HTTPException) -> Response:
         status_code = e.code if e.code is not None else 500
         message = e.description or "HTTP error"
@@ -47,7 +47,7 @@ def register_error_handlers(app: Flask) -> None:
         )
         return json_response(payload, status_code=status_code)
 
-    @app.errorhandler(Exception)  # type: ignore[misc]
+    @app.errorhandler(Exception)
     def handle_generic_exception(e: Exception) -> Response:
         request_id = str(getattr(g, "request_id", "n/a"))
         app.logger.exception("Unhandled exception. request_id=%s", request_id)

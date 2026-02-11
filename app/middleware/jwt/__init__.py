@@ -1,5 +1,5 @@
 from functools import wraps
-from typing import Any, Callable, TypeVar
+from typing import Any, Callable, TypeVar, cast
 
 import jwt
 from flask import Response, current_app, jsonify, request
@@ -8,9 +8,9 @@ F = TypeVar("F", bound=Callable[..., Any])
 JSON_MIMETYPE = "application/json"
 
 
-def token_required(f: F) -> Callable[..., Any]:
+def token_required(f: F) -> F:
     @wraps(f)
-    def decorated(*args: Any, **kwargs: Any) -> Response:
+    def decorated(*args: Any, **kwargs: Any) -> Any:
         auth_header = request.headers.get("Authorization")
         if not auth_header:
             return Response(
@@ -24,7 +24,7 @@ def token_required(f: F) -> Callable[..., Any]:
             payload = jwt.decode(
                 token, current_app.config["SECRET_KEY"], algorithms=["HS256"]
             )
-            request.user_id = payload["user_id"]  # opcional: pode injetar o ID
+            request.environ["auraxis.user_id"] = str(payload.get("user_id", ""))
         except jwt.ExpiredSignatureError:
             return Response(
                 jsonify({"message": "Token expired!"}).get_data(),
@@ -40,4 +40,4 @@ def token_required(f: F) -> Callable[..., Any]:
 
         return f(*args, **kwargs)
 
-    return decorated
+    return cast(F, decorated)

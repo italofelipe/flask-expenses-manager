@@ -216,3 +216,64 @@ def test_graphql_public_mutation_allowed_without_authentication(client: Any) -> 
     assert response.status_code == 200
     body = response.get_json()
     assert "errors" not in body
+
+
+def test_graphql_register_enforces_password_policy(client: Any) -> None:
+    suffix = uuid.uuid4().hex[:8]
+    mutation = """
+    mutation Register($name: String!, $email: String!, $password: String!) {
+      registerUser(name: $name, email: $email, password: $password) {
+        message
+      }
+    }
+    """
+    response = _graphql(
+        client,
+        mutation,
+        variables={
+            "name": f"weak-{suffix}",
+            "email": f"weak-{suffix}@email.com",
+            "password": "weakpass",
+        },
+    )
+
+    assert response.status_code == 200
+    body = response.get_json()
+    assert "errors" in body
+    assert "password" in body["errors"][0]["message"]
+
+
+def test_graphql_register_normalizes_email_for_conflict_detection(client: Any) -> None:
+    suffix = uuid.uuid4().hex[:8]
+    mutation = """
+    mutation Register($name: String!, $email: String!, $password: String!) {
+      registerUser(name: $name, email: $email, password: $password) {
+        message
+      }
+    }
+    """
+    first = _graphql(
+        client,
+        mutation,
+        variables={
+            "name": f"norm-{suffix}",
+            "email": f"norm-{suffix}@email.com",
+            "password": "StrongPass@123",
+        },
+    )
+    assert first.status_code == 200
+    assert "errors" not in first.get_json()
+
+    second = _graphql(
+        client,
+        mutation,
+        variables={
+            "name": f"norm2-{suffix}",
+            "email": f"NORM-{suffix}@EMAIL.COM",
+            "password": "StrongPass@123",
+        },
+    )
+    assert second.status_code == 200
+    second_body = second.get_json()
+    assert "errors" in second_body
+    assert second_body["errors"][0]["message"] == "Email already registered"

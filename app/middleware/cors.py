@@ -80,7 +80,7 @@ def register_cors(app: Flask) -> None:
     _validate_cors_policy(policy)
     app.extensions["cors_policy"] = policy
 
-    @app.after_request  # type: ignore[misc]
+    @app.after_request
     def add_cors_headers(response: Response) -> Response:
         origin = request.headers.get("Origin")
         if not origin or not _is_allowed_origin(origin, policy.allowed_origins):
@@ -96,7 +96,7 @@ def register_cors(app: Flask) -> None:
         response.headers["Access-Control-Max-Age"] = str(policy.max_age_seconds)
         return response
 
-    @app.before_request  # type: ignore[misc]
+    @app.before_request
     def handle_cors_preflight() -> Response | None:
         if request.method != "OPTIONS":
             return None

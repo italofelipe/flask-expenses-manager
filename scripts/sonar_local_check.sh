@@ -6,6 +6,12 @@ cd "$ROOT_DIR"
 
 SONAR_HOST_URL="${SONAR_HOST_URL:-https://sonarcloud.io}"
 
+normalize_env_var() {
+  local value="$1"
+  # Remove CR/LF and trim leading/trailing whitespace.
+  printf '%s' "$value" | tr -d '\r\n' | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//'
+}
+
 required_vars=(
   "SONAR_TOKEN"
   "SONAR_PROJECT_KEY"
@@ -15,6 +21,17 @@ required_vars=(
 for var_name in "${required_vars[@]}"; do
   if [[ -z "${!var_name:-}" ]]; then
     echo "Missing required environment variable: ${var_name}" >&2
+    exit 1
+  fi
+done
+
+SONAR_TOKEN="$(normalize_env_var "${SONAR_TOKEN}")"
+SONAR_PROJECT_KEY="$(normalize_env_var "${SONAR_PROJECT_KEY}")"
+SONAR_ORGANIZATION="$(normalize_env_var "${SONAR_ORGANIZATION}")"
+
+for var_name in "${required_vars[@]}"; do
+  if [[ -z "${!var_name:-}" ]]; then
+    echo "Environment variable is empty after normalization: ${var_name}" >&2
     exit 1
   fi
 done

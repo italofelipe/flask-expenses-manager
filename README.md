@@ -106,6 +106,9 @@ Hooks configurados via `.pre-commit-config.yaml`:
 - isort
 - flake8
 - mypy
+- bandit
+- gitleaks
+- detect-private-key
 - sonar-local-check
 
 Execução manual:
@@ -118,6 +121,10 @@ CI (`.github/workflows/ci.yml`) inclui gates de segurança:
 - `pip-audit` (dependências Python)
 - `bandit` (SAST, falha em severidade alta)
 - `gitleaks` (secret scanning)
+- `schemathesis` (confiabilidade de contrato OpenAPI)
+- `cosmic-ray` (mutation testing para módulos críticos)
+- `trivy` (scan de filesystem e imagem Docker)
+- `snyk` (scan de dependências e container, condicional por `SNYK_ENABLED`)
 - `dependency-review` em PR (falha com vulnerabilidade nova `high+`)
 
 ## Rate limiting (baseline S2)

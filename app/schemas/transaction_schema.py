@@ -14,7 +14,7 @@ class TransactionSchema(Schema):
         dump_only=True, description="ID único da transação (gerado automaticamente)"
     )
     user_id = fields.UUID(
-        required=False, description="ID do usuário proprietário da transação"
+        dump_only=True, description="ID do usuário proprietário da transação"
     )
     title = fields.Str(
         required=True,
@@ -101,7 +101,7 @@ class TransactionSchema(Schema):
         dump_only=True, description="Data da última atualização"
     )
 
-    @pre_load  # type: ignore[misc]
+    @pre_load
     def sanitize_input(self, data: object, **kwargs: object) -> object:
         sanitized = sanitize_string_fields(
             data,

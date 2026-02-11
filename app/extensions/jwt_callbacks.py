@@ -41,7 +41,7 @@ def is_token_revoked(jti: str) -> bool:
 
 
 def register_jwt_callbacks(jwt: JWTManager) -> None:
-    @jwt.token_in_blocklist_loader  # type: ignore[misc]
+    @jwt.token_in_blocklist_loader
     def check_if_token_revoked(
         jwt_header: Dict[str, Any], jwt_payload: Dict[str, Any]
     ) -> bool:
@@ -54,7 +54,7 @@ def register_jwt_callbacks(jwt: JWTManager) -> None:
         user = db.session.get(User, UUID(user_id))
         return not user or user.current_jti != jti
 
-    @jwt.revoked_token_loader  # type: ignore[misc]
+    @jwt.revoked_token_loader
     def revoked_token_callback(
         jwt_header: Dict[str, Any], jwt_payload: Dict[str, Any]
     ) -> Any:
@@ -64,7 +64,7 @@ def register_jwt_callbacks(jwt: JWTManager) -> None:
             status_code=401,
         )
 
-    @jwt.invalid_token_loader  # type: ignore[misc]
+    @jwt.invalid_token_loader
     def invalid_token_callback(error: str) -> Any:
         return _jwt_error_response(
             "Token inválido",
@@ -72,7 +72,7 @@ def register_jwt_callbacks(jwt: JWTManager) -> None:
             status_code=401,
         )
 
-    @jwt.expired_token_loader  # type: ignore[misc]
+    @jwt.expired_token_loader
     def expired_token_callback(
         jwt_header: Dict[str, Any], jwt_payload: Dict[str, Any]
     ) -> Any:
@@ -82,7 +82,7 @@ def register_jwt_callbacks(jwt: JWTManager) -> None:
             status_code=401,
         )
 
-    @jwt.unauthorized_loader  # type: ignore[misc]
+    @jwt.unauthorized_loader
     def missing_token_callback(error: str) -> Any:
         return _jwt_error_response(
             "Token ausente",

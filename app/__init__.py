@@ -51,11 +51,11 @@ def create_app() -> Flask:
     )
     validate_security_configuration()
 
-    @app.before_request  # type: ignore[misc]
+    @app.before_request
     def bind_request_id() -> None:
         g.request_id = uuid4().hex
 
-    @app.after_request  # type: ignore[misc]
+    @app.after_request
     def append_request_id_header(response: Response) -> Response:
         response.headers["X-Request-Id"] = str(getattr(g, "request_id", "n/a"))
         return response

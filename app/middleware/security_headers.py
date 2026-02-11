@@ -60,7 +60,7 @@ def register_security_headers(app: Flask) -> None:
     policy = _build_security_headers_policy()
     app.extensions["security_headers_policy"] = policy
 
-    @app.after_request  # type: ignore[misc]
+    @app.after_request
     def attach_security_headers(response: Response) -> Response:
         response.headers["X-Frame-Options"] = policy.frame_options
         response.headers["X-Content-Type-Options"] = policy.content_type_options

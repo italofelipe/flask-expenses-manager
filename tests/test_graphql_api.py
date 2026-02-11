@@ -459,3 +459,75 @@ def test_graphql_wallet_and_ticker_queries_mutations(client) -> None:
     delete_body = delete_response.get_json()
     assert "errors" not in delete_body
     assert delete_body["data"]["deleteTicker"]["ok"] is True
+
+
+def test_graphql_login_requires_email_or_name(client) -> None:
+    login_mutation = """
+    mutation LoginWithoutPrincipal($password: String!) {
+      login(password: $password) {
+        message
+        token
+      }
+    }
+    """
+    response = _graphql(
+        client,
+        login_mutation,
+        {"password": "StrongPass@123"},
+    )
+    assert response.status_code == 200
+    body = response.get_json()
+    assert "errors" in body
+    assert body["errors"][0]["message"] == "Missing credentials"
+
+
+def test_graphql_logout_mutation_success(client) -> None:
+    token = _register_and_login_graphql(client)
+    logout_mutation = """
+    mutation Logout {
+      logout {
+        ok
+        message
+      }
+    }
+    """
+    response = _graphql(client, logout_mutation, token=token)
+    assert response.status_code == 200
+    body = response.get_json()
+    assert "errors" not in body
+    assert body["data"]["logout"]["ok"] is True
+    assert body["data"]["logout"]["message"] == "Logout successful"
+
+
+def test_graphql_ticker_duplicate_and_delete_not_found(client) -> None:
+    token = _register_and_login_graphql(client)
+    add_ticker_mutation = """
+    mutation AddTicker {
+      addTicker(symbol: "ITUB4", quantity: 5, type: "stock") {
+        item { id symbol }
+      }
+    }
+    """
+    first = _graphql(client, add_ticker_mutation, token=token)
+    assert first.status_code == 200
+    assert "errors" not in first.get_json()
+
+    duplicate = _graphql(client, add_ticker_mutation, token=token)
+    assert duplicate.status_code == 200
+    duplicate_body = duplicate.get_json()
+    assert "errors" in duplicate_body
+    assert duplicate_body["errors"][0]["message"] == "Ticker já adicionado"
+
+    delete_missing_mutation = """
+    mutation DeleteMissingTicker {
+      deleteTicker(symbol: "MISSING") {
+        ok
+        message
+      }
+    }
+    """
+    delete_missing = _graphql(client, delete_missing_mutation, token=token)
+    assert delete_missing.status_code == 200
+    delete_missing_body = delete_missing.get_json()
+    assert "errors" in delete_missing_body
+    assert delete_missing_body["errors"][0]["message"] == "Ticker não encontrado"
