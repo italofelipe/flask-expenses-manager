@@ -40,7 +40,7 @@ class WalletSchema(Schema):
     quantity = fields.Integer(allow_none=True)
     asset_class = fields.String(allow_none=True)
     annual_rate = fields.Decimal(as_string=True, allow_none=True)
-    register_date = fields.Date(missing=lambda: date.today())
+    register_date = fields.Date(load_default=lambda: date.today())
     target_withdraw_date = fields.Date(allow_none=True)
     should_be_on_wallet = fields.Boolean(required=True)
     created_at = fields.DateTime(dump_only=True)
