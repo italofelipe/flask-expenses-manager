@@ -258,22 +258,56 @@ def _append_iam_and_ssm_checks(
 
 def _append_ebs_encryption_checks(
     *,
+    profile: str,
+    region: str,
     results: list[CheckResult],
     resource_name: str,
     instance: dict[str, Any],
 ) -> None:
+    volume_ids: list[str] = []
     for mapping in instance.get("BlockDeviceMappings", []):
         ebs = mapping.get("Ebs") or {}
-        volume_id = str(ebs.get("VolumeId", "unknown"))
+        volume_id = str(ebs.get("VolumeId", "")).strip()
+        if volume_id:
+            volume_ids.append(volume_id)
+
+    if not volume_ids:
+        results.append(
+            CheckResult("WARN", "EBS encryption", resource_name, "no ebs volumes found")
+        )
+        return
+
+    volumes_payload = _run_aws(
+        profile=profile,
+        region=region,
+        args=["ec2", "describe-volumes", "--volume-ids", *volume_ids],
+        allow_error=True,
+    )
+    volumes_by_id: dict[str, dict[str, Any]] = {
+        str(v.get("VolumeId")): v for v in (volumes_payload.get("Volumes") or [])
+    }
+
+    for volume_id in volume_ids:
         resource = f"{resource_name}:{volume_id}"
-        if bool(ebs.get("Encrypted", False)):
+        volume = volumes_by_id.get(volume_id)
+        if not volume:
+            results.append(
+                CheckResult(
+                    "WARN",
+                    "EBS encryption",
+                    resource,
+                    "volume not found in describe-volumes result",
+                )
+            )
+            continue
+        if bool(volume.get("Encrypted")):
             results.append(
                 CheckResult("PASS", "EBS encryption", resource, "encrypted=true")
             )
-            continue
-        results.append(
-            CheckResult("FAIL", "EBS encryption", resource, "encrypted=false")
-        )
+        else:
+            results.append(
+                CheckResult("FAIL", "EBS encryption", resource, "encrypted=false")
+            )
 
 
 def _permission_is_world_open(permission: dict[str, Any]) -> bool:
@@ -373,6 +407,8 @@ def _append_instance_checks(
         managed_ids=managed_ids,
     )
     _append_ebs_encryption_checks(
+        profile=profile,
+        region=region,
         results=results,
         resource_name=resource_name,
         instance=instance,
