@@ -62,7 +62,7 @@ Ultima atualizacao: 2026-02-12
 | G11 | CI/Governance | Formalizar política de branch protection + required checks + push protection no GitHub | Todo | 0% | Alto: sem enforcement central, gates podem ser ignorados |  | 2026-02-11 |
 | G12 | CI/Quality | Garantir paridade local do job `Quality` (script Python 3.11 + hook mypy alinhado ao CI) | Done | 100% | Baixo | pending-commit | 2026-02-11 |
 | G13 | CI/Quality | Adicionar matrix de tipagem (`mypy`) em Python 3.11 e 3.13 para reduzir regressão entre ambientes | Done | 100% | Baixo: job dedicado `mypy-matrix` cobre 3.11/3.13 em paralelo | pending-commit | 2026-02-12 |
-| G14 | CI/Quality | Avaliar lock/constraints de dependências de tooling (lint/type/security) para builds determinísticos | Todo | 0% | Médio: atualização não controlada de tooling pode quebrar gates sem mudança de código |  | 2026-02-11 |
+| G14 | CI/Quality | Avaliar lock/constraints de dependências de tooling (lint/type/security) para builds determinísticos | Done | 100% | Baixo: `pip-audit` e stubs de tipagem fixados em versão e CI sem instalação avulsa não determinística | pending-commit | 2026-02-12 |
 | G15 | CI/Review | Integrar Cursor Bugbot como camada de revisão automática de PR + calibrar obrigatoriedade no ruleset | In Progress | 35% | Médio: risco de falso positivo se exigido sem período de calibração |  | 2026-02-11 |
 | G16 | Quality | Reduzir warnings globais de deprecacao (Marshmallow v4, apispec schema naming, warnings de terceiros) com plano faseado | In Progress | 92% | Baixo: warnings do pipeline local foram saneados; remanescente depende de upgrade estruturado de bibliotecas terceiras | pending-commit | 2026-02-12 |
 | H1 | Arquitetura | Adicionar suporte a GraphQL | In Progress | 65% | Alto: impacto transversal na API | ba1f238, e12bf21 | 2026-02-09 |
@@ -211,6 +211,7 @@ Ultima atualizacao: 2026-02-12
 | 2026-02-12 | G16 (fase 6) | `pytest.ini` atualizado para filtrar apenas deprecações conhecidas de bibliotecas terceiras (`flask-apispec`/`schemathesis`) e manter `DeprecationWarning` do namespace `app.*` em modo `error`; execução completa da suíte ficou limpa (0 warnings exibidos) com cobertura em 88.24% | pending-commit |
 | 2026-02-12 | A1 (fechamento) | Helper de contrato extraído para utilitário neutro (`app/utils/api_contract.py`) e aplicado em `response_contract`, `jwt_callbacks`, `rate_limit` e `token_required`; fluxo JWT legado agora responde contrato v2 quando solicitado (sem quebrar v1) | pending-commit |
 | 2026-02-12 | G13 | CI ganhou job dedicado `mypy-matrix` em Python 3.11 e 3.13, reduzindo risco de regressão de tipagem entre versões sem alterar os gates existentes de lint/test/security | pending-commit |
+| 2026-02-12 | G14 | Tooling CI deterministic: `pip-audit` adicionado com versão fixa em `requirements-dev.txt`, remoção de `pip install` avulso no workflow e stubs (`types-*`) fixados em `requirements.txt` | pending-commit |
 | 2026-02-09 | D (observacao) | Restaurados arquivos deletados acidentalmente: ticker/carteira | n/a |
 
 ## Proxima prioridade sugerida
