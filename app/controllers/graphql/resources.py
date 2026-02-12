@@ -8,7 +8,7 @@ from graphql import GraphQLError
 from app.application.services.public_error_mapper_service import (
     map_validation_exception,
 )
-from app.controllers.graphql_controller_utils import (
+from app.controllers.graphql.utils import (
     build_graphql_result_response,
     graphql_error_response,
     parse_graphql_payload,
