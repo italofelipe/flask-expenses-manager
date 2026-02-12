@@ -86,7 +86,7 @@ Ultima atualizacao: 2026-02-12
 | I16 | Nginx/TLS | Checklist de validação local/AWS (DNS, SG, health, curl, logs, rollback) | In Progress | 65% | Baixo | pending-commit | 2026-02-10 |
 | R1 | Rebranding | Mapear todas ocorrências de nomenclatura legada do projeto e registrar plano de substituição para `auraxis` | Done | 100% | Baixo: mapeamento concluído em arquivos versionados | pending-commit | 2026-02-10 |
 | R2 | Rebranding | Substituir ocorrências versionadas de nomenclatura legada por `auraxis` (sem quebrar integrações externas) | Done | 100% | Medio: integrações externas podem manter identificador legado temporário | pending-commit | 2026-02-10 |
-| S1 | AWS Security | Restringir acesso e hardening de instâncias EC2 (SG, NACL, IMDSv2, SSH policy, patching baseline) | Todo | 0% | Alto: superfície de ataque de infraestrutura |  | 2026-02-10 |
+| S1 | AWS Security | Restringir acesso e hardening de instâncias EC2 (SG, NACL, IMDSv2, SSH policy, patching baseline) | In Progress | 45% | Médio: baseline CLI criado e hardening parcial aplicado; pendentes EBS encryption, IAM profile/SSM e política fina de SSH/NACL | pending-commit | 2026-02-12 |
 | S2 | App Security | Implementar segurança de endpoints (rate-limit, validação/sanitização de request/response, headers e authz por recurso) | Done | 100% | Médio: baseline completo em aplicação; próximos passos são monitoramento centralizado e hardening de infraestrutura (S1) | pending-commit | 2026-02-11 |
 | S3 | App Security | Executar checklist OWASP no sistema (ASVS/API Top 10), corrigir gaps e formalizar evidências | In Progress | 92% | Médio: baseline e remediações de aplicação concluídas; pendências residuais concentram-se em controles de infraestrutura (S1) | pending-commit | 2026-02-11 |
 | S4-01 | App Security | Remover vazamento de exceções em respostas (`str(e)`, `traceback`) e adotar erros genéricos com correlação | Done | 100% | Médio: manter revisão contínua em novos endpoints | pending-commit | 2026-02-11 |
@@ -217,6 +217,7 @@ Ultima atualizacao: 2026-02-12
 | 2026-02-12 | S6-08 | Startup hardening reforçado: `SECURITY_ENFORCE_STRONG_SECRETS=false` agora é rejeitado em runtime seguro (`FLASK_DEBUG=false` e `FLASK_TESTING=false`), com testes de regressão para cenários seguro/debug | 5fc1be7 |
 | 2026-02-12 | S6-09 | Sweep de retenção confirmado fora do ciclo de request: retenção executada por comando operacional (`flask audit-events purge-expired`) com teste de regressão que garante não execução durante requests (`tests/test_audit_trail.py`) | 208e1d1 |
 | 2026-02-12 | S6-12 | Política `/docs` endurecida com validação de startup: `DOCS_EXPOSURE_POLICY` inválido agora causa erro em runtime seguro; em debug mantém fallback seguro para produtividade local, com testes dedicados | 208e1d1 |
+| 2026-02-12 | S1 (fase 1) | Script operacional `scripts/aws_s1_hardening.py` criado com `audit/apply` (dry-run por padrão) para checagem de IMDSv2, SG exposure, EBS encryption, IAM profile, SSM e termination protection; aplicado hardening de termination protection em `auraxis_prod` e `auraxis_dev` via CLI | pending-commit |
 | 2026-02-09 | D (observacao) | Restaurados arquivos deletados acidentalmente: ticker/carteira | n/a |
 
 ## Proxima prioridade sugerida
