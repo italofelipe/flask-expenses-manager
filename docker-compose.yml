@@ -10,6 +10,13 @@ services:
     volumes:
       - pgdata:/var/lib/postgresql/data
 
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    volumes:
+      - redisdata:/data
+
   web:
     build: .
     ports:
@@ -27,8 +34,12 @@ services:
       DB_NAME: ${POSTGRES_DB}
       DB_USER: ${POSTGRES_USER}
       DB_PASS: ${POSTGRES_PASSWORD}
+      RATE_LIMIT_REDIS_URL: ${RATE_LIMIT_REDIS_URL:-redis://redis:6379/0}
+      LOGIN_GUARD_REDIS_URL: ${LOGIN_GUARD_REDIS_URL:-redis://redis:6379/0}
     depends_on:
       - db
+      - redis
 
 volumes:
   pgdata:
+  redisdata:

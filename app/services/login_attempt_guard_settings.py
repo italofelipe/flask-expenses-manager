@@ -25,6 +25,13 @@ def read_bool_env(name: str, default: bool) -> bool:
     return raw.strip().lower() in {"1", "true", "yes", "on"}
 
 
+def _read_explicit_bool_env(name: str) -> tuple[bool, bool]:
+    raw = os.getenv(name)
+    if raw is None:
+        return False, False
+    return raw.strip().lower() in {"1", "true", "yes", "on"}, True
+
+
 def read_positive_int_env(name: str, default: int) -> int:
     raw = os.getenv(name)
     if raw is None:
@@ -36,15 +43,34 @@ def read_positive_int_env(name: str, default: int) -> int:
     return value if value > 0 else default
 
 
+def _is_secure_runtime() -> bool:
+    return not read_bool_env("FLASK_DEBUG", False) and not read_bool_env(
+        "FLASK_TESTING", False
+    )
+
+
 def build_login_attempt_guard_settings(
     *,
     configured_backend: str,
     backend_ready: bool,
 ) -> LoginAttemptGuardSettings:
-    default_fail_closed = (
+    del backend_ready
+    secure_runtime = _is_secure_runtime()
+    default_fail_closed = configured_backend == "redis" and secure_runtime
+    explicit_fail_closed, has_explicit_fail_closed = _read_explicit_bool_env(
+        "LOGIN_GUARD_FAIL_CLOSED"
+    )
+    if (
         configured_backend == "redis"
-        and not read_bool_env("FLASK_DEBUG", False)
-        and not read_bool_env("FLASK_TESTING", False)
+        and secure_runtime
+        and not has_explicit_fail_closed
+    ):
+        raise RuntimeError(
+            "Missing LOGIN_GUARD_FAIL_CLOSED. Configure explicit failure policy "
+            "for LOGIN_GUARD_BACKEND=redis in secure runtime."
+        )
+    fail_closed = (
+        explicit_fail_closed if has_explicit_fail_closed else default_fail_closed
     )
     return LoginAttemptGuardSettings(
         enabled=read_bool_env("LOGIN_GUARD_ENABLED", True),
@@ -69,7 +95,7 @@ def build_login_attempt_guard_settings(
         ),
         retention_seconds=read_positive_int_env("LOGIN_GUARD_RETENTION_SECONDS", 3600),
         max_keys=read_positive_int_env("LOGIN_GUARD_MAX_KEYS", 20000),
-        fail_closed=read_bool_env("LOGIN_GUARD_FAIL_CLOSED", default_fail_closed),
+        fail_closed=fail_closed,
     )
 
 

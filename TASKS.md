@@ -122,7 +122,7 @@ Ultima atualizacao: 2026-02-12
 | S6-04 | App Security | Remover vazamento de `str(exc)`/detalhes internos em controllers REST e padronizar erro seguro | Done | 100% | Baixo: mapeador de erro público aplicado em REST/GraphQL para exceções de validação, com fallback seguro para falhas inesperadas | pending-commit | 2026-02-11 |
 | S6-05 | App Security | Unificar política de registro REST/GraphQL (mesma validação de senha/email e normalização) | Done | 100% | Baixo: GraphQL passou a usar `UserRegistrationSchema` | pending-commit | 2026-02-11 |
 | S6-06 | App Security | Mitigar enumeração de contas em register/login (status e comportamento observável) | Done | 100% | Baixo: defaults seguros em runtime de produção e proteção de timing em login REST/GraphQL | pending-commit | 2026-02-12 |
-| S6-07 | App Security | Migrar login guard para backend distribuído (Redis) com política de falha explícita | Todo | 0% | Médio: proteção inconsistente em escala |  | 2026-02-11 |
+| S6-07 | App Security | Migrar login guard para backend distribuído (Redis) com política de falha explícita | Done | 100% | Baixo: policy explícita exigida em runtime seguro e compose com Redis pronto para rate-limit/login guard | pending-commit | 2026-02-12 |
 | S6-08 | App Security | Endurecer defaults de runtime (`DEBUG=False` por padrão seguro e validação de startup) | Todo | 0% | Médio: risco por configuração ausente/incompleta |  | 2026-02-11 |
 | S6-09 | App Security | Retirar sweep de retenção de auditoria do ciclo de request (job agendado/assíncrono) | Todo | 0% | Médio: impacto em latência e disponibilidade |  | 2026-02-11 |
 | S6-10 | App Security | Atualizar dependências com CVE (`Flask`, `marshmallow`) e zerar `pip-audit` runtime | Done | 100% | Baixo: gate validado com `pip-audit` sem vulnerabilidades conhecidas | afc15c7 | 2026-02-11 |
@@ -213,6 +213,7 @@ Ultima atualizacao: 2026-02-12
 | 2026-02-12 | G13 | CI ganhou job dedicado `mypy-matrix` em Python 3.11 e 3.13, reduzindo risco de regressão de tipagem entre versões sem alterar os gates existentes de lint/test/security | pending-commit |
 | 2026-02-12 | G14 | Tooling CI deterministic: `pip-audit` adicionado com versão fixa em `requirements-dev.txt`, remoção de `pip install` avulso no workflow e stubs (`types-*`) fixados em `requirements.txt` | pending-commit |
 | 2026-02-12 | S6-06 | Mitigação de enumeração em autenticação: política padrão em produção agora oculta conflito de registro e desabilita sinal de principal conhecido no login guard; REST/GraphQL passaram a usar verificação de senha com proteção de timing para usuários inexistentes | pending-commit |
+| 2026-02-12 | S6-07 | Login guard Redis endurecido com política de falha explícita em runtime seguro (`LOGIN_GUARD_FAIL_CLOSED` obrigatório) e compose atualizado com serviço Redis + URLs padrão para login guard/rate limit (dev/prod/local) | pending-commit |
 | 2026-02-09 | D (observacao) | Restaurados arquivos deletados acidentalmente: ticker/carteira | n/a |
 
 ## Proxima prioridade sugerida
