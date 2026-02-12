@@ -20,6 +20,7 @@ from app.controllers.transaction_controller import TransactionResource, transact
 from app.controllers.user_controller import UserMeResource, UserProfileResource, user_bp
 from app.controllers.wallet_controller import register_wallet_dependencies, wallet_bp
 from app.docs.api_documentation import API_INFO, TAGS
+from app.docs.schema_name_resolver import resolve_openapi_schema_name
 from app.extensions.audit_retention_cli import register_audit_retention_commands
 from app.extensions.audit_trail import register_audit_trail
 from app.extensions.database import db
@@ -81,7 +82,9 @@ def create_app() -> Flask:
                 title=str(API_INFO["title"]),
                 version=str(API_INFO["version"]),
                 openapi_version="3.0.2",
-                plugins=[MarshmallowPlugin()],
+                plugins=[
+                    MarshmallowPlugin(schema_name_resolver=resolve_openapi_schema_name)
+                ],
                 info={
                     "description": API_INFO["description"],
                     "contact": API_INFO["contact"],
