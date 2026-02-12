@@ -67,3 +67,31 @@ def test_audit_trail_persists_event_when_enabled(
         event = AuditEvent.query.filter_by(path="/auth/register").first()
         assert event is not None
         assert event.method == "POST"
+
+
+def test_audit_trail_does_not_run_retention_on_request(
+    client,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("AUDIT_PERSISTENCE_ENABLED", "true")
+    calls = {"count": 0}
+
+    def _should_not_run(*_args, **_kwargs) -> int:
+        calls["count"] += 1
+        raise AssertionError("retention purge must not run during request handling")
+
+    monkeypatch.setattr(
+        "app.services.audit_event_service.purge_expired_audit_events",
+        _should_not_run,
+    )
+    response = client.post(
+        "/auth/register",
+        json={
+            "name": "audit-no-retention",
+            "email": "audit-no-retention@email.com",
+            "password": "StrongPass@123",
+        },
+    )
+
+    assert response.status_code == 201
+    assert calls["count"] == 0
