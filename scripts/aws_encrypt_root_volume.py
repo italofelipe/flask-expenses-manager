@@ -26,6 +26,7 @@ class RootVolumeInfo:
     root_device_name: str
     volume_id: str
     availability_zone: str
+    delete_on_termination: bool
 
 
 def _aws_base_args(*, profile: str | None, region: str) -> list[str]:
@@ -104,6 +105,9 @@ def _describe_root_volume(
         root_device_name=root_device_name,
         volume_id=root_mapping["Ebs"]["VolumeId"],
         availability_zone=az,
+        delete_on_termination=bool(
+            root_mapping["Ebs"].get("DeleteOnTermination", True)
+        ),
     )
 
 
@@ -305,6 +309,36 @@ def _attach_volume(
     )
 
 
+def _set_delete_on_termination(
+    *,
+    profile: str | None,
+    region: str,
+    instance_id: str,
+    device_name: str,
+    delete_on_termination: bool,
+) -> None:
+    payload = json.dumps(
+        [
+            {
+                "DeviceName": device_name,
+                "Ebs": {"DeleteOnTermination": delete_on_termination},
+            }
+        ]
+    )
+    _aws_json(
+        [
+            "ec2",
+            "modify-instance-attribute",
+            "--instance-id",
+            instance_id,
+            "--block-device-mappings",
+            payload,
+        ],
+        profile=profile,
+        region=region,
+    )
+
+
 def run(
     *,
     profile: str | None,
@@ -374,6 +408,18 @@ def run(
         device_name=info.root_device_name,
     )
     print(f"[OK] Attached new root volume: {new_volume_id} -> {info.root_device_name}")
+
+    _set_delete_on_termination(
+        profile=profile,
+        region=region,
+        instance_id=instance_id,
+        device_name=info.root_device_name,
+        delete_on_termination=info.delete_on_termination,
+    )
+    print(
+        "[OK] DeleteOnTermination preserved: "
+        f"{info.root_device_name}={info.delete_on_termination}"
+    )
 
     _start_instance(profile=profile, region=region, instance_id=instance_id)
     print("[OK] Instance started.")
