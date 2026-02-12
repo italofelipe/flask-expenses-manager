@@ -324,11 +324,13 @@ def _classify_sg_permission(permission: dict[str, Any]) -> tuple[str, str]:
     from_port = permission.get("FromPort")
     to_port = permission.get("ToPort")
     protocol = str(permission.get("IpProtocol", ""))
+    is_ssh = protocol == "tcp" and from_port == 22 and to_port == 22
     world_open = _permission_is_world_open(permission)
     if not world_open:
+        if is_ssh:
+            return "WARN", "SSH ingress present (prefer SSM Session Manager)"
         return "PASS", "No world-open rule found for this permission"
 
-    is_ssh = protocol == "tcp" and from_port == 22 and to_port == 22
     is_all_ports = protocol in {"-1", "all"} or (
         protocol == "tcp" and from_port in {0, None} and to_port in {65535, None}
     )
@@ -366,6 +368,8 @@ def _append_security_group_checks(
             status, details = _classify_sg_permission(permission)
             if status == "FAIL" and "Port 22" in details:
                 check = "Security Group SSH exposure"
+            elif status == "WARN" and "SSH ingress present" in details:
+                check = "Security Group SSH ingress"
             elif status == "FAIL":
                 check = "Security Group broad exposure"
             elif status == "WARN":
@@ -612,6 +616,39 @@ def _iter_world_open_ssh_cidrs(payload: dict[str, Any]) -> list[str]:
     return cidrs
 
 
+def _iter_ssh_permissions(payload: dict[str, Any]) -> list[dict[str, Any]]:
+    permissions: list[dict[str, Any]] = []
+    for permission in payload.get("IpPermissions", []):
+        protocol = str(permission.get("IpProtocol", ""))
+        from_port = permission.get("FromPort")
+        to_port = permission.get("ToPort")
+        if protocol != "tcp" or from_port != 22 or to_port != 22:
+            continue
+        ipv4 = [
+            {"CidrIp": str(item.get("CidrIp", ""))}
+            for item in permission.get("IpRanges", [])
+            if str(item.get("CidrIp", "")).strip()
+        ]
+        ipv6 = [
+            {"CidrIpv6": str(item.get("CidrIpv6", ""))}
+            for item in permission.get("Ipv6Ranges", [])
+            if str(item.get("CidrIpv6", "")).strip()
+        ]
+        if not ipv4 and not ipv6:
+            continue
+        perm: dict[str, Any] = {
+            "IpProtocol": "tcp",
+            "FromPort": 22,
+            "ToPort": 22,
+        }
+        if ipv4:
+            perm["IpRanges"] = ipv4
+        if ipv6:
+            perm["Ipv6Ranges"] = ipv6
+        permissions.append(perm)
+    return permissions
+
+
 def _harden_ssh_ingress(
     *,
     profile: str,
@@ -675,6 +712,37 @@ def _harden_ssh_ingress(
         )
 
 
+def _disable_ssh_ingress(
+    *,
+    profile: str,
+    region: str,
+    group_id: str,
+    dry_run: bool,
+) -> None:
+    payload = _describe_security_group(
+        profile=profile, region=region, group_id=group_id
+    )
+    ssh_permissions = _iter_ssh_permissions(payload)
+    if not ssh_permissions:
+        print(f"[SKIP] No SSH ingress rules found on {group_id}")
+        return
+    for perm in ssh_permissions:
+        completed = _run_sg_update(
+            profile=profile,
+            region=region,
+            group_id=group_id,
+            action="revoke-security-group-ingress",
+            permissions=[perm],
+            dry_run=dry_run,
+        )
+        _handle_sg_update_result(
+            completed=completed,
+            ok_message=f"[APPLY] Revoked SSH ingress on {group_id}",
+            dry_run_message=f"[DRY-RUN] Revoke SSH ingress on {group_id}",
+            error_context=f"Failed revoking SSH ingress on {group_id}",
+        )
+
+
 def cmd_audit(args: argparse.Namespace) -> int:
     instances = _describe_instances(
         profile=args.profile,
@@ -703,6 +771,11 @@ def cmd_apply(args: argparse.Namespace) -> int:
     trusted_ssh_cidrs = [
         item.strip() for item in args.trusted_ssh_cidrs if item.strip()
     ]
+    if args.disable_ssh and args.restrict_ssh:
+        print(
+            "Choose either --disable-ssh or --restrict-ssh, not both.", file=sys.stderr
+        )
+        return 2
     if args.restrict_ssh and not trusted_ssh_cidrs:
         print(
             (
@@ -714,37 +787,78 @@ def cmd_apply(args: argparse.Namespace) -> int:
         return 2
 
     for instance in instances:
-        instance_id = str(instance.get("InstanceId"))
-        _enforce_imdsv2(
-            profile=args.profile,
-            region=args.region,
-            instance_id=instance_id,
+        _apply_instance_controls(
+            args=args,
+            instance=instance,
             dry_run=dry_run,
+            trusted_ssh_cidrs=trusted_ssh_cidrs,
         )
-        if args.enable_termination_protection:
-            _set_termination_protection(
-                profile=args.profile,
-                region=args.region,
-                instance_id=instance_id,
-                dry_run=dry_run,
-            )
-        if args.restrict_ssh:
-            for sg in instance.get("SecurityGroups", []):
-                group_id = str(sg.get("GroupId", ""))
-                if not group_id:
-                    continue
-                _harden_ssh_ingress(
-                    profile=args.profile,
-                    region=args.region,
-                    group_id=group_id,
-                    trusted_ssh_cidrs=trusted_ssh_cidrs,
-                    dry_run=dry_run,
-                )
     if dry_run:
         print("\nDry-run completed. Re-run with --execute to apply changes.")
     else:
         print("\nApply completed.")
     return 0
+
+
+def _apply_instance_controls(
+    *,
+    args: argparse.Namespace,
+    instance: dict[str, Any],
+    dry_run: bool,
+    trusted_ssh_cidrs: list[str],
+) -> None:
+    instance_id = str(instance.get("InstanceId"))
+    _enforce_imdsv2(
+        profile=args.profile,
+        region=args.region,
+        instance_id=instance_id,
+        dry_run=dry_run,
+    )
+    if args.enable_termination_protection:
+        _set_termination_protection(
+            profile=args.profile,
+            region=args.region,
+            instance_id=instance_id,
+            dry_run=dry_run,
+        )
+    _apply_ssh_controls(
+        args=args,
+        instance=instance,
+        dry_run=dry_run,
+        trusted_ssh_cidrs=trusted_ssh_cidrs,
+    )
+
+
+def _apply_ssh_controls(
+    *,
+    args: argparse.Namespace,
+    instance: dict[str, Any],
+    dry_run: bool,
+    trusted_ssh_cidrs: list[str],
+) -> None:
+    if args.restrict_ssh:
+        for sg in instance.get("SecurityGroups", []):
+            group_id = str(sg.get("GroupId", ""))
+            if not group_id:
+                continue
+            _harden_ssh_ingress(
+                profile=args.profile,
+                region=args.region,
+                group_id=group_id,
+                trusted_ssh_cidrs=trusted_ssh_cidrs,
+                dry_run=dry_run,
+            )
+    if args.disable_ssh:
+        for sg in instance.get("SecurityGroups", []):
+            group_id = str(sg.get("GroupId", ""))
+            if not group_id:
+                continue
+            _disable_ssh_ingress(
+                profile=args.profile,
+                region=args.region,
+                group_id=group_id,
+                dry_run=dry_run,
+            )
 
 
 def _build_parser() -> argparse.ArgumentParser:
@@ -798,6 +912,11 @@ def _build_parser() -> argparse.ArgumentParser:
         "--restrict-ssh",
         action="store_true",
         help="Revoke SSH world ingress and authorize only trusted CIDRs.",
+    )
+    apply_parser.add_argument(
+        "--disable-ssh",
+        action="store_true",
+        help="Revoke all SSH ingress rules from attached security groups (prefer SSM).",
     )
     apply_parser.add_argument(
         "--trusted-ssh-cidr",
