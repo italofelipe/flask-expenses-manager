@@ -8,7 +8,7 @@ from graphql import GraphQLError
 from app.application.services.public_error_mapper_service import (
     map_validation_exception,
 )
-from app.controllers.transaction_controller_utils import serialize_transaction
+from app.controllers.transaction.utils import serialize_transaction
 from app.graphql.auth import get_current_user_required
 from app.graphql.schema_utils import (
     _apply_due_date_range_filter,

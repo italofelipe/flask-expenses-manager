@@ -8,7 +8,7 @@ import graphene
 from dateutil.relativedelta import relativedelta
 from graphql import GraphQLError
 
-from app.controllers.transaction_controller_utils import (
+from app.controllers.transaction.utils import (
     _build_installment_amounts,
     _validate_recurring_payload,
     serialize_transaction,
