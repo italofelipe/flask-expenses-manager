@@ -120,7 +120,7 @@ def test_transaction_update_rejects_user_id_payload_mutation(client) -> None:
     assert "user_id" in str(response_body["error"]["details"])
 
     with client.application.app_context():
-        transaction = Transaction.query.get(UUID(transaction_id))
+        transaction = db.session.get(Transaction, UUID(transaction_id))
         assert transaction is not None
         assert str(transaction.user_id) == owner_user_id
         assert transaction.title != "Titulo nao aplicado"

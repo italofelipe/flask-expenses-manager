@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import date, datetime
+from datetime import date
 from decimal import Decimal
 from typing import Any
 from uuid import UUID
@@ -19,6 +19,7 @@ from app.graphql.types import WalletType
 from app.models.wallet import Wallet
 from app.schemas.wallet_schema import WalletSchema
 from app.services.investment_service import InvestmentService
+from app.utils.datetime_utils import iso_utc_now_naive
 
 
 class AddWalletEntryMutation(graphene.Mutation):
@@ -153,7 +154,7 @@ class UpdateWalletEntryMutation(graphene.Mutation):
                         else None
                     ),
                     "changeType": "update",
-                    "changeDate": datetime.utcnow().isoformat(),
+                    "changeDate": iso_utc_now_naive(),
                 }
             )
             investment.history = history

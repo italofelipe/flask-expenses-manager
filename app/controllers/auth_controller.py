@@ -392,7 +392,7 @@ class LogoutResource(MethodResource):
     @jwt_required()
     def post(self) -> Response:
         identity = get_jwt_identity()
-        user = User.query.get(UUID(identity))
+        user = db.session.get(User, UUID(str(identity)))
         if user:
             user.current_jti = None
             db.session.commit()

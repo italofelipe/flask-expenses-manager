@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-from datetime import datetime
 from decimal import Decimal
 from typing import Any
 from uuid import UUID
@@ -46,6 +45,7 @@ from app.extensions.database import db
 from app.extensions.jwt_callbacks import is_token_revoked
 from app.models.transaction import Transaction, TransactionStatus, TransactionType
 from app.schemas.transaction_schema import TransactionSchema
+from app.utils.datetime_utils import utc_now_compatible_with
 
 transaction_bp = Blueprint("transaction", __name__, url_prefix="/transactions")
 
@@ -268,7 +268,7 @@ class TransactionResource(MethodResource):
             )
 
         if "paid_at" in kwargs and kwargs["paid_at"] is not None:
-            if kwargs["paid_at"] > datetime.utcnow():
+            if kwargs["paid_at"] > utc_now_compatible_with(kwargs["paid_at"]):
                 return _compat_error(
                     legacy_payload={"error": "'paid_at' não pode ser uma data futura."},
                     status_code=400,

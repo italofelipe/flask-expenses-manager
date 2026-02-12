@@ -1,5 +1,5 @@
 import uuid
-from datetime import date, datetime, timedelta
+from datetime import UTC, date, datetime, timedelta
 
 
 def _register_and_login(client, prefix: str) -> str:
@@ -95,7 +95,7 @@ def test_transaction_update_paid_at_without_paid_status(client) -> None:
     response = client.put(
         f"/transactions/{transaction_id}",
         headers=_auth_headers(token, "v2"),
-        json={"status": "pending", "paid_at": datetime.utcnow().isoformat()},
+        json={"status": "pending", "paid_at": datetime.now(UTC).isoformat()},
     )
 
     assert response.status_code == 400
@@ -110,7 +110,7 @@ def test_transaction_update_paid_at_future_returns_400(client) -> None:
         json=_transaction_payload(),
     )
     transaction_id = created.get_json()["data"]["transaction"][0]["id"]
-    future_paid_at = (datetime.utcnow() + timedelta(days=2)).isoformat()
+    future_paid_at = (datetime.now(UTC) + timedelta(days=2)).isoformat()
 
     response = client.put(
         f"/transactions/{transaction_id}",

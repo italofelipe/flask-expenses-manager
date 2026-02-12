@@ -1,7 +1,6 @@
 # mypy: disable-error-code=name-defined
 
 import enum
-from datetime import datetime
 from typing import Any
 from uuid import UUID as UUIDType
 from uuid import uuid4
@@ -9,6 +8,7 @@ from uuid import uuid4
 from sqlalchemy.dialects.postgresql import UUID
 
 from app.extensions.database import db
+from app.utils.datetime_utils import utc_now_naive
 
 
 class TransactionType(enum.Enum):
@@ -59,10 +59,8 @@ class Transaction(db.Model):
         db.Boolean, default=False, nullable=False, server_default=db.text("false")
     )
 
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
-    updated_at = db.Column(
-        db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow
-    )
+    created_at = db.Column(db.DateTime, default=utc_now_naive)
+    updated_at = db.Column(db.DateTime, default=utc_now_naive, onupdate=utc_now_naive)
 
     tag = db.relationship("Tag", backref="transactions")
     account = db.relationship("Account", backref="transactions")

@@ -24,6 +24,7 @@ from app.services.investment_operation_service import (
 from app.services.investment_service import InvestmentService
 from app.services.portfolio_history_service import PortfolioHistoryService
 from app.services.portfolio_valuation_service import PortfolioValuationService
+from app.utils.datetime_utils import iso_utc_now_naive
 
 # Import PaginatedResponse for paginated investment history
 from app.utils.pagination import PaginatedResponse
@@ -934,7 +935,7 @@ def _build_quantity_change(
     """Constrói registro de histórico para mudança de quantidade."""
     price = InvestmentService.get_market_price(investment.ticker)
     return {
-        "changeDate": datetime.utcnow().isoformat(),
+        "changeDate": iso_utc_now_naive(),
         "originalQuantity": old_quantity,
         "estimated_value_on_create_date": (
             float(old_estimated)
@@ -953,7 +954,7 @@ def _build_value_change(old_value: Any) -> Dict[str, Any]:
         "originalValue": (
             float(old_value) if isinstance(old_value, Decimal) else old_value
         ),
-        "changeDate": datetime.utcnow().isoformat(),
+        "changeDate": iso_utc_now_naive(),
     }
 
 

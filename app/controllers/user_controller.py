@@ -135,7 +135,7 @@ def assign_user_profile_fields(
 
 
 def validate_user_token(user_id: UUID, jti: str) -> Union[User, Response]:
-    user = cast(User | None, User.query.get(user_id))
+    user = cast(User | None, db.session.get(User, user_id))
     if not user or not hasattr(user, "current_jti") or user.current_jti != jti:
         return _compat_error(
             legacy_payload={"message": "Token revogado ou usuário não encontrado"},
@@ -271,7 +271,7 @@ class UserProfileResource(MethodResource):
     def put(self, **kwargs: Any) -> Response:
         user_id = UUID(get_jwt_identity())
         jti = get_jwt()["jti"]
-        user = User.query.get(user_id)
+        user = db.session.get(User, user_id)
         if not user:
             return _compat_error(
                 legacy_payload={"message": "Usuário não encontrado"},
