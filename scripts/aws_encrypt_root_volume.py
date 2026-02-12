@@ -48,8 +48,11 @@ def _aws_json(cmd: Sequence[str], *, profile: str | None, region: str) -> Any:
     proc = subprocess.run(full_cmd, check=False, capture_output=True, text=True)
     if proc.returncode != 0:
         raise SystemExit(proc.stderr.strip() or f"AWS CLI failed: {' '.join(full_cmd)}")
+    stdout = (proc.stdout or "").strip()
+    if not stdout:
+        return {}
     try:
-        return json.loads(proc.stdout)
+        return json.loads(stdout)
     except json.JSONDecodeError as exc:
         raise SystemExit(f"Failed to parse AWS CLI JSON output: {exc}") from exc
 
