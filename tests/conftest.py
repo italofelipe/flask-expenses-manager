@@ -4,6 +4,7 @@ from pathlib import Path
 from typing import Generator
 
 import pytest
+from sqlalchemy.orm import close_all_sessions
 
 ROOT_DIR = Path(__file__).resolve().parents[1]
 if str(ROOT_DIR) not in sys.path:
@@ -68,7 +69,8 @@ def app(tmp_path: Path):
 
 @pytest.fixture
 def client(app) -> Generator:
-    yield app.test_client()
+    with app.test_client() as test_client:
+        yield test_client
 
 
 @pytest.fixture(autouse=True)
@@ -86,3 +88,9 @@ def clear_investment_service_cache() -> Generator[None, None, None]:
     InvestmentService._clear_cache_for_tests()
     reset_metrics_for_tests()
     reset_login_attempt_guard_for_tests()
+
+
+@pytest.fixture(autouse=True)
+def cleanup_sqlalchemy_sessions() -> Generator[None, None, None]:
+    yield
+    close_all_sessions()

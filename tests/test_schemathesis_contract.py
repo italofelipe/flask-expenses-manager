@@ -53,7 +53,8 @@ def _normalize_operation_parameters(operation: dict[str, object]) -> None:
 
 
 def _load_normalized_openapi_spec() -> dict[str, object]:
-    response = _APP.test_client().get("/docs/swagger/")
+    with _APP.test_client() as client:
+        response = client.get("/docs/swagger/")
     spec = dict(response.get_json() or {})
     paths = spec.get("paths")
     if not isinstance(paths, dict):
@@ -95,7 +96,20 @@ SERVER_ERROR_CHECK = getattr(
 def test_openapi_contract_no_server_errors(case: schemathesis.Case) -> None:
     assert SERVER_ERROR_CHECK is not None
     response = case.call(headers={"X-API-Contract": "v2"})
-    case.validate_response(
-        response,
-        checks=(SERVER_ERROR_CHECK,),
-    )
+    try:
+        case.validate_response(
+            response,
+            checks=(SERVER_ERROR_CHECK,),
+        )
+    finally:
+        close = getattr(response, "close", None)
+        if callable(close):
+            close()
+    # Under newer Python versions, SQLite connections can surface as ResourceWarning
+    # when finalized during Hypothesis execution. Ensure the engine is fully disposed
+    # between examples to keep the suite warning-free and deterministic.
+    from app.extensions.database import db
+
+    with _APP.app_context():
+        db.session.remove()
+        db.engine.dispose()
