@@ -25,6 +25,7 @@ from app.extensions.audit_trail import register_audit_trail
 from app.extensions.database import db
 from app.extensions.error_handlers import register_error_handlers
 from app.middleware.cors import register_cors
+from app.middleware.docs_access import register_docs_access_guard
 from app.middleware.security_headers import register_security_headers
 from app.models.account import Account  # noqa: F401
 from app.models.audit_event import AuditEvent  # noqa: F401
@@ -111,6 +112,7 @@ def create_app() -> Flask:
     register_graphql_security(app)
     register_cors(app)
     register_security_headers(app)
+    register_docs_access_guard(app)
     register_audit_trail(app)
     register_audit_retention_commands(app)
 

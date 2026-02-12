@@ -15,6 +15,7 @@ TEST_ENV_OVERRIDES = {
     "FLASK_DEBUG": "False",
     "FLASK_TESTING": "true",
     "SECURITY_ENFORCE_STRONG_SECRETS": "false",
+    "DOCS_EXPOSURE_POLICY": "public",
     "CORS_ALLOWED_ORIGINS": "https://frontend.local",
     "GRAPHQL_ALLOW_INTROSPECTION": "true",
     "BRAPI_CACHE_TTL_SECONDS": "0",

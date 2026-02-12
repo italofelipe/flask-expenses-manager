@@ -14,6 +14,7 @@ os.environ.setdefault("JWT_SECRET_KEY", "y" * 64)
 os.environ.setdefault("FLASK_DEBUG", "False")
 os.environ.setdefault("FLASK_TESTING", "true")
 os.environ.setdefault("SECURITY_ENFORCE_STRONG_SECRETS", "false")
+os.environ.setdefault("DOCS_EXPOSURE_POLICY", "public")
 
 _APP = create_app()
 
