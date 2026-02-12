@@ -87,7 +87,7 @@ Ultima atualizacao: 2026-02-12
 | R1 | Rebranding | Mapear todas ocorrências de nomenclatura legada do projeto e registrar plano de substituição para `auraxis` | Done | 100% | Baixo: mapeamento concluído em arquivos versionados | pending-commit | 2026-02-10 |
 | R2 | Rebranding | Substituir ocorrências versionadas de nomenclatura legada por `auraxis` (sem quebrar integrações externas) | Done | 100% | Medio: integrações externas podem manter identificador legado temporário | pending-commit | 2026-02-10 |
 | S1 | AWS Security | Restringir acesso e hardening de instâncias EC2 (SG, NACL, IMDSv2, SSH policy, patching baseline) | In Progress | 90% | Médio: DEV/PROD com root EBS criptografado + IMDSv2 + termination protection + IAM profile + SSM online; pendente refinamento fino de SSH/NACL (e decisão sobre exposição 80/443) + automação de patching baseline | pending-commit | 2026-02-12 |
-| S1-02 | AWS Security | Cleanup pós-migração de EBS: revisar e remover volumes/snapshots antigos (após janela de validação) | Todo | 0% | Médio: risco de custo extra e retenção de dados se não limpar; precisa garantir rollback antes de remover |  | 2026-02-12 |
+| S1-02 | AWS Security | Cleanup pós-migração de EBS: revisar e remover volumes/snapshots antigos (após janela de validação) | Done | 100% | Baixo: volumes e snapshots intermediários removidos após confirmação | pending-commit | 2026-02-12 |
 | S2 | App Security | Implementar segurança de endpoints (rate-limit, validação/sanitização de request/response, headers e authz por recurso) | Done | 100% | Médio: baseline completo em aplicação; próximos passos são monitoramento centralizado e hardening de infraestrutura (S1) | pending-commit | 2026-02-11 |
 | S3 | App Security | Executar checklist OWASP no sistema (ASVS/API Top 10), corrigir gaps e formalizar evidências | In Progress | 92% | Médio: baseline e remediações de aplicação concluídas; pendências residuais concentram-se em controles de infraestrutura (S1) | pending-commit | 2026-02-11 |
 | S4-01 | App Security | Remover vazamento de exceções em respostas (`str(e)`, `traceback`) e adotar erros genéricos com correlação | Done | 100% | Médio: manter revisão contínua em novos endpoints | pending-commit | 2026-02-11 |
@@ -222,6 +222,7 @@ Ultima atualizacao: 2026-02-12
 | 2026-02-12 | S1 (fase 2) | SSM online confirmado via auditoria e script de migração de root volume para EBS criptografado adicionado (`scripts/aws_encrypt_root_volume.py`) com dry-run e `--execute` (downtime). | pending-commit |
 | 2026-02-12 | S1 (fase 3) | Migração DEV executada: root volume substituído por EBS criptografado; `aws_s1_hardening.py audit` agora valida `encrypted=true` (PROD pendente). | pending-commit |
 | 2026-02-12 | S1 (fase 4) | Migração PROD executada: root volume substituído por EBS criptografado; `aws_s1_hardening.py audit` valida `encrypted=true`. Observação: volume antigo e snapshots mantidos para rollback/cleanup posterior. | pending-commit |
+| 2026-02-12 | S1-02 | Cleanup pós-migração executado: volumes não criptografados antigos e snapshots intermediários removidos (DEV+PROD). | pending-commit |
 | 2026-02-09 | D (observacao) | Restaurados arquivos deletados acidentalmente: ticker/carteira | n/a |
 
 ## Proxima prioridade sugerida
