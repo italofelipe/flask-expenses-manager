@@ -53,6 +53,34 @@ jobs:
       - name: Bandit (SAST - high severity gate)
         run: bandit -r app -lll -iii
 
+  mypy-matrix:
+    name: Type Check (mypy, py${{ matrix.python-version }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.11", "3.13"]
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: pip
+          cache-dependency-path: requirements.txt
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install -r requirements-dev.txt
+
+      - name: Mypy
+        run: mypy app
+
   secret-scan:
     name: Secret Scan (Gitleaks)
     runs-on: ubuntu-latest
