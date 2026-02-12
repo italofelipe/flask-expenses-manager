@@ -23,12 +23,19 @@ def _runtime_environment_name() -> str:
 
 def validate_security_configuration() -> None:
     enforce = _read_bool_env("SECURITY_ENFORCE_STRONG_SECRETS", True)
-    if not enforce:
-        return
 
     is_debug = _read_bool_env("FLASK_DEBUG", False)
     is_testing = _read_bool_env("FLASK_TESTING", False)
     runtime_environment = _runtime_environment_name()
+    secure_runtime = not is_debug and not is_testing
+
+    if not enforce:
+        if secure_runtime:
+            raise RuntimeError(
+                "Invalid runtime configuration: SECURITY_ENFORCE_STRONG_SECRETS "
+                "must be true when FLASK_DEBUG=false and FLASK_TESTING=false."
+            )
+        return
 
     if runtime_environment in {"prod", "production"} and is_debug:
         raise RuntimeError(

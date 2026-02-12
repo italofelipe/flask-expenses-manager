@@ -61,10 +61,32 @@ def test_validate_security_configuration_rejects_weak_secrets_in_secure_runtime(
         assert "Weak/invalid secrets" in str(exc)
 
 
-def test_validate_security_configuration_can_be_disabled_with_flag(monkeypatch) -> None:
+def test_validate_security_configuration_rejects_disabled_enforcement_in_secure_runtime(
+    monkeypatch,
+) -> None:
     monkeypatch.setenv("SECURITY_ENFORCE_STRONG_SECRETS", "false")
     monkeypatch.setenv("AURAXIS_ENV", "production")
     monkeypatch.setenv("FLASK_DEBUG", "false")
+    monkeypatch.setenv("FLASK_TESTING", "false")
+    monkeypatch.setenv("SECRET_KEY", "dev")
+    monkeypatch.setenv("JWT_SECRET_KEY", "super-secret-key")
+    module = _reload_config_module()
+
+    try:
+        module.validate_security_configuration()
+        assert (
+            False
+        ), "Expected RuntimeError for disabled secret enforcement in secure runtime."
+    except RuntimeError as exc:
+        assert "SECURITY_ENFORCE_STRONG_SECRETS must be true" in str(exc)
+
+
+def test_validate_security_configuration_can_be_disabled_in_debug_runtime(
+    monkeypatch,
+) -> None:
+    monkeypatch.setenv("SECURITY_ENFORCE_STRONG_SECRETS", "false")
+    monkeypatch.setenv("AURAXIS_ENV", "dev")
+    monkeypatch.setenv("FLASK_DEBUG", "true")
     monkeypatch.setenv("FLASK_TESTING", "false")
     monkeypatch.setenv("SECRET_KEY", "dev")
     monkeypatch.setenv("JWT_SECRET_KEY", "super-secret-key")
