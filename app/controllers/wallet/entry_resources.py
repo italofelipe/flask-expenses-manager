@@ -136,8 +136,8 @@ def add_wallet_entry() -> tuple[dict[str, Any], int]:
 )
 @use_kwargs(
     {
-        "page": fields.Int(missing=1, validate=lambda x: x > 0),
-        "per_page": fields.Int(missing=10, validate=lambda x: 0 < x <= 100),
+        "page": fields.Int(load_default=1, validate=lambda x: x > 0),
+        "per_page": fields.Int(load_default=10, validate=lambda x: 0 < x <= 100),
     },
     location="query",
 )
