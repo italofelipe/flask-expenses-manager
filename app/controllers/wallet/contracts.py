@@ -3,22 +3,12 @@ from __future__ import annotations
 from datetime import date, datetime
 from typing import Any
 
-from flask import request
-
 from app.application.errors import PublicValidationError
 from app.application.services.public_error_mapper_service import (
     map_validation_exception,
 )
+from app.controllers.response_contract import compat_error_tuple, compat_success_tuple
 from app.services.investment_operation_service import InvestmentOperationError
-from app.utils.response_builder import error_payload, success_payload
-
-CONTRACT_HEADER = "X-API-Contract"
-CONTRACT_V2 = "v2"
-
-
-def is_v2_contract() -> bool:
-    header_value = str(request.headers.get(CONTRACT_HEADER, "")).strip().lower()
-    return header_value == CONTRACT_V2
 
 
 def compat_success(
@@ -29,9 +19,13 @@ def compat_success(
     data: dict[str, Any],
     meta: dict[str, Any] | None = None,
 ) -> tuple[dict[str, Any], int]:
-    if is_v2_contract():
-        return success_payload(message=message, data=data, meta=meta), status_code
-    return legacy_payload, status_code
+    return compat_success_tuple(
+        legacy_payload=legacy_payload,
+        status_code=status_code,
+        message=message,
+        data=data,
+        meta=meta,
+    )
 
 
 def compat_error(
@@ -42,16 +36,13 @@ def compat_error(
     error_code: str,
     details: dict[str, Any] | None = None,
 ) -> tuple[dict[str, Any], int]:
-    if is_v2_contract():
-        return (
-            error_payload(
-                message=message,
-                code=error_code,
-                details=details,
-            ),
-            status_code,
-        )
-    return legacy_payload, status_code
+    return compat_error_tuple(
+        legacy_payload=legacy_payload,
+        status_code=status_code,
+        message=message,
+        error_code=error_code,
+        details=details,
+    )
 
 
 def operation_error_response(

@@ -2,20 +2,13 @@ from __future__ import annotations
 
 from typing import Any
 
-from flask import Response, has_request_context, jsonify, request
+from flask import Response
 
-from app.utils.response_builder import error_payload, success_payload
-
-JSON_MIMETYPE = "application/json"
-CONTRACT_HEADER = "X-API-Contract"
-CONTRACT_V2 = "v2"
-
-
-def is_v2_contract() -> bool:
-    if not has_request_context():
-        return False
-    header_value = str(request.headers.get(CONTRACT_HEADER, "")).strip().lower()
-    return header_value == CONTRACT_V2
+from app.controllers.response_contract import (
+    compat_error_response,
+    compat_success_response,
+    is_v2_contract,
+)
 
 
 def compat_success(
@@ -26,13 +19,12 @@ def compat_success(
     data: dict[str, Any],
     meta: dict[str, Any] | None = None,
 ) -> Response:
-    payload = legacy_payload
-    if is_v2_contract():
-        payload = success_payload(message=message, data=data, meta=meta)
-    return Response(
-        jsonify(payload).get_data(),
-        status=status_code,
-        mimetype=JSON_MIMETYPE,
+    return compat_success_response(
+        legacy_payload=legacy_payload,
+        status_code=status_code,
+        message=message,
+        data=data,
+        meta=meta,
     )
 
 
@@ -44,11 +36,17 @@ def compat_error(
     error_code: str,
     details: dict[str, Any] | None = None,
 ) -> Response:
-    payload = legacy_payload
-    if is_v2_contract():
-        payload = error_payload(message=message, code=error_code, details=details)
-    return Response(
-        jsonify(payload).get_data(),
-        status=status_code,
-        mimetype=JSON_MIMETYPE,
+    return compat_error_response(
+        legacy_payload=legacy_payload,
+        status_code=status_code,
+        message=message,
+        error_code=error_code,
+        details=details,
     )
+
+
+__all__ = [
+    "is_v2_contract",
+    "compat_success",
+    "compat_error",
+]

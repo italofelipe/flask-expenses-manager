@@ -2,24 +2,22 @@ from __future__ import annotations
 
 from typing import Any
 
-from flask import Response, has_request_context, jsonify, request
+from flask import Response
 
-from app.utils.response_builder import error_payload, success_payload
+from app.controllers.response_contract import (
+    CONTRACT_HEADER,
+    CONTRACT_V2,
+    ResponseContractError,
+    compat_error_response,
+    compat_success_response,
+    is_v2_contract,
+    response_from_contract_error,
+)
 
-JSON_MIMETYPE = "application/json"
-CONTRACT_HEADER = "X-API-Contract"
-CONTRACT_V2 = "v2"
 AUTH_BACKEND_UNAVAILABLE_MESSAGE = (
     "Authentication temporarily unavailable. Try again later."
 )
 AUTH_BACKEND_UNAVAILABLE_CODE = "AUTH_BACKEND_UNAVAILABLE"
-
-
-def is_v2_contract() -> bool:
-    if not has_request_context():
-        return False
-    header_value = str(request.headers.get(CONTRACT_HEADER, "")).strip().lower()
-    return header_value == CONTRACT_V2
 
 
 def compat_success(
@@ -30,13 +28,12 @@ def compat_success(
     data: dict[str, Any],
     meta: dict[str, Any] | None = None,
 ) -> Response:
-    payload = legacy_payload
-    if is_v2_contract():
-        payload = success_payload(message=message, data=data, meta=meta)
-    return Response(
-        jsonify(payload).get_data(),
-        status=status_code,
-        mimetype=JSON_MIMETYPE,
+    return compat_success_response(
+        legacy_payload=legacy_payload,
+        status_code=status_code,
+        message=message,
+        data=data,
+        meta=meta,
     )
 
 
@@ -48,13 +45,12 @@ def compat_error(
     error_code: str,
     details: dict[str, Any] | None = None,
 ) -> Response:
-    payload = legacy_payload
-    if is_v2_contract():
-        payload = error_payload(message=message, code=error_code, details=details)
-    return Response(
-        jsonify(payload).get_data(),
-        status=status_code,
-        mimetype=JSON_MIMETYPE,
+    return compat_error_response(
+        legacy_payload=legacy_payload,
+        status_code=status_code,
+        message=message,
+        error_code=error_code,
+        details=details,
     )
 
 
@@ -63,9 +59,24 @@ def registration_ack_payload(message: str) -> dict[str, Any]:
 
 
 def auth_backend_unavailable_response() -> Response:
-    return compat_error(
-        legacy_payload={"message": AUTH_BACKEND_UNAVAILABLE_MESSAGE},
-        status_code=503,
-        message=AUTH_BACKEND_UNAVAILABLE_MESSAGE,
-        error_code=AUTH_BACKEND_UNAVAILABLE_CODE,
+    return response_from_contract_error(
+        ResponseContractError(
+            message=AUTH_BACKEND_UNAVAILABLE_MESSAGE,
+            code=AUTH_BACKEND_UNAVAILABLE_CODE,
+            status_code=503,
+            legacy_payload={"message": AUTH_BACKEND_UNAVAILABLE_MESSAGE},
+        )
     )
+
+
+__all__ = [
+    "CONTRACT_HEADER",
+    "CONTRACT_V2",
+    "AUTH_BACKEND_UNAVAILABLE_MESSAGE",
+    "AUTH_BACKEND_UNAVAILABLE_CODE",
+    "is_v2_contract",
+    "compat_success",
+    "compat_error",
+    "registration_ack_payload",
+    "auth_backend_unavailable_response",
+]

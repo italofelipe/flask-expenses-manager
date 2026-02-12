@@ -5,19 +5,24 @@ from decimal import ROUND_DOWN, Decimal
 from typing import Any
 from uuid import UUID
 
-from flask import Response, current_app, has_request_context, jsonify, request
+from flask import Response, current_app
 
 from app.application.errors import PublicValidationError
+from app.controllers.response_contract import (
+    CONTRACT_HEADER,
+    CONTRACT_V2,
+    compat_error_response,
+    compat_success_response,
+    is_v2_contract,
+)
 from app.models.transaction import Transaction, TransactionStatus, TransactionType
 from app.services.transaction_reference_authorization_service import (
     TransactionReferenceAuthorizationError,
     enforce_transaction_reference_ownership,
 )
-from app.utils.response_builder import error_payload, success_payload
+from app.utils.response_builder import json_response
 
 INVALID_TOKEN_MESSAGE = "Token inválido."
-CONTRACT_HEADER = "X-API-Contract"
-CONTRACT_V2 = "v2"
 MUTABLE_TRANSACTION_FIELDS = frozenset(
     {
         "title",
@@ -42,16 +47,11 @@ MUTABLE_TRANSACTION_FIELDS = frozenset(
 
 
 def _is_v2_contract() -> bool:
-    if not has_request_context():
-        return False
-    header_value = str(request.headers.get(CONTRACT_HEADER, "")).strip().lower()
-    return header_value == CONTRACT_V2
+    return is_v2_contract()
 
 
 def _json_response(payload: dict[str, Any], status_code: int) -> Response:
-    response = jsonify(payload)
-    response.status_code = status_code
-    return response
+    return json_response(payload, status_code=status_code)
 
 
 def _compat_success(
@@ -62,12 +62,13 @@ def _compat_success(
     data: dict[str, Any],
     meta: dict[str, Any] | None = None,
 ) -> Response:
-    if _is_v2_contract():
-        return _json_response(
-            success_payload(message=message, data=data, meta=meta),
-            status_code,
-        )
-    return _json_response(legacy_payload, status_code)
+    return compat_success_response(
+        legacy_payload=legacy_payload,
+        status_code=status_code,
+        message=message,
+        data=data,
+        meta=meta,
+    )
 
 
 def _compat_error(
@@ -78,12 +79,13 @@ def _compat_error(
     error_code: str,
     details: dict[str, Any] | None = None,
 ) -> Response:
-    if _is_v2_contract():
-        return _json_response(
-            error_payload(message=message, code=error_code, details=details),
-            status_code,
-        )
-    return _json_response(legacy_payload, status_code)
+    return compat_error_response(
+        legacy_payload=legacy_payload,
+        status_code=status_code,
+        message=message,
+        error_code=error_code,
+        details=details,
+    )
 
 
 def _parse_positive_int(value: str | None, *, default: int, field_name: str) -> int:

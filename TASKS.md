@@ -17,7 +17,7 @@ Ultima atualizacao: 2026-02-12
 
 | ID | Area | Tarefa | Status | Progresso | Risco | Commit | Ultima atualizacao |
 |---|---|---|---|---:|---|---|---|
-| A1 | API Base | Padronizar contrato de resposta (sucesso/erro) em todos os endpoints | In Progress | 70% | Medio: domínios futuros ainda nao padronizados | da2ff52, f3ef3c0 | 2026-02-09 |
+| A1 | API Base | Padronizar contrato de resposta (sucesso/erro) em todos os endpoints | In Progress | 82% | Medio: ainda restam pontos fora do helper central (rate-limit/jwt callbacks) | da2ff52, f3ef3c0, pending-commit | 2026-02-12 |
 | A2 | API Base | Revisar OpenAPI/Swagger para refletir rotas reais | Todo | 35% | Medio: divergencia gera erro de consumo em cliente | da19f35, f3ef3c0 | 2026-02-09 |
 | A3 | API Base | Remover inconsistencias de nomenclatura (ticker/wallet/investment) | Todo | 20% | Medio: confusao entre recurso legado e atual |  | 2026-02-09 |
 | A4 | API Base | Definir estrategia unica de validacao (Marshmallow vs Pydantic gradual) | Todo | 0% | Baixo: decisao arquitetural pendente |  | 2026-02-09 |
@@ -198,6 +198,7 @@ Ultima atualizacao: 2026-02-12
 | 2026-02-11 | H1/Cleanup | Refatoração estrutural de transações e GraphQL: `transaction_controller` quebrado em recursos modulares, OpenAPI extraído, `schema.py` segmentado em `types/query/mutations`; cobertura global mantida em 88% com suíte e hooks verdes | cbcf368 |
 | 2026-02-11 | S6-04/H1-Cleanup | Sanitização de erro aplicada aos controllers REST (`user/wallet/transaction reports`) com camada de aplicação (`DTO + interface + mapper`) para validação pública e fallback seguro sem leak; cobertura validada em 88% | pending-commit |
 | 2026-02-12 | A5/H1-Cleanup | `graphql_controller_utils` movido para `app/controllers/graphql/utils.py` com facade legada mantida para imports antigos e alinhamento do padrão por domínio | pending-commit |
+| 2026-02-12 | A1 | Contrato v1/v2 unificado em helper compartilhado (`app/controllers/response_contract.py`) com classe de erro extensível (`ResponseContractError`) e adoção inicial em auth/user/wallet/transaction | pending-commit |
 | 2026-02-09 | D (observacao) | Restaurados arquivos deletados acidentalmente: ticker/carteira | n/a |
 
 ## Proxima prioridade sugerida
