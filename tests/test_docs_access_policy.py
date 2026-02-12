@@ -1,8 +1,9 @@
 from __future__ import annotations
 
 import uuid
+from contextlib import contextmanager
 from pathlib import Path
-from typing import Any
+from typing import Any, Generator
 
 import pytest
 
@@ -36,7 +37,38 @@ def _create_docs_policy_app(
     with app.app_context():
         db.drop_all()
         db.create_all()
-    return app
+    return app, db_path
+
+
+def _dispose_docs_policy_app(app: Any, db_path: Path) -> None:
+    from app.extensions.database import db
+
+    with app.app_context():
+        db.session.remove()
+        db.drop_all()
+        db.engine.dispose()
+    if db_path.exists():
+        db_path.unlink()
+
+
+@contextmanager
+def _docs_policy_app_context(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+    *,
+    flask_debug: bool,
+    docs_policy: str | None,
+) -> Generator[Any, None, None]:
+    app, db_path = _create_docs_policy_app(
+        monkeypatch,
+        tmp_path,
+        flask_debug=flask_debug,
+        docs_policy=docs_policy,
+    )
+    try:
+        yield app
+    finally:
+        _dispose_docs_policy_app(app, db_path)
 
 
 def _register_and_login(client: Any, *, prefix: str) -> str:
@@ -60,60 +92,57 @@ def test_docs_policy_defaults_to_authenticated_when_not_debug(
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,
 ) -> None:
-    app = _create_docs_policy_app(
+    with _docs_policy_app_context(
         monkeypatch,
         tmp_path,
         flask_debug=False,
         docs_policy=None,
-    )
-
-    response = app.test_client().get("/docs/")
-    assert response.status_code == 401
-    assert response.get_json()["message"] == "Token inválido ou ausente"
+    ) as app:
+        response = app.test_client().get("/docs/")
+        assert response.status_code == 401
+        assert response.get_json()["message"] == "Token inválido ou ausente"
 
 
 def test_docs_policy_defaults_to_public_in_debug(
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,
 ) -> None:
-    app = _create_docs_policy_app(
+    with _docs_policy_app_context(
         monkeypatch,
         tmp_path,
         flask_debug=True,
         docs_policy=None,
-    )
-
-    response = app.test_client().get("/docs/")
-    assert response.status_code == 200
+    ) as app:
+        response = app.test_client().get("/docs/")
+        assert response.status_code == 200
 
 
 def test_docs_policy_can_disable_documentation(
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,
 ) -> None:
-    app = _create_docs_policy_app(
+    with _docs_policy_app_context(
         monkeypatch,
         tmp_path,
         flask_debug=False,
         docs_policy="disabled",
-    )
-
-    response = app.test_client().get("/docs/")
-    assert response.status_code == 404
+    ) as app:
+        response = app.test_client().get("/docs/")
+        assert response.status_code == 404
 
 
 def test_docs_policy_authenticated_allows_jwt(
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,
 ) -> None:
-    app = _create_docs_policy_app(
+    with _docs_policy_app_context(
         monkeypatch,
         tmp_path,
         flask_debug=False,
         docs_policy="authenticated",
-    )
-    client = app.test_client()
-    token = _register_and_login(client, prefix="docs-auth")
+    ) as app:
+        client = app.test_client()
+        token = _register_and_login(client, prefix="docs-auth")
 
-    response = client.get("/docs/", headers={"Authorization": f"Bearer {token}"})
-    assert response.status_code == 200
+        response = client.get("/docs/", headers={"Authorization": f"Bearer {token}"})
+        assert response.status_code == 200

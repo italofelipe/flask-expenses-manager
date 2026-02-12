@@ -49,7 +49,7 @@ Ultima atualizacao: 2026-02-12
 | F2 | Auxiliares | CRUD de `Account` | Todo | 0% | Baixo |  | 2026-02-09 |
 | F3 | Auxiliares | CRUD de `CreditCard` | Todo | 0% | Baixo |  | 2026-02-09 |
 | F4 | Auxiliares | Integrar `Tag/Account/CreditCard` com transacoes e validacoes | Todo | 0% | Medio |  | 2026-02-09 |
-| G1 | Qualidade | Completar suite de testes por dominio | In Progress | 75% | Medio: lacunas em cenarios complexos | 497f901, f3ef3c0 | 2026-02-09 |
+| G1 | Qualidade | Completar suite de testes por dominio | In Progress | 80% | Medio: lacunas em cenarios complexos | 497f901, f3ef3c0, pending-commit | 2026-02-12 |
 | G2 | Qualidade | Testes de integracao BRAPI com mocks/fakes | In Progress | 60% | Medio: falta cenário E2E com falha real do provider | 497f901, pending-commit | 2026-02-09 |
 | G3 | Qualidade | Enforce de cobertura minima no CI | In Progress | 80% | Baixo | 497f901, 7f0ac66 | 2026-02-09 |
 | G4 | Qualidade | Pipeline CI para lint, type-check, testes e gates de qualidade | In Progress | 92% | Baixo | 842a656, 7f0ac66 | 2026-02-11 |
@@ -64,6 +64,7 @@ Ultima atualizacao: 2026-02-12
 | G13 | CI/Quality | Adicionar matrix de tipagem (`mypy`) em Python 3.11 e 3.13 para reduzir regressão entre ambientes | Todo | 0% | Médio: divergência de stubs entre versões pode voltar a gerar falso positivo/falso negativo |  | 2026-02-11 |
 | G14 | CI/Quality | Avaliar lock/constraints de dependências de tooling (lint/type/security) para builds determinísticos | Todo | 0% | Médio: atualização não controlada de tooling pode quebrar gates sem mudança de código |  | 2026-02-11 |
 | G15 | CI/Review | Integrar Cursor Bugbot como camada de revisão automática de PR + calibrar obrigatoriedade no ruleset | In Progress | 35% | Médio: risco de falso positivo se exigido sem período de calibração |  | 2026-02-11 |
+| G16 | Quality | Reduzir warnings globais de deprecacao (Marshmallow v4, apispec schema naming, warnings de terceiros) com plano faseado | In Progress | 20% | Medio: ajustes de schema/documentacao podem afetar compatibilidade de contrato OpenAPI |  | 2026-02-12 |
 | H1 | Arquitetura | Adicionar suporte a GraphQL | In Progress | 65% | Alto: impacto transversal na API | ba1f238, e12bf21 | 2026-02-09 |
 | H2 | Seguranca | Implementar rate limit por rota/usuario/IP | Done | 100% | Baixo: rate-limit por domínio com backend distribuído, fail-closed e observabilidade básica | pending-commit | 2026-02-11 |
 | H3 | Seguranca | Hardening de validacao/sanitizacao/authz/headers/auditoria | Done | 100% | Médio: baseline aplicado; evolução contínua segue para monitoramento centralizado e infraestrutura S1 | pending-commit | 2026-02-11 |
@@ -201,6 +202,7 @@ Ultima atualizacao: 2026-02-12
 | 2026-02-12 | A5/H1-Cleanup | `graphql_controller_utils` movido para `app/controllers/graphql/utils.py` com facade legada mantida para imports antigos e alinhamento do padrão por domínio | pending-commit |
 | 2026-02-12 | A1 | Contrato v1/v2 unificado em helper compartilhado (`app/controllers/response_contract.py`) com classe de erro extensível (`ResponseContractError`) e adoção inicial em auth/user/wallet/transaction | pending-commit |
 | 2026-02-12 | A6/S6-07 Prep | Login guard refatorado para arquitetura modular (`login_attempt_guard_context/settings/backend/service`) com dependências explícitas, mantendo API pública e cobertura >= 85% | pending-commit |
+| 2026-02-12 | G1/G16 | Suíte estabilizada sem `ResourceWarning` de SQLite e sem `InsecureKeyLengthWarning` em JWT de testes (fixtures e apps de teste endurecidos); backlog de deprecações Marshmallow/apispec formalizado | pending-commit |
 | 2026-02-09 | D (observacao) | Restaurados arquivos deletados acidentalmente: ticker/carteira | n/a |
 
 ## Proxima prioridade sugerida

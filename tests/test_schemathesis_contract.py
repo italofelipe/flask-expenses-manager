@@ -19,6 +19,16 @@ os.environ.setdefault("DOCS_EXPOSURE_POLICY", "public")
 _APP = create_app()
 
 
+@pytest.fixture(scope="session", autouse=True)
+def _dispose_schemathesis_app() -> None:
+    yield
+    from app.extensions.database import db
+
+    with _APP.app_context():
+        db.session.remove()
+        db.engine.dispose()
+
+
 def _normalize_parameter(parameter: object) -> dict[str, object] | None:
     if not isinstance(parameter, dict):
         return None

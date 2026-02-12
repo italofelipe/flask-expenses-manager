@@ -10,8 +10,8 @@ if str(ROOT_DIR) not in sys.path:
     sys.path.insert(0, str(ROOT_DIR))
 
 TEST_ENV_OVERRIDES = {
-    "SECRET_KEY": "test-secret",
-    "JWT_SECRET_KEY": "test-jwt-secret",
+    "SECRET_KEY": "test-secret-key-with-64-chars-minimum-for-jwt-signing-0001",
+    "JWT_SECRET_KEY": "test-jwt-secret-key-with-64-chars-minimum-for-signing-0002",
     "FLASK_DEBUG": "False",
     "FLASK_TESTING": "true",
     "SECURITY_ENFORCE_STRONG_SECRETS": "false",
@@ -20,6 +20,9 @@ TEST_ENV_OVERRIDES = {
     "GRAPHQL_ALLOW_INTROSPECTION": "true",
     "BRAPI_CACHE_TTL_SECONDS": "0",
 }
+
+for key, value in TEST_ENV_OVERRIDES.items():
+    os.environ.setdefault(key, value)
 
 
 @pytest.fixture(autouse=True)
@@ -46,6 +49,8 @@ def app(tmp_path: Path):
 
     app = create_app()
     app.config["TESTING"] = True
+    app.config["SECRET_KEY"] = TEST_ENV_OVERRIDES["SECRET_KEY"]
+    app.config["JWT_SECRET_KEY"] = TEST_ENV_OVERRIDES["JWT_SECRET_KEY"]
 
     with app.app_context():
         db.drop_all()

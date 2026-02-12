@@ -10,7 +10,7 @@ from app.middleware.jwt import token_required
 
 def _build_app() -> Flask:
     app = Flask(__name__)
-    app.config["SECRET_KEY"] = "super-secret-key-for-tests-only"
+    app.config["SECRET_KEY"] = "super-secret-key-for-tests-only-with-32-plus-chars"
     return app
 
 
