@@ -220,8 +220,8 @@ Ultima atualizacao: 2026-02-12
 | 2026-02-09 | D (observacao) | Restaurados arquivos deletados acidentalmente: ticker/carteira | n/a |
 
 ## Proxima prioridade sugerida
-- S6 (P0/P1): executar backlog de correcoes de seguranca de aplicacao (`S6-01..S6-12`) antes de avancar em novas features de infraestrutura/observabilidade.
 - S1/S3 (P1): fechar controles de infraestrutura OWASP em AWS (`S1`) e integrar exportação central de métricas/alertas de segurança (CloudWatch/Prometheus).
+- G17 (P1): eliminar `ResourceWarning` remanescente da suíte (`tests/test_transaction_contract.py`) para manter execução 100% limpa e reproduzível no CI/local.
 
 ## Mapeamento Rebranding (nomenclatura legada -> `auraxis`)
 
