@@ -34,6 +34,9 @@ from app.models.user import User
 from app.schemas.auth_schema import AuthSchema
 from app.schemas.user_schemas import UserRegistrationSchema
 from app.services.login_attempt_guard_service import (
+    LoginAttemptContext,
+    LoginAttemptGuardService,
+    LoginGuardBackendUnavailableError,
     build_login_attempt_context,
     get_login_attempt_guard,
 )
@@ -42,6 +45,10 @@ from app.utils.response_builder import error_payload, success_payload
 JSON_MIMETYPE = "application/json"
 CONTRACT_HEADER = "X-API-Contract"
 CONTRACT_V2 = "v2"
+AUTH_BACKEND_UNAVAILABLE_MESSAGE = (
+    "Authentication temporarily unavailable. Try again later."
+)
+AUTH_BACKEND_UNAVAILABLE_CODE = "AUTH_BACKEND_UNAVAILABLE"
 
 auth_bp = Blueprint("auth", __name__, url_prefix="/auth")
 
@@ -91,6 +98,50 @@ def _compat_error(
 
 def _registration_ack_payload(message: str) -> Dict[str, Any]:
     return {"message": message, "data": {}}
+
+
+def _auth_backend_unavailable_response() -> Response:
+    return _compat_error(
+        legacy_payload={"message": AUTH_BACKEND_UNAVAILABLE_MESSAGE},
+        status_code=503,
+        message=AUTH_BACKEND_UNAVAILABLE_MESSAGE,
+        error_code=AUTH_BACKEND_UNAVAILABLE_CODE,
+    )
+
+
+def _guard_login_check(
+    *,
+    login_guard: LoginAttemptGuardService,
+    login_context: LoginAttemptContext,
+) -> tuple[bool, int] | Response:
+    try:
+        return login_guard.check(login_context)
+    except LoginGuardBackendUnavailableError:
+        return _auth_backend_unavailable_response()
+
+
+def _guard_register_failure(
+    *,
+    login_guard: LoginAttemptGuardService,
+    login_context: LoginAttemptContext,
+) -> Response | None:
+    try:
+        login_guard.register_failure(login_context)
+    except LoginGuardBackendUnavailableError:
+        return _auth_backend_unavailable_response()
+    return None
+
+
+def _guard_register_success(
+    *,
+    login_guard: LoginAttemptGuardService,
+    login_context: LoginAttemptContext,
+) -> Response | None:
+    try:
+        login_guard.register_success(login_context)
+    except LoginGuardBackendUnavailableError:
+        return _auth_backend_unavailable_response()
+    return None
 
 
 class RegisterResource(MethodResource):
@@ -210,6 +261,9 @@ class AuthResource(MethodResource):
             200: {"description": "Login realizado com sucesso"},
             400: {"description": "Credenciais ausentes"},
             401: {"description": "Credenciais inválidas"},
+            503: {
+                "description": "Serviço de autenticação temporariamente indisponível"
+            },
             500: {"description": "Erro interno ao efetuar login"},
         },
     )
@@ -245,7 +299,14 @@ class AuthResource(MethodResource):
             ),
         )
         login_guard = get_login_attempt_guard()
-        allowed, retry_after = login_guard.check(login_context)
+        check_result = _guard_login_check(
+            login_guard=login_guard,
+            login_context=login_context,
+        )
+        if isinstance(check_result, Response):
+            return check_result
+        allowed, retry_after = check_result
+
         if not allowed:
             return _compat_error(
                 legacy_payload={
@@ -259,7 +320,12 @@ class AuthResource(MethodResource):
             )
 
         if not user or not check_password_hash(user.password, password):
-            login_guard.register_failure(login_context)
+            failure_guard_response = _guard_register_failure(
+                login_guard=login_guard,
+                login_context=login_context,
+            )
+            if failure_guard_response is not None:
+                return failure_guard_response
             return _compat_error(
                 legacy_payload={"message": "Invalid credentials"},
                 status_code=401,
@@ -268,7 +334,12 @@ class AuthResource(MethodResource):
             )
 
         try:
-            login_guard.register_success(login_context)
+            success_guard_response = _guard_register_success(
+                login_guard=login_guard,
+                login_context=login_context,
+            )
+            if success_guard_response is not None:
+                return success_guard_response
             token = create_access_token(
                 identity=str(user.id), expires_delta=timedelta(hours=1)
             )

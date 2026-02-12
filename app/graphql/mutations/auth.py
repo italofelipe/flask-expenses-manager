@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from datetime import timedelta
-from typing import Any, cast
+from typing import Any, NoReturn, cast
 
 import graphene
 from flask_jwt_extended import create_access_token, get_jti
@@ -20,9 +20,56 @@ from app.graphql.types import AuthPayloadType, UserType
 from app.models.user import User
 from app.schemas.user_schemas import UserRegistrationSchema
 from app.services.login_attempt_guard_service import (
+    LoginAttemptContext,
+    LoginAttemptGuardService,
+    LoginGuardBackendUnavailableError,
     build_login_attempt_context,
     get_login_attempt_guard,
 )
+
+AUTH_BACKEND_UNAVAILABLE_MESSAGE = (
+    "Authentication temporarily unavailable. Try again later."
+)
+
+
+def _raise_auth_backend_unavailable(exc: Exception) -> NoReturn:
+    raise GraphQLError(
+        AUTH_BACKEND_UNAVAILABLE_MESSAGE,
+        extensions={"code": "AUTH_BACKEND_UNAVAILABLE", "reason": str(exc)},
+    ) from exc
+
+
+def _guard_check_or_raise(
+    *,
+    login_guard: LoginAttemptGuardService,
+    login_context: LoginAttemptContext,
+) -> tuple[bool, int]:
+    try:
+        return login_guard.check(login_context)
+    except LoginGuardBackendUnavailableError as exc:
+        _raise_auth_backend_unavailable(exc)
+
+
+def _guard_register_failure_or_raise(
+    *,
+    login_guard: LoginAttemptGuardService,
+    login_context: LoginAttemptContext,
+) -> None:
+    try:
+        login_guard.register_failure(login_context)
+    except LoginGuardBackendUnavailableError as exc:
+        _raise_auth_backend_unavailable(exc)
+
+
+def _guard_register_success_or_raise(
+    *,
+    login_guard: LoginAttemptGuardService,
+    login_context: LoginAttemptContext,
+) -> None:
+    try:
+        login_guard.register_success(login_context)
+    except LoginGuardBackendUnavailableError as exc:
+        _raise_auth_backend_unavailable(exc)
 
 
 class RegisterUserMutation(graphene.Mutation):
@@ -119,7 +166,10 @@ class LoginMutation(graphene.Mutation):
             ),
         )
         login_guard = get_login_attempt_guard()
-        allowed, retry_after = login_guard.check(login_context)
+        allowed, retry_after = _guard_check_or_raise(
+            login_guard=login_guard,
+            login_context=login_context,
+        )
         if not allowed:
             raise GraphQLError(
                 "Too many login attempts. Try again later.",
@@ -130,10 +180,16 @@ class LoginMutation(graphene.Mutation):
             )
 
         if not user or not check_password_hash(user.password, password):
-            login_guard.register_failure(login_context)
+            _guard_register_failure_or_raise(
+                login_guard=login_guard,
+                login_context=login_context,
+            )
             raise GraphQLError("Invalid credentials")
 
-        login_guard.register_success(login_context)
+        _guard_register_success_or_raise(
+            login_guard=login_guard,
+            login_context=login_context,
+        )
         token = create_access_token(
             identity=str(user.id), expires_delta=timedelta(hours=1)
         )

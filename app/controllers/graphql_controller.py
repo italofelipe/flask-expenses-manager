@@ -36,7 +36,10 @@ def _format_graphql_execution_error(err: GraphQLError) -> dict[str, Any]:
             "message": "An unexpected error occurred.",
             "extensions": {"code": "INTERNAL_ERROR", "details": {}},
         }
-    return {"message": err.message}
+    payload: dict[str, Any] = {"message": err.message}
+    if err.extensions:
+        payload["extensions"] = err.extensions
+    return payload
 
 
 def _enforce_graphql_policies(
