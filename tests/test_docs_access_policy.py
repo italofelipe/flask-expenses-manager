@@ -14,14 +14,19 @@ def _create_docs_policy_app(
     *,
     flask_debug: bool,
     docs_policy: str | None,
+    flask_testing: bool = True,
+    security_enforce_strong_secrets: bool = False,
 ):
     db_path = tmp_path / f"docs-policy-{uuid.uuid4().hex}.sqlite3"
     monkeypatch.setenv("DATABASE_URL", f"sqlite:///{db_path}")
     monkeypatch.setenv("SECRET_KEY", "x" * 64)
     monkeypatch.setenv("JWT_SECRET_KEY", "y" * 64)
     monkeypatch.setenv("FLASK_DEBUG", "true" if flask_debug else "false")
-    monkeypatch.setenv("FLASK_TESTING", "true")
-    monkeypatch.setenv("SECURITY_ENFORCE_STRONG_SECRETS", "false")
+    monkeypatch.setenv("FLASK_TESTING", "true" if flask_testing else "false")
+    monkeypatch.setenv(
+        "SECURITY_ENFORCE_STRONG_SECRETS",
+        "true" if security_enforce_strong_secrets else "false",
+    )
     monkeypatch.setenv("AUDIT_PERSISTENCE_ENABLED", "false")
 
     if docs_policy is None:
@@ -112,6 +117,35 @@ def test_docs_policy_defaults_to_public_in_debug(
         tmp_path,
         flask_debug=True,
         docs_policy=None,
+    ) as app:
+        response = app.test_client().get("/docs/")
+        assert response.status_code == 200
+
+
+def test_docs_policy_invalid_value_raises_in_secure_runtime(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    with pytest.raises(RuntimeError, match="Invalid DOCS_EXPOSURE_POLICY"):
+        _create_docs_policy_app(
+            monkeypatch,
+            tmp_path,
+            flask_debug=False,
+            docs_policy="invalid-policy",
+            flask_testing=False,
+            security_enforce_strong_secrets=True,
+        )
+
+
+def test_docs_policy_invalid_value_falls_back_in_debug(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    with _docs_policy_app_context(
+        monkeypatch,
+        tmp_path,
+        flask_debug=True,
+        docs_policy="invalid-policy",
     ) as app:
         response = app.test_client().get("/docs/")
         assert response.status_code == 200

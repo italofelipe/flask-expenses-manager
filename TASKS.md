@@ -124,10 +124,10 @@ Ultima atualizacao: 2026-02-12
 | S6-06 | App Security | Mitigar enumeração de contas em register/login (status e comportamento observável) | Done | 100% | Baixo: defaults seguros em runtime de produção e proteção de timing em login REST/GraphQL | pending-commit | 2026-02-12 |
 | S6-07 | App Security | Migrar login guard para backend distribuído (Redis) com política de falha explícita | Done | 100% | Baixo: policy explícita exigida em runtime seguro e compose com Redis pronto para rate-limit/login guard | pending-commit | 2026-02-12 |
 | S6-08 | App Security | Endurecer defaults de runtime (`DEBUG=False` por padrão seguro e validação de startup) | Done | 100% | Baixo: runtime seguro bloqueia bypass de enforcement de secrets e mantém validação de startup | pending-commit | 2026-02-12 |
-| S6-09 | App Security | Retirar sweep de retenção de auditoria do ciclo de request (job agendado/assíncrono) | Todo | 0% | Médio: impacto em latência e disponibilidade |  | 2026-02-11 |
+| S6-09 | App Security | Retirar sweep de retenção de auditoria do ciclo de request (job agendado/assíncrono) | Done | 100% | Baixo: retenção externalizada via CLI/job e proteção coberta por teste de não execução no request | pending-commit | 2026-02-12 |
 | S6-10 | App Security | Atualizar dependências com CVE (`Flask`, `marshmallow`) e zerar `pip-audit` runtime | Done | 100% | Baixo: gate validado com `pip-audit` sem vulnerabilidades conhecidas | afc15c7 | 2026-02-11 |
 | S6-11 | App Security | Harden Docker de produção (non-root, multi-stage, runtime deps only) | Done | 100% | Baixo: multi-stage + non-root + contexto sem segredos reduziram superfície e removeram CVEs críticos/altos observados | pending-commit | 2026-02-11 |
-| S6-12 | App Security | Definir política de exposição de documentação em produção (`/docs`) por ambiente/autenticação | Todo | 0% | Baixo: disclosure de metadata da API |  | 2026-02-11 |
+| S6-12 | App Security | Definir política de exposição de documentação em produção (`/docs`) por ambiente/autenticação | Done | 100% | Baixo: política por ambiente + fail-fast para configuração inválida em runtime seguro | pending-commit | 2026-02-12 |
 | X1 | Tech Debt | Remover/atualizar TODO desatualizado sobre enums em transacoes | Todo | 0% | Baixo: clareza de manutencao |  | 2026-02-09 |
 
 ## Registro de progresso recente
@@ -215,6 +215,8 @@ Ultima atualizacao: 2026-02-12
 | 2026-02-12 | S6-06 | Mitigação de enumeração em autenticação: política padrão em produção agora oculta conflito de registro e desabilita sinal de principal conhecido no login guard; REST/GraphQL passaram a usar verificação de senha com proteção de timing para usuários inexistentes | pending-commit |
 | 2026-02-12 | S6-07 | Login guard Redis endurecido com política de falha explícita em runtime seguro (`LOGIN_GUARD_FAIL_CLOSED` obrigatório) e compose atualizado com serviço Redis + URLs padrão para login guard/rate limit (dev/prod/local) | pending-commit |
 | 2026-02-12 | S6-08 | Startup hardening reforçado: `SECURITY_ENFORCE_STRONG_SECRETS=false` agora é rejeitado em runtime seguro (`FLASK_DEBUG=false` e `FLASK_TESTING=false`), com testes de regressão para cenários seguro/debug | pending-commit |
+| 2026-02-12 | S6-09 | Sweep de retenção confirmado fora do ciclo de request: retenção executada por comando operacional (`flask audit-events purge-expired`) com teste de regressão que garante não execução durante requests (`tests/test_audit_trail.py`) | pending-commit |
+| 2026-02-12 | S6-12 | Política `/docs` endurecida com validação de startup: `DOCS_EXPOSURE_POLICY` inválido agora causa erro em runtime seguro; em debug mantém fallback seguro para produtividade local, com testes dedicados | pending-commit |
 | 2026-02-09 | D (observacao) | Restaurados arquivos deletados acidentalmente: ticker/carteira | n/a |
 
 ## Proxima prioridade sugerida

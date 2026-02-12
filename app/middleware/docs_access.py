@@ -29,10 +29,22 @@ def _default_docs_policy() -> str:
     return _POLICY_AUTHENTICATED
 
 
+def _is_secure_runtime() -> bool:
+    is_debug = os.getenv("FLASK_DEBUG", "false").strip().lower() == "true"
+    is_testing = os.getenv("FLASK_TESTING", "false").strip().lower() == "true"
+    return not is_debug and not is_testing
+
+
 def _read_docs_exposure_policy() -> str:
-    raw = os.getenv("DOCS_EXPOSURE_POLICY", "").strip().lower()
-    if raw in _ALLOWED_POLICIES:
-        return raw
+    raw_policy = os.getenv("DOCS_EXPOSURE_POLICY", "")
+    normalized_policy = raw_policy.strip().lower()
+    if normalized_policy in _ALLOWED_POLICIES:
+        return normalized_policy
+    if normalized_policy and _is_secure_runtime():
+        raise RuntimeError(
+            "Invalid DOCS_EXPOSURE_POLICY. "
+            f"Allowed values: {sorted(_ALLOWED_POLICIES)}."
+        )
     return _default_docs_policy()
 
 
