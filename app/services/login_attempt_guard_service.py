@@ -1,29 +1,22 @@
 from __future__ import annotations
 
-import hashlib
-import os
-from dataclasses import dataclass
 from math import ceil
 from time import time
 
 from app.extensions.integration_metrics import increment_metric
-from app.services.login_attempt_guard_storage import (
-    LoginAttemptState,
-    LoginAttemptStorage,
-    build_login_attempt_storage_from_env,
+from app.services.login_attempt_guard_backend import (
+    LoginAttemptGuardBackend,
+    build_login_attempt_guard_backend_from_env,
 )
-
-
-@dataclass(frozen=True)
-class LoginAttemptContext:
-    principal: str
-    client_ip: str
-    user_agent: str
-    known_principal: bool = False
-
-    def key(self) -> str:
-        raw = f"{self.principal}|{self.client_ip}|{self.user_agent}"
-        return hashlib.sha256(raw.encode("utf-8")).hexdigest()
+from app.services.login_attempt_guard_context import (
+    LoginAttemptContext,
+    build_login_attempt_context,
+)
+from app.services.login_attempt_guard_settings import (
+    LoginAttemptGuardSettings,
+    build_login_attempt_guard_settings,
+)
+from app.services.login_attempt_guard_storage import LoginAttemptState
 
 
 class LoginGuardBackendUnavailableError(RuntimeError):
@@ -36,43 +29,33 @@ class LoginAttemptGuardService:
     def __init__(
         self,
         *,
-        enabled: bool,
-        failure_threshold: int,
-        known_failure_threshold: int,
-        base_cooldown_seconds: int,
-        max_cooldown_seconds: int,
-        known_base_cooldown_seconds: int,
-        known_max_cooldown_seconds: int,
-        retention_seconds: int,
-        max_keys: int,
-        storage: LoginAttemptStorage,
-        backend_name: str,
-        configured_backend: str,
-        backend_ready: bool,
-        fail_closed: bool,
-        backend_failure_reason: str | None = None,
+        settings: LoginAttemptGuardSettings,
+        backend: LoginAttemptGuardBackend,
     ) -> None:
-        self._enabled = enabled
-        self._failure_threshold = max(1, failure_threshold)
-        self._known_failure_threshold = max(1, known_failure_threshold)
-        self._base_cooldown_seconds = max(1, base_cooldown_seconds)
+        self._enabled = settings.enabled
+        self._failure_threshold = max(1, settings.failure_threshold)
+        self._known_failure_threshold = max(1, settings.known_failure_threshold)
+        self._base_cooldown_seconds = max(1, settings.base_cooldown_seconds)
         self._max_cooldown_seconds = max(
             self._base_cooldown_seconds,
-            max_cooldown_seconds,
+            settings.max_cooldown_seconds,
         )
-        self._known_base_cooldown_seconds = max(1, known_base_cooldown_seconds)
+        self._known_base_cooldown_seconds = max(
+            1,
+            settings.known_base_cooldown_seconds,
+        )
         self._known_max_cooldown_seconds = max(
             self._known_base_cooldown_seconds,
-            known_max_cooldown_seconds,
+            settings.known_max_cooldown_seconds,
         )
-        self._retention_seconds = max(60, retention_seconds)
-        self._max_keys = max(1000, max_keys)
-        self._storage = storage
-        self.backend_name = backend_name
-        self.configured_backend = configured_backend
-        self.backend_ready = backend_ready
-        self.fail_closed = fail_closed
-        self.backend_failure_reason = backend_failure_reason
+        self._retention_seconds = max(60, settings.retention_seconds)
+        self._max_keys = max(1000, settings.max_keys)
+        self._storage = backend.storage
+        self.backend_name = backend.backend_name
+        self.configured_backend = backend.configured_backend
+        self.backend_ready = backend.backend_ready
+        self.fail_closed = settings.fail_closed
+        self.backend_failure_reason = backend.backend_failure_reason
 
     @property
     def enabled(self) -> bool:
@@ -85,11 +68,7 @@ class LoginAttemptGuardService:
         now = time()
         key = context.key()
         try:
-            self._storage.prune(
-                now=now,
-                retention_seconds=self._retention_seconds,
-                max_keys=self._max_keys,
-            )
+            self._prune_storage(now)
             state = self._storage.get(key)
         except Exception as exc:
             return self._handle_backend_error_for_check(exc)
@@ -102,6 +81,7 @@ class LoginAttemptGuardService:
             increment_metric("login_guard.check.allowed")
             increment_metric("login_guard.check.allowed.expired_block")
             return True, 0
+
         retry_after = int(ceil(state.blocked_until - now))
         increment_metric("login_guard.check.blocked")
         suffix = "known" if context.known_principal else "unknown"
@@ -115,11 +95,7 @@ class LoginAttemptGuardService:
         now = time()
         key = context.key()
         try:
-            self._storage.prune(
-                now=now,
-                retention_seconds=self._retention_seconds,
-                max_keys=self._max_keys,
-            )
+            self._prune_storage(now)
             state = self._storage.get(key) or LoginAttemptState()
             if state.blocked_until > now:
                 state.updated_at = now
@@ -144,10 +120,7 @@ class LoginAttemptGuardService:
                 return 0
 
             exponent = state.failures - active_failure_threshold
-            cooldown = min(
-                active_base_cooldown * (2**exponent),
-                active_max_cooldown,
-            )
+            cooldown = min(active_base_cooldown * (2**exponent), active_max_cooldown)
             state.blocked_until = now + cooldown
             self._persist_state(key, state)
             increment_metric("login_guard.cooldown.started")
@@ -189,10 +162,13 @@ class LoginAttemptGuardService:
         return max(self._retention_seconds, 60) + max_cooldown
 
     def _persist_state(self, key: str, state: LoginAttemptState) -> None:
-        self._storage.set(
-            key,
-            state,
-            ttl_seconds=self._state_ttl_seconds(),
+        self._storage.set(key, state, ttl_seconds=self._state_ttl_seconds())
+
+    def _prune_storage(self, now: float) -> None:
+        self._storage.prune(
+            now=now,
+            retention_seconds=self._retention_seconds,
+            max_keys=self._max_keys,
         )
 
     def _is_fail_closed_active(self) -> bool:
@@ -228,127 +204,18 @@ class LoginAttemptGuardService:
         self._storage.reset_for_tests()
 
 
-def _read_bool_env(name: str, default: bool) -> bool:
-    raw = os.getenv(name)
-    if raw is None:
-        return default
-    return raw.strip().lower() in {"1", "true", "yes", "on"}
-
-
-def _read_int_env(name: str, default: int) -> int:
-    raw = os.getenv(name)
-    if raw is None:
-        return default
-    try:
-        value = int(raw)
-    except ValueError:
-        return default
-    return value if value > 0 else default
-
-
-def _resolve_client_ip(
-    *,
-    remote_addr: str | None,
-    forwarded_for: str | None,
-    real_ip: str | None,
-) -> str:
-    trust_proxy = _read_bool_env("LOGIN_GUARD_TRUST_PROXY_HEADERS", False)
-    if trust_proxy:
-        forwarded = str(forwarded_for or "").strip()
-        if forwarded:
-            first_hop = forwarded.split(",")[0].strip()
-            if first_hop:
-                return first_hop
-        real = str(real_ip or "").strip()
-        if real:
-            return real
-    return str(remote_addr or "unknown")
-
-
-def build_login_attempt_context(
-    *,
-    principal: str,
-    remote_addr: str | None,
-    user_agent: str | None,
-    forwarded_for: str | None = None,
-    real_ip: str | None = None,
-    known_principal: bool = False,
-) -> LoginAttemptContext:
-    normalized_principal = principal.strip().lower()
-    normalized_agent = str(user_agent or "").strip()[:512]
-    client_ip = _resolve_client_ip(
-        remote_addr=remote_addr,
-        forwarded_for=forwarded_for,
-        real_ip=real_ip,
-    )
-    return LoginAttemptContext(
-        principal=normalized_principal,
-        client_ip=client_ip,
-        user_agent=normalized_agent,
-        known_principal=known_principal,
-    )
-
-
 _guard: LoginAttemptGuardService | None = None
 
 
 def get_login_attempt_guard() -> LoginAttemptGuardService:
     global _guard
     if _guard is None:
-        (
-            storage,
-            backend_name,
-            backend_ready,
-            configured_backend,
-            backend_failure_reason,
-        ) = build_login_attempt_storage_from_env()
-        default_fail_closed = (
-            configured_backend == "redis"
-            and not _read_bool_env("FLASK_DEBUG", False)
-            and not _read_bool_env("FLASK_TESTING", False)
+        backend = build_login_attempt_guard_backend_from_env()
+        settings = build_login_attempt_guard_settings(
+            configured_backend=backend.configured_backend,
+            backend_ready=backend.backend_ready,
         )
-        fail_closed = _read_bool_env("LOGIN_GUARD_FAIL_CLOSED", default_fail_closed)
-        _guard = LoginAttemptGuardService(
-            enabled=_read_bool_env("LOGIN_GUARD_ENABLED", True),
-            failure_threshold=_read_int_env("LOGIN_GUARD_FAILURE_THRESHOLD", 5),
-            known_failure_threshold=_read_int_env(
-                "LOGIN_GUARD_KNOWN_FAILURE_THRESHOLD",
-                _read_int_env("LOGIN_GUARD_FAILURE_THRESHOLD", 5),
-            ),
-            base_cooldown_seconds=_read_int_env(
-                "LOGIN_GUARD_BASE_COOLDOWN_SECONDS",
-                30,
-            ),
-            max_cooldown_seconds=_read_int_env(
-                "LOGIN_GUARD_MAX_COOLDOWN_SECONDS",
-                900,
-            ),
-            known_base_cooldown_seconds=_read_int_env(
-                "LOGIN_GUARD_KNOWN_BASE_COOLDOWN_SECONDS",
-                _read_int_env(
-                    "LOGIN_GUARD_BASE_COOLDOWN_SECONDS",
-                    30,
-                ),
-            ),
-            known_max_cooldown_seconds=_read_int_env(
-                "LOGIN_GUARD_KNOWN_MAX_COOLDOWN_SECONDS",
-                _read_int_env(
-                    "LOGIN_GUARD_MAX_COOLDOWN_SECONDS",
-                    900,
-                ),
-            ),
-            retention_seconds=_read_int_env(
-                "LOGIN_GUARD_RETENTION_SECONDS",
-                3600,
-            ),
-            max_keys=_read_int_env("LOGIN_GUARD_MAX_KEYS", 20000),
-            storage=storage,
-            backend_name=backend_name,
-            configured_backend=configured_backend,
-            backend_ready=backend_ready,
-            fail_closed=fail_closed,
-            backend_failure_reason=backend_failure_reason,
-        )
+        _guard = LoginAttemptGuardService(settings=settings, backend=backend)
     return _guard
 
 
@@ -357,3 +224,13 @@ def reset_login_attempt_guard_for_tests() -> None:
     if _guard is not None:
         _guard.reset_for_tests()
     _guard = None
+
+
+__all__ = [
+    "LoginAttemptContext",
+    "LoginGuardBackendUnavailableError",
+    "LoginAttemptGuardService",
+    "build_login_attempt_context",
+    "get_login_attempt_guard",
+    "reset_login_attempt_guard_for_tests",
+]

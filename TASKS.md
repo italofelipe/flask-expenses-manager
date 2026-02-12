@@ -17,11 +17,12 @@ Ultima atualizacao: 2026-02-12
 
 | ID | Area | Tarefa | Status | Progresso | Risco | Commit | Ultima atualizacao |
 |---|---|---|---|---:|---|---|---|
-| A1 | API Base | Padronizar contrato de resposta (sucesso/erro) em todos os endpoints | In Progress | 82% | Medio: ainda restam pontos fora do helper central (rate-limit/jwt callbacks) | da2ff52, f3ef3c0, pending-commit | 2026-02-12 |
+| A1 | API Base | Padronizar contrato de resposta (sucesso/erro) em todos os endpoints | In Progress | 86% | Medio: ainda restam pontos fora do helper central (rate-limit/jwt callbacks) | da2ff52, f3ef3c0, pending-commit | 2026-02-12 |
 | A2 | API Base | Revisar OpenAPI/Swagger para refletir rotas reais | Todo | 35% | Medio: divergencia gera erro de consumo em cliente | da19f35, f3ef3c0 | 2026-02-09 |
 | A3 | API Base | Remover inconsistencias de nomenclatura (ticker/wallet/investment) | Todo | 20% | Medio: confusao entre recurso legado e atual |  | 2026-02-09 |
 | A4 | API Base | Definir estrategia unica de validacao (Marshmallow vs Pydantic gradual) | Todo | 0% | Baixo: decisao arquitetural pendente |  | 2026-02-09 |
 | A5 | API Base | Consolidar utilitarios de controller dentro dos pacotes de dominio com facade legada para retrocompatibilidade | Done | 100% | Baixo | pending-commit | 2026-02-12 |
+| A6 | API Base | Modularizar login guard em componentes coesos (`context`, `settings`, `backend`, `service`) preservando retrocompatibilidade publica | Done | 100% | Baixo: arquitetura simplificada sem mudanca de regra de bloqueio/cooldown | pending-commit | 2026-02-12 |
 | B1 | Usuario | Criar endpoint dedicado para leitura de perfil (payload reduzido) | Todo | 0% | Baixo |  | 2026-02-09 |
 | B2 | Usuario | Reforcar validacoes de coerencia financeira no perfil | Todo | 0% | Medio: dados inconsistentes impactam metas |  | 2026-02-09 |
 | B3 | Usuario | Adicionar auditoria de atualizacao de perfil | Todo | 0% | Medio: rastreabilidade insuficiente |  | 2026-02-09 |
@@ -199,6 +200,7 @@ Ultima atualizacao: 2026-02-12
 | 2026-02-11 | S6-04/H1-Cleanup | Sanitização de erro aplicada aos controllers REST (`user/wallet/transaction reports`) com camada de aplicação (`DTO + interface + mapper`) para validação pública e fallback seguro sem leak; cobertura validada em 88% | pending-commit |
 | 2026-02-12 | A5/H1-Cleanup | `graphql_controller_utils` movido para `app/controllers/graphql/utils.py` com facade legada mantida para imports antigos e alinhamento do padrão por domínio | pending-commit |
 | 2026-02-12 | A1 | Contrato v1/v2 unificado em helper compartilhado (`app/controllers/response_contract.py`) com classe de erro extensível (`ResponseContractError`) e adoção inicial em auth/user/wallet/transaction | pending-commit |
+| 2026-02-12 | A6/S6-07 Prep | Login guard refatorado para arquitetura modular (`login_attempt_guard_context/settings/backend/service`) com dependências explícitas, mantendo API pública e cobertura >= 85% | pending-commit |
 | 2026-02-09 | D (observacao) | Restaurados arquivos deletados acidentalmente: ticker/carteira | n/a |
 
 ## Proxima prioridade sugerida
