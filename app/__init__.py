@@ -18,7 +18,7 @@ from app.controllers.auth_controller import (
 from app.controllers.graphql_controller import graphql_bp, register_graphql_security
 from app.controllers.transaction_controller import TransactionResource, transaction_bp
 from app.controllers.user_controller import UserMeResource, UserProfileResource, user_bp
-from app.controllers.wallet_controller import wallet_bp
+from app.controllers.wallet_controller import register_wallet_dependencies, wallet_bp
 from app.docs.api_documentation import API_INFO, TAGS
 from app.extensions.audit_retention_cli import register_audit_retention_commands
 from app.extensions.audit_trail import register_audit_trail
@@ -115,6 +115,7 @@ def create_app() -> Flask:
     register_docs_access_guard(app)
     register_audit_trail(app)
     register_audit_retention_commands(app)
+    register_wallet_dependencies(app)
 
     # Registra blueprints ANTES dos endpoints no Swagger
     app.register_blueprint(transaction_bp)
