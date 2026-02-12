@@ -1,25 +1,17 @@
 from typing import Any, Dict
 from uuid import UUID
 
-from flask import has_request_context, jsonify, request
+from flask import jsonify
 from flask_jwt_extended import JWTManager, get_jwt_identity
 
 from app.extensions.database import db
 from app.models.user import User
+from app.utils.api_contract import is_v2_contract_request
 from app.utils.response_builder import error_payload
-
-CONTRACT_HEADER = "X-API-Contract"
-CONTRACT_V2 = "v2"
-
-
-def _is_v2_contract() -> bool:
-    if not has_request_context():
-        return False
-    return str(request.headers.get(CONTRACT_HEADER, "")).strip().lower() == CONTRACT_V2
 
 
 def _jwt_error_response(message: str, *, code: str, status_code: int) -> Any:
-    if _is_v2_contract():
+    if is_v2_contract_request():
         return (
             jsonify(error_payload(message=message, code=code, details={})),
             status_code,

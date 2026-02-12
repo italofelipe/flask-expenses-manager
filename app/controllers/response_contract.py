@@ -2,13 +2,11 @@ from __future__ import annotations
 
 from typing import Any
 
-from flask import Response, has_request_context, request
+from flask import Response
 
 from app.exceptions import APIError
+from app.utils.api_contract import CONTRACT_HEADER, CONTRACT_V2, is_v2_contract_request
 from app.utils.response_builder import error_payload, json_response, success_payload
-
-CONTRACT_HEADER = "X-API-Contract"
-CONTRACT_V2 = "v2"
 
 
 class ResponseContractError(APIError):
@@ -33,10 +31,7 @@ class ResponseContractError(APIError):
 
 
 def is_v2_contract() -> bool:
-    if not has_request_context():
-        return False
-    header_value = str(request.headers.get(CONTRACT_HEADER, "")).strip().lower()
-    return header_value == CONTRACT_V2
+    return is_v2_contract_request()
 
 
 def compat_success_response(

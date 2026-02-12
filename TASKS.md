@@ -17,7 +17,7 @@ Ultima atualizacao: 2026-02-12
 
 | ID | Area | Tarefa | Status | Progresso | Risco | Commit | Ultima atualizacao |
 |---|---|---|---|---:|---|---|---|
-| A1 | API Base | Padronizar contrato de resposta (sucesso/erro) em todos os endpoints | In Progress | 86% | Medio: ainda restam pontos fora do helper central (rate-limit/jwt callbacks) | da2ff52, f3ef3c0, pending-commit | 2026-02-12 |
+| A1 | API Base | Padronizar contrato de resposta (sucesso/erro) em todos os endpoints | Done | 100% | Baixo: padronização v1/v2 aplicada em controllers, rate-limit e fluxo JWT legado/callbacks | da2ff52, f3ef3c0, pending-commit | 2026-02-12 |
 | A2 | API Base | Revisar OpenAPI/Swagger para refletir rotas reais | Todo | 35% | Medio: divergencia gera erro de consumo em cliente | da19f35, f3ef3c0 | 2026-02-09 |
 | A3 | API Base | Remover inconsistencias de nomenclatura (ticker/wallet/investment) | Todo | 20% | Medio: confusao entre recurso legado e atual |  | 2026-02-09 |
 | A4 | API Base | Definir estrategia unica de validacao (Marshmallow vs Pydantic gradual) | Todo | 0% | Baixo: decisao arquitetural pendente |  | 2026-02-09 |
@@ -209,6 +209,7 @@ Ultima atualizacao: 2026-02-12
 | 2026-02-12 | G16 (fase 4) | Endpoints de wallet atualizados de `missing=` para `load_default` no parsing de query (`page/per_page`) para compatibilidade Marshmallow v4; cobertura global mantida em 88.17% | pending-commit |
 | 2026-02-12 | G16 (fase 5) | `APISpec` passou a usar `schema_name_resolver` determinístico com sufixo por modificadores de schema (`only/exclude/...`), removendo colisões de componentes OpenAPI e reduzindo warnings da suíte de 160 para 11 | pending-commit |
 | 2026-02-12 | G16 (fase 6) | `pytest.ini` atualizado para filtrar apenas deprecações conhecidas de bibliotecas terceiras (`flask-apispec`/`schemathesis`) e manter `DeprecationWarning` do namespace `app.*` em modo `error`; execução completa da suíte ficou limpa (0 warnings exibidos) com cobertura em 88.24% | pending-commit |
+| 2026-02-12 | A1 (fechamento) | Helper de contrato extraído para utilitário neutro (`app/utils/api_contract.py`) e aplicado em `response_contract`, `jwt_callbacks`, `rate_limit` e `token_required`; fluxo JWT legado agora responde contrato v2 quando solicitado (sem quebrar v1) | pending-commit |
 | 2026-02-09 | D (observacao) | Restaurados arquivos deletados acidentalmente: ticker/carteira | n/a |
 
 ## Proxima prioridade sugerida
