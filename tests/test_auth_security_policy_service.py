@@ -17,7 +17,7 @@ def _reset_policy_cache() -> None:
     reset_auth_security_policy_for_tests()
 
 
-def test_auth_security_policy_defaults_to_legacy_compatibility() -> None:
+def test_auth_security_policy_defaults_to_relaxed_runtime_compatibility() -> None:
     policy = get_auth_security_policy()
 
     assert policy.registration.conceal_conflict is False
@@ -25,6 +25,21 @@ def test_auth_security_policy_defaults_to_legacy_compatibility() -> None:
     assert policy.registration.created_message == "User created successfully"
     assert policy.registration.conflict_message == "Email already registered"
     assert policy.login_guard.expose_known_principal is True
+
+
+def test_auth_security_policy_defaults_to_secure_behavior_in_production_runtime(
+    monkeypatch: Any,
+) -> None:
+    monkeypatch.setenv("FLASK_DEBUG", "false")
+    monkeypatch.setenv("FLASK_TESTING", "false")
+    monkeypatch.delenv("AUTH_CONCEAL_REGISTRATION_CONFLICT", raising=False)
+    monkeypatch.delenv("AUTH_LOGIN_GUARD_EXPOSE_KNOWN_PRINCIPAL", raising=False)
+    reset_auth_security_policy_for_tests()
+
+    policy = get_auth_security_policy()
+
+    assert policy.registration.conceal_conflict is True
+    assert policy.login_guard.expose_known_principal is False
 
 
 def test_auth_security_policy_reads_env_overrides(monkeypatch: Any) -> None:

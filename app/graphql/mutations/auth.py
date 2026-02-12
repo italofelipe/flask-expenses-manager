@@ -7,10 +7,13 @@ import graphene
 from flask_jwt_extended import create_access_token, get_jti
 from graphql import GraphQLError
 from marshmallow import ValidationError
-from werkzeug.security import check_password_hash, generate_password_hash
+from werkzeug.security import generate_password_hash
 
 from app.application.services.auth_security_policy_service import (
     get_auth_security_policy,
+)
+from app.application.services.password_verification_service import (
+    verify_password_with_timing_protection,
 )
 from app.controllers.user_controller import assign_user_profile_fields
 from app.extensions.database import db
@@ -179,7 +182,12 @@ class LoginMutation(graphene.Mutation):
                 },
             )
 
-        if not user or not check_password_hash(user.password, password):
+        password_hash = user.password if user is not None else None
+        is_valid_password = verify_password_with_timing_protection(
+            password_hash=password_hash,
+            plain_password=password,
+        )
+        if not user or not is_valid_password:
             _guard_register_failure_or_raise(
                 login_guard=login_guard,
                 login_context=login_context,

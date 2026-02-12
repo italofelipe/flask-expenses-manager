@@ -24,14 +24,21 @@ def _read_text_env(name: str, default: str) -> str:
     return value or default
 
 
+def _is_relaxed_auth_security_runtime() -> bool:
+    return _read_bool_env("FLASK_DEBUG", False) or _read_bool_env(
+        "FLASK_TESTING", False
+    )
+
+
 def _build_policy() -> AuthSecurityPolicyDTO:
+    relaxed_runtime = _is_relaxed_auth_security_runtime()
     conceal_registration_conflict = _read_bool_env(
         "AUTH_CONCEAL_REGISTRATION_CONFLICT",
-        False,
+        not relaxed_runtime,
     )
     expose_known_principal = _read_bool_env(
         "AUTH_LOGIN_GUARD_EXPOSE_KNOWN_PRINCIPAL",
-        True,
+        relaxed_runtime,
     )
     accepted_message = _read_text_env(
         "AUTH_REGISTRATION_ACCEPTED_MESSAGE",
