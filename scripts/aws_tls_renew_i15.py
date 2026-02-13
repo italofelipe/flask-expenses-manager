@@ -118,13 +118,23 @@ def _wait(ctx: AwsCtx, *, command_id: str, instance_id: str) -> None:
     )
 
 
-def _build_install_script(*, repo_path: str) -> str:
+def _build_install_script(*, repo_path: str | None) -> str:
     # systemd unit files live in the repo; we install them to /etc/systemd/system.
+    preferred = repo_path or ""
     return f"""\
 set -euo pipefail
-REPO="{repo_path}"
-if [ ! -d "$REPO" ]; then
-  echo "Repo not found: $REPO"
+
+REPO="{preferred}"
+if [ -n "$REPO" ] && [ -d "$REPO" ]; then
+  echo "[i15] repo=$REPO (explicit)"
+elif [ -d /opt/auraxis ]; then
+  REPO=/opt/auraxis
+  echo "[i15] repo=$REPO"
+elif [ -d /opt/flask_expenses ]; then
+  REPO=/opt/flask_expenses
+  echo "[i15] repo=$REPO (legacy)"
+else
+  echo "Repo not found in /opt."
   exit 2
 fi
 cd "$REPO"
@@ -142,11 +152,27 @@ sudo systemctl status --no-pager auraxis-certbot-renew.timer || true
 """
 
 
-def _build_run_once_script(*, repo_path: str, dry_run: bool) -> str:
+def _build_run_once_script(*, repo_path: str | None, dry_run: bool) -> str:
     flag = "--dry-run" if dry_run else ""
+    preferred = repo_path or ""
     return f"""\
 set -euo pipefail
-cd "{repo_path}"
+
+REPO="{preferred}"
+if [ -n "$REPO" ] && [ -d "$REPO" ]; then
+  echo "[i15] repo=$REPO (explicit)"
+elif [ -d /opt/auraxis ]; then
+  REPO=/opt/auraxis
+  echo "[i15] repo=$REPO"
+elif [ -d /opt/flask_expenses ]; then
+  REPO=/opt/flask_expenses
+  echo "[i15] repo=$REPO (legacy)"
+else
+  echo "Repo not found in /opt."
+  exit 2
+fi
+
+cd "$REPO"
 ./scripts/renew_tls_cert.sh {flag}
 """
 
@@ -165,11 +191,25 @@ def build_parser() -> argparse.ArgumentParser:
         "install", help="Install systemd timer+service for renewal."
     )
     p_install.add_argument("--env", choices=["prod", "dev"], default="prod")
-    p_install.add_argument("--repo-path", default="/opt/auraxis")
+    p_install.add_argument(
+        "--repo-path",
+        default=None,
+        help=(
+            "Optional override if repo is not under /opt/auraxis "
+            "or /opt/flask_expenses."
+        ),
+    )
 
     p_run = sub.add_parser("run-once", help="Run renewal once via SSM.")
     p_run.add_argument("--env", choices=["prod", "dev"], default="prod")
-    p_run.add_argument("--repo-path", default="/opt/auraxis")
+    p_run.add_argument(
+        "--repo-path",
+        default=None,
+        help=(
+            "Optional override if repo is not under /opt/auraxis "
+            "or /opt/flask_expenses."
+        ),
+    )
     p_run.add_argument("--dry-run", action="store_true")
     return p
 
@@ -181,7 +221,7 @@ def main() -> int:
     instance_id = args.prod_instance_id if env_name == "prod" else args.dev_instance_id
 
     if args.cmd == "install":
-        script = _build_install_script(repo_path=str(args.repo_path))
+        script = _build_install_script(repo_path=args.repo_path)
         cmd_id = _ssm_send_shell(
             ctx, instance_id, script, f"auraxis: i15 install ({env_name})"
         )
@@ -191,7 +231,7 @@ def main() -> int:
 
     if args.cmd == "run-once":
         script = _build_run_once_script(
-            repo_path=str(args.repo_path), dry_run=bool(args.dry_run)
+            repo_path=args.repo_path, dry_run=bool(args.dry_run)
         )
         cmd_id = _ssm_send_shell(
             ctx,
