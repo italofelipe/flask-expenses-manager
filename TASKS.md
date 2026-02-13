@@ -73,7 +73,7 @@ Ultima atualizacao: 2026-02-13
 | I3 | Deploy AWS | Provisionar ambiente base na AWS (VPC, SG, instância Lightsail/EC2) | In Progress | 70% | Medio: hardening inicial de rede e portas | pending-commit | 2026-02-10 |
 | I4 | Deploy AWS | Provisionar banco no plano A (PostgreSQL em container na própria VM) | Todo | 0% | Medio: risco operacional sem HA gerenciado |  | 2026-02-09 |
 | I5 | Deploy AWS | Provisionar banco no plano B (RDS PostgreSQL) e documentar critérios de fallback | Todo | 0% | Alto: custo pode estourar orçamento |  | 2026-02-09 |
-| I6 | Deploy AWS | Configurar deploy automático (GitHub Actions -> servidor) com rollback básico | Todo | 0% | Medio: risco de indisponibilidade durante release |  | 2026-02-09 |
+| I6 | Deploy AWS | Configurar deploy automático (GitHub Actions -> servidor) com rollback básico | In Progress | 35% | Medio: deploy via SSM (manual) implementado; falta integrar GitHub Actions com OIDC/IAM e adicionar rollback automático | pending-commit | 2026-02-13 |
 | I7 | Deploy AWS | Observabilidade mínima (logs centralizados, métricas, alertas básicos) | Done | 100% | Médio: DEV canary via HTTP:80 (sem TLS), PROD via HTTPS:443; logs em CloudWatch Logs confirmados para web/nginx/db/redis | pending-commit | 2026-02-13 |
 | I8 | Deploy AWS | Hardening de produção (secrets, TLS, firewall, least-privilege IAM) | In Progress | 40% | Alto: risco de segurança e vazamento | pending-commit | 2026-02-10 |
 | I9 | Deploy AWS | Runbook de operação (backup, restore, rotação de credenciais, incidentes) | Todo | 0% | Medio: continuidade operacional insuficiente |  | 2026-02-09 |
@@ -247,6 +247,7 @@ Ultima atualizacao: 2026-02-13
 | 2026-02-13 | Security | GraphQL: sanitização de `extensions` em erros de execução para evitar leak de detalhes de infraestrutura; Transações: deduplicação de `_guard_revoked_token` em `transaction.utils`. | pending-commit |
 | 2026-02-13 | DX/CI | Paridade local: script `scripts/run_ci_like_actions_local.sh` (pipeline CI-like) + hooks `pre-push` no pre-commit para `pip-audit` e `security_evidence_check.sh` (evita surpresas só no Actions). | pending-commit |
 | 2026-02-13 | I7 | Rollout em EC2 via SSM: `awslogs` aplicado em DEV/PROD (streams `dev/prod-{nginx,web,db,redis}`), health checks Route53: PROD `HTTPS:443`, DEV migrado para `HTTP:80` (TLS ainda não emitido no DEV), alarmes reabilitados após estabilização. | pending-commit |
+| 2026-02-13 | I6 | Deploy (fase 1, manual): script `scripts/aws_deploy_i6.py` para deploy via SSM por git ref em DEV/PROD com validação `/healthz` e render de Nginx por ambiente. | pending-commit |
 | 2026-02-13 | S1 | Alertas operacionais: regra EventBridge `auraxis-ssm-command-failures` -> SNS `auraxis-alerts` para falhas de SSM RunCommand (patching/backups/ops). | pending-commit |
 | 2026-02-13 | S1 | Patching validado end-to-end: tasks de `AWS-RunPatchBaseline` re-registradas com `RebootIfNeeded` (DEV) e `NoReboot` (PROD) e validação executada via maintenance windows one-off agendadas (DEV+PROD: SUCCESS). | pending-commit |
 | 2026-02-09 | D (observacao) | Restaurados arquivos deletados acidentalmente: ticker/carteira | n/a |
