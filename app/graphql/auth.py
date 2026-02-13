@@ -5,6 +5,7 @@ from flask import request
 from flask_jwt_extended import decode_token
 from graphql import GraphQLError
 
+from app.extensions.database import db
 from app.models.user import User
 
 
@@ -30,7 +31,7 @@ def get_current_user_optional() -> User | None:
     if not user_id or not jti:
         return None
 
-    user = cast(User | None, User.query.get(UUID(str(user_id))))
+    user = cast(User | None, db.session.get(User, UUID(str(user_id))))
     if not user or user.current_jti != str(jti):
         return None
     return user

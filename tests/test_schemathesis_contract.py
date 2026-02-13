@@ -3,6 +3,18 @@ from __future__ import annotations
 import os
 
 import pytest
+
+# This module is intentionally opt-in.
+# Import-time application boot + schema generation can be expensive and may slow
+# down unrelated local checks (pre-commit, unit test runs, etc.).
+# The CI "Schemathesis" job already sets `SCHEMATHESIS_MAX_EXAMPLES`.
+if os.getenv("SCHEMATHESIS_MAX_EXAMPLES") is None:
+    pytest.skip(
+        "Schemathesis contract tests are opt-in. "
+        "Set SCHEMATHESIS_MAX_EXAMPLES to enable.",
+        allow_module_level=True,
+    )
+
 import schemathesis
 from hypothesis import HealthCheck, settings
 
@@ -14,8 +26,19 @@ os.environ.setdefault("JWT_SECRET_KEY", "y" * 64)
 os.environ.setdefault("FLASK_DEBUG", "False")
 os.environ.setdefault("FLASK_TESTING", "true")
 os.environ.setdefault("SECURITY_ENFORCE_STRONG_SECRETS", "false")
+os.environ.setdefault("DOCS_EXPOSURE_POLICY", "public")
 
 _APP = create_app()
+
+
+@pytest.fixture(scope="session", autouse=True)
+def _dispose_schemathesis_app() -> None:
+    yield
+    from app.extensions.database import db
+
+    with _APP.app_context():
+        db.session.remove()
+        db.engine.dispose()
 
 
 def _normalize_parameter(parameter: object) -> dict[str, object] | None:
@@ -42,7 +65,8 @@ def _normalize_operation_parameters(operation: dict[str, object]) -> None:
 
 
 def _load_normalized_openapi_spec() -> dict[str, object]:
-    response = _APP.test_client().get("/docs/swagger/")
+    with _APP.test_client() as client:
+        response = client.get("/docs/swagger/")
     spec = dict(response.get_json() or {})
     paths = spec.get("paths")
     if not isinstance(paths, dict):
@@ -84,7 +108,20 @@ SERVER_ERROR_CHECK = getattr(
 def test_openapi_contract_no_server_errors(case: schemathesis.Case) -> None:
     assert SERVER_ERROR_CHECK is not None
     response = case.call(headers={"X-API-Contract": "v2"})
-    case.validate_response(
-        response,
-        checks=(SERVER_ERROR_CHECK,),
-    )
+    try:
+        case.validate_response(
+            response,
+            checks=(SERVER_ERROR_CHECK,),
+        )
+    finally:
+        close = getattr(response, "close", None)
+        if callable(close):
+            close()
+    # Under newer Python versions, SQLite connections can surface as ResourceWarning
+    # when finalized during Hypothesis execution. Ensure the engine is fully disposed
+    # between examples to keep the suite warning-free and deterministic.
+    from app.extensions.database import db
+
+    with _APP.app_context():
+        db.session.remove()
+        db.engine.dispose()

@@ -52,11 +52,7 @@ def test_transaction_endpoints_return_401_when_token_is_revoked(
     transaction_id = created.get_json()["data"]["transaction"][0]["id"]
 
     monkeypatch.setattr(
-        "app.controllers.transaction_controller.is_token_revoked",
-        lambda _jti: True,
-    )
-    monkeypatch.setattr(
-        "app.controllers.transaction_report_resources.is_token_revoked",
+        "app.controllers.transaction.utils.is_token_revoked",
         lambda _jti: True,
     )
 
@@ -95,7 +91,7 @@ def test_transaction_installment_create_handles_internal_error(
 ) -> None:
     token = _register_and_login(client, "installment-error")
     monkeypatch.setattr(
-        "app.controllers.transaction_controller._build_installment_amounts",
+        "app.controllers.transaction.resources._build_installment_amounts",
         lambda *_args, **_kwargs: (_ for _ in ()).throw(RuntimeError("boom")),
     )
 
@@ -151,6 +147,30 @@ def test_transaction_expenses_rejects_invalid_order_and_period(client) -> None:
     assert invalid_order.get_json()["error"]["code"] == "VALIDATION_ERROR"
 
 
+def test_transaction_expenses_masks_unexpected_value_error(client, monkeypatch) -> None:
+    token = _register_and_login(client, "expense-value-error")
+
+    def _raise_unexpected_value_error(*_args: object, **_kwargs: object) -> object:
+        raise ValueError("sqlalchemy internal failure: select * from users")
+
+    monkeypatch.setattr(
+        "app.controllers.transaction.report_resources._resolve_transaction_ordering",
+        _raise_unexpected_value_error,
+    )
+
+    response = client.get(
+        f"/transactions/expenses?finalDate={date.today().isoformat()}",
+        headers=_auth_headers(token),
+    )
+
+    assert response.status_code == 400
+    body = response.get_json()
+    serialized = str(body)
+    assert body["error"]["code"] == "VALIDATION_ERROR"
+    assert body["message"] == "Parâmetros de período inválidos."
+    assert "sqlalchemy internal failure" not in serialized
+
+
 def test_transaction_summary_and_dashboard_handle_analytics_failures(
     client, monkeypatch
 ) -> None:
@@ -167,7 +187,7 @@ def test_transaction_summary_and_dashboard_handle_analytics_failures(
             raise RuntimeError("analytics unavailable")
 
     monkeypatch.setattr(
-        "app.controllers.transaction_report_resources.TransactionAnalyticsService",
+        "app.controllers.transaction.report_resources.TransactionAnalyticsService",
         _BrokenAnalyticsService,
     )
 

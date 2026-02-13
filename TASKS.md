@@ -1,6 +1,6 @@
 # TASKS - Central de TODOs e Progresso
 
-Ultima atualizacao: 2026-02-11
+Ultima atualizacao: 2026-02-13
 
 ## Regras de uso deste arquivo
 - Este arquivo centraliza TODOs de produto, engenharia e qualidade.
@@ -17,10 +17,12 @@ Ultima atualizacao: 2026-02-11
 
 | ID | Area | Tarefa | Status | Progresso | Risco | Commit | Ultima atualizacao |
 |---|---|---|---|---:|---|---|---|
-| A1 | API Base | Padronizar contrato de resposta (sucesso/erro) em todos os endpoints | In Progress | 70% | Medio: domínios futuros ainda nao padronizados | da2ff52, f3ef3c0 | 2026-02-09 |
+| A1 | API Base | Padronizar contrato de resposta (sucesso/erro) em todos os endpoints | Done | 100% | Baixo: padronização v1/v2 aplicada em controllers, rate-limit e fluxo JWT legado/callbacks | da2ff52, f3ef3c0, pending-commit | 2026-02-12 |
 | A2 | API Base | Revisar OpenAPI/Swagger para refletir rotas reais | Todo | 35% | Medio: divergencia gera erro de consumo em cliente | da19f35, f3ef3c0 | 2026-02-09 |
 | A3 | API Base | Remover inconsistencias de nomenclatura (ticker/wallet/investment) | Todo | 20% | Medio: confusao entre recurso legado e atual |  | 2026-02-09 |
 | A4 | API Base | Definir estrategia unica de validacao (Marshmallow vs Pydantic gradual) | Todo | 0% | Baixo: decisao arquitetural pendente |  | 2026-02-09 |
+| A5 | API Base | Consolidar utilitarios de controller dentro dos pacotes de dominio com facade legada para retrocompatibilidade | Done | 100% | Baixo | pending-commit | 2026-02-12 |
+| A6 | API Base | Modularizar login guard em componentes coesos (`context`, `settings`, `backend`, `service`) preservando retrocompatibilidade publica | Done | 100% | Baixo: arquitetura simplificada sem mudanca de regra de bloqueio/cooldown | pending-commit | 2026-02-12 |
 | B1 | Usuario | Criar endpoint dedicado para leitura de perfil (payload reduzido) | Todo | 0% | Baixo |  | 2026-02-09 |
 | B2 | Usuario | Reforcar validacoes de coerencia financeira no perfil | Todo | 0% | Medio: dados inconsistentes impactam metas |  | 2026-02-09 |
 | B3 | Usuario | Adicionar auditoria de atualizacao de perfil | Todo | 0% | Medio: rastreabilidade insuficiente |  | 2026-02-09 |
@@ -47,7 +49,7 @@ Ultima atualizacao: 2026-02-11
 | F2 | Auxiliares | CRUD de `Account` | Todo | 0% | Baixo |  | 2026-02-09 |
 | F3 | Auxiliares | CRUD de `CreditCard` | Todo | 0% | Baixo |  | 2026-02-09 |
 | F4 | Auxiliares | Integrar `Tag/Account/CreditCard` com transacoes e validacoes | Todo | 0% | Medio |  | 2026-02-09 |
-| G1 | Qualidade | Completar suite de testes por dominio | In Progress | 75% | Medio: lacunas em cenarios complexos | 497f901, f3ef3c0 | 2026-02-09 |
+| G1 | Qualidade | Completar suite de testes por dominio | In Progress | 80% | Medio: lacunas em cenarios complexos | 497f901, f3ef3c0, pending-commit | 2026-02-12 |
 | G2 | Qualidade | Testes de integracao BRAPI com mocks/fakes | In Progress | 60% | Medio: falta cenário E2E com falha real do provider | 497f901, pending-commit | 2026-02-09 |
 | G3 | Qualidade | Enforce de cobertura minima no CI | In Progress | 80% | Baixo | 497f901, 7f0ac66 | 2026-02-09 |
 | G4 | Qualidade | Pipeline CI para lint, type-check, testes e gates de qualidade | In Progress | 92% | Baixo | 842a656, 7f0ac66 | 2026-02-11 |
@@ -59,9 +61,10 @@ Ultima atualizacao: 2026-02-11
 | G10 | CI/Security | Integrar scan de imagem/container com Trivy em todo PR/push | Done | 100% | Baixo: pipeline validado com imagem hardenizada e scan HIGH/CRITICAL limpo no baseline atual | pending-commit | 2026-02-11 |
 | G11 | CI/Governance | Formalizar política de branch protection + required checks + push protection no GitHub | Todo | 0% | Alto: sem enforcement central, gates podem ser ignorados |  | 2026-02-11 |
 | G12 | CI/Quality | Garantir paridade local do job `Quality` (script Python 3.11 + hook mypy alinhado ao CI) | Done | 100% | Baixo | pending-commit | 2026-02-11 |
-| G13 | CI/Quality | Adicionar matrix de tipagem (`mypy`) em Python 3.11 e 3.13 para reduzir regressão entre ambientes | Todo | 0% | Médio: divergência de stubs entre versões pode voltar a gerar falso positivo/falso negativo |  | 2026-02-11 |
-| G14 | CI/Quality | Avaliar lock/constraints de dependências de tooling (lint/type/security) para builds determinísticos | Todo | 0% | Médio: atualização não controlada de tooling pode quebrar gates sem mudança de código |  | 2026-02-11 |
+| G13 | CI/Quality | Adicionar matrix de tipagem (`mypy`) em Python 3.11 e 3.13 para reduzir regressão entre ambientes | Done | 100% | Baixo: job dedicado `mypy-matrix` cobre 3.11/3.13 em paralelo | pending-commit | 2026-02-12 |
+| G14 | CI/Quality | Avaliar lock/constraints de dependências de tooling (lint/type/security) para builds determinísticos | Done | 100% | Baixo: `pip-audit` e stubs de tipagem fixados em versão e CI sem instalação avulsa não determinística | pending-commit | 2026-02-12 |
 | G15 | CI/Review | Integrar Cursor Bugbot como camada de revisão automática de PR + calibrar obrigatoriedade no ruleset | In Progress | 35% | Médio: risco de falso positivo se exigido sem período de calibração |  | 2026-02-11 |
+| G16 | Quality | Reduzir warnings globais de deprecacao (Marshmallow v4, apispec schema naming, warnings de terceiros) com plano faseado | In Progress | 92% | Baixo: warnings do pipeline local foram saneados; remanescente depende de upgrade estruturado de bibliotecas terceiras | pending-commit | 2026-02-12 |
 | H1 | Arquitetura | Adicionar suporte a GraphQL | In Progress | 65% | Alto: impacto transversal na API | ba1f238, e12bf21 | 2026-02-09 |
 | H2 | Seguranca | Implementar rate limit por rota/usuario/IP | Done | 100% | Baixo: rate-limit por domínio com backend distribuído, fail-closed e observabilidade básica | pending-commit | 2026-02-11 |
 | H3 | Seguranca | Hardening de validacao/sanitizacao/authz/headers/auditoria | Done | 100% | Médio: baseline aplicado; evolução contínua segue para monitoramento centralizado e infraestrutura S1 | pending-commit | 2026-02-11 |
@@ -71,7 +74,7 @@ Ultima atualizacao: 2026-02-11
 | I4 | Deploy AWS | Provisionar banco no plano A (PostgreSQL em container na própria VM) | Todo | 0% | Medio: risco operacional sem HA gerenciado |  | 2026-02-09 |
 | I5 | Deploy AWS | Provisionar banco no plano B (RDS PostgreSQL) e documentar critérios de fallback | Todo | 0% | Alto: custo pode estourar orçamento |  | 2026-02-09 |
 | I6 | Deploy AWS | Configurar deploy automático (GitHub Actions -> servidor) com rollback básico | Todo | 0% | Medio: risco de indisponibilidade durante release |  | 2026-02-09 |
-| I7 | Deploy AWS | Observabilidade mínima (logs centralizados, métricas, alertas básicos) | Todo | 0% | Medio: sem observabilidade o suporte fica reativo |  | 2026-02-09 |
+| I7 | Deploy AWS | Observabilidade mínima (logs centralizados, métricas, alertas básicos) | In Progress | 92% | Alto: health checks/alarms criados para `/healthz`, mas requer deploy do endpoint em DEV/PROD antes de habilitar actions; logs CloudWatch via `awslogs` overlay pronto; falta aplicar overlay em EC2 e validar ingestão de logs/streams | pending-commit | 2026-02-13 |
 | I8 | Deploy AWS | Hardening de produção (secrets, TLS, firewall, least-privilege IAM) | In Progress | 40% | Alto: risco de segurança e vazamento | pending-commit | 2026-02-10 |
 | I9 | Deploy AWS | Runbook de operação (backup, restore, rotação de credenciais, incidentes) | Todo | 0% | Medio: continuidade operacional insuficiente |  | 2026-02-09 |
 | I10 | Deploy Cloud | Primeiro deploy em produção (MVP) imediatamente após fechar Bloco D | Todo | 0% | Alto: dependência de D5-D8 e pipeline estável |  | 2026-02-09 |
@@ -83,7 +86,9 @@ Ultima atualizacao: 2026-02-11
 | I16 | Nginx/TLS | Checklist de validação local/AWS (DNS, SG, health, curl, logs, rollback) | In Progress | 65% | Baixo | pending-commit | 2026-02-10 |
 | R1 | Rebranding | Mapear todas ocorrências de nomenclatura legada do projeto e registrar plano de substituição para `auraxis` | Done | 100% | Baixo: mapeamento concluído em arquivos versionados | pending-commit | 2026-02-10 |
 | R2 | Rebranding | Substituir ocorrências versionadas de nomenclatura legada por `auraxis` (sem quebrar integrações externas) | Done | 100% | Medio: integrações externas podem manter identificador legado temporário | pending-commit | 2026-02-10 |
-| S1 | AWS Security | Restringir acesso e hardening de instâncias EC2 (SG, NACL, IMDSv2, SSH policy, patching baseline) | Todo | 0% | Alto: superfície de ataque de infraestrutura |  | 2026-02-10 |
+| S1 | AWS Security | Restringir acesso e hardening de instâncias EC2 (SG, NACL, IMDSv2, SSH policy, patching baseline) | Done | 100% | Baixo: baseline aplicado e validado; pendência remanescente é apenas runbook operacional (I9) e ajustes contínuos | pending-commit | 2026-02-13 |
+| S1-03 | AWS Security | Backups do PostgreSQL para S3 (bucket hardenizado + IAM least-privilege + lifecycle + versioning + restore drill + agendamento via SSM MW) | Done | 100% | Médio: ainda falta runbook de restore completo e teste de RTO/RPO com volume real | pending-commit | 2026-02-13 |
+| S1-02 | AWS Security | Cleanup pós-migração de EBS: revisar e remover volumes/snapshots antigos (após janela de validação) | Done | 100% | Baixo: volumes e snapshots intermediários removidos após confirmação | pending-commit | 2026-02-12 |
 | S2 | App Security | Implementar segurança de endpoints (rate-limit, validação/sanitização de request/response, headers e authz por recurso) | Done | 100% | Médio: baseline completo em aplicação; próximos passos são monitoramento centralizado e hardening de infraestrutura (S1) | pending-commit | 2026-02-11 |
 | S3 | App Security | Executar checklist OWASP no sistema (ASVS/API Top 10), corrigir gaps e formalizar evidências | In Progress | 92% | Médio: baseline e remediações de aplicação concluídas; pendências residuais concentram-se em controles de infraestrutura (S1) | pending-commit | 2026-02-11 |
 | S4-01 | App Security | Remover vazamento de exceções em respostas (`str(e)`, `traceback`) e adotar erros genéricos com correlação | Done | 100% | Médio: manter revisão contínua em novos endpoints | pending-commit | 2026-02-11 |
@@ -116,15 +121,15 @@ Ultima atualizacao: 2026-02-11
 | S6-01 | App Security | Corrigir mass-assignment no `PUT /transactions/{id}` com allowlist de campos mutáveis | Done | 100% | Baixo: coberto por validação e testes de regressão | pending-commit | 2026-02-11 |
 | S6-02 | App Security | Tornar `user_id` dump-only no schema de transação e bloquear bind de ownership por payload | Done | 100% | Baixo: schema endurecido e teste de payload malicioso adicionado | pending-commit | 2026-02-11 |
 | S6-03 | App Security | Validar ownership de `tag_id/account_id/credit_card_id` no REST de transações (create/update) | Done | 100% | Baixo: validação central reaproveitada no REST | pending-commit | 2026-02-11 |
-| S6-04 | App Security | Remover vazamento de `str(exc)`/detalhes internos em controllers REST e padronizar erro seguro | In Progress | 65% | Médio: transações já saneadas; faltam demais controllers REST | pending-commit | 2026-02-11 |
+| S6-04 | App Security | Remover vazamento de `str(exc)`/detalhes internos em controllers REST e padronizar erro seguro | Done | 100% | Baixo: mapeador de erro público aplicado em REST/GraphQL para exceções de validação, com fallback seguro para falhas inesperadas | pending-commit | 2026-02-11 |
 | S6-05 | App Security | Unificar política de registro REST/GraphQL (mesma validação de senha/email e normalização) | Done | 100% | Baixo: GraphQL passou a usar `UserRegistrationSchema` | pending-commit | 2026-02-11 |
-| S6-06 | App Security | Mitigar enumeração de contas em register/login (status e comportamento observável) | Todo | 0% | Médio: facilita credential stuffing orientado |  | 2026-02-11 |
-| S6-07 | App Security | Migrar login guard para backend distribuído (Redis) com política de falha explícita | Todo | 0% | Médio: proteção inconsistente em escala |  | 2026-02-11 |
-| S6-08 | App Security | Endurecer defaults de runtime (`DEBUG=False` por padrão seguro e validação de startup) | Todo | 0% | Médio: risco por configuração ausente/incompleta |  | 2026-02-11 |
-| S6-09 | App Security | Retirar sweep de retenção de auditoria do ciclo de request (job agendado/assíncrono) | Todo | 0% | Médio: impacto em latência e disponibilidade |  | 2026-02-11 |
+| S6-06 | App Security | Mitigar enumeração de contas em register/login (status e comportamento observável) | Done | 100% | Baixo: defaults seguros em runtime de produção e proteção de timing em login REST/GraphQL | 4ff5265 | 2026-02-12 |
+| S6-07 | App Security | Migrar login guard para backend distribuído (Redis) com política de falha explícita | Done | 100% | Baixo: policy explícita exigida em runtime seguro e compose com Redis pronto para rate-limit/login guard | e23b2af | 2026-02-12 |
+| S6-08 | App Security | Endurecer defaults de runtime (`DEBUG=False` por padrão seguro e validação de startup) | Done | 100% | Baixo: runtime seguro bloqueia bypass de enforcement de secrets e mantém validação de startup | 5fc1be7 | 2026-02-12 |
+| S6-09 | App Security | Retirar sweep de retenção de auditoria do ciclo de request (job agendado/assíncrono) | Done | 100% | Baixo: retenção externalizada via CLI/job e proteção coberta por teste de não execução no request | 208e1d1 | 2026-02-12 |
 | S6-10 | App Security | Atualizar dependências com CVE (`Flask`, `marshmallow`) e zerar `pip-audit` runtime | Done | 100% | Baixo: gate validado com `pip-audit` sem vulnerabilidades conhecidas | afc15c7 | 2026-02-11 |
 | S6-11 | App Security | Harden Docker de produção (non-root, multi-stage, runtime deps only) | Done | 100% | Baixo: multi-stage + non-root + contexto sem segredos reduziram superfície e removeram CVEs críticos/altos observados | pending-commit | 2026-02-11 |
-| S6-12 | App Security | Definir política de exposição de documentação em produção (`/docs`) por ambiente/autenticação | Todo | 0% | Baixo: disclosure de metadata da API |  | 2026-02-11 |
+| S6-12 | App Security | Definir política de exposição de documentação em produção (`/docs`) por ambiente/autenticação | Done | 100% | Baixo: política por ambiente + fail-fast para configuração inválida em runtime seguro | 208e1d1 | 2026-02-12 |
 | X1 | Tech Debt | Remover/atualizar TODO desatualizado sobre enums em transacoes | Todo | 0% | Baixo: clareza de manutencao |  | 2026-02-09 |
 
 ## Registro de progresso recente
@@ -194,11 +199,60 @@ Ultima atualizacao: 2026-02-11
 | 2026-02-11 | G15 | Cursor Bugbot registrado em documentação de CI/CD como camada complementar de revisão de PR; estratégia de execução local e limitações formalizadas | pending-commit |
 | 2026-02-11 | G8/G9 | Hardening de CI: mutation test sem path hardcoded de `.venv` (compatível com runner GitHub) e actions Snyk fixadas por SHA imutável para reduzir risco de supply-chain | pending-commit |
 | 2026-02-11 | G10/S6-11 | Hardening de container para Trivy: Dockerfile.prod multi-stage, runtime não-root, atualização de pacotes no estágio final e exclusão de `.env/.pem/.key` no `.dockerignore`; scan local Trivy (HIGH/CRITICAL) limpo | pending-commit |
+| 2026-02-11 | H1/Cleanup | Refatoração estrutural de transações e GraphQL: `transaction_controller` quebrado em recursos modulares, OpenAPI extraído, `schema.py` segmentado em `types/query/mutations`; cobertura global mantida em 88% com suíte e hooks verdes | cbcf368 |
+| 2026-02-11 | S6-04/H1-Cleanup | Sanitização de erro aplicada aos controllers REST (`user/wallet/transaction reports`) com camada de aplicação (`DTO + interface + mapper`) para validação pública e fallback seguro sem leak; cobertura validada em 88% | pending-commit |
+| 2026-02-12 | A5/H1-Cleanup | `graphql_controller_utils` movido para `app/controllers/graphql/utils.py` com facade legada mantida para imports antigos e alinhamento do padrão por domínio | pending-commit |
+| 2026-02-12 | A1 | Contrato v1/v2 unificado em helper compartilhado (`app/controllers/response_contract.py`) com classe de erro extensível (`ResponseContractError`) e adoção inicial em auth/user/wallet/transaction | pending-commit |
+| 2026-02-12 | A6/S6-07 Prep | Login guard refatorado para arquitetura modular (`login_attempt_guard_context/settings/backend/service`) com dependências explícitas, mantendo API pública e cobertura >= 85% | pending-commit |
+| 2026-02-12 | G1/G16 | Suíte estabilizada sem `ResourceWarning` de SQLite e sem `InsecureKeyLengthWarning` em JWT de testes (fixtures e apps de teste endurecidos); backlog de deprecações Marshmallow/apispec formalizado | pending-commit |
+| 2026-02-12 | G16 (fase 1) | `auth_schema` migrado para `metadata=` (Marshmallow 4-ready) e `wallet_schema` atualizado para `load_default`; suíte e cobertura >= 85% mantidas | pending-commit |
+| 2026-02-12 | G16 (fase 2) | Schemas auxiliares (`account`, `tag`, `credit_card`, `error`, `user_ticker`) migrados para `metadata=` em preparação ao Marshmallow v4; cobertura mantida em 88% | pending-commit |
+| 2026-02-12 | G16 (fase 3) | `transaction_schema` e `user_schemas` migrados para `metadata=` e remoção de `Meta.ordered` legado; `mypy` e suíte completa verdes com cobertura global em 88.17% | pending-commit |
+| 2026-02-12 | G16 (fase 4) | Endpoints de wallet atualizados de `missing=` para `load_default` no parsing de query (`page/per_page`) para compatibilidade Marshmallow v4; cobertura global mantida em 88.17% | pending-commit |
+| 2026-02-12 | G16 (fase 5) | `APISpec` passou a usar `schema_name_resolver` determinístico com sufixo por modificadores de schema (`only/exclude/...`), removendo colisões de componentes OpenAPI e reduzindo warnings da suíte de 160 para 11 | pending-commit |
+| 2026-02-12 | G16 (fase 6) | `pytest.ini` atualizado para filtrar apenas deprecações conhecidas de bibliotecas terceiras (`flask-apispec`/`schemathesis`) e manter `DeprecationWarning` do namespace `app.*` em modo `error`; execução completa da suíte ficou limpa (0 warnings exibidos) com cobertura em 88.24% | pending-commit |
+| 2026-02-12 | A1 (fechamento) | Helper de contrato extraído para utilitário neutro (`app/utils/api_contract.py`) e aplicado em `response_contract`, `jwt_callbacks`, `rate_limit` e `token_required`; fluxo JWT legado agora responde contrato v2 quando solicitado (sem quebrar v1) | pending-commit |
+| 2026-02-12 | G13 | CI ganhou job dedicado `mypy-matrix` em Python 3.11 e 3.13, reduzindo risco de regressão de tipagem entre versões sem alterar os gates existentes de lint/test/security | pending-commit |
+| 2026-02-12 | G14 | Tooling CI deterministic: `pip-audit` adicionado com versão fixa em `requirements-dev.txt`, remoção de `pip install` avulso no workflow e stubs (`types-*`) fixados em `requirements.txt` | pending-commit |
+| 2026-02-12 | S6-06 | Mitigação de enumeração em autenticação: política padrão em produção agora oculta conflito de registro e desabilita sinal de principal conhecido no login guard; REST/GraphQL passaram a usar verificação de senha com proteção de timing para usuários inexistentes | 4ff5265 |
+| 2026-02-12 | S6-07 | Login guard Redis endurecido com política de falha explícita em runtime seguro (`LOGIN_GUARD_FAIL_CLOSED` obrigatório) e compose atualizado com serviço Redis + URLs padrão para login guard/rate limit (dev/prod/local) | e23b2af |
+| 2026-02-12 | S6-08 | Startup hardening reforçado: `SECURITY_ENFORCE_STRONG_SECRETS=false` agora é rejeitado em runtime seguro (`FLASK_DEBUG=false` e `FLASK_TESTING=false`), com testes de regressão para cenários seguro/debug | 5fc1be7 |
+| 2026-02-12 | S6-09 | Sweep de retenção confirmado fora do ciclo de request: retenção executada por comando operacional (`flask audit-events purge-expired`) com teste de regressão que garante não execução durante requests (`tests/test_audit_trail.py`) | 208e1d1 |
+| 2026-02-12 | S6-12 | Política `/docs` endurecida com validação de startup: `DOCS_EXPOSURE_POLICY` inválido agora causa erro em runtime seguro; em debug mantém fallback seguro para produtividade local, com testes dedicados | 208e1d1 |
+| 2026-02-12 | S1 (fase 1) | Script operacional `scripts/aws_s1_hardening.py` criado com `audit/apply` (dry-run por padrão) para checagem de IMDSv2, SG exposure, EBS encryption, IAM profile, SSM e termination protection; aplicado hardening de termination protection em `auraxis_prod` e `auraxis_dev` via CLI | pending-commit |
+| 2026-02-12 | S1 (fase 2) | SSM online confirmado via auditoria e script de migração de root volume para EBS criptografado adicionado (`scripts/aws_encrypt_root_volume.py`) com dry-run e `--execute` (downtime). | pending-commit |
+| 2026-02-12 | S1 (fase 3) | Migração DEV executada: root volume substituído por EBS criptografado; `aws_s1_hardening.py audit` agora valida `encrypted=true` (PROD pendente). | pending-commit |
+| 2026-02-12 | S1 (fase 4) | Migração PROD executada: root volume substituído por EBS criptografado; `aws_s1_hardening.py audit` valida `encrypted=true`. Observação: volume antigo e snapshots mantidos para rollback/cleanup posterior. | pending-commit |
+| 2026-02-12 | S1-02 | Cleanup pós-migração executado: volumes não criptografados antigos e snapshots intermediários removidos (DEV+PROD). | pending-commit |
+| 2026-02-12 | S1 (fase 5) | Correção de disponibilidade pós-downtime: PROD recebeu Elastic IP e `api.auraxis.com.br` foi atualizado no Route 53 para evitar mudança de IP após stop/start; validação via `dig` e `curl` (HTTPS 200). | pending-commit |
+| 2026-02-12 | S1 (fase 6) | SSH ingress removido dos Security Groups usados por DEV/PROD; acesso administrativo passa a depender de SSM Session Manager (requer `session-manager-plugin` local). Auditor S1 agora sinaliza `SSH ingress present` quando existir regra de porta 22. | pending-commit |
+| 2026-02-12 | S1 (fase 7) | Patching baseline configurado via SSM Maintenance Window: `auraxis-dev-patching` (cron 05:00 UTC) e `auraxis-prod-patching` (cron 06:00 UTC) com task `AWS-RunPatchBaseline` e role `auraxis-ssm-maintenance-window-role`. Instâncias taggeadas com `App=auraxis` e `Environment=dev/prod`. | pending-commit |
+| 2026-02-12 | S1 (fase 8) | Security Groups segregados por ambiente: criados `auraxis-prod-web` e `auraxis-dev-web` (somente 80/443), anexados às instâncias e SGs antigos removidos. | pending-commit |
+| 2026-02-12 | S1 (fase 9) | Egress hardening nos SGs de DEV/PROD: removido `-1 0.0.0.0/0` e permitido somente `tcp/443`, `tcp/80`, DNS (`tcp/udp 53` para `172.31.0.2/32`) e NTP (`udp/123` para `169.254.169.123/32`). Auditor S1 passou a reportar egress scope/broad egress. | pending-commit |
+| 2026-02-12 | S1 (fase 10) | DNS DEV corrigido: `dev.api.auraxis.com.br` atualizado para o IP público atual da instância DEV, validado com `dig` e `curl` (HTTPS 200). | pending-commit |
+| 2026-02-13 | S1 (fase 11) | DEV com IP estável: Elastic IP associado à instância DEV e `dev.api.auraxis.com.br` atualizado no Route 53; validação via `dig` e `curl` (HTTPS 200). | pending-commit |
+| 2026-02-13 | S1 (fase 12) | Observabilidade mínima (sem SNS): alarmes CloudWatch criados para DEV/PROD (`CPUHigh` e `StatusCheckFailed`). Próximo passo é adicionar SNS/Email/ChatOps e dashboards. | pending-commit |
+| 2026-02-13 | S1 (fase 13) | NACL hardening no subnet compartilhado (`subnet-006b15b6fb193f5e7`): NACL dedicado `auraxis-web-nacl` criado e associado, permitindo apenas 80/443 e portas efêmeras (tcp/udp 1024-65535) + egress DNS/NTP; validação via `curl` (PROD/DEV 200) e SSM RunCommand (Success). | pending-commit |
+| 2026-02-13 | S1 (fase 14) | Firewall no host (UFW) habilitado via SSM em DEV/PROD: default deny incoming, allow outgoing, allow `80/tcp` e `443/tcp` e loopback. Validado via `curl` (PROD/DEV 200) e `ufw status` (active). | pending-commit |
+| 2026-02-13 | S1 (fase 15) | Patching calibrado: execução on-demand do `AWS-RunPatchBaseline` em DEV validada (Success). Política alvo: DEV `RebootIfNeeded`, PROD `NoReboot` (configurada via maintenance windows). | pending-commit |
+| 2026-02-13 | S1 (fase 16) | Observabilidade mínima: CloudWatch Dashboard `Auraxis-EC2` criado com CPU e StatusCheckFailed para DEV/PROD. | pending-commit |
+| 2026-02-13 | S1 (fase 17) | Notificações habilitadas: tópico SNS `auraxis-alerts` criado com assinatura email e alarmes CloudWatch atualizados para enviar `ALARM/OK/INSUFFICIENT_DATA` para o SNS. Teste: `set-alarm-state` disparado manualmente em um alarme de DEV. | pending-commit |
+| 2026-02-13 | S1-03 | Backups Postgres em S3: bucket com policy HTTPS+SSE, versioning, lifecycle, IAM no role da EC2; backup manual DEV/PROD validado + restore drill DEV validado; agendamento diário via SSM Maintenance Windows. | pending-commit |
+| 2026-02-13 | I7 | Observabilidade mínima: CloudWatch Agent aplicado via SSM para métricas de memória/disco (`Auraxis/EC2`), alarmes `MemUsedHigh/DiskUsedHigh` (DEV+PROD) com SNS/email e dashboard `Auraxis-EC2` atualizado. | pending-commit |
+| 2026-02-13 | I7 | Logs centralizados (preparação): overlay `docker-compose.aws.logging.yml` (awslogs) e script idempotente `scripts/aws_cloudwatch_logs_i7.py` para IAM + log groups + retention. Pendência: aplicar overlay nas EC2 e validar streams recebendo eventos. | pending-commit |
+| 2026-02-13 | I7 | Healthcheck: endpoint público `GET /healthz` (liveness) e healthcheck do `docker-compose.prod.yml` migrado de `/docs/swagger/` para `/healthz` para reduzir acoplamento a docs. | pending-commit |
+| 2026-02-13 | I7 | Canary barato: Route53 health checks (DEV+PROD) em `https://<domain>/healthz` + alarmes CloudWatch `auraxis-health-dev/prod` para SNS `auraxis-alerts`. | pending-commit |
+| 2026-02-13 | I7 | Mitigação temporária: `auraxis-health-dev/prod` ficaram em estado `ALARM` (endpoint ainda não deployado em master). Actions foram desabilitadas via `cloudwatch disable-alarm-actions` até concluir deploy de `/healthz`. | pending-commit |
+| 2026-02-13 | CI/Security | Correção do check `security_evidence_check.sh`: padrões atualizados para refletir paths reais após modularização (`graphql/utils.py`, `auth/resources.py`). | 465cba6 |
+| 2026-02-13 | Security | GraphQL: sanitização de `extensions` em erros de execução para evitar leak de detalhes de infraestrutura; Transações: deduplicação de `_guard_revoked_token` em `transaction.utils`. | pending-commit |
+| 2026-02-13 | DX/CI | Paridade local: script `scripts/run_ci_like_actions_local.sh` (pipeline CI-like) + hooks `pre-push` no pre-commit para `pip-audit` e `security_evidence_check.sh` (evita surpresas só no Actions). | pending-commit |
+| 2026-02-13 | S1 | Alertas operacionais: regra EventBridge `auraxis-ssm-command-failures` -> SNS `auraxis-alerts` para falhas de SSM RunCommand (patching/backups/ops). | pending-commit |
+| 2026-02-13 | S1 | Patching validado end-to-end: tasks de `AWS-RunPatchBaseline` re-registradas com `RebootIfNeeded` (DEV) e `NoReboot` (PROD) e validação executada via maintenance windows one-off agendadas (DEV+PROD: SUCCESS). | pending-commit |
 | 2026-02-09 | D (observacao) | Restaurados arquivos deletados acidentalmente: ticker/carteira | n/a |
 
 ## Proxima prioridade sugerida
-- S6 (P0/P1): executar backlog de correcoes de seguranca de aplicacao (`S6-01..S6-12`) antes de avancar em novas features de infraestrutura/observabilidade.
 - S1/S3 (P1): fechar controles de infraestrutura OWASP em AWS (`S1`) e integrar exportação central de métricas/alertas de segurança (CloudWatch/Prometheus).
+- G17 (P1): eliminar `ResourceWarning` remanescente da suíte (`tests/test_transaction_contract.py`) para manter execução 100% limpa e reproduzível no CI/local.
 
 ## Mapeamento Rebranding (nomenclatura legada -> `auraxis`)
 

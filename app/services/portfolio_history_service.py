@@ -6,6 +6,7 @@ from decimal import Decimal
 from typing import Any, cast
 from uuid import UUID
 
+from app.application.errors import PublicValidationError
 from app.models.investment_operation import InvestmentOperation
 from app.models.wallet import Wallet
 from app.services.investment_service import InvestmentService
@@ -97,7 +98,7 @@ class PortfolioHistoryService:
         resolved_end = end_date or today
         resolved_start = start_date or (resolved_end - timedelta(days=30))
         if resolved_start > resolved_end:
-            raise ValueError("startDate não pode ser maior que finalDate.")
+            raise PublicValidationError("startDate não pode ser maior que finalDate.")
         return PortfolioHistoryRange(start_date=resolved_start, end_date=resolved_end)
 
     def _load_ticker_prices(

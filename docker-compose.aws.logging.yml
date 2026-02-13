@@ -1,0 +1,61 @@
+#
+# Auraxis - AWS logging overlay (CloudWatch Logs)
+#
+# Usage (EC2 DEV/PROD):
+#   docker compose --env-file .env.prod \
+#     -f docker-compose.prod.yml \
+#     -f docker-compose.aws.logging.yml \
+#     up -d --build --force-recreate
+#
+# Notes
+# - This overlay is intentionally separate so local runs do not require AWS credentials.
+# - Containers publish stdout/stderr to CloudWatch Logs using the instance role (IMDSv2).
+# - Ensure the instance profile role has permissions for CloudWatch Logs (see
+#   `scripts/aws_cloudwatch_logs_i7.py`).
+#
+services:
+  db:
+    logging:
+      driver: awslogs
+      options:
+        awslogs-region: ${AWS_REGION:-us-east-1}
+        awslogs-group: ${AURAXIS_CW_LOG_GROUP:-/auraxis/${AURAXIS_ENV:-unknown}/containers}
+        awslogs-stream: ${AURAXIS_ENV:-unknown}-db
+        awslogs-create-group: "true"
+
+  redis:
+    logging:
+      driver: awslogs
+      options:
+        awslogs-region: ${AWS_REGION:-us-east-1}
+        awslogs-group: ${AURAXIS_CW_LOG_GROUP:-/auraxis/${AURAXIS_ENV:-unknown}/containers}
+        awslogs-stream: ${AURAXIS_ENV:-unknown}-redis
+        awslogs-create-group: "true"
+
+  web:
+    logging:
+      driver: awslogs
+      options:
+        awslogs-region: ${AWS_REGION:-us-east-1}
+        awslogs-group: ${AURAXIS_CW_LOG_GROUP:-/auraxis/${AURAXIS_ENV:-unknown}/containers}
+        awslogs-stream: ${AURAXIS_ENV:-unknown}-web
+        awslogs-create-group: "true"
+
+  reverse-proxy:
+    logging:
+      driver: awslogs
+      options:
+        awslogs-region: ${AWS_REGION:-us-east-1}
+        awslogs-group: ${AURAXIS_CW_LOG_GROUP:-/auraxis/${AURAXIS_ENV:-unknown}/containers}
+        awslogs-stream: ${AURAXIS_ENV:-unknown}-nginx
+        awslogs-create-group: "true"
+
+  certbot:
+    logging:
+      driver: awslogs
+      options:
+        awslogs-region: ${AWS_REGION:-us-east-1}
+        awslogs-group: ${AURAXIS_CW_LOG_GROUP:-/auraxis/${AURAXIS_ENV:-unknown}/containers}
+        awslogs-stream: ${AURAXIS_ENV:-unknown}-certbot
+        awslogs-create-group: "true"
+

@@ -13,14 +13,39 @@ def _is_secret_weak(secret: str) -> bool:
     return normalized in {"", "dev", "super-secret-key", "changeme"} or len(secret) < 32
 
 
+def _runtime_environment_name() -> str:
+    for env_name in ("AURAXIS_ENV", "APP_ENV", "FLASK_ENV"):
+        raw = os.getenv(env_name)
+        if raw is not None and raw.strip():
+            return raw.strip().lower()
+    return ""
+
+
 def validate_security_configuration() -> None:
     enforce = _read_bool_env("SECURITY_ENFORCE_STRONG_SECRETS", True)
+
+    is_debug = _read_bool_env("FLASK_DEBUG", False)
+    is_testing = _read_bool_env("FLASK_TESTING", False)
+    runtime_environment = _runtime_environment_name()
+    secure_runtime = not is_debug and not is_testing
+
     if not enforce:
+        if secure_runtime:
+            raise RuntimeError(
+                "Invalid runtime configuration: SECURITY_ENFORCE_STRONG_SECRETS "
+                "must be true when FLASK_DEBUG=false and FLASK_TESTING=false."
+            )
         return
 
-    is_debug = _read_bool_env("FLASK_DEBUG", True)
-    is_testing = _read_bool_env("FLASK_TESTING", False)
-    if is_debug or is_testing:
+    if runtime_environment in {"prod", "production"} and is_debug:
+        raise RuntimeError(
+            "Invalid runtime configuration: FLASK_DEBUG must be false in production."
+        )
+
+    if is_testing:
+        return
+
+    if is_debug:
         return
 
     secret_key = os.getenv("SECRET_KEY", "dev")
@@ -46,7 +71,7 @@ class Config:
     JWT_TOKEN_LOCATION = ["headers"]
     JWT_HEADER_TYPE = "Bearer"
 
-    DEBUG = os.getenv("FLASK_DEBUG", "True") == "True"
+    DEBUG = _read_bool_env("FLASK_DEBUG", False)
 
     # Database config
     _DATABASE_URL = os.getenv("DATABASE_URL")

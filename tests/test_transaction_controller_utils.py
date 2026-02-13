@@ -172,8 +172,7 @@ def test_enforce_reference_ownership_and_updates(monkeypatch) -> None:
     account_id = uuid4()
     card_id = uuid4()
     monkeypatch.setattr(
-        utils,
-        "enforce_transaction_reference_ownership",
+        "app.controllers.transaction.utils.enforce_transaction_reference_ownership",
         lambda **_kwargs: None,
     )
 
@@ -190,7 +189,10 @@ def test_enforce_reference_ownership_and_updates(monkeypatch) -> None:
     def _raise_error(**kwargs: object) -> None:
         raise TransactionReferenceAuthorizationError("Sem permissão para referência")
 
-    monkeypatch.setattr(utils, "enforce_transaction_reference_ownership", _raise_error)
+    monkeypatch.setattr(
+        "app.controllers.transaction.utils.enforce_transaction_reference_ownership",
+        _raise_error,
+    )
     assert (
         utils._enforce_transaction_reference_ownership_or_error(
             user_id=user_id,

@@ -2,10 +2,23 @@ from functools import wraps
 from typing import Any, Callable, TypeVar, cast
 
 import jwt
-from flask import Response, current_app, jsonify, request
+from flask import Response, current_app, request
+
+from app.utils.api_contract import is_v2_contract_request
+from app.utils.response_builder import error_payload, json_response
 
 F = TypeVar("F", bound=Callable[..., Any])
-JSON_MIMETYPE = "application/json"
+
+
+def _legacy_error_payload(message: str) -> dict[str, str]:
+    return {"message": message}
+
+
+def _token_error_response(message: str) -> Response:
+    payload: dict[str, Any] = _legacy_error_payload(message)
+    if is_v2_contract_request():
+        payload = error_payload(message=message, code="UNAUTHORIZED", details={})
+    return json_response(payload, status_code=401)
 
 
 def token_required(f: F) -> F:
@@ -13,11 +26,7 @@ def token_required(f: F) -> F:
     def decorated(*args: Any, **kwargs: Any) -> Any:
         auth_header = request.headers.get("Authorization")
         if not auth_header:
-            return Response(
-                jsonify({"message": "Token is missing!"}).get_data(),
-                status=401,
-                mimetype=JSON_MIMETYPE,
-            )
+            return _token_error_response("Token is missing!")
 
         try:
             token = auth_header.split(" ")[1]
@@ -26,17 +35,9 @@ def token_required(f: F) -> F:
             )
             request.environ["auraxis.user_id"] = str(payload.get("user_id", ""))
         except jwt.ExpiredSignatureError:
-            return Response(
-                jsonify({"message": "Token expired!"}).get_data(),
-                status=401,
-                mimetype=JSON_MIMETYPE,
-            )
+            return _token_error_response("Token expired!")
         except jwt.InvalidTokenError:
-            return Response(
-                jsonify({"message": "Invalid token!"}).get_data(),
-                status=401,
-                mimetype=JSON_MIMETYPE,
-            )
+            return _token_error_response("Invalid token!")
 
         return f(*args, **kwargs)
 

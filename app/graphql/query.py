@@ -5,7 +5,10 @@ from uuid import UUID
 import graphene
 from graphql import GraphQLError
 
-from app.controllers.transaction_controller_utils import serialize_transaction
+from app.application.services.public_error_mapper_service import (
+    map_validation_exception,
+)
+from app.controllers.transaction.utils import serialize_transaction
 from app.graphql.auth import get_current_user_required
 from app.graphql.schema_utils import (
     _apply_due_date_range_filter,
@@ -442,7 +445,11 @@ class Query(graphene.ObjectType):
                 start_date=parsed_start_date, end_date=parsed_final_date
             )
         except ValueError as exc:
-            raise GraphQLError(str(exc)) from exc
+            mapped_error = map_validation_exception(
+                exc,
+                fallback_message="Parâmetros de período inválidos.",
+            )
+            raise GraphQLError(mapped_error.message) from exc
         return PortfolioHistoryPayloadType(
             summary=PortfolioHistorySummaryType(**payload["summary"]),
             items=[PortfolioHistoryItemType(**item) for item in payload["items"]],

@@ -4,21 +4,26 @@ from pathlib import Path
 from typing import Generator
 
 import pytest
+from sqlalchemy.orm import close_all_sessions
 
 ROOT_DIR = Path(__file__).resolve().parents[1]
 if str(ROOT_DIR) not in sys.path:
     sys.path.insert(0, str(ROOT_DIR))
 
 TEST_ENV_OVERRIDES = {
-    "SECRET_KEY": "test-secret",
-    "JWT_SECRET_KEY": "test-jwt-secret",
+    "SECRET_KEY": "test-secret-key-with-64-chars-minimum-for-jwt-signing-0001",
+    "JWT_SECRET_KEY": "test-jwt-secret-key-with-64-chars-minimum-for-signing-0002",
     "FLASK_DEBUG": "False",
     "FLASK_TESTING": "true",
     "SECURITY_ENFORCE_STRONG_SECRETS": "false",
+    "DOCS_EXPOSURE_POLICY": "public",
     "CORS_ALLOWED_ORIGINS": "https://frontend.local",
     "GRAPHQL_ALLOW_INTROSPECTION": "true",
     "BRAPI_CACHE_TTL_SECONDS": "0",
 }
+
+for key, value in TEST_ENV_OVERRIDES.items():
+    os.environ.setdefault(key, value)
 
 
 @pytest.fixture(autouse=True)
@@ -45,6 +50,8 @@ def app(tmp_path: Path):
 
     app = create_app()
     app.config["TESTING"] = True
+    app.config["SECRET_KEY"] = TEST_ENV_OVERRIDES["SECRET_KEY"]
+    app.config["JWT_SECRET_KEY"] = TEST_ENV_OVERRIDES["JWT_SECRET_KEY"]
 
     with app.app_context():
         db.drop_all()
@@ -62,7 +69,8 @@ def app(tmp_path: Path):
 
 @pytest.fixture
 def client(app) -> Generator:
-    yield app.test_client()
+    with app.test_client() as test_client:
+        yield test_client
 
 
 @pytest.fixture(autouse=True)
@@ -80,3 +88,9 @@ def clear_investment_service_cache() -> Generator[None, None, None]:
     InvestmentService._clear_cache_for_tests()
     reset_metrics_for_tests()
     reset_login_attempt_guard_for_tests()
+
+
+@pytest.fixture(autouse=True)
+def cleanup_sqlalchemy_sessions() -> Generator[None, None, None]:
+    yield
+    close_all_sessions()

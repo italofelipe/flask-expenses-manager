@@ -122,3 +122,27 @@ def test_user_me_invalid_status_v2_contract(client) -> None:
     body = response.get_json()
     assert body["success"] is False
     assert body["error"]["code"] == "VALIDATION_ERROR"
+
+
+def test_user_me_masks_unexpected_value_error(client, monkeypatch) -> None:
+    token = _register_and_login(client)
+
+    def _raise_unexpected_value_error(*_args: object, **_kwargs: object) -> int:
+        raise ValueError("sqlalchemy internal error leaked")
+
+    monkeypatch.setattr(
+        "app.controllers.user_controller._parse_positive_int",
+        _raise_unexpected_value_error,
+    )
+
+    response = client.get(
+        "/user/me?page=1&limit=10",
+        headers=_auth_headers(token, "v2"),
+    )
+    assert response.status_code == 400
+    body = response.get_json()
+    serialized = str(body)
+    assert body["success"] is False
+    assert body["error"]["code"] == "VALIDATION_ERROR"
+    assert body["message"] == "Parâmetros de paginação inválidos."
+    assert "sqlalchemy internal error leaked" not in serialized

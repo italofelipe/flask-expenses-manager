@@ -9,6 +9,9 @@ from app.extensions.jwt_callbacks import _jwt_error_response
 def register_auth_guard(app: Any) -> None:
     @app.before_request  # type: ignore[misc]
     def auth_guard() -> Any:
+        # Liveness endpoint must remain public for infra health checks.
+        if request.path.rstrip("/") == "/healthz":
+            return
         open_endpoints = {
             "registerresource",
             "authresource",

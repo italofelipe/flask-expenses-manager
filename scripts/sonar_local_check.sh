@@ -53,7 +53,7 @@ if [[ ! -x "$PYTHON_BIN" ]]; then
 fi
 
 echo "[sonar-local] Running tests with coverage..."
-"$PYTHON_BIN" -m pytest -q --disable-warnings --cov=app --cov-report=xml:coverage.xml
+"$PYTHON_BIN" -m pytest -p no:schemathesis -m "not schemathesis" -q --disable-warnings --cov=app --cov-report=xml:coverage.xml
 
 echo "[sonar-local] Running sonar-scanner with quality gate wait..."
 sonar-scanner \

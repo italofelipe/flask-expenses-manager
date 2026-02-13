@@ -8,16 +8,24 @@ class AuthSchema(Schema):
 
     email = fields.String(
         load_default=None,
-        description="Endereço de email do usuário",
-        example="joao.silva@email.com",
+        metadata={
+            "description": "Endereço de email do usuário",
+            "example": "joao.silva@email.com",
+        },
     )
     name = fields.String(
         load_default=None,
-        description="Nome do usuário (alternativa ao email)",
-        example="João Silva",
+        metadata={
+            "description": "Nome do usuário (alternativa ao email)",
+            "example": "João Silva",
+        },
     )
     password = fields.String(
-        required=True, description="Senha do usuário", example="minhasenha123"
+        required=True,
+        metadata={
+            "description": "Senha do usuário",
+            "example": "minhasenha123",
+        },
     )
 
     @pre_load
@@ -38,19 +46,23 @@ class AuthSuccessResponseSchema(Schema):
 
     message = fields.String(
         required=True,
-        description="Mensagem de sucesso",
-        example="Login realizado com sucesso",
+        metadata={
+            "description": "Mensagem de sucesso",
+            "example": "Login realizado com sucesso",
+        },
     )
     token = fields.String(
         required=True,
-        description="Token JWT para autenticação",
-        example="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+        metadata={
+            "description": "Token JWT para autenticação",
+            "example": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+        },
     )
     user = fields.Dict(
         required=True,
         keys=fields.String(),
         values=fields.String(),
-        description="Dados básicos do usuário autenticado",
+        metadata={"description": "Dados básicos do usuário autenticado"},
     )
 
 
@@ -59,6 +71,8 @@ class LogoutSchema(Schema):
 
     message = fields.String(
         required=True,
-        description="Mensagem de confirmação do logout",
-        example="Logout realizado com sucesso",
+        metadata={
+            "description": "Mensagem de confirmação do logout",
+            "example": "Logout realizado com sucesso",
+        },
     )

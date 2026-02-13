@@ -12,10 +12,9 @@ from flask import Flask, Response, current_app, g, jsonify, request
 from flask_jwt_extended import decode_token
 
 from app.extensions.integration_metrics import increment_metric
+from app.utils.api_contract import is_v2_contract_request
 from app.utils.response_builder import error_payload
 
-CONTRACT_HEADER = "X-API-Contract"
-CONTRACT_V2 = "v2"
 RATE_LIMIT_ERROR_CODE = "RATE_LIMIT_EXCEEDED"
 RATE_LIMIT_MESSAGE = "Limite de requisições excedido. Tente novamente em instantes."
 RATE_LIMIT_BACKEND_UNAVAILABLE_CODE = "RATE_LIMIT_BACKEND_UNAVAILABLE"
@@ -53,11 +52,6 @@ def _read_bool_env(name: str, default: bool) -> bool:
     if raw is None:
         return default
     return raw.strip().lower() in {"1", "true", "yes", "on"}
-
-
-def _is_v2_contract_request() -> bool:
-    header_value = str(request.headers.get(CONTRACT_HEADER, "")).strip().lower()
-    return header_value == CONTRACT_V2
 
 
 def _get_client_ip() -> str:
@@ -415,7 +409,7 @@ def _build_rate_limited_response(decision: RateLimitDecision) -> Response:
         "window_seconds": decision.rule.window_seconds,
         "retry_after_seconds": decision.retry_after_seconds,
     }
-    if _is_v2_contract_request():
+    if is_v2_contract_request():
         payload = error_payload(
             message=RATE_LIMIT_MESSAGE,
             code=RATE_LIMIT_ERROR_CODE,
@@ -442,7 +436,7 @@ def _build_backend_unavailable_response(reason: str | None = None) -> Response:
     if reason:
         details["reason"] = reason
 
-    if _is_v2_contract_request():
+    if is_v2_contract_request():
         payload = error_payload(
             message=RATE_LIMIT_BACKEND_UNAVAILABLE_MESSAGE,
             code=RATE_LIMIT_BACKEND_UNAVAILABLE_CODE,

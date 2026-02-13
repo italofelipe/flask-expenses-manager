@@ -10,7 +10,7 @@ from app.middleware.jwt import token_required
 
 def _build_app() -> Flask:
     app = Flask(__name__)
-    app.config["SECRET_KEY"] = "super-secret-key-for-tests-only"
+    app.config["SECRET_KEY"] = "super-secret-key-for-tests-only-with-32-plus-chars"
     return app
 
 
@@ -26,6 +26,23 @@ def test_token_required_rejects_missing_authorization_header() -> None:
 
     assert response.status_code == 401
     assert response.get_json()["message"] == "Token is missing!"
+
+
+def test_token_required_returns_v2_contract_error_when_header_is_set() -> None:
+    app = _build_app()
+
+    @token_required
+    def protected() -> tuple[dict[str, str], int]:
+        return {"ok": "true"}, 200
+
+    with app.test_request_context("/protected", headers={"X-API-Contract": "v2"}):
+        response = protected()
+
+    body = response.get_json()
+    assert response.status_code == 401
+    assert body["success"] is False
+    assert body["error"]["code"] == "UNAUTHORIZED"
+    assert body["message"] == "Token is missing!"
 
 
 def test_token_required_rejects_expired_token() -> None:

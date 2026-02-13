@@ -8,6 +8,7 @@ from flask_apispec import FlaskApiSpec
 from flask_jwt_extended import JWTManager
 from flask_marshmallow import Marshmallow
 from flask_migrate import Migrate
+from sqlalchemy.pool import NullPool
 
 from app.controllers.auth_controller import (
     AuthResource,
@@ -16,14 +17,18 @@ from app.controllers.auth_controller import (
     auth_bp,
 )
 from app.controllers.graphql_controller import graphql_bp, register_graphql_security
+from app.controllers.health_controller import health_bp
 from app.controllers.transaction_controller import TransactionResource, transaction_bp
 from app.controllers.user_controller import UserMeResource, UserProfileResource, user_bp
-from app.controllers.wallet_controller import wallet_bp
+from app.controllers.wallet_controller import register_wallet_dependencies, wallet_bp
 from app.docs.api_documentation import API_INFO, TAGS
+from app.docs.schema_name_resolver import resolve_openapi_schema_name
+from app.extensions.audit_retention_cli import register_audit_retention_commands
 from app.extensions.audit_trail import register_audit_trail
 from app.extensions.database import db
 from app.extensions.error_handlers import register_error_handlers
 from app.middleware.cors import register_cors
+from app.middleware.docs_access import register_docs_access_guard
 from app.middleware.security_headers import register_security_headers
 from app.models.account import Account  # noqa: F401
 from app.models.audit_event import AuditEvent  # noqa: F401
@@ -49,6 +54,13 @@ def create_app() -> Flask:
     app.config["MAX_CONTENT_LENGTH"] = int(
         os.getenv("MAX_REQUEST_BYTES", str(1024 * 1024))
     )
+    # Prevent SQLite connection pooling in tests to avoid leaked connections
+    # surfacing as ResourceWarning under newer Python versions.
+    if os.getenv("FLASK_TESTING", "false").strip().lower() == "true":
+        db_uri = str(app.config.get("SQLALCHEMY_DATABASE_URI", ""))
+        if db_uri.startswith("sqlite"):
+            app.config.setdefault("SQLALCHEMY_ENGINE_OPTIONS", {})
+            app.config["SQLALCHEMY_ENGINE_OPTIONS"].update({"poolclass": NullPool})
     validate_security_configuration()
 
     @app.before_request
@@ -79,7 +91,9 @@ def create_app() -> Flask:
                 title=str(API_INFO["title"]),
                 version=str(API_INFO["version"]),
                 openapi_version="3.0.2",
-                plugins=[MarshmallowPlugin()],
+                plugins=[
+                    MarshmallowPlugin(schema_name_resolver=resolve_openapi_schema_name)
+                ],
                 info={
                     "description": API_INFO["description"],
                     "contact": API_INFO["contact"],
@@ -110,7 +124,10 @@ def create_app() -> Flask:
     register_graphql_security(app)
     register_cors(app)
     register_security_headers(app)
+    register_docs_access_guard(app)
     register_audit_trail(app)
+    register_audit_retention_commands(app)
+    register_wallet_dependencies(app)
 
     # Registra blueprints ANTES dos endpoints no Swagger
     app.register_blueprint(transaction_bp)
@@ -118,6 +135,7 @@ def create_app() -> Flask:
     app.register_blueprint(auth_bp)
     app.register_blueprint(wallet_bp)
     app.register_blueprint(graphql_bp)
+    app.register_blueprint(health_bp)
 
     # Registra os endpoints documentados no Swagger
     docs.register(RegisterResource, blueprint="auth", endpoint="registerresource")
