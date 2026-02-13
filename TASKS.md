@@ -83,7 +83,7 @@ Ultima atualizacao: 2026-02-13
 | I13 | Nginx/TLS | Provisionar emissão de certificado Let's Encrypt para `api.auraxis.com.br` | Done | 100% | Medio: manter validações pós-deploy e automação de renovação (I15) | pending-commit | 2026-02-13 |
 | I14 | Nginx/TLS | Ativar config TLS no Nginx (redirect 80->443 + headers de segurança) | Done | 100% | Baixo: TLS ativo em PROD com headers de segurança; DEV segue HTTP por enquanto | pending-commit | 2026-02-13 |
 | I15 | Nginx/TLS | Configurar renovação automática de certificado e validações pós-renovação | Done | 100% | Baixo: timer systemd instalado em PROD e validação dry-run executada via SSM | 575dcea, 3137cd9 | 2026-02-13 |
-| I16 | Nginx/TLS | Checklist de validação local/AWS (DNS, SG, health, curl, logs, rollback) | Done | 100% | Baixo: checklist automatizado em `scripts/aws_validate_i16.py` e validado contra DEV/PROD | pending-commit | 2026-02-13 |
+| I16 | Nginx/TLS | Checklist de validação local/AWS (DNS, SG, health, curl, logs, rollback) | Done | 100% | Baixo: checklist automatizado em `scripts/aws_validate_i16.py` e validado contra DEV/PROD | 2af0a95 | 2026-02-13 |
 | R1 | Rebranding | Mapear todas ocorrências de nomenclatura legada do projeto e registrar plano de substituição para `auraxis` | Done | 100% | Baixo: mapeamento concluído em arquivos versionados | pending-commit | 2026-02-10 |
 | R2 | Rebranding | Substituir ocorrências versionadas de nomenclatura legada por `auraxis` (sem quebrar integrações externas) | Done | 100% | Medio: integrações externas podem manter identificador legado temporário | pending-commit | 2026-02-10 |
 | S1 | AWS Security | Restringir acesso e hardening de instâncias EC2 (SG, NACL, IMDSv2, SSH policy, patching baseline) | Done | 100% | Baixo: baseline aplicado e validado; pendência remanescente é apenas runbook operacional (I9) e ajustes contínuos | pending-commit | 2026-02-13 |
@@ -221,7 +221,7 @@ Ultima atualizacao: 2026-02-13
 | 2026-02-13 | I15 | TLS: script de renovação (`renew_tls_cert.sh`) + systemd timer instalado em PROD via SSM e validação `--dry-run` executada | 575dcea, 3137cd9 |
 | 2026-02-13 | I8 | Firewall host: UFW habilitado em DEV/PROD via SSM (deny incoming + allow 80/443 + loopback), com verificação de status | 5825206, 2b2459c |
 | 2026-02-13 | I8 | IAM audit: instâncias DEV/PROD usando role `auraxis-ec2-ssm-role` com políticas gerenciadas mínimas (SSM + CloudWatchAgent) e inline policy para backups S3 | c76957f |
-| 2026-02-13 | I16 | Checklist automatizado (DNS/HTTP/SSM/Route53/Logs/S3) implementado e validado em DEV/PROD (`scripts/aws_validate_i16.py`) | pending-commit |
+| 2026-02-13 | I16 | Checklist automatizado (DNS/HTTP/SSM/Route53/Logs/S3) implementado e validado em DEV/PROD (`scripts/aws_validate_i16.py`) | 2af0a95 |
 | 2026-02-12 | S6-12 | Política `/docs` endurecida com validação de startup: `DOCS_EXPOSURE_POLICY` inválido agora causa erro em runtime seguro; em debug mantém fallback seguro para produtividade local, com testes dedicados | 208e1d1 |
 | 2026-02-12 | S1 (fase 1) | Script operacional `scripts/aws_s1_hardening.py` criado com `audit/apply` (dry-run por padrão) para checagem de IMDSv2, SG exposure, EBS encryption, IAM profile, SSM e termination protection; aplicado hardening de termination protection em `auraxis_prod` e `auraxis_dev` via CLI | pending-commit |
 | 2026-02-12 | S1 (fase 2) | SSM online confirmado via auditoria e script de migração de root volume para EBS criptografado adicionado (`scripts/aws_encrypt_root_volume.py`) com dry-run e `--execute` (downtime). | pending-commit |
