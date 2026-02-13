@@ -341,7 +341,7 @@ import json,sys
 path=sys.argv[1]
 prev=sys.argv[2] or ""
 cur=sys.argv[3] or ""
-data={"previous": prev, "current": cur}
+data={{"previous": prev, "current": cur}}
 with open(path,"w",encoding="utf-8") as f:
   json.dump(data,f,indent=2,sort_keys=True)
 print("[i6] wrote deploy state:", path, data)
