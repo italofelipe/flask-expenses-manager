@@ -86,7 +86,7 @@ def _ssm_send_shell(ctx: AwsCtx, instance_id: str, script: str, comment: str) ->
     return str(out["Command"]["CommandId"])
 
 
-def _wait(ctx: AwsCtx, *, command_id: str, instance_id: str) -> None:
+def _wait(ctx: AwsCtx, *, command_id: str, instance_id: str) -> dict[str, Any]:
     deadline = time.time() + 1200
     while time.time() < deadline:
         out = _run_aws(
@@ -114,7 +114,7 @@ def _wait(ctx: AwsCtx, *, command_id: str, instance_id: str) -> None:
                 f"instance_id={instance_id} command_id={command_id} status={status}\n"
                 f"STDOUT:\n{stdout[-2000:]}\nSTDERR:\n{stderr[-2000:]}"
             )
-        return
+        return out
     raise AwsCliError(
         "Timeout waiting SSM command. "
         f"instance_id={instance_id} command_id={command_id}"
@@ -173,9 +173,19 @@ def build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="Apply for real. Without this flag, runs dry-run mode.",
     )
+    p_apply.add_argument(
+        "--print-output",
+        action="store_true",
+        help="Print SSM stdout/stderr on success (useful for auditing).",
+    )
 
     p_status = sub.add_parser("status", help="Show UFW status on instance.")
     p_status.add_argument("--env", choices=["prod", "dev"], required=True)
+    p_status.add_argument(
+        "--print-output",
+        action="store_true",
+        help="Print SSM stdout/stderr on success.",
+    )
     return p
 
 
@@ -194,7 +204,14 @@ def main() -> int:
             f"auraxis: i8 ufw apply ({env_name}) execute={bool(args.execute)}",
         )
         print(f"{env_name.upper()} command_id={cmd_id}")
-        _wait(ctx, command_id=cmd_id, instance_id=instance_id)
+        invocation = _wait(ctx, command_id=cmd_id, instance_id=instance_id)
+        if bool(args.print_output):
+            stdout = str(invocation.get("StandardOutputContent") or "").strip()
+            stderr = str(invocation.get("StandardErrorContent") or "").strip()
+            if stdout:
+                print(stdout)
+            if stderr:
+                print(stderr)
         return 0
 
     if args.cmd == "status":
@@ -203,7 +220,14 @@ def main() -> int:
             ctx, instance_id, script, f"auraxis: i8 ufw status ({env_name})"
         )
         print(f"{env_name.upper()} command_id={cmd_id}")
-        _wait(ctx, command_id=cmd_id, instance_id=instance_id)
+        invocation = _wait(ctx, command_id=cmd_id, instance_id=instance_id)
+        if bool(args.print_output):
+            stdout = str(invocation.get("StandardOutputContent") or "").strip()
+            stderr = str(invocation.get("StandardErrorContent") or "").strip()
+            if stdout:
+                print(stdout)
+            if stderr:
+                print(stderr)
         return 0
 
     raise AssertionError("unreachable")
