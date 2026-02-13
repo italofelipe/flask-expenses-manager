@@ -150,7 +150,58 @@ def _wait_for_command(
     )
 
 
-def build_apply_script(*, env_name: str, aws_region: str) -> str:
+def build_apply_script(*, env_name: str, aws_region: str, git_ref: str | None) -> str:
+    ref_cmd = ""
+    if git_ref:
+        # Checkout a ref that exists locally after fetch.
+        # Examples: "origin/master", "origin/refactor/wallet-controller-modularization".
+        # `reset --hard` is safe here because repo should be treated as deploy artifact.
+        ref_cmd = f"git checkout -f {git_ref} && git reset --hard {git_ref} && "
+    cors_origins = (
+        "https://www.auraxis.com.br,https://auraxis.com.br,https://app.auraxis.com.br"
+        if env_name == "prod"
+        else "http://localhost:3000,http://localhost:5173"
+    )
+    domain = "api.auraxis.com.br" if env_name == "prod" else "dev.api.auraxis.com.br"
+    render_nginx = (
+        # PROD: enforce TLS with Let's Encrypt certs.
+        f"""python3 - <<'PY'
+from pathlib import Path
+
+root = Path("deploy/nginx")
+src = root / "default.tls.conf"
+dst = root / "default.conf"
+text = src.read_text(encoding="utf-8")
+text = text.replace("__DOMAIN__", "{domain}")
+dst.write_text(text, encoding="utf-8")
+print("[i7] rendered nginx tls config:", dst)
+PY"""
+        if env_name == "prod"
+        # DEV: keep HTTP until a TLS cert is provisioned for dev.api.
+        else f"""cat > deploy/nginx/default.conf <<'CONF'
+server {{
+    listen 80;
+    server_name {domain};
+
+    client_max_body_size 10m;
+
+    location /.well-known/acme-challenge/ {{
+        root /var/www/certbot;
+    }}
+
+    location / {{
+        proxy_pass http://web:8000;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_set_header Connection "";
+    }}
+}}
+CONF
+echo "[i7] rendered nginx http config: deploy/nginx/default.conf" """
+    )
     return f"""\
 set -euo pipefail
 
@@ -179,7 +230,7 @@ fi
 
 sudo -u "$OP_USER" git config --global --add safe.directory "$REPO" || true
 sudo -u "$OP_USER" bash -lc \\
-  "cd '$REPO' && git fetch --all --prune && git pull --ff-only"
+  "cd '$REPO' && git fetch --all --prune && {ref_cmd}true"
 
 if [ ! -f docker-compose.aws.logging.yml ]; then
   echo "Missing docker-compose.aws.logging.yml in $REPO after git pull."
@@ -188,6 +239,9 @@ if [ ! -f docker-compose.aws.logging.yml ]; then
   echo "Merge the branch that adds the overlay, then re-run this script."
   exit 4
 fi
+
+# Render nginx config for this environment.
+{render_nginx}
 
 ENV_FILE=.env.prod
 if [ ! -f "$ENV_FILE" ]; then
@@ -198,15 +252,38 @@ fi
 ensure_kv() {{
   local key="$1"
   local value="$2"
-  if grep -qE "^${{key}}=" "$ENV_FILE"; then
-    sed -i "s/^${{key}}=.*/${{key}}=${{value}}/" "$ENV_FILE"
-  else
-    printf "\\n%s=%s\\n" "$key" "$value" >> "$ENV_FILE"
-  fi
+  python3 - "$ENV_FILE" "$key" "$value" <<'PY'
+import sys
+from pathlib import Path
+
+path = Path(sys.argv[1])
+key = sys.argv[2]
+value = sys.argv[3]
+
+lines = path.read_text(encoding="utf-8").splitlines()
+out = []
+replaced = False
+for line in lines:
+    if line.startswith(key + "=") and not replaced:
+        out.append(key + "=" + value)
+        replaced = True
+    else:
+        out.append(line)
+
+if not replaced:
+    # keep a blank line separator when appending new keys
+    if out and out[-1].strip():
+        out.append("")
+    out.append(key + "=" + value)
+
+path.write_text("\\n".join(out) + "\\n", encoding="utf-8")
+PY
 }}
 
 ensure_kv "AURAXIS_ENV" "{env_name}"
 ensure_kv "AWS_REGION" "{aws_region}"
+# Required by production runtime hardening; keep a safe default if missing.
+ensure_kv "CORS_ALLOWED_ORIGINS" "{cors_origins}"
 
 echo "[i7] restarting compose with awslogs overlay..."
 docker compose --env-file "$ENV_FILE" \\
@@ -215,8 +292,15 @@ docker compose --env-file "$ENV_FILE" \\
   up -d --build --force-recreate
 
 echo "[i7] validating healthz via nginx..."
-curl -fsS http://127.0.0.1/healthz >/dev/null
-echo "[i7] OK"
+for i in $(seq 1 15); do
+  if curl -fsS http://127.0.0.1/healthz >/dev/null; then
+    echo "[i7] OK"
+    exit 0
+  fi
+  sleep 2
+done
+echo "[i7] healthz validation failed"
+exit 5
 """
 
 
@@ -233,6 +317,14 @@ def build_parser() -> argparse.ArgumentParser:
     p_apply = sub.add_parser("apply", help="Apply logging overlay to DEV/PROD.")
     p_apply.add_argument("--targets", choices=["dev", "prod", "all"], default="all")
     p_apply.add_argument("--no-wait", action="store_true")
+    p_apply.add_argument(
+        "--git-ref",
+        default="origin/refactor/wallet-controller-modularization",
+        help=(
+            "Git ref to force-checkout on the instance before restarting compose. "
+            "Use empty string to keep current branch."
+        ),
+    )
     return p
 
 
@@ -241,8 +333,15 @@ def main() -> int:
     ctx = AwsCtx(profile=args.profile, region=args.region)
 
     if args.cmd == "apply":
+        git_ref = str(args.git_ref).strip()
+        if not git_ref:
+            git_ref = None
         if args.targets in {"dev", "all"}:
-            script = build_apply_script(env_name="dev", aws_region=ctx.region)
+            script = build_apply_script(
+                env_name="dev",
+                aws_region=ctx.region,
+                git_ref=git_ref,
+            )
             cmd_id = _ssm_send_shell(
                 ctx,
                 [args.dev_instance_id],
@@ -257,7 +356,11 @@ def main() -> int:
                     instance_id=args.dev_instance_id,
                 )
         if args.targets in {"prod", "all"}:
-            script = build_apply_script(env_name="prod", aws_region=ctx.region)
+            script = build_apply_script(
+                env_name="prod",
+                aws_region=ctx.region,
+                git_ref=git_ref,
+            )
             cmd_id = _ssm_send_shell(
                 ctx,
                 [args.prod_instance_id],
