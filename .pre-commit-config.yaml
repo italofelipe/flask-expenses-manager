@@ -47,3 +47,15 @@ repos:
     language: system
     pass_filenames: false
     always_run: true
+  - id: security-evidence
+    name: security-evidence (OWASP S3)
+    entry: bash scripts/security_evidence_check.sh
+    language: system
+    pass_filenames: false
+    stages: [pre-push]
+  - id: pip-audit
+    name: pip-audit (dependencies)
+    entry: bash -c 'pip-audit -r requirements.txt'
+    language: system
+    pass_filenames: false
+    stages: [pre-push]

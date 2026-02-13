@@ -245,6 +245,7 @@ Ultima atualizacao: 2026-02-13
 | 2026-02-13 | I7 | Mitigação temporária: `auraxis-health-dev/prod` ficaram em estado `ALARM` (endpoint ainda não deployado em master). Actions foram desabilitadas via `cloudwatch disable-alarm-actions` até concluir deploy de `/healthz`. | pending-commit |
 | 2026-02-13 | CI/Security | Correção do check `security_evidence_check.sh`: padrões atualizados para refletir paths reais após modularização (`graphql/utils.py`, `auth/resources.py`). | 465cba6 |
 | 2026-02-13 | Security | GraphQL: sanitização de `extensions` em erros de execução para evitar leak de detalhes de infraestrutura; Transações: deduplicação de `_guard_revoked_token` em `transaction.utils`. | pending-commit |
+| 2026-02-13 | DX/CI | Paridade local: script `scripts/run_ci_like_actions_local.sh` (pipeline CI-like) + hooks `pre-push` no pre-commit para `pip-audit` e `security_evidence_check.sh` (evita surpresas só no Actions). | pending-commit |
 | 2026-02-13 | S1 | Alertas operacionais: regra EventBridge `auraxis-ssm-command-failures` -> SNS `auraxis-alerts` para falhas de SSM RunCommand (patching/backups/ops). | pending-commit |
 | 2026-02-13 | S1 | Patching validado end-to-end: tasks de `AWS-RunPatchBaseline` re-registradas com `RebootIfNeeded` (DEV) e `NoReboot` (PROD) e validação executada via maintenance windows one-off agendadas (DEV+PROD: SUCCESS). | pending-commit |
 | 2026-02-09 | D (observacao) | Restaurados arquivos deletados acidentalmente: ticker/carteira | n/a |
