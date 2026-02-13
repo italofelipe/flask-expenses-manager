@@ -1,0 +1,12 @@
+[Unit]
+Description=Auraxis - Renew Let's Encrypt certificates and reload nginx
+Wants=docker.service
+After=docker.service
+
+[Service]
+Type=oneshot
+WorkingDirectory=/opt/auraxis
+Environment=COMPOSE_FILE=docker-compose.prod.yml
+Environment=ENV_FILE=.env.prod
+ExecStart=/bin/bash -lc './scripts/renew_tls_cert.sh'
+

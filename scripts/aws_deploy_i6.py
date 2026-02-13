@@ -6,7 +6,8 @@ Status
 - This is a pragmatic stepping stone before full GitHub Actions -> AWS deploy.
 - It provides:
   - deploy to DEV/PROD by git ref (branch/tag/commit)
-  - basic "rollback" (deploy a previous ref)
+  - basic rollback (deploy previous successfully deployed ref)
+  - status (show deployed refs)
   - deterministic execution with SSM + wait-for-success
 
 Why this exists
@@ -21,6 +22,7 @@ What it does on the instance
   - PROD: TLS (requires cert already provisioned)
   - DEV: HTTP (until dev TLS is provisioned)
 - Restarts compose with `docker-compose.prod.yml` (+ optional overlays).
+ - Tracks deploy state in `/var/lib/auraxis/deploy_state.json` (per-instance).
 
 Operator prerequisites
 - AWS CLI auth working locally.
@@ -42,6 +44,8 @@ DEFAULT_REGION = "us-east-1"
 
 DEFAULT_PROD_INSTANCE_ID = "i-0057e3b52162f78f8"
 DEFAULT_DEV_INSTANCE_ID = "i-0bb5b392c2188dd3d"
+
+DEPLOY_STATE_PATH = "/var/lib/auraxis/deploy_state.json"
 
 
 @dataclass(frozen=True)
@@ -130,7 +134,13 @@ def _wait(ctx: AwsCtx, *, command_id: str, instance_id: str) -> None:
     )
 
 
-def _build_script(*, env_name: str, aws_region: str, git_ref: str) -> str:
+def _build_script(
+    *,
+    env_name: str,
+    aws_region: str,
+    git_ref: str | None,
+    mode: str,
+) -> str:
     domain = "api.auraxis.com.br" if env_name == "prod" else "dev.api.auraxis.com.br"
     cors_origins = (
         "https://www.auraxis.com.br,https://auraxis.com.br,https://app.auraxis.com.br"
@@ -170,8 +180,13 @@ CONF
 echo "[i6] rendered nginx http config: deploy/nginx/default.conf" """
     )
 
+    git_ref_setup = f'GIT_REF="{git_ref}"' if git_ref is not None else 'GIT_REF=""'
+
     return f"""\
 set -euo pipefail
+
+MODE="{mode}"
+{git_ref_setup}
 
 REPO=""
 if [ -d /opt/auraxis ]; then
@@ -185,14 +200,74 @@ fi
 cd "$REPO"
 echo "[i6] repo=$REPO"
 
+STATE_PATH="{DEPLOY_STATE_PATH}"
+sudo mkdir -p "$(dirname "$STATE_PATH")"
+
 OP_USER="ubuntu"
 if [ ! -d "/home/$OP_USER" ]; then
   OP_USER="$(id -un)"
 fi
 sudo -u "$OP_USER" git config --global --add safe.directory "$REPO" || true
+
+CURRENT_REF="$(
+  sudo -u "$OP_USER" bash -lc "cd '$REPO' && git rev-parse HEAD" || true
+)"
+CURRENT_BRANCH="$(
+  sudo -u "$OP_USER" bash -lc "cd '$REPO' && git rev-parse --abbrev-ref HEAD" || true
+)"
+
+STATE_CURRENT=""
+STATE_PREVIOUS=""
+if [ -f "$STATE_PATH" ]; then
+  STATE_CURRENT="$(python3 - <<'PY' "$STATE_PATH"
+import json,sys
+p=sys.argv[1]
+try:
+  data=json.load(open(p,'r',encoding='utf-8'))
+  print(data.get('current','') or '')
+except Exception:
+  print('')
+PY
+)"
+  STATE_PREVIOUS="$(python3 - <<'PY' "$STATE_PATH"
+import json,sys
+p=sys.argv[1]
+try:
+  data=json.load(open(p,'r',encoding='utf-8'))
+  print(data.get('previous','') or '')
+except Exception:
+  print('')
+PY
+)"
+fi
+
+if [ "$MODE" = "status" ]; then
+  echo "[i6] git: branch=$CURRENT_BRANCH head=$CURRENT_REF"
+  echo "[i6] state: current=$STATE_CURRENT previous=$STATE_PREVIOUS path=$STATE_PATH"
+  exit 0
+fi
+
+if [ "$MODE" = "rollback" ]; then
+  if [ -z "$STATE_PREVIOUS" ]; then
+    echo "[i6] rollback requested but no previous deploy recorded in $STATE_PATH"
+    exit 12
+  fi
+  GIT_REF="$STATE_PREVIOUS"
+fi
+
+if [ -z "$GIT_REF" ]; then
+  echo "[i6] missing git ref."
+  echo "[i6] Provide --git-ref for deploy or ensure state has previous for rollback."
+  exit 13
+fi
+
+echo "[i6] mode=$MODE git_ref=$GIT_REF"
 sudo -u "$OP_USER" bash -lc \\
-  "cd '$REPO' && git fetch --all --prune && git checkout -f {git_ref} \\
-    && git reset --hard {git_ref}"
+  "cd '$REPO' && git fetch --all --prune && git checkout -f '$GIT_REF' \\
+    && git reset --hard '$GIT_REF'"
+
+NEW_REF="$(sudo -u "$OP_USER" bash -lc "cd '$REPO' && git rev-parse HEAD")"
+echo "[i6] new_head=$NEW_REF"
 
 {render_nginx}
 
@@ -261,6 +336,16 @@ echo "[i6] validating healthz..."
 for i in $(seq 1 20); do
   if curl -fsS http://127.0.0.1/healthz >/dev/null; then
     echo "[i6] OK"
+    python3 - <<'PY' "$STATE_PATH" "$CURRENT_REF" "$NEW_REF"
+import json,sys
+path=sys.argv[1]
+prev=sys.argv[2] or ""
+cur=sys.argv[3] or ""
+data={"previous": prev, "current": cur}
+with open(path,"w",encoding="utf-8") as f:
+  json.dump(data,f,indent=2,sort_keys=True)
+print("[i6] wrote deploy state:", path, data)
+PY
     exit 0
   fi
   sleep 2
@@ -281,6 +366,13 @@ def build_parser() -> argparse.ArgumentParser:
     p_deploy = sub.add_parser("deploy", help="Deploy a git ref to DEV/PROD.")
     p_deploy.add_argument("--env", choices=["dev", "prod"], required=True)
     p_deploy.add_argument("--git-ref", default="origin/master")
+    p_rb = sub.add_parser(
+        "rollback",
+        help="Rollback DEV/PROD to the previous successfully deployed ref.",
+    )
+    p_rb.add_argument("--env", choices=["dev", "prod"], required=True)
+    p_status = sub.add_parser("status", help="Show deploy state and current git ref.")
+    p_status.add_argument("--env", choices=["dev", "prod"], required=True)
     return p
 
 
@@ -288,21 +380,30 @@ def main() -> int:
     args = build_parser().parse_args()
     ctx = AwsCtx(profile=args.profile, region=args.region)
 
-    if args.cmd == "deploy":
+    if args.cmd in {"deploy", "rollback", "status"}:
         env_name = str(args.env)
         instance_id = (
             args.dev_instance_id if env_name == "dev" else args.prod_instance_id
         )
+
+        mode = str(args.cmd)
+        git_ref: str | None = None
+        comment_ref = ""
+        if mode == "deploy":
+            git_ref = str(args.git_ref)
+            comment_ref = f" ref={git_ref}"
+
         script = _build_script(
             env_name=env_name,
             aws_region=ctx.region,
-            git_ref=str(args.git_ref),
+            git_ref=git_ref,
+            mode=mode,
         )
         cmd_id = _ssm_send_shell(
             ctx,
             instance_id,
             script,
-            f"auraxis: deploy i6 ({env_name}) ref={args.git_ref}",
+            f"auraxis: i6 {mode} ({env_name}){comment_ref}",
         )
         print(f"{env_name.upper()} command_id={cmd_id}")
         _wait(ctx, command_id=cmd_id, instance_id=instance_id)

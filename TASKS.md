@@ -70,19 +70,19 @@ Ultima atualizacao: 2026-02-13
 | H3 | Seguranca | Hardening de validacao/sanitizacao/authz/headers/auditoria | Done | 100% | Médio: baseline aplicado; evolução contínua segue para monitoramento centralizado e infraestrutura S1 | pending-commit | 2026-02-11 |
 | I1 | Deploy Cloud | Fechar arquitetura alvo AWS/Azure para budget de R$40/mês e registrar decisão | Done | 100% | Medio: custos podem variar por região/câmbio | pending-commit | 2026-02-09 |
 | I2 | Deploy Cloud | Preparar Docker para produção (Dockerfile prod, gunicorn, healthcheck) | Done | 100% | Medio: diferenças dev/prod podem quebrar startup | pending-commit | 2026-02-09 |
-| I3 | Deploy AWS | Provisionar ambiente base na AWS (VPC, SG, instância Lightsail/EC2) | In Progress | 70% | Medio: hardening inicial de rede e portas | pending-commit | 2026-02-10 |
-| I4 | Deploy AWS | Provisionar banco no plano A (PostgreSQL em container na própria VM) | Todo | 0% | Medio: risco operacional sem HA gerenciado |  | 2026-02-09 |
+| I3 | Deploy AWS | Provisionar ambiente base na AWS (VPC, SG, instância Lightsail/EC2) | Done | 100% | Medio: manter hardening evolutivo em I8 e runbook em I9 | pending-commit | 2026-02-13 |
+| I4 | Deploy AWS | Provisionar banco no plano A (PostgreSQL em container na própria VM) | Done | 100% | Medio: risco operacional sem HA gerenciado (mitigado parcialmente com backups S3 e restore drill) | pending-commit | 2026-02-13 |
 | I5 | Deploy AWS | Provisionar banco no plano B (RDS PostgreSQL) e documentar critérios de fallback | Todo | 0% | Alto: custo pode estourar orçamento |  | 2026-02-09 |
-| I6 | Deploy AWS | Configurar deploy automático (GitHub Actions -> servidor) com rollback básico | In Progress | 35% | Medio: deploy via SSM (manual) implementado; falta integrar GitHub Actions com OIDC/IAM e adicionar rollback automático | pending-commit | 2026-02-13 |
+| I6 | Deploy AWS | Configurar deploy automático (GitHub Actions -> servidor) com rollback básico | In Progress | 55% | Medio: deploy via SSM implementado com `deploy/rollback/status` e state em `/var/lib/auraxis/deploy_state.json`; pendente OIDC/IAM no GitHub Actions | pending-commit | 2026-02-13 |
 | I7 | Deploy AWS | Observabilidade mínima (logs centralizados, métricas, alertas básicos) | Done | 100% | Médio: DEV canary via HTTP:80 (sem TLS), PROD via HTTPS:443; logs em CloudWatch Logs confirmados para web/nginx/db/redis | pending-commit | 2026-02-13 |
 | I8 | Deploy AWS | Hardening de produção (secrets, TLS, firewall, least-privilege IAM) | In Progress | 40% | Alto: risco de segurança e vazamento | pending-commit | 2026-02-10 |
 | I9 | Deploy AWS | Runbook de operação (backup, restore, rotação de credenciais, incidentes) | Todo | 0% | Medio: continuidade operacional insuficiente |  | 2026-02-09 |
-| I10 | Deploy Cloud | Primeiro deploy em produção (MVP) imediatamente após fechar Bloco D | Todo | 0% | Alto: dependência de D5-D8 e pipeline estável |  | 2026-02-09 |
+| I10 | Deploy Cloud | Primeiro deploy em produção (MVP) imediatamente após fechar Bloco D | Done | 100% | Medio: operação em VM única (sem HA) exige runbook e rotinas de backup/restore (I9/S1-03) | pending-commit | 2026-02-13 |
 | I11 | Nginx/TLS | Configurar Nginx em HTTP com suporte a ACME challenge (`/.well-known/acme-challenge`) | Done | 100% | Baixo | pending-commit | 2026-02-10 |
 | I12 | Nginx/TLS | Configurar compose prod para `443`, volumes de certbot e certificados | Done | 100% | Medio: erro de volume/mount pode invalidar proxy | pending-commit | 2026-02-10 |
-| I13 | Nginx/TLS | Provisionar emissão de certificado Let's Encrypt para `api.auraxis.com.br` | In Progress | 60% | Medio: depende de DNS + portas 80/443 + rate limit ACME | pending-commit | 2026-02-10 |
-| I14 | Nginx/TLS | Ativar config TLS no Nginx (redirect 80->443 + headers de segurança) | Todo | 0% | Medio: depende de I13 |  | 2026-02-10 |
-| I15 | Nginx/TLS | Configurar renovação automática de certificado e validações pós-renovação | Todo | 0% | Medio: risco de expiração sem automação |  | 2026-02-10 |
+| I13 | Nginx/TLS | Provisionar emissão de certificado Let's Encrypt para `api.auraxis.com.br` | Done | 100% | Medio: manter validações pós-deploy e automação de renovação (I15) | pending-commit | 2026-02-13 |
+| I14 | Nginx/TLS | Ativar config TLS no Nginx (redirect 80->443 + headers de segurança) | Done | 100% | Baixo: TLS ativo em PROD com headers de segurança; DEV segue HTTP por enquanto | pending-commit | 2026-02-13 |
+| I15 | Nginx/TLS | Configurar renovação automática de certificado e validações pós-renovação | In Progress | 60% | Medio: automação implementada via systemd timer + script; pendente instalar/aplicar em PROD via SSM e validar execução | pending-commit | 2026-02-13 |
 | I16 | Nginx/TLS | Checklist de validação local/AWS (DNS, SG, health, curl, logs, rollback) | In Progress | 65% | Baixo | pending-commit | 2026-02-10 |
 | R1 | Rebranding | Mapear todas ocorrências de nomenclatura legada do projeto e registrar plano de substituição para `auraxis` | Done | 100% | Baixo: mapeamento concluído em arquivos versionados | pending-commit | 2026-02-10 |
 | R2 | Rebranding | Substituir ocorrências versionadas de nomenclatura legada por `auraxis` (sem quebrar integrações externas) | Done | 100% | Medio: integrações externas podem manter identificador legado temporário | pending-commit | 2026-02-10 |
