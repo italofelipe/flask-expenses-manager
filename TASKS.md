@@ -1,6 +1,6 @@
 # TASKS - Central de TODOs e Progresso
 
-Ultima atualizacao: 2026-02-12
+Ultima atualizacao: 2026-02-13
 
 ## Regras de uso deste arquivo
 - Este arquivo centraliza TODOs de produto, engenharia e qualidade.
@@ -86,7 +86,8 @@ Ultima atualizacao: 2026-02-12
 | I16 | Nginx/TLS | Checklist de validação local/AWS (DNS, SG, health, curl, logs, rollback) | In Progress | 65% | Baixo | pending-commit | 2026-02-10 |
 | R1 | Rebranding | Mapear todas ocorrências de nomenclatura legada do projeto e registrar plano de substituição para `auraxis` | Done | 100% | Baixo: mapeamento concluído em arquivos versionados | pending-commit | 2026-02-10 |
 | R2 | Rebranding | Substituir ocorrências versionadas de nomenclatura legada por `auraxis` (sem quebrar integrações externas) | Done | 100% | Medio: integrações externas podem manter identificador legado temporário | pending-commit | 2026-02-10 |
-| S1 | AWS Security | Restringir acesso e hardening de instâncias EC2 (SG, NACL, IMDSv2, SSH policy, patching baseline) | In Progress | 99% | Baixo: DEV/PROD com root EBS criptografado + IMDSv2 + termination protection + IAM profile + SSM online + IP estável em DEV/PROD via Elastic IP + SSH ingress removido + SGs dedicados por ambiente + egress restrito (DNS/NTP/HTTP/HTTPS) + patching baseline (SSM Maintenance Window) configurado + alarmes CloudWatch básicos + NACL dedicado no subnet + firewall host (UFW) ativo + dashboard CloudWatch + SNS/Email para alarmes; pendente calibrar execução real do patching em janela e definir política de retenção/backup do banco | pending-commit | 2026-02-13 |
+| S1 | AWS Security | Restringir acesso e hardening de instâncias EC2 (SG, NACL, IMDSv2, SSH policy, patching baseline) | In Progress | 99% | Baixo: DEV/PROD com root EBS criptografado + IMDSv2 + termination protection + IAM profile + SSM online + IP estável em DEV/PROD via Elastic IP + SSH ingress removido + SGs dedicados por ambiente + egress restrito (DNS/NTP/HTTP/HTTPS) + patching baseline (SSM Maintenance Window) configurado + alarmes CloudWatch básicos + NACL dedicado no subnet + firewall host (UFW) ativo + dashboard CloudWatch + SNS/Email para alarmes; pendente apenas calibrar/confirmar execução real do patching em janela (automático) e definir runbook operacional | pending-commit | 2026-02-13 |
+| S1-03 | AWS Security | Backups do PostgreSQL para S3 (bucket hardenizado + IAM least-privilege + lifecycle + versioning + restore drill + agendamento via SSM MW) | Done | 100% | Médio: ainda falta runbook de restore completo e teste de RTO/RPO com volume real | pending-commit | 2026-02-13 |
 | S1-02 | AWS Security | Cleanup pós-migração de EBS: revisar e remover volumes/snapshots antigos (após janela de validação) | Done | 100% | Baixo: volumes e snapshots intermediários removidos após confirmação | pending-commit | 2026-02-12 |
 | S2 | App Security | Implementar segurança de endpoints (rate-limit, validação/sanitização de request/response, headers e authz por recurso) | Done | 100% | Médio: baseline completo em aplicação; próximos passos são monitoramento centralizado e hardening de infraestrutura (S1) | pending-commit | 2026-02-11 |
 | S3 | App Security | Executar checklist OWASP no sistema (ASVS/API Top 10), corrigir gaps e formalizar evidências | In Progress | 92% | Médio: baseline e remediações de aplicação concluídas; pendências residuais concentram-se em controles de infraestrutura (S1) | pending-commit | 2026-02-11 |
@@ -236,6 +237,7 @@ Ultima atualizacao: 2026-02-12
 | 2026-02-13 | S1 (fase 15) | Patching calibrado: execução on-demand do `AWS-RunPatchBaseline` em DEV validada (Success). Política alvo: DEV `RebootIfNeeded`, PROD `NoReboot` (configurada via maintenance windows). | pending-commit |
 | 2026-02-13 | S1 (fase 16) | Observabilidade mínima: CloudWatch Dashboard `Auraxis-EC2` criado com CPU e StatusCheckFailed para DEV/PROD. | pending-commit |
 | 2026-02-13 | S1 (fase 17) | Notificações habilitadas: tópico SNS `auraxis-alerts` criado com assinatura email e alarmes CloudWatch atualizados para enviar `ALARM/OK/INSUFFICIENT_DATA` para o SNS. Teste: `set-alarm-state` disparado manualmente em um alarme de DEV. | pending-commit |
+| 2026-02-13 | S1-03 | Backups Postgres em S3: bucket com policy HTTPS+SSE, versioning, lifecycle, IAM no role da EC2; backup manual DEV/PROD validado + restore drill DEV validado; agendamento diário via SSM Maintenance Windows. | pending-commit |
 | 2026-02-09 | D (observacao) | Restaurados arquivos deletados acidentalmente: ticker/carteira | n/a |
 
 ## Proxima prioridade sugerida
