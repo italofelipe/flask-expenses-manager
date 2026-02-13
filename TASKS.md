@@ -74,7 +74,7 @@ Ultima atualizacao: 2026-02-13
 | I4 | Deploy AWS | Provisionar banco no plano A (PostgreSQL em container na própria VM) | Todo | 0% | Medio: risco operacional sem HA gerenciado |  | 2026-02-09 |
 | I5 | Deploy AWS | Provisionar banco no plano B (RDS PostgreSQL) e documentar critérios de fallback | Todo | 0% | Alto: custo pode estourar orçamento |  | 2026-02-09 |
 | I6 | Deploy AWS | Configurar deploy automático (GitHub Actions -> servidor) com rollback básico | Todo | 0% | Medio: risco de indisponibilidade durante release |  | 2026-02-09 |
-| I7 | Deploy AWS | Observabilidade mínima (logs centralizados, métricas, alertas básicos) | In Progress | 20% | Medio: sem observabilidade o suporte fica reativo; execução depende de sessão AWS SSO válida para aplicar via SSM | pending-commit | 2026-02-13 |
+| I7 | Deploy AWS | Observabilidade mínima (logs centralizados, métricas, alertas básicos) | In Progress | 65% | Medio: métricas/alertas base ok; falta log shipping e alarmes adicionais (patch failures/app health) | pending-commit | 2026-02-13 |
 | I8 | Deploy AWS | Hardening de produção (secrets, TLS, firewall, least-privilege IAM) | In Progress | 40% | Alto: risco de segurança e vazamento | pending-commit | 2026-02-10 |
 | I9 | Deploy AWS | Runbook de operação (backup, restore, rotação de credenciais, incidentes) | Todo | 0% | Medio: continuidade operacional insuficiente |  | 2026-02-09 |
 | I10 | Deploy Cloud | Primeiro deploy em produção (MVP) imediatamente após fechar Bloco D | Todo | 0% | Alto: dependência de D5-D8 e pipeline estável |  | 2026-02-09 |
@@ -238,6 +238,7 @@ Ultima atualizacao: 2026-02-13
 | 2026-02-13 | S1 (fase 16) | Observabilidade mínima: CloudWatch Dashboard `Auraxis-EC2` criado com CPU e StatusCheckFailed para DEV/PROD. | pending-commit |
 | 2026-02-13 | S1 (fase 17) | Notificações habilitadas: tópico SNS `auraxis-alerts` criado com assinatura email e alarmes CloudWatch atualizados para enviar `ALARM/OK/INSUFFICIENT_DATA` para o SNS. Teste: `set-alarm-state` disparado manualmente em um alarme de DEV. | pending-commit |
 | 2026-02-13 | S1-03 | Backups Postgres em S3: bucket com policy HTTPS+SSE, versioning, lifecycle, IAM no role da EC2; backup manual DEV/PROD validado + restore drill DEV validado; agendamento diário via SSM Maintenance Windows. | pending-commit |
+| 2026-02-13 | I7 | Observabilidade mínima: CloudWatch Agent aplicado via SSM para métricas de memória/disco (`Auraxis/EC2`), alarmes `MemUsedHigh/DiskUsedHigh` (DEV+PROD) com SNS/email e dashboard `Auraxis-EC2` atualizado. | pending-commit |
 | 2026-02-09 | D (observacao) | Restaurados arquivos deletados acidentalmente: ticker/carteira | n/a |
 
 ## Proxima prioridade sugerida
