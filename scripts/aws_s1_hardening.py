@@ -320,6 +320,19 @@ def _permission_is_world_open(permission: dict[str, Any]) -> bool:
     return any(_is_world_open(item) for item in ipv4_ranges + ipv6_ranges)
 
 
+def _permission_has_any_cidr(permission: dict[str, Any]) -> bool:
+    if any(
+        str(item.get("CidrIp", "")).strip() for item in permission.get("IpRanges", [])
+    ):
+        return True
+    if any(
+        str(item.get("CidrIpv6", "")).strip()
+        for item in permission.get("Ipv6Ranges", [])
+    ):
+        return True
+    return False
+
+
 def _classify_sg_permission(permission: dict[str, Any]) -> tuple[str, str]:
     from_port = permission.get("FromPort")
     to_port = permission.get("ToPort")
@@ -345,6 +358,19 @@ def _classify_sg_permission(permission: dict[str, Any]) -> tuple[str, str]:
             f"protocol={protocol} from_port={from_port} to_port={to_port}"
         ),
     )
+
+
+def _classify_sg_egress_permission(permission: dict[str, Any]) -> tuple[str, str]:
+    protocol = str(permission.get("IpProtocol", ""))
+    world_open = _permission_is_world_open(permission)
+    has_any_cidr = _permission_has_any_cidr(permission)
+    if not has_any_cidr:
+        return "PASS", "No CIDR egress rule (security-group or prefix-list only)"
+    if protocol in {"-1", "all"} and world_open:
+        return "WARN", "All egress open to world"
+    if world_open:
+        return "PASS", "Egress to world restricted by protocol/ports"
+    return "PASS", "Egress restricted to specific CIDRs"
 
 
 def _append_security_group_checks(
@@ -376,6 +402,15 @@ def _append_security_group_checks(
                 check = "Security Group public ingress"
             else:
                 check = "Security Group ingress scope"
+            results.append(
+                CheckResult(status, check, f"{resource_name}:{sg_id}", details)
+            )
+
+        for permission in sg_payload.get("IpPermissionsEgress", []):
+            status, details = _classify_sg_egress_permission(permission)
+            check = "Security Group egress scope"
+            if status == "WARN":
+                check = "Security Group broad egress"
             results.append(
                 CheckResult(status, check, f"{resource_name}:{sg_id}", details)
             )
