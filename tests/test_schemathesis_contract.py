@@ -3,6 +3,18 @@ from __future__ import annotations
 import os
 
 import pytest
+
+# This module is intentionally opt-in.
+# Import-time application boot + schema generation can be expensive and may slow
+# down unrelated local checks (pre-commit, unit test runs, etc.).
+# The CI "Schemathesis" job already sets `SCHEMATHESIS_MAX_EXAMPLES`.
+if os.getenv("SCHEMATHESIS_MAX_EXAMPLES") is None:
+    pytest.skip(
+        "Schemathesis contract tests are opt-in. "
+        "Set SCHEMATHESIS_MAX_EXAMPLES to enable.",
+        allow_module_level=True,
+    )
+
 import schemathesis
 from hypothesis import HealthCheck, settings
 
