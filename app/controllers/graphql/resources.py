@@ -28,6 +28,34 @@ from app.graphql.security import (
 from .blueprint import graphql_bp
 
 
+def _sanitize_graphql_extensions(extensions: Any) -> dict[str, Any] | None:
+    """
+    Sanitize GraphQL extensions before returning them to clients.
+
+    Why
+    - Some internal errors encode infra state in extensions (e.g. "redis unreachable").
+    - Returning raw extensions can leak operational details to clients.
+
+    Policy
+    - Only forward a small allowlist of fields.
+    - Drop everything else.
+    """
+
+    if not isinstance(extensions, dict):
+        return None
+
+    payload: dict[str, Any] = {}
+    code = extensions.get("code")
+    if isinstance(code, str) and code:
+        payload["code"] = code
+
+    retry_after = extensions.get("retry_after_seconds")
+    if isinstance(retry_after, int) and 0 <= retry_after <= 86400:
+        payload["retry_after_seconds"] = retry_after
+
+    return payload or None
+
+
 def _format_graphql_execution_error(err: GraphQLError) -> dict[str, Any]:
     is_debug = bool(
         current_app.config.get("DEBUG") or current_app.config.get("TESTING")
@@ -39,8 +67,9 @@ def _format_graphql_execution_error(err: GraphQLError) -> dict[str, Any]:
             "extensions": {"code": "INTERNAL_ERROR", "details": {}},
         }
     payload: dict[str, Any] = {"message": err.message}
-    if err.extensions:
-        payload["extensions"] = err.extensions
+    safe_extensions = _sanitize_graphql_extensions(err.extensions)
+    if safe_extensions:
+        payload["extensions"] = safe_extensions
     return payload
 
 

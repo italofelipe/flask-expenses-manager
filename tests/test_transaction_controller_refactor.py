@@ -52,11 +52,7 @@ def test_transaction_endpoints_return_401_when_token_is_revoked(
     transaction_id = created.get_json()["data"]["transaction"][0]["id"]
 
     monkeypatch.setattr(
-        "app.controllers.transaction.resources.is_token_revoked",
-        lambda _jti: True,
-    )
-    monkeypatch.setattr(
-        "app.controllers.transaction.report_resources.is_token_revoked",
+        "app.controllers.transaction.utils.is_token_revoked",
         lambda _jti: True,
     )
 

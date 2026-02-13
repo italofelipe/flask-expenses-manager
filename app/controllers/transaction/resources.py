@@ -9,15 +9,9 @@ from uuid import UUID
 from flask import Response
 from flask_apispec import doc, use_kwargs
 from flask_apispec.views import MethodResource
-from flask_jwt_extended import (
-    get_jwt,
-    get_jwt_identity,
-    jwt_required,
-    verify_jwt_in_request,
-)
+from flask_jwt_extended import get_jwt_identity, jwt_required
 
 from app.extensions.database import db
-from app.extensions.jwt_callbacks import is_token_revoked
 from app.models.transaction import Transaction, TransactionStatus, TransactionType
 from app.schemas.transaction_schema import TransactionSchema
 from app.utils.datetime_utils import utc_now_compatible_with
@@ -43,19 +37,11 @@ from .utils import (
     _compat_error,
     _compat_success,
     _enforce_transaction_reference_ownership_or_error,
+    _guard_revoked_token,
     _internal_error_response,
-    _invalid_token_response,
     _validate_recurring_payload,
     serialize_transaction,
 )
-
-
-def _guard_revoked_token() -> Response | None:
-    verify_jwt_in_request()
-    jwt_data = get_jwt()
-    if is_token_revoked(jwt_data["jti"]):
-        return _invalid_token_response()
-    return None
 
 
 class TransactionResource(MethodResource):

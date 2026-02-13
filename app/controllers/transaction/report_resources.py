@@ -5,18 +5,12 @@ from uuid import UUID
 from flask import Response, request
 from flask_apispec import doc
 from flask_apispec.views import MethodResource
-from flask_jwt_extended import (
-    get_jwt,
-    get_jwt_identity,
-    jwt_required,
-    verify_jwt_in_request,
-)
+from flask_jwt_extended import get_jwt_identity, jwt_required
 
 from app.application.services.public_error_mapper_service import (
     map_validation_exception,
 )
 from app.extensions.database import db
-from app.extensions.jwt_callbacks import is_token_revoked
 from app.models.transaction import Transaction, TransactionStatus, TransactionType
 from app.services.transaction_analytics_service import TransactionAnalyticsService
 from app.utils.pagination import PaginatedResponse
@@ -33,8 +27,8 @@ from .openapi import (
 from .utils import (
     _compat_error,
     _compat_success,
+    _guard_revoked_token,
     _internal_error_response,
-    _invalid_token_response,
     _parse_month_param,
     _parse_optional_date,
     _parse_optional_uuid,
@@ -42,14 +36,6 @@ from .utils import (
     _resolve_transaction_ordering,
     serialize_transaction,
 )
-
-
-def _guard_revoked_token() -> Response | None:
-    verify_jwt_in_request()
-    jwt_data = get_jwt()
-    if is_token_revoked(jwt_data["jti"]):
-        return _invalid_token_response()
-    return None
 
 
 def _validation_error_response(
@@ -568,5 +554,4 @@ __all__ = [
     "_guard_revoked_token",
     "_resolve_transaction_ordering",
     "TransactionAnalyticsService",
-    "is_token_revoked",
 ]

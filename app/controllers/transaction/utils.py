@@ -6,6 +6,7 @@ from typing import Any
 from uuid import UUID
 
 from flask import Response, current_app
+from flask_jwt_extended import get_jwt, verify_jwt_in_request
 
 from app.application.errors import PublicValidationError
 from app.controllers.response_contract import (
@@ -15,6 +16,7 @@ from app.controllers.response_contract import (
     compat_success_response,
     is_v2_contract,
 )
+from app.extensions.jwt_callbacks import is_token_revoked
 from app.models.transaction import Transaction, TransactionStatus, TransactionType
 from app.services.transaction_reference_authorization_service import (
     TransactionReferenceAuthorizationError,
@@ -169,6 +171,24 @@ def _validate_recurring_payload(
     if due_date < start_date or due_date > end_date:
         return "Parâmetro 'due_date' deve estar entre 'start_date' e 'end_date'."
 
+    return None
+
+
+def _guard_revoked_token() -> Response | None:
+    """
+    Reject requests made with revoked JWTs.
+
+    Notes
+    - We keep this in `transaction.utils` to avoid duplicate implementations
+      across multiple transaction resources.
+    - This intentionally performs its own `verify_jwt_in_request()` call
+      because resources may call it before accessing identity claims.
+    """
+
+    verify_jwt_in_request()
+    jwt_data = get_jwt()
+    if is_token_revoked(jwt_data["jti"]):
+        return _invalid_token_response()
     return None
 
 
