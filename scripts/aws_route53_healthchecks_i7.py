@@ -195,6 +195,20 @@ def build_parser() -> argparse.ArgumentParser:
     sub = p.add_subparsers(dest="cmd", required=True)
     sub.add_parser("apply", help="Create/ensure health checks + alarms.")
     sub.add_parser("validate", help="Validate health checks exist (best-effort).")
+    sub.add_parser(
+        "disable-actions",
+        help=(
+            "Disable alarm actions for auraxis-health-dev/prod "
+            "(prevents notifications)."
+        ),
+    )
+    sub.add_parser(
+        "enable-actions",
+        help=(
+            "Enable alarm actions for auraxis-health-dev/prod "
+            "(restores notifications)."
+        ),
+    )
     return p
 
 
@@ -237,6 +251,34 @@ def main() -> int:
             )
             if not found:
                 raise AwsCliError(f"Missing health check for https://{fqdn}{args.path}")
+        return 0
+
+    if args.cmd == "disable-actions":
+        _run_aws(
+            ctx,
+            [
+                "cloudwatch",
+                "disable-alarm-actions",
+                "--alarm-names",
+                "auraxis-health-prod",
+                "auraxis-health-dev",
+            ],
+            expect_json=False,
+        )
+        return 0
+
+    if args.cmd == "enable-actions":
+        _run_aws(
+            ctx,
+            [
+                "cloudwatch",
+                "enable-alarm-actions",
+                "--alarm-names",
+                "auraxis-health-prod",
+                "auraxis-health-dev",
+            ],
+            expect_json=False,
+        )
         return 0
 
     raise AssertionError("unreachable")
