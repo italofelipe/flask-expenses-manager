@@ -1,16 +1,16 @@
 # Cloud Deploy Analysis (AWS vs Azure)
 
-Atualizado em: 2026-02-09
-Objetivo: preparar deploy da primeira versão após fechamento do Bloco D, com orçamento de até R$40/mês.
+Atualizado em: 2026-02-14
+Objetivo: preparar deploy e operacao com orçamento de ate **R$70/mês**.
 
 ## Premissas
-- Budget alvo: `R$40/mês`.
+- Budget alvo: `R$70/mês`.
 - Conversão conservadora usada para análise: `US$1 ~= R$6,00`.
 - Carga inicial baixa (POC/MVP), sem alta disponibilidade.
 - Aplicação em Docker.
 
 ## Viabilidade rápida
-- Com orçamento de R$40 (~US$6,67), banco gerenciado dedicado (RDS/Azure PostgreSQL) tende a estourar o custo.
+- Mesmo com orçamento de R$70 (~US$11,67), banco gerenciado dedicado (RDS/Azure PostgreSQL) tende a consumir a maior parte do budget e pode estourar o teto (dependendo de FX e storage/backups).
 - Estratégia mais viável no curto prazo: app + PostgreSQL no mesmo host (self-managed) com Docker.
 
 ## AWS (estimativa)
@@ -20,7 +20,7 @@ Objetivo: preparar deploy da primeira versão após fechamento do Bloco D, com o
 
 Conclusão AWS:
 - Plano enxuto com host único: viável perto do budget.
-- Plano com RDS dedicado: não viável com R$40/mês.
+- Plano com RDS dedicado: geralmente não viável com o budget atual, a menos que haja aumento de orçamento ou ajuste de escopo.
 
 ## Azure (estimativa)
 - VM `Standard_B1s` Linux (eastus): `US$0.0104/h` (~`US$7.59/mês` em 730h), sem disco/tráfego.
@@ -34,6 +34,7 @@ Conclusão Azure:
 ## Decisão recomendada (MVP)
 - Provedor recomendado: **AWS**.
 - Motivo: melhor chance de caber no orçamento mensal de R$40 com setup mínimo.
+  - Observacao: agora o budget alvo e R$70/mes, mas a estrategia continua a mesma (host unico + DB self-managed).
 
 ## Plano A (recomendado para budget)
 - Infra: 1 instância (Lightsail/EC2 low-cost).
@@ -59,6 +60,10 @@ Critério de troca A -> B:
 - falhas recorrentes de integridade/restore no banco self-managed;
 - necessidade de RPO/RTO mais agressivo;
 - aumento de orçamento mensal.
+
+## Guardrails de custo (recomendado)
+- Configurar AWS Budgets + Cost Anomaly Detection com limite conservador em USD.
+- Documento: `docs/AWS_COST_GUARDRAILS.md`
 
 ## PostgreSQL local (máquina do desenvolvedor) vs cloud
 - Não recomendado para produção usar banco na máquina local do dev.
