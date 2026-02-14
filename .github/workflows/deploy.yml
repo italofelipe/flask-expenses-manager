@@ -1,0 +1,103 @@
+name: Deploy
+
+on:
+  push:
+    branches:
+      - master
+  workflow_dispatch:
+    inputs:
+      env:
+        description: Target environment
+        required: true
+        type: choice
+        options:
+          - dev
+          - prod
+        default: dev
+      git_ref:
+        description: Git ref to deploy (branch/tag/sha). Default: origin/master
+        required: false
+        type: string
+        default: origin/master
+
+concurrency:
+  group: deploy-${{ github.ref }}-${{ github.event_name }}-${{ inputs.env || 'dev' }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  deploy-dev:
+    name: Deploy DEV
+    runs-on: ubuntu-latest
+    if: ${{ github.event_name == 'push' || inputs.env == 'dev' }}
+    environment: dev
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Configure AWS credentials (OIDC)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: ${{ vars.AWS_REGION }}
+
+      - name: Deploy via SSM
+        env:
+          AWS_REGION: ${{ vars.AWS_REGION }}
+          DEV_INSTANCE_ID: ${{ vars.AURAXIS_DEV_INSTANCE_ID }}
+          PROD_INSTANCE_ID: ${{ vars.AURAXIS_PROD_INSTANCE_ID }}
+        run: |
+          REF="${{ inputs.git_ref }}"
+          if [ "${{ github.event_name }}" = "push" ]; then
+            REF="origin/master"
+          fi
+          python scripts/aws_deploy_i6.py \
+            --profile "" \
+            --region "${AWS_REGION}" \
+            --dev-instance-id "${DEV_INSTANCE_ID}" \
+            --prod-instance-id "${PROD_INSTANCE_ID}" \
+            deploy --env dev --git-ref "${REF}"
+
+  deploy-prod:
+    name: Deploy PROD
+    runs-on: ubuntu-latest
+    if: ${{ github.event_name == 'workflow_dispatch' && inputs.env == 'prod' }}
+    environment: prod
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Configure AWS credentials (OIDC)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: ${{ vars.AWS_REGION }}
+
+      - name: Deploy via SSM
+        env:
+          AWS_REGION: ${{ vars.AWS_REGION }}
+          DEV_INSTANCE_ID: ${{ vars.AURAXIS_DEV_INSTANCE_ID }}
+          PROD_INSTANCE_ID: ${{ vars.AURAXIS_PROD_INSTANCE_ID }}
+        run: |
+          python scripts/aws_deploy_i6.py \
+            --profile "" \
+            --region "${AWS_REGION}" \
+            --dev-instance-id "${DEV_INSTANCE_ID}" \
+            --prod-instance-id "${PROD_INSTANCE_ID}" \
+            deploy --env prod --git-ref "${{ inputs.git_ref }}"
+

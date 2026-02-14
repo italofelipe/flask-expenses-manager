@@ -59,7 +59,13 @@ class AwsCliError(RuntimeError):
 
 
 def _run_aws(ctx: AwsCtx, args: list[str], *, expect_json: bool = True) -> Any:
-    cmd = ["aws", "--profile", ctx.profile, "--region", ctx.region, *args]
+    cmd: list[str] = ["aws"]
+    # In CI (GitHub Actions OIDC), we prefer env credentials and may not have a profile.
+    if ctx.profile:
+        cmd.extend(["--profile", ctx.profile])
+    if ctx.region:
+        cmd.extend(["--region", ctx.region])
+    cmd.extend(args)
     p = subprocess.run(cmd, capture_output=True, text=True, check=False)
     if p.returncode != 0:
         raise AwsCliError(
