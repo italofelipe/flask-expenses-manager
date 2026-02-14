@@ -56,10 +56,14 @@ docker compose -f docker-compose.prod.yml down
   - TLS/HTTPS (quando habilitado): `https://api.auraxis.com.br`
 
 ## Deploy TLS (AWS)
-- Guia completo de Nginx + Certbot:
-  - `/opt/auraxis/docs/NGINX_AWS_TLS.md`
+- Runbook completo (deploy, rollback, TLS, backups, observabilidade):
+  - `/opt/auraxis/docs/RUNBOOK.md`
 - Segredos em cloud (SSM/Secrets Manager):
   - `/opt/auraxis/docs/CLOUD_SECRETS_RUNBOOK.md`
+- Guardrails de custo (Budget <= R$70/mes):
+  - `/opt/auraxis/docs/AWS_COST_GUARDRAILS.md`
+- Plano B (RDS) quando budget permitir:
+  - `/opt/auraxis/docs/RDS_PLAN_B.md`
 
 ## Endpoints reais (código atual)
 

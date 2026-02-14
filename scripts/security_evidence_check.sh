@@ -73,7 +73,10 @@ check_contains "app/controllers/auth/resources.py" "generate_password_hash" "Pas
 if command -v rg >/dev/null 2>&1; then
   jwt_count=$(rg -n "@jwt_required\(" app/controllers | wc -l | tr -d ' ')
 else
-  jwt_count=$(grep -R --line-number "@jwt_required(" app/controllers | wc -l | tr -d ' ')
+  jwt_count=$(
+    grep -R --line-number --binary-files=without-match --exclude-dir="__pycache__" \
+      "@jwt_required(" app/controllers | wc -l | tr -d " "
+  )
 fi
 if [[ "${jwt_count}" -gt 10 ]]; then
   echo "- [PASS] jwt_required coverage baseline (${jwt_count} protected handlers found)" >>"${REPORT_FILE}"

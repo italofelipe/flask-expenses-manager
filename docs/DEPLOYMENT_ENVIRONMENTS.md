@@ -51,7 +51,7 @@ docker compose --env-file .env.prod -f docker-compose.prod.yml up -d --force-rec
 ```
 
 Detailed runbook:
-- `docs/NGINX_AWS_TLS.md`
+- `docs/RUNBOOK.md`
 
 ## Compatibility note
 - `app/__init__.py` now gates `db.create_all()` using `AUTO_CREATE_DB`.
@@ -69,3 +69,5 @@ docker compose --env-file .env.runtime -f docker-compose.prod.yml up -d --build
 
 Runbook:
 - `docs/CLOUD_SECRETS_RUNBOOK.md`
+- `docs/AWS_COST_GUARDRAILS.md`
+- `docs/RDS_PLAN_B.md`

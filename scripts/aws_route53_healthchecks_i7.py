@@ -119,9 +119,10 @@ def ensure_health_check(
         "ResourcePath": resource_path,
         "RequestInterval": request_interval,
         "FailureThreshold": failure_threshold,
-        # SNI is required when multiple TLS certs share the same IP/ALB.
-        "EnableSNI": True,
     }
+    if type_ == "HTTPS":
+        # SNI is required when multiple TLS certs share the same IP/ALB.
+        cfg["EnableSNI"] = True
     out = _run_aws(
         ctx,
         [
@@ -209,6 +210,13 @@ def build_parser() -> argparse.ArgumentParser:
             "(restores notifications)."
         ),
     )
+    sub.add_parser(
+        "migrate-dev-http",
+        help=(
+            "Update DEV health check to HTTP:80 (keeps PROD on HTTPS:443). "
+            "Useful when DEV does not have a TLS cert yet."
+        ),
+    )
     return p
 
 
@@ -279,6 +287,56 @@ def main() -> int:
             ],
             expect_json=False,
         )
+        return 0
+
+    if args.cmd == "migrate-dev-http":
+        https_id = _find_health_check_id(
+            ctx,
+            fqdn=args.dev_domain,
+            resource_path=args.path,
+            port=443,
+            type_="HTTPS",
+        )
+        http_id = _find_health_check_id(
+            ctx,
+            fqdn=args.dev_domain,
+            resource_path=args.path,
+            port=80,
+            type_="HTTP",
+        )
+        if not http_id:
+            http_id = ensure_health_check(
+                ctx,
+                fqdn=args.dev_domain,
+                resource_path=args.path,
+                port=80,
+                type_="HTTP",
+            )
+
+        ensure_health_alarm(
+            ctx,
+            alarm_name="auraxis-health-dev",
+            health_check_id=http_id,
+            sns_topic_arn=args.sns_topic_arn,
+            description=(
+                "Auraxis DEV health check failing: "
+                f"http://{args.dev_domain}{args.path}"
+            ),
+        )
+
+        # Disable the old HTTPS check to avoid confusion and reduce noise.
+        if https_id and https_id != http_id:
+            _run_aws(
+                ctx,
+                [
+                    "route53",
+                    "update-health-check",
+                    "--health-check-id",
+                    https_id,
+                    "--disabled",
+                ],
+                expect_json=False,
+            )
         return 0
 
     raise AssertionError("unreachable")
