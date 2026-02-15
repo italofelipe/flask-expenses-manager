@@ -7,7 +7,7 @@ on:
   workflow_dispatch:
     inputs:
       env:
-        description: Target environment
+        description: "Target environment"
         required: true
         type: choice
         options:
@@ -15,7 +15,7 @@ on:
           - prod
         default: dev
       git_ref:
-        description: Git ref to deploy (branch/tag/sha). Default: origin/master
+        description: "Git ref to deploy (branch/tag/sha). Default: origin/master"
         required: false
         type: string
         default: origin/master
@@ -100,4 +100,3 @@ jobs:
             --dev-instance-id "${DEV_INSTANCE_ID}" \
             --prod-instance-id "${PROD_INSTANCE_ID}" \
             deploy --env prod --git-ref "${{ inputs.git_ref }}"
-
