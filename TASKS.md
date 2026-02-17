@@ -288,3 +288,24 @@ Pendências de substituição controlada:
 | H1-WALLET | `wallet_controller` | `walletEntries`, `walletHistory`, `addWalletEntry`, `updateWalletEntry`, `deleteWalletEntry` | In Progress | 60% | Alto: consistencia de calculo e historico | ba1f238 |
 | H1-TICKER | `graphql.schema` | `tickers`, `addTicker`, `deleteTicker` | In Progress | 75% | Baixo | ba1f238 |
 | H1-HARDENING | `graphql_controller` | autorização fina por operação, limites de complexidade/profundidade, observabilidade | In Progress | 45% | Alto: custo de query baseline ativo, faltam observabilidade e custo por domínio | pending-commit |
+
+## CD Automation (new)
+
+| ID | Area | Tarefa | Status | Progresso | Risco | Commit | Ultima atualizacao |
+|---|---|---|---|---:|---|---|---|
+| CD-01 | CD | Normalizar path de deploy para `/opt/auraxis` em DEV/PROD e eliminar ambiguidade com `/opt/flask_expenses` | Todo | 0% | Médio: drift operacional entre instâncias |  | 2026-02-17 |
+| CD-02 | CD | Adicionar preflight obrigatório no deploy (`repo/env/vars/docker`) antes de alterar runtime | Done | 100% | Baixo: validações implementadas no `aws_deploy_i6.py` com falha explícita | pending-commit | 2026-02-17 |
+| CD-03 | CD | Smoke test pós-deploy com rollback automático em falha | Done | 100% | Médio: rollback automático depende de permissões SSM corretas no role de deploy | pending-commit | 2026-02-17 |
+| CD-04 | CD | Separar roles de deploy por ambiente (least-privilege: DEV vs PROD) | Todo | 0% | Médio: erro de IAM bloqueia pipeline |  | 2026-02-17 |
+| CD-05 | CD | Publicar resumo de deploy (ref, command-id, smoke, rollback) no job summary + histórico local | Done | 100% | Baixo | pending-commit | 2026-02-17 |
+| CD-06 | CD | Migrar para deploy imutável por imagem (ECR) e rollback por tag anterior | Todo | 0% | Médio: mudança de estratégia exige transição controlada |  | 2026-02-17 |
+| DX-01 | DX | Criar aliases no macOS para sessão AWS/SSO (`auraxis-sso-login`, `auraxis-sso-logout`) e conexão rápida EC2 via SSM (`ec2-auraxis-dev-login`, `ec2-auraxis-prod-login`) | Todo | 0% | Baixo |  | 2026-02-17 |
+| DX-02 | DX | Habilitar acesso remoto ao EC2 no Cursor/VS Code via SSM (sem SSH aberto) com `ProxyCommand` e host por `instance-id` | Todo | 0% | Médio: configuração local depende de plugin/CLI e perfil AWS |  | 2026-02-17 |
+| DX-03 | DX | Documentar playbook de troubleshooting de acesso remoto (SSO expirado, session-manager-plugin, profile incorreto, known_hosts) | Todo | 0% | Baixo |  | 2026-02-17 |
+
+## Changelog
+| Data | Item | Descricao | Commit |
+|---|---|---|---|
+| 2026-02-17 | CD Plan | Plano formal de automação de CD criado em `docs/CD_AUTOMATION_EXECUTION_PLAN.md` com fases, riscos, backlog e critérios de aceite. | n/a |
+| 2026-02-17 | DX Backlog | Itens DX adicionados: aliases de acesso no macOS, conexão VS Code/Cursor via SSM e runbook de troubleshooting remoto. | n/a |
+| 2026-02-17 | CD Hardening | Deploy SSM recebeu preflight obrigatório, switch TLS idempotente (`scripts/ensure_tls_runtime.sh`), smoke por edge/local e rollback automático no workflow `deploy.yml` (DEV/PROD), além de resumo de deploy no job summary. | pending-commit |

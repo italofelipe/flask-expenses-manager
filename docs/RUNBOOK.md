@@ -30,7 +30,7 @@ curl -fsS http://dev.api.auraxis.com.br/healthz
 
 ## Deploy (sem SSH) via SSM
 
-O deploy via SSM aplica um `git checkout` do ref desejado na instancia, renderiza Nginx por ambiente e reinicia o compose. Ao final, valida `/healthz`.
+O deploy via SSM aplica um `git checkout` do ref desejado na instancia, executa preflight de runtime, reinicia o compose, ajusta TLS de forma idempotente e valida `/healthz`.
 
 Comandos:
 
@@ -58,12 +58,15 @@ Rollback (para o ref anterior bem sucedido, por instancia):
 
 Notas:
 - O estado do deploy fica em `/var/lib/auraxis/deploy_state.json` na instancia.
-- DEV renderiza Nginx em HTTP; PROD renderiza Nginx em TLS usando `deploy/nginx/default.tls.conf`.
+- O switch de Nginx/TLS é idempotente via `scripts/ensure_tls_runtime.sh`:
+  - usa TLS quando o certificado existe
+  - tenta emitir cert em PROD quando possível
+  - mantém HTTP sem derrubar proxy quando cert ainda não existe
 
 ## TLS (PROD)
 
 Emissao inicial:
-- Script: `scripts/request_tls_cert.sh` (webroot, certbot container)
+- Script: `scripts/request_tls_cert.sh` (webroot, certbot container, ativa TLS automaticamente ao final)
 
 Renovacao automatica:
 - Script: `scripts/renew_tls_cert.sh`
@@ -157,4 +160,3 @@ Sintomas comuns e respostas:
 3) Necessidade de restore
 - Executar restore drill para validar ferramenta
 - Em caso de restore real, documentar o plano de RTO/RPO e executar em janela
-
