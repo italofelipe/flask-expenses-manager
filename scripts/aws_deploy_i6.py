@@ -17,10 +17,11 @@ Why this exists
 What it does on the instance
 - Locates repo dir in `/opt/auraxis` (preferred) or `/opt/flask_expenses` (legacy).
 - Runs `git fetch` and force-checkouts a ref (defaults to `origin/master`).
-- Ensures required runtime env keys for hardened prod configs.
-- Renders Nginx config:
-  - PROD: TLS (requires cert already provisioned)
-  - DEV: HTTP (until dev TLS is provisioned)
+- Runs preflight checks (repo/env/required keys/docker).
+- Applies runtime TLS mode idempotently:
+  - uses TLS only when certificate exists
+  - auto-requests cert in PROD when possible
+  - falls back to HTTP safely without crashing Nginx
 - Restarts compose with `docker-compose.prod.yml` (+ optional overlays).
  - Tracks deploy state in `/var/lib/auraxis/deploy_state.json` (per-instance).
 
@@ -153,39 +154,6 @@ def _build_script(
         if env_name == "prod"
         else "http://localhost:3000,http://localhost:5173"
     )
-    render_nginx = (
-        f"""python3 - <<'PY'
-from pathlib import Path
-root = Path("deploy/nginx")
-src = root / "default.tls.conf"
-dst = root / "default.conf"
-text = src.read_text(encoding="utf-8").replace("__DOMAIN__", "{domain}")
-dst.write_text(text, encoding="utf-8")
-print("[i6] rendered nginx tls config:", dst)
-PY"""
-        if env_name == "prod"
-        else f"""cat > deploy/nginx/default.conf <<'CONF'
-server {{
-    listen 80;
-    server_name {domain};
-
-    client_max_body_size 10m;
-    location /.well-known/acme-challenge/ {{ root /var/www/certbot; }}
-
-    location / {{
-        proxy_pass http://web:8000;
-        proxy_http_version 1.1;
-        proxy_set_header Host $host;
-        proxy_set_header X-Real-IP $remote_addr;
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto $scheme;
-        proxy_set_header Connection "";
-    }}
-}}
-CONF
-echo "[i6] rendered nginx http config: deploy/nginx/default.conf" """
-    )
-
     git_ref_setup = f'GIT_REF="{git_ref}"' if git_ref is not None else 'GIT_REF=""'
 
     return f"""\
@@ -267,6 +235,54 @@ if [ -z "$GIT_REF" ]; then
   exit 13
 fi
 
+require_file() {{
+  path="$1"
+  if [ ! -f "$path" ]; then
+    echo "[i6] missing required file: $path"
+    exit 21
+  fi
+}}
+
+require_env_key() {{
+  key="$1"
+  if ! grep -qE "^${{key}}=" "$ENV_FILE"; then
+    echo "[i6] missing required env key in $ENV_FILE: $key"
+    exit 22
+  fi
+}}
+
+require_cmd() {{
+  cmd="$1"
+  if ! command -v "$cmd" >/dev/null 2>&1; then
+    echo "[i6] missing command: $cmd"
+    exit 23
+  fi
+}}
+
+ENV_FILE=.env.prod
+require_file "$ENV_FILE"
+require_file "docker-compose.prod.yml"
+require_file "scripts/ensure_tls_runtime.sh"
+require_file "deploy/nginx/default.http.conf"
+require_file "deploy/nginx/default.tls.conf"
+
+require_cmd docker
+require_cmd curl
+if ! docker info >/dev/null 2>&1; then
+  echo "[i6] docker daemon unavailable"
+  exit 24
+fi
+
+for key in \\
+  SECRET_KEY JWT_SECRET_KEY DOMAIN CERTBOT_EMAIL \\
+  POSTGRES_DB POSTGRES_USER POSTGRES_PASSWORD \\
+  DB_HOST DB_PORT DB_NAME DB_USER DB_PASS \\
+  RATE_LIMIT_BACKEND RATE_LIMIT_REDIS_URL RATE_LIMIT_FAIL_CLOSED \\
+  LOGIN_GUARD_ENABLED LOGIN_GUARD_BACKEND LOGIN_GUARD_REDIS_URL \\
+  LOGIN_GUARD_FAIL_CLOSED; do
+  require_env_key "$key"
+done
+
 echo "[i6] mode=$MODE git_ref=$GIT_REF"
 sudo -u "$OP_USER" bash -lc \\
   "cd '$REPO' && git fetch --all --prune && git checkout -f '$GIT_REF' \\
@@ -274,14 +290,6 @@ sudo -u "$OP_USER" bash -lc \\
 
 NEW_REF="$(sudo -u "$OP_USER" bash -lc "cd '$REPO' && git rev-parse HEAD")"
 echo "[i6] new_head=$NEW_REF"
-
-{render_nginx}
-
-ENV_FILE=.env.prod
-if [ ! -f "$ENV_FILE" ]; then
-  echo "Missing $ENV_FILE."
-  exit 3
-fi
 
 python3 - "$ENV_FILE" "AURAXIS_ENV" "{env_name}" <<'PY'
 import sys
@@ -338,9 +346,29 @@ echo "[i6] restarting compose..."
 docker compose --env-file "$ENV_FILE" -f docker-compose.prod.yml \\
   up -d --build --force-recreate
 
+echo "[i6] ensuring runtime TLS mode..."
+AUTO_REQUEST_TLS_CERT="true"
+if [ "{env_name}" = "dev" ]; then
+  AUTO_REQUEST_TLS_CERT="false"
+fi
+chmod +x scripts/ensure_tls_runtime.sh
+COMPOSE_FILE="docker-compose.prod.yml" ENV_FILE="$ENV_FILE" \\
+  AUTO_REQUEST_TLS_CERT="$AUTO_REQUEST_TLS_CERT" \\
+  ./scripts/ensure_tls_runtime.sh "{env_name}" "{domain}"
+
 echo "[i6] validating healthz..."
-for i in $(seq 1 20); do
-  if curl -fsS http://127.0.0.1/healthz >/dev/null; then
+SCHEME="http"
+CURL_FLAGS="-fsS"
+if grep -q "listen 443" deploy/nginx/default.conf; then
+  SCHEME="https"
+  CURL_FLAGS="-kfsS"
+fi
+echo "[i6] edge_scheme=$SCHEME domain={domain}"
+
+for i in $(seq 1 30); do
+  EDGE_HEALTH_URL="$SCHEME://127.0.0.1/healthz"
+  if curl -fsS http://127.0.0.1:8000/healthz >/dev/null \\
+    && curl $CURL_FLAGS "$EDGE_HEALTH_URL" -H "Host: {domain}" >/dev/null; then
     echo "[i6] OK"
     python3 - <<'PY' "$STATE_PATH" "$CURRENT_REF" "$NEW_REF"
 import json,sys
