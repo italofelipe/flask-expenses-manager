@@ -270,8 +270,27 @@ if ! docker info >/dev/null 2>&1; then
   exit 24
 fi
 
+ensure_env_default() {{
+  key="$1"
+  value="$2"
+  if grep -qE "^${{key}}=" "$ENV_FILE"; then
+    return 0
+  fi
+  echo "${{key}}=${{value}}" >> "$ENV_FILE"
+  echo "[i6] defaulted $key"
+}}
+
+# Backward-compatibility for older .env.prod files on long-lived instances.
+ensure_env_default RATE_LIMIT_BACKEND redis
+ensure_env_default RATE_LIMIT_REDIS_URL redis://redis:6379/0
+ensure_env_default RATE_LIMIT_FAIL_CLOSED true
+ensure_env_default LOGIN_GUARD_ENABLED true
+ensure_env_default LOGIN_GUARD_BACKEND redis
+ensure_env_default LOGIN_GUARD_REDIS_URL redis://redis:6379/0
+ensure_env_default LOGIN_GUARD_FAIL_CLOSED true
+
 for key in \\
-  SECRET_KEY JWT_SECRET_KEY DOMAIN CERTBOT_EMAIL \\
+  SECRET_KEY JWT_SECRET_KEY DOMAIN \\
   POSTGRES_DB POSTGRES_USER POSTGRES_PASSWORD \\
   DB_HOST DB_PORT DB_NAME DB_USER DB_PASS \\
   RATE_LIMIT_BACKEND RATE_LIMIT_REDIS_URL RATE_LIMIT_FAIL_CLOSED \\
@@ -279,6 +298,10 @@ for key in \\
   LOGIN_GUARD_FAIL_CLOSED; do
   require_env_key "$key"
 done
+
+if [ "{env_name}" = "prod" ]; then
+  require_env_key CERTBOT_EMAIL
+fi
 
 echo "[i6] mode=$MODE git_ref=$GIT_REF"
 sudo -u "$OP_USER" bash -lc \\
