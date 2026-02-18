@@ -1,6 +1,6 @@
 # TASKS - Central de TODOs e Progresso
 
-Ultima atualizacao: 2026-02-13
+Ultima atualizacao: 2026-02-18
 
 ## Regras de uso deste arquivo
 - Este arquivo centraliza TODOs de produto, engenharia e qualidade.
@@ -299,7 +299,7 @@ Pendências de substituição controlada:
 | CD-04 | CD | Separar roles de deploy por ambiente (least-privilege: DEV vs PROD) | Todo | 0% | Médio: erro de IAM bloqueia pipeline |  | 2026-02-17 |
 | CD-05 | CD | Publicar resumo de deploy (ref, command-id, smoke, rollback) no job summary + histórico local | Done | 100% | Baixo | pending-commit | 2026-02-17 |
 | CD-06 | CD | Migrar para deploy imutável por imagem (ECR) e rollback por tag anterior | Todo | 0% | Médio: mudança de estratégia exige transição controlada |  | 2026-02-17 |
-| CD-07 | CD | Corrigir falha de bootstrap no deploy remoto (`missing required file: scripts/ensure_tls_runtime.sh`) com fallback compatível para refs legados e ambientes já provisionados | In Progress | 99% | Médio: até validar novo run, ainda existe risco residual de drift no script remoto e no `.env` legado | pending-commit | 2026-02-18 |
+| CD-07 | CD | Corrigir falha de bootstrap no deploy remoto (`missing required file: scripts/ensure_tls_runtime.sh`) com fallback compatível para refs legados e ambientes já provisionados | Done | 100% | Baixo: bootstrap/scripts/env defaults, rollback sem `fetch` remoto e precheck explícito de auth Git reduziram fragilidade operacional; pendência estratégica segue em CD-06 (deploy imutável por imagem) | pending-commit | 2026-02-18 |
 | DX-01 | DX | Criar aliases no macOS para sessão AWS/SSO (`auraxis-sso-login`, `auraxis-sso-logout`) e conexão rápida EC2 via SSM (`ec2-auraxis-dev-login`, `ec2-auraxis-prod-login`) | Todo | 0% | Baixo |  | 2026-02-17 |
 | DX-02 | DX | Habilitar acesso remoto ao EC2 no Cursor/VS Code via SSM (sem SSH aberto) com `ProxyCommand` e host por `instance-id` | Todo | 0% | Médio: configuração local depende de plugin/CLI e perfil AWS |  | 2026-02-17 |
 | DX-03 | DX | Documentar playbook de troubleshooting de acesso remoto (SSO expirado, session-manager-plugin, profile incorreto, known_hosts) | Todo | 0% | Baixo |  | 2026-02-17 |
@@ -320,3 +320,4 @@ Pendências de substituição controlada:
 | 2026-02-18 | CD Incident 5 | Deploy PROD falhou por `git fetch` usando `github.com:22` em ambiente com egress restrito. Correção aplicada no `aws_deploy_i6.py` para forçar transporte Git via SSH sobre `443` (`ssh.github.com`) durante o fetch remoto via SSM. | pending-commit |
 | 2026-02-18 | CD Incident 6 | Rollback PROD falhou por depender de `git fetch` remoto e autenticação SSH. Correção aplicada no `aws_deploy_i6.py`: rollback agora usa apenas commit local registrado no `deploy_state`, sem `fetch`; caso commit não exista localmente, falha explícita com diagnóstico. | pending-commit |
 | 2026-02-18 | CD Incident 7 | Deploy PROD continuou falhando por ausência de chave SSH no usuário operacional da instância. Hardening no `aws_deploy_i6.py`: precheck `git ls-remote` com falha explícita e mensagem de remediação antes de `fetch`, reduzindo ambiguidade operacional em incidentes futuros. | pending-commit |
+| 2026-02-18 | CD Incident 8 | Incidente `publickey` resolvido operacionalmente: chave SSH de deploy provisionada no usuário `ubuntu` da instância PROD, mapeada para `ssh.github.com:443` via `~/.ssh/config` e cadastrada como Deploy Key no repositório; deploy PROD voltou a executar com sucesso. | n/a |
