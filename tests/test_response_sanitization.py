@@ -74,3 +74,30 @@ def test_graphql_masks_internal_errors_in_production(
     payload = response.get_json()
     assert payload["errors"][0]["message"] == "An unexpected error occurred."
     assert payload["errors"][0]["extensions"]["code"] == "INTERNAL_ERROR"
+
+
+def test_graphql_keeps_public_error_with_allowlisted_code_in_production(
+    app: Any,
+    client: Any,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    app.config["DEBUG"] = False
+    app.config["TESTING"] = False
+
+    from app.controllers import graphql_controller
+
+    def _fake_execute(*args: Any, **kwargs: Any) -> _FakeExecutionResult:
+        error = GraphQLError(
+            "Invalid credentials",
+            extensions={"code": "UNAUTHORIZED"},
+            original_error=GraphQLError("Invalid credentials"),
+        )
+        return _FakeExecutionResult(errors=[error], data=None)
+
+    monkeypatch.setattr(graphql_controller.schema, "execute", _fake_execute)
+
+    response = client.post("/graphql", json={"query": "query { __typename }"})
+    assert response.status_code == 400
+    payload = response.get_json()
+    assert payload["errors"][0]["message"] == "Invalid credentials"
+    assert payload["errors"][0]["extensions"]["code"] == "UNAUTHORIZED"

@@ -34,6 +34,14 @@ AUTH_BACKEND_UNAVAILABLE_MESSAGE = (
     "Authentication temporarily unavailable. Try again later."
 )
 
+_GQL_VALIDATION_ERROR = "VALIDATION_ERROR"
+_GQL_UNAUTHORIZED = "UNAUTHORIZED"
+_GQL_CONFLICT = "CONFLICT"
+
+
+def _public_graphql_error(message: str, *, code: str) -> GraphQLError:
+    return GraphQLError(message, extensions={"code": code})
+
 
 def _raise_auth_backend_unavailable(exc: Exception) -> NoReturn:
     raise GraphQLError(
@@ -99,8 +107,14 @@ class RegisterUserMutation(graphene.Mutation):
                     f"{field}: {', '.join(str(item) for item in errors)}"
                     for field, errors in messages.items()
                 )
-                raise GraphQLError(flat or "Dados inválidos para registro.") from exc
-            raise GraphQLError("Dados inválidos para registro.") from exc
+                raise _public_graphql_error(
+                    flat or "Dados inválidos para registro.",
+                    code=_GQL_VALIDATION_ERROR,
+                ) from exc
+            raise _public_graphql_error(
+                "Dados inválidos para registro.",
+                code=_GQL_VALIDATION_ERROR,
+            ) from exc
 
         duplicate_user = User.query.filter_by(email=validated["email"]).first()
         if duplicate_user:
@@ -108,7 +122,10 @@ class RegisterUserMutation(graphene.Mutation):
                 return AuthPayloadType(
                     message=auth_policy.registration.accepted_message,
                 )
-            raise GraphQLError(auth_policy.registration.conflict_message)
+            raise _public_graphql_error(
+                auth_policy.registration.conflict_message,
+                code=_GQL_CONFLICT,
+            )
 
         user = User(
             name=validated["name"],
@@ -144,7 +161,10 @@ class LoginMutation(graphene.Mutation):
     ) -> AuthPayloadType:
         auth_policy = get_auth_security_policy()
         if not (email or name):
-            raise GraphQLError("Missing credentials")
+            raise _public_graphql_error(
+                "Missing credentials",
+                code=_GQL_VALIDATION_ERROR,
+            )
 
         principal = str(email or name or "")
         user = (
@@ -192,7 +212,10 @@ class LoginMutation(graphene.Mutation):
                 login_guard=login_guard,
                 login_context=login_context,
             )
-            raise GraphQLError("Invalid credentials")
+            raise _public_graphql_error(
+                "Invalid credentials",
+                code=_GQL_UNAUTHORIZED,
+            )
 
         _guard_register_success_or_raise(
             login_guard=login_guard,
@@ -242,10 +265,16 @@ class UpdateUserProfileMutation(graphene.Mutation):
         user = get_current_user_required()
         result = assign_user_profile_fields(user, kwargs)
         if result["error"]:
-            raise GraphQLError(str(result["message"]))
+            raise _public_graphql_error(
+                str(result["message"]),
+                code=_GQL_VALIDATION_ERROR,
+            )
         errors = user.validate_profile_data()
         if errors:
-            raise GraphQLError(f"Erro de validação: {errors}")
+            raise _public_graphql_error(
+                f"Erro de validação: {errors}",
+                code=_GQL_VALIDATION_ERROR,
+            )
         db.session.commit()
         return UpdateUserProfileMutation(
             user=UserType(**_user_to_graphql_payload(user))

@@ -27,6 +27,16 @@ from app.graphql.security import (
 
 from .blueprint import graphql_bp
 
+_PUBLIC_GRAPHQL_ERROR_CODES = {
+    "AUTH_BACKEND_UNAVAILABLE",
+    "CONFLICT",
+    "FORBIDDEN",
+    "NOT_FOUND",
+    "TOO_MANY_ATTEMPTS",
+    "UNAUTHORIZED",
+    "VALIDATION_ERROR",
+}
+
 
 def _sanitize_graphql_extensions(extensions: Any) -> dict[str, Any] | None:
     """
@@ -56,18 +66,35 @@ def _sanitize_graphql_extensions(extensions: Any) -> dict[str, Any] | None:
     return payload or None
 
 
+def _is_public_graphql_error(
+    err: GraphQLError,
+    safe_extensions: dict[str, Any] | None,
+) -> bool:
+    if not safe_extensions:
+        return False
+    code = safe_extensions.get("code")
+    return isinstance(code, str) and code in _PUBLIC_GRAPHQL_ERROR_CODES
+
+
 def _format_graphql_execution_error(err: GraphQLError) -> dict[str, Any]:
     is_debug = bool(
         current_app.config.get("DEBUG") or current_app.config.get("TESTING")
     )
-    if err.original_error is not None and not is_debug:
+    safe_extensions = _sanitize_graphql_extensions(err.extensions)
+    if not is_debug and err.original_error is not None:
+        if _is_public_graphql_error(err, safe_extensions):
+            public_payload: dict[str, Any] = {"message": err.message}
+            if safe_extensions:
+                public_payload["extensions"] = safe_extensions
+            return public_payload
+
         current_app.logger.exception("GraphQL internal execution error", exc_info=err)
         return {
             "message": "An unexpected error occurred.",
             "extensions": {"code": "INTERNAL_ERROR", "details": {}},
         }
+
     payload: dict[str, Any] = {"message": err.message}
-    safe_extensions = _sanitize_graphql_extensions(err.extensions)
     if safe_extensions:
         payload["extensions"] = safe_extensions
     return payload
