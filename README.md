@@ -1,220 +1,189 @@
-# Not Enough Cash, Stranger!
+# Auraxis API
 
-API RESTful para gestão financeira pessoal, construída com Flask, JWT e PostgreSQL.
+API de gestão financeira pessoal (estudo/POC com padrão de produção) construída com Flask, PostgreSQL, Redis, REST + GraphQL e pipeline forte de qualidade/segurança.
 
-## Stack atual
+## Visão geral
+
+O repositório entrega uma base backend pronta para evoluir produto sem virar "frankenstein":
+- domínio financeiro com autenticação, transações, carteira e investimentos;
+- contrato REST padronizado e camada GraphQL compartilhando o mesmo domínio;
+- segurança aplicada (rate limit, hardening de headers/CORS, guard de login, auditoria);
+- operação em AWS com runbook, backup, observabilidade e deploy automatizado via GitHub Actions + SSM.
+
+## O que você vai encontrar neste repositório
+
+### Funcionalidades implementadas
+- Autenticação
+  - `POST /auth/register`
+  - `POST /auth/login`
+  - `POST /auth/logout`
+- Usuário
+  - `PUT /user/profile`
+  - `GET /user/me`
+- Transações
+  - CRUD e operações auxiliares (`restore`, `deleted`, `force delete`)
+  - listagem com filtros e resumo/dashboard
+- Carteira e investimentos
+  - operações de carteira + valuation + histórico
+- GraphQL
+  - endpoint único `POST /graphql`
+  - queries/mutations cobrindo fluxos principais
+
+### Qualidade e segurança
+- Linters e typing: `black`, `isort`, `flake8`, `mypy`
+- Segurança: `bandit`, `gitleaks`, `pip-audit`, `trivy`, `snyk` (condicional)
+- Confiabilidade: `pytest`, cobertura, `schemathesis`, mutation testing (`cosmic-ray`)
+- Observabilidade e operação AWS: scripts em `scripts/` + runbooks em `docs/`
+
+## Stack de tecnologia
+
+### Aplicação
+- Python 3.13
 - Flask
 - Flask-JWT-Extended
-- Flask-SQLAlchemy / Flask-Migrate
-- Marshmallow + Webargs (validação e serialização)
-- Flask-Apispec (Swagger/OpenAPI)
+- Flask-SQLAlchemy + Flask-Migrate
+- Marshmallow + Webargs
+- Flask-Apispec (OpenAPI/Swagger)
+- Graphene (GraphQL)
 - PostgreSQL
+- Redis
 
-## Rodando com Docker
+### Infra e operação
+- Docker / Docker Compose
+- Nginx + Certbot (TLS)
+- AWS EC2 + SSM + Route53 + CloudWatch + SNS + S3
+- GitHub Actions (CI/CD)
+- SonarQube Cloud
 
-### Ambiente DEV
-1. Crie o arquivo de ambiente de desenvolvimento:
+## Arquitetura (high-level)
 
+Estrutura principal da aplicação:
+- `app/controllers/` - camada HTTP (REST/GraphQL), contrato e serialização de entrada/saída
+- `app/application/` - DTOs, interfaces e serviços de aplicação
+- `app/services/` - serviços de domínio e integrações
+- `app/models/` - modelos SQLAlchemy
+- `app/schemas/` - validação/serialização
+- `app/middleware/` - auth guard, rate limit, CORS, security headers
+- `app/extensions/` - inicialização de extensões e observabilidade
+
+## Como rodar
+
+### Pré-requisitos
+- Docker + Docker Compose
+- Python 3.13 (para execução local sem container e tooling)
+- (Opcional) Node.js + npm para rodar suíte Postman via Newman
+
+### 1) Ambiente DEV (recomendado para desenvolvimento)
 ```bash
 cp .env.dev.example .env.dev
+docker compose -f docker-compose.dev.yml up --build -d
 ```
 
-2. Suba os containers:
+Acessos DEV:
+- API: [http://localhost:3333](http://localhost:3333)
+- Health: [http://localhost:3333/healthz](http://localhost:3333/healthz)
+- Swagger: [http://localhost:3333/docs/](http://localhost:3333/docs/)
+- OpenAPI JSON: [http://localhost:3333/docs/swagger/](http://localhost:3333/docs/swagger/)
 
-```bash
-docker compose -f docker-compose.dev.yml up --build
-```
-
-### Ambiente PROD (local/staging)
-1. Crie o arquivo de ambiente de produção:
-
+### 2) Ambiente PROD local/staging
 ```bash
 cp .env.prod.example .env.prod
-```
-
-2. Suba os containers:
-
-```bash
 docker compose -f docker-compose.prod.yml up --build -d
 ```
 
-3. Derrube os containers:
-
+### 3) Parar ambiente
 ```bash
+docker compose -f docker-compose.dev.yml down
 docker compose -f docker-compose.prod.yml down
 ```
 
-## Portas e acesso
-- DEV:
-  - App exposto no host: `http://localhost:3333`
-  - Swagger UI: `http://localhost:3333/docs/`
-  - OpenAPI JSON: `http://localhost:3333/docs/swagger/`
-  - PostgreSQL: `localhost:5432`
-- PROD:
-  - Nginx/reverse proxy: `http://localhost`
-  - App interno (container): `web:8000`
-  - TLS/HTTPS (quando habilitado): `https://api.auraxis.com.br`
+## Testes e validações
 
-## Deploy TLS (AWS)
-- Runbook completo (deploy, rollback, TLS, backups, observabilidade):
-  - `/opt/auraxis/docs/RUNBOOK.md`
-- Segredos em cloud (SSM/Secrets Manager):
-  - `/opt/auraxis/docs/CLOUD_SECRETS_RUNBOOK.md`
-- Guardrails de custo (Budget <= R$70/mes):
-  - `/opt/auraxis/docs/AWS_COST_GUARDRAILS.md`
-- Plano B (RDS) quando budget permitir:
-  - `/opt/auraxis/docs/RDS_PLAN_B.md`
+### Testes Python
+```bash
+pytest
+pytest --cov=app --cov-report=term-missing --cov-report=xml
+```
 
-## Endpoints reais (código atual)
-
-### Autenticação
-- `POST /auth/register`
-- `POST /auth/login`
-- `POST /auth/logout`
-
-### Usuário
-- `PUT /user/profile`
-- `GET /user/me`
-
-### Transações
-- `POST /transactions`
-- `PUT /transactions/{transaction_id}`
-- `DELETE /transactions/{transaction_id}` (soft delete)
-- `PATCH /transactions/restore/{transaction_id}`
-- `GET /transactions/deleted`
-- `DELETE /transactions/{transaction_id}/force` (hard delete)
-- `GET /transactions/summary?month=YYYY-MM`
-- `GET /transactions/list`
-
-### Carteira / investimentos
-- `POST /wallet`
-- `GET /wallet`
-- `GET /wallet/{investment_id}/history`
-- `PUT /wallet/{investment_id}`
-- `DELETE /wallet/{investment_id}`
-
-## Documentação por controller
-- `/opt/auraxis/docs/controllers/auth_controller.md`
-- `/opt/auraxis/docs/controllers/user_controller.md`
-- `/opt/auraxis/docs/controllers/transaction_controller.md`
-- `/opt/auraxis/docs/controllers/wallet_controller.md`
-- `/opt/auraxis/docs/API_RESPONSE_CONTRACT.md` (contrato alvo de resposta)
-- `/opt/auraxis/docs/PHASE0_RESPONSE_ADOPTION_PLAN.md` (plano de adoção sem quebra)
-- `/opt/auraxis/docs/PHASE0_IMPLEMENTATION_LOG.md` (log das entregas da Fase 0)
-- `/opt/auraxis/docs/TESTING.md` (setup e execução da suíte)
-- `/opt/auraxis/docs/CI_CD.md` (pipeline CI no GitHub Actions)
-
-## Qualidade de código
-Hooks configurados via `.pre-commit-config.yaml`:
-- black
-- isort
-- flake8
-- mypy
-- bandit
-- gitleaks
-- detect-private-key
-- sonar-local-check
-
-Execução manual:
-
+### Pre-commit (qualidade local)
 ```bash
 pre-commit run --all-files
 ```
 
-CI (`.github/workflows/ci.yml`) inclui gates de segurança:
-- `pip-audit` (dependências Python)
-- `bandit` (SAST, falha em severidade alta)
-- `gitleaks` (secret scanning)
-- `schemathesis` (confiabilidade de contrato OpenAPI)
-- `cosmic-ray` (mutation testing para módulos críticos)
-- `trivy` (scan de filesystem e imagem Docker)
-- `snyk` (scan de dependências e container, condicional por `SNYK_ENABLED`)
-- `dependency-review` em PR (falha com vulnerabilidade nova `high+`)
+### Reprodução local dos checks de CI
+```bash
+./scripts/run_ci_quality_local.sh
+./scripts/run_ci_like_actions_local.sh
+```
 
-## Rate limiting (baseline S2)
-- Middleware de proteção ativo para:
-  - `/auth/register` e `/auth/login` (chave por IP)
-  - `/graphql`, `/transactions/*` e `/wallet/*` (chave por usuário, com fallback IP)
-- Em excesso de requisições:
-  - status `429`
-  - headers `Retry-After`, `X-RateLimit-Limit`, `X-RateLimit-Remaining`, `X-RateLimit-Reset`, `X-RateLimit-Rule`
+### Suíte Postman / API Dog (smoke + regression)
+Arquivos:
+- coleção: `api-tests/postman/auraxis.postman_collection.json`
+- environments:
+  - `api-tests/postman/environments/local.postman_environment.json`
+  - `api-tests/postman/environments/dev.postman_environment.json`
+  - `api-tests/postman/environments/prod.postman_environment.json`
 
-Variáveis de ambiente principais:
-- `RATE_LIMIT_ENABLED=true`
-- `RATE_LIMIT_DEFAULT_LIMIT=300`
-- `RATE_LIMIT_DEFAULT_WINDOW_SECONDS=60`
-- `RATE_LIMIT_AUTH_LIMIT=20`
-- `RATE_LIMIT_GRAPHQL_LIMIT=120`
-- `RATE_LIMIT_TRANSACTIONS_LIMIT=180`
-- `RATE_LIMIT_WALLET_LIMIT=180`
-- `RATE_LIMIT_TRUST_PROXY_HEADERS=true` (recomendado em produção atrás de Nginx)
-- `RATE_LIMIT_BACKEND=redis` (em produção) ou `memory` (local/dev)
-- `RATE_LIMIT_REDIS_URL=redis://redis:6379/0` (quando backend for redis)
-- `RATE_LIMIT_FAIL_CLOSED=true` (recomendado em produção; retorna `503` se Redis indisponível)
+Execução:
+```bash
+npm install -g newman
+./scripts/run_postman_suite.sh
+./scripts/run_postman_suite.sh ./api-tests/postman/environments/dev.postman_environment.json
+./scripts/run_postman_suite.sh ./api-tests/postman/environments/prod.postman_environment.json
+```
 
-## GraphQL hardening (baseline S2)
-- Proteções de transporte antes da execução:
-  - tamanho máximo da query
-  - profundidade máxima
-  - complexidade máxima
-  - limite de operações por documento
-- Autorização por recurso em mutações sensíveis:
-  - `createTransaction` valida ownership de `tagId`, `accountId` e `creditCardId`
-    para impedir referência cruzada entre usuários.
+## Deploy, operação e AWS
 
-Variáveis de ambiente principais:
-- `GRAPHQL_MAX_QUERY_BYTES=20000`
-- `GRAPHQL_MAX_DEPTH=8`
-- `GRAPHQL_MAX_COMPLEXITY=300`
-- `GRAPHQL_MAX_OPERATIONS=3`
-- `GRAPHQL_MAX_LIST_MULTIPLIER=50`
-- `GRAPHQL_ALLOW_INTROSPECTION=false` (recomendado em produção)
-- `GRAPHQL_PUBLIC_QUERIES=__typename`
-- `GRAPHQL_PUBLIC_MUTATIONS=registerUser,login`
-- `GRAPHQL_ALLOW_UNNAMED_OPERATIONS=false` (recomendado em produção)
+- Runbook principal: `docs/RUNBOOK.md`
+- Planejamento de CD: `docs/CD_AUTOMATION_EXECUTION_PLAN.md`
+- TLS/Nginx: `docs/NGINX_AWS_TLS.md`
+- Guardrails de custo: `docs/AWS_COST_GUARDRAILS.md`
+- Segredos em cloud: `docs/CLOUD_SECRETS_RUNBOOK.md`
+- Plano B com RDS: `docs/RDS_PLAN_B.md`
 
-## Hardening adicional de segurança
-- Limite global de payload HTTP:
-  - `MAX_REQUEST_BYTES=1048576` (1MB por padrão)
-- Secrets fortes obrigatórios fora de DEV:
-  - `SECURITY_ENFORCE_STRONG_SECRETS=true`
-- CORS por allowlist:
-  - `CORS_ALLOWED_ORIGINS=https://app.auraxis.com.br,https://www.auraxis.com.br`
-  - `CORS_ALLOW_CREDENTIALS=true` (não usar `*` com credenciais)
-  - `CORS_ALLOWED_METHODS=GET,POST,PUT,PATCH,DELETE,OPTIONS`
-  - `CORS_ALLOWED_HEADERS=Authorization,Content-Type,X-API-Contract`
-  - `CORS_MAX_AGE_SECONDS=600`
-- Headers de segurança por ambiente:
-  - `SECURITY_X_FRAME_OPTIONS=SAMEORIGIN`
-  - `SECURITY_X_CONTENT_TYPE_OPTIONS=nosniff`
-  - `SECURITY_REFERRER_POLICY=strict-origin-when-cross-origin`
-  - `SECURITY_PERMISSIONS_POLICY=geolocation=(), microphone=(), camera=()`
-  - `SECURITY_HSTS_ENABLED=true` (produção)
-  - `SECURITY_HSTS_VALUE=max-age=31536000; includeSubDomains`
-- Trilha de auditoria para rotas sensíveis:
-  - `AUDIT_TRAIL_ENABLED=true`
-  - `AUDIT_PATH_PREFIXES=/auth/,/user/,/transactions/,/wallet,/graphql`
-  - `AUDIT_PERSISTENCE_ENABLED=true` (recomendado em produção para persistência em `audit_events`)
-- Proteção progressiva de login (brute-force/account takeover):
-  - `LOGIN_GUARD_ENABLED=true`
-  - `LOGIN_GUARD_FAILURE_THRESHOLD=5`
-  - `LOGIN_GUARD_BASE_COOLDOWN_SECONDS=30`
-  - `LOGIN_GUARD_MAX_COOLDOWN_SECONDS=900`
-  - `LOGIN_GUARD_TRUST_PROXY_HEADERS=true` (recomendado em produção atrás de Nginx)
-- Observabilidade BRAPI (contadores de integração):
-  - `brapi.timeout`
-  - `brapi.http_error`
-  - `brapi.invalid_payload`
-  - payload de snapshot disponível internamente via `build_brapi_metrics_payload()`
-- Sanitização de resposta:
-  - Campos sensíveis (`password`, `password_hash`, `secret*`) são removidos de payloads serializados.
-  - Erros `INTERNAL_ERROR` retornam apenas `request_id` fora de DEBUG/TESTING.
-  - Erros internos de execução GraphQL retornam mensagem genérica em produção.
-- Threat model:
-  - baseline STRIDE + abuse cases em `/opt/auraxis/docs/THREAT_MODEL_STRIDE.md`.
+## Documentação por tópico
 
-## Situação atual de testes
-Existe suíte configurada em `tests/` com `pytest` e setup isolado de banco para execução local.
+### Produto, backlog e progresso
+- Backlog central: `TASKS.md`
+- Plano por área: `docs/PLANO_TAREFAS_POR_AREA.md`
 
-## Fase 0 (documentação e consistência)
-Nesta fase, o foco é alinhar documentação com comportamento real e mapear lacunas sem alterar regras de negócio já funcionando.
+### API e contratos
+- API geral: `docs/API_DOCUMENTATION.md`
+- Contrato de resposta: `docs/API_RESPONSE_CONTRACT.md`
+- Schema GraphQL: `schema.graphql`
+- Docs por controller: `docs/controllers/`
+
+### Segurança
+- Baseline OWASP: `docs/OWASP_S3_BASELINE.md`
+- Inventário de superfície: `docs/OWASP_S3_INVENTORY.md`
+- Checklist OWASP/ASVS: `docs/OWASP_S3_CHECKLIST.md`
+- Plano de remediação: `docs/OWASP_S3_REMEDIATION_PLAN.md`
+- Threat model STRIDE: `docs/THREAT_MODEL_STRIDE.md`
+
+### CI/CD e qualidade
+- Pipeline CI/CD: `docs/CI_CD.md`
+- Plano de segurança e resiliência: `docs/CI_SECURITY_RESILIENCE_PLAN.md`
+- Guia de testes: `docs/TESTING.md`
+
+## Convenções do projeto
+
+- Branches: padrão de nome convencional (evitar prefixos ad-hoc)
+- Commits: Conventional Commits
+- Qualidade mínima: sem quebrar CI/security gates
+- Evolução arquitetural: incremental, retrocompatível, orientada a domínio
+
+## Estado atual e próximos passos
+
+- Estado de execução detalhado e histórico de progresso: `TASKS.md`
+- Prioridades atuais:
+  1. Consolidar CD com least-privilege por ambiente
+  2. Avançar para deploy imutável por imagem (ECR)
+  3. Expandir suíte externa de API (Postman/API Dog) para cenários críticos
+  4. Fechar débitos de padronização de erros GraphQL e documentação OpenAPI
+
+---
+Se você acabou de chegar no projeto, comece por:
+1. `README.md` (este arquivo)
+2. `TASKS.md`
+3. `docs/RUNBOOK.md`
+4. `docs/API_DOCUMENTATION.md`

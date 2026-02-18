@@ -1,0 +1,310 @@
+{
+  "info": {
+    "_postman_id": "3fd49b04-3416-4cf2-9048-b58abf132a20",
+    "name": "Auraxis API - Smoke and Regression",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    "description": "Reliable smoke/regression suite for REST + GraphQL. Importable in Postman and API Dog."
+  },
+  "item": [
+    {
+      "name": "01 - Healthz",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/healthz",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "healthz"
+          ]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('healthz status 200', function () {",
+              "  pm.response.to.have.status(200);",
+              "});"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ]
+    },
+    {
+      "name": "02 - Register (REST)",
+      "event": [
+        {
+          "listen": "prerequest",
+          "script": {
+            "exec": [
+              "var ts = Date.now().toString();",
+              "pm.collectionVariables.set('runEmail', 'auraxis+' + ts + '@example.com');",
+              "pm.collectionVariables.set('runName', 'auraxis_' + ts);"
+            ],
+            "type": "text/javascript"
+          }
+        },
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('register returns 201', function () {",
+              "  pm.response.to.have.status(201);",
+              "});",
+              "var body = pm.response.json();",
+              "pm.test('register response has message', function () {",
+              "  pm.expect(body.message).to.be.a('string');",
+              "});"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "X-API-Contract",
+            "value": "v2"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"name\": \"{{runName}}\",\n  \"email\": \"{{runEmail}}\",\n  \"password\": \"{{testPassword}}\"\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/auth/register",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "auth",
+            "register"
+          ]
+        }
+      }
+    },
+    {
+      "name": "03 - Login (REST)",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('login returns 200', function () {",
+              "  pm.response.to.have.status(200);",
+              "});",
+              "var body = pm.response.json();",
+              "var token = body && body.data ? body.data.token : null;",
+              "pm.test('login returns jwt token', function () {",
+              "  pm.expect(token).to.be.a('string').and.not.empty;",
+              "});",
+              "pm.collectionVariables.set('authToken', token);"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "X-API-Contract",
+            "value": "v2"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"email\": \"{{runEmail}}\",\n  \"password\": \"{{testPassword}}\"\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/auth/login",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "auth",
+            "login"
+          ]
+        }
+      }
+    },
+    {
+      "name": "04 - Me (REST auth required)",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('me returns 200', function () {",
+              "  pm.response.to.have.status(200);",
+              "});",
+              "var body = pm.response.json();",
+              "pm.test('me returns authenticated user data', function () {",
+              "  pm.expect(body.data).to.be.an('object');",
+              "});"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{authToken}}"
+          },
+          {
+            "key": "X-API-Contract",
+            "value": "v2"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/user/me?page=1&limit=10",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "user",
+            "me"
+          ],
+          "query": [
+            {
+              "key": "page",
+              "value": "1"
+            },
+            {
+              "key": "limit",
+              "value": "10"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "05 - GraphQL login invalid credentials (safe error)",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('graphql invalid login transport status is 200', function () {",
+              "  pm.response.to.have.status(200);",
+              "});",
+              "var body = pm.response.json();",
+              "var firstErr = body.errors && body.errors[0] ? body.errors[0] : {};",
+              "var code = firstErr.extensions ? firstErr.extensions.code : null;",
+              "pm.test('graphql returns public auth error code', function () {",
+              "  pm.expect(code).to.eql('UNAUTHORIZED');",
+              "});",
+              "pm.test('graphql does not expose INTERNAL_ERROR for invalid credentials', function () {",
+              "  pm.expect(code).to.not.eql('INTERNAL_ERROR');",
+              "});"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"query\": \"mutation Login($email: String, $password: String!) { login(email: $email, password: $password) { token message } }\",\n  \"variables\": {\n    \"email\": \"{{runEmail}}\",\n    \"password\": \"{{testPasswordWrong}}\"\n  }\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/graphql",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "graphql"
+          ]
+        }
+      }
+    },
+    {
+      "name": "06 - GraphQL me query (auth required)",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('graphql me returns 200', function () {",
+              "  pm.response.to.have.status(200);",
+              "});",
+              "var body = pm.response.json();",
+              "pm.test('graphql me has data and no errors', function () {",
+              "  pm.expect(body.data).to.be.an('object');",
+              "  pm.expect(body.errors).to.eql(undefined);",
+              "});",
+              "pm.test('graphql me email matches runEmail', function () {",
+              "  pm.expect(body.data.me.email).to.eql(pm.collectionVariables.get('runEmail'));",
+              "});"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "Authorization",
+            "value": "Bearer {{authToken}}"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"query\": \"query Me { me { id email name } }\"\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/graphql",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "graphql"
+          ]
+        }
+      }
+    }
+  ],
+  "variable": [
+    {
+      "key": "runEmail",
+      "value": ""
+    },
+    {
+      "key": "runName",
+      "value": ""
+    },
+    {
+      "key": "authToken",
+      "value": ""
+    }
+  ]
+}
