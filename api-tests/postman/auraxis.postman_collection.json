@@ -202,8 +202,8 @@
           "listen": "test",
           "script": {
             "exec": [
-              "pm.test('graphql invalid login returns 400', function () {",
-              "  pm.response.to.have.status(400);",
+              "pm.test('graphql invalid login transport status is 200', function () {",
+              "  pm.response.to.have.status(200);",
               "});",
               "var body = pm.response.json();",
               "var firstErr = body.errors && body.errors[0] ? body.errors[0] : {};",

@@ -304,7 +304,7 @@ Pendências de substituição controlada:
 | DX-02 | DX | Habilitar acesso remoto ao EC2 no Cursor/VS Code via SSM (sem SSH aberto) com `ProxyCommand` e host por `instance-id` | Todo | 0% | Médio: configuração local depende de plugin/CLI e perfil AWS |  | 2026-02-17 |
 | DX-03 | DX | Documentar playbook de troubleshooting de acesso remoto (SSO expirado, session-manager-plugin, profile incorreto, known_hosts) | Todo | 0% | Baixo |  | 2026-02-17 |
 | GQL-ERR-01 | Technical Debt | Melhorar catálogo de erros GraphQL (mensagens claras e seguras por domínio, com códigos padronizados e mapeamento consistente entre REST/GraphQL) | In Progress | 35% | Médio: inconsistência pode degradar DX e observabilidade; excesso de detalhe pode vazar contexto interno | pending-commit | 2026-02-18 |
-| API-TEST-01 | Technical Debt | Gerar collections e suíte de testes confiáveis para Postman/API Dog (REST + GraphQL), com variáveis de ambiente, assertions e smoke/regression para aumentar robustez operacional | In Progress | 60% | Médio: base de smoke/regression implementada; pendente expansão de cenários de negócio críticos e integração no CI com gate dedicado | pending-commit | 2026-02-18 |
+| API-TEST-01 | Technical Debt | Gerar collections e suíte de testes confiáveis para Postman/API Dog (REST + GraphQL), com variáveis de ambiente, assertions e smoke/regression para aumentar robustez operacional | In Progress | 75% | Médio: base de smoke/regression implementada e validada em DEV via Newman; pendente expansão de cenários de negócio críticos e integração no CI com gate dedicado | pending-commit | 2026-02-18 |
 
 ## Changelog
 | Data | Item | Descricao | Commit |
@@ -324,3 +324,4 @@ Pendências de substituição controlada:
 | 2026-02-18 | CD-01 Progress | `aws_deploy_i6.py` passou a canonicalizar path legado automaticamente (`/opt/auraxis -> /opt/flask_expenses`) quando necessário, mantendo retrocompatibilidade e reduzindo drift entre hosts. | pending-commit |
 | 2026-02-18 | CD-04 Progress | Workflow `deploy.yml` passou a usar role OIDC dedicada por ambiente (`AWS_ROLE_ARN_DEV` e `AWS_ROLE_ARN_PROD`) para reduzir blast-radius e reforçar least privilege. | pending-commit |
 | 2026-02-18 | API-TEST-01 Progress | Suite inicial Postman/API Dog criada (`api-tests/postman` + `scripts/run_postman_suite.sh`) cobrindo smoke/regression REST+GraphQL com assertions de segurança para erro GraphQL público sem leak de `INTERNAL_ERROR`. | pending-commit |
+| 2026-02-18 | API-TEST-01 Validation | Suite Postman/API Dog executada com sucesso em DEV via Newman (6 requests / 13 assertions / 0 falhas); ajuste aplicado no cenário GraphQL para refletir contrato HTTP 200 + `errors` no payload. | pending-commit |
