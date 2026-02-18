@@ -62,6 +62,40 @@ Notas:
   - usa TLS quando o certificado existe
   - tenta emitir cert em PROD quando possível
   - mantém HTTP sem derrubar proxy quando cert ainda não existe
+- O deploy normal (`mode=deploy`) ainda depende de acesso Git remoto no host.
+- O rollback (`mode=rollback`) **não** depende de `git fetch` remoto; usa o commit local salvo no estado.
+
+### Pré-requisito Git (host PROD/DEV)
+
+Se ocorrer `Permission denied (publickey)` no deploy:
+
+1. No host, garantir chave SSH no usuário operacional (`ubuntu`) e config para GitHub em `443`:
+```bash
+sudo -iu ubuntu
+mkdir -p ~/.ssh && chmod 700 ~/.ssh
+test -f ~/.ssh/id_ed25519 || ssh-keygen -t ed25519 -C auraxis-deploy -f ~/.ssh/id_ed25519 -N ''
+cat > ~/.ssh/config <<'EOF'
+Host github.com
+  HostName ssh.github.com
+  Port 443
+  User git
+  IdentityFile ~/.ssh/id_ed25519
+  IdentitiesOnly yes
+  StrictHostKeyChecking accept-new
+EOF
+chmod 600 ~/.ssh/config ~/.ssh/id_ed25519
+chmod 644 ~/.ssh/id_ed25519.pub
+ssh-keyscan -p 443 ssh.github.com >> ~/.ssh/known_hosts
+chmod 644 ~/.ssh/known_hosts
+```
+
+2. Cadastrar `~/.ssh/id_ed25519.pub` em `GitHub -> Repository -> Settings -> Deploy keys` (read-only).
+
+3. Validar:
+```bash
+sudo -iu ubuntu bash -lc 'ssh -T git@github.com || true'
+sudo -iu ubuntu bash -lc 'cd /opt/auraxis && git ls-remote origin -h refs/heads/master'
+```
 
 ## TLS (PROD)
 

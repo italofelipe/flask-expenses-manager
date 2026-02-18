@@ -163,12 +163,23 @@ MODE="{mode}"
 {git_ref_setup}
 
 REPO=""
-if [ -d /opt/auraxis ]; then
-  REPO=/opt/auraxis
-elif [ -d /opt/flask_expenses ]; then
-  REPO=/opt/flask_expenses
-else
-  echo "Repo not found in /opt."
+CANONICAL_REPO=/opt/auraxis
+LEGACY_REPO=/opt/flask_expenses
+if [ -d "$CANONICAL_REPO/.git" ] || [ -f "$CANONICAL_REPO/.git" ]; then
+  REPO="$CANONICAL_REPO"
+elif [ -d "$LEGACY_REPO/.git" ] || [ -f "$LEGACY_REPO/.git" ]; then
+  if [ ! -e "$CANONICAL_REPO" ]; then
+    sudo ln -s "$LEGACY_REPO" "$CANONICAL_REPO"
+    echo "[i6] canonicalized repo path: $CANONICAL_REPO -> $LEGACY_REPO"
+  fi
+  if [ -d "$CANONICAL_REPO/.git" ] || [ -f "$CANONICAL_REPO/.git" ]; then
+    REPO="$CANONICAL_REPO"
+  else
+    REPO="$LEGACY_REPO"
+  fi
+fi
+if [ -z "$REPO" ]; then
+  echo "Repo not found in /opt (expected $CANONICAL_REPO or $LEGACY_REPO)."
   exit 2
 fi
 cd "$REPO"
