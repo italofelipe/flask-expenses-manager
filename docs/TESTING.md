@@ -21,6 +21,40 @@ pytest
 pytest tests/test_response_contract.py
 ```
 
+## Suíte Postman / API Dog (Smoke + Regression)
+
+Coleção versionada:
+- `/Users/italochagas/Desktop/projetos/flask/flask-template/api-tests/postman/auraxis.postman_collection.json`
+
+Environments:
+- `/Users/italochagas/Desktop/projetos/flask/flask-template/api-tests/postman/environments/local.postman_environment.json`
+- `/Users/italochagas/Desktop/projetos/flask/flask-template/api-tests/postman/environments/dev.postman_environment.json`
+- `/Users/italochagas/Desktop/projetos/flask/flask-template/api-tests/postman/environments/prod.postman_environment.json`
+
+Runner local (Newman):
+```bash
+./scripts/run_postman_suite.sh
+```
+
+Runner com environment específico:
+```bash
+./scripts/run_postman_suite.sh ./api-tests/postman/environments/dev.postman_environment.json
+./scripts/run_postman_suite.sh ./api-tests/postman/environments/prod.postman_environment.json
+```
+
+Pré-requisito:
+```bash
+npm install -g newman
+```
+
+Cobertura inicial da coleção:
+- `GET /healthz`
+- `POST /auth/register`
+- `POST /auth/login`
+- `GET /user/me` (autenticado)
+- `POST /graphql` login inválido (garante erro público seguro)
+- `POST /graphql` query `me` (autenticado)
+
 ## Como a suíte está configurada
 - `pytest.ini` define padrão de descoberta dos testes.
 - `tests/conftest.py` configura um banco SQLite isolado por execução de teste.
