@@ -309,11 +309,23 @@ echo "[i6] mode=$MODE git_ref=$GIT_REF"
 GIT_SSH_COMMAND_AURAXIS="ssh -o StrictHostKeyChecking=accept-new \\
   -o ConnectTimeout=15 -o HostName=ssh.github.com -p 443"
 echo "[i6] git transport=ssh-over-443"
-sudo -u "$OP_USER" bash -lc \\
-  "cd '$REPO' \\
-    && git -c core.sshCommand='$GIT_SSH_COMMAND_AURAXIS' fetch --all --prune \\
-    && git checkout -f '$GIT_REF' \\
-    && git reset --hard '$GIT_REF'"
+if [ "$MODE" = "rollback" ]; then
+  if ! sudo -u "$OP_USER" bash -lc \\
+    "cd '$REPO' && git cat-file -e '$GIT_REF^{{commit}}'"; then
+    echo "[i6] rollback ref not available locally: $GIT_REF"
+    exit 14
+  fi
+  sudo -u "$OP_USER" bash -lc \\
+    "cd '$REPO' \\
+      && git checkout -f '$GIT_REF' \\
+      && git reset --hard '$GIT_REF'"
+else
+  sudo -u "$OP_USER" bash -lc \\
+    "cd '$REPO' \\
+      && git -c core.sshCommand='$GIT_SSH_COMMAND_AURAXIS' fetch --all --prune \\
+      && git checkout -f '$GIT_REF' \\
+      && git reset --hard '$GIT_REF'"
+fi
 
 NEW_REF="$(sudo -u "$OP_USER" bash -lc "cd '$REPO' && git rev-parse HEAD")"
 echo "[i6] new_head=$NEW_REF"
