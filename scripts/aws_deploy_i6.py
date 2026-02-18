@@ -554,6 +554,7 @@ import urllib.request
 
 urllib.request.urlopen(sys.argv[1], timeout=3)
 PY
+  then
     WEB_OK="true"
   fi
 
