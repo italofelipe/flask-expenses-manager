@@ -15,10 +15,10 @@ on:
           - prod
         default: dev
       git_ref:
-        description: "Git ref to deploy (branch/tag/sha). Default: origin/master"
+        description: "Git ref to deploy (branch/tag/sha). Empty = github.sha (manual)"
         required: false
         type: string
-        default: origin/master
+        default: ""
 
 concurrency:
   group: deploy-${{ github.ref }}-${{ github.event_name }}-${{ inputs.env || 'dev' }}
@@ -60,6 +60,8 @@ jobs:
           REF="${{ inputs.git_ref }}"
           if [ "${{ github.event_name }}" = "push" ]; then
             REF="origin/master"
+          elif [ -z "${REF}" ]; then
+            REF="${GITHUB_SHA}"
           fi
           python scripts/aws_deploy_i6.py \
             --profile "" \
@@ -124,12 +126,16 @@ jobs:
           DEV_INSTANCE_ID: ${{ vars.AURAXIS_DEV_INSTANCE_ID }}
           PROD_INSTANCE_ID: ${{ vars.AURAXIS_PROD_INSTANCE_ID }}
         run: |
+          REF="${{ inputs.git_ref }}"
+          if [ -z "${REF}" ]; then
+            REF="${GITHUB_SHA}"
+          fi
           python scripts/aws_deploy_i6.py \
             --profile "" \
             --region "${AWS_REGION}" \
             --dev-instance-id "${DEV_INSTANCE_ID}" \
             --prod-instance-id "${PROD_INSTANCE_ID}" \
-            deploy --env prod --git-ref "${{ inputs.git_ref }}"
+            deploy --env prod --git-ref "${REF}"
 
       - name: Auto-rollback PROD on deploy failure
         if: ${{ failure() }}

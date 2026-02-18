@@ -299,6 +299,7 @@ Pendências de substituição controlada:
 | CD-04 | CD | Separar roles de deploy por ambiente (least-privilege: DEV vs PROD) | Todo | 0% | Médio: erro de IAM bloqueia pipeline |  | 2026-02-17 |
 | CD-05 | CD | Publicar resumo de deploy (ref, command-id, smoke, rollback) no job summary + histórico local | Done | 100% | Baixo | pending-commit | 2026-02-17 |
 | CD-06 | CD | Migrar para deploy imutável por imagem (ECR) e rollback por tag anterior | Todo | 0% | Médio: mudança de estratégia exige transição controlada |  | 2026-02-17 |
+| CD-07 | CD | Corrigir falha de bootstrap no deploy remoto (`missing required file: scripts/ensure_tls_runtime.sh`) com fallback compatível para refs legados e ambientes já provisionados | In Progress | 80% | Médio: sem bootstrap compatível, deploy/rollback falham em instâncias com checkout antigo | pending-commit | 2026-02-18 |
 | DX-01 | DX | Criar aliases no macOS para sessão AWS/SSO (`auraxis-sso-login`, `auraxis-sso-logout`) e conexão rápida EC2 via SSM (`ec2-auraxis-dev-login`, `ec2-auraxis-prod-login`) | Todo | 0% | Baixo |  | 2026-02-17 |
 | DX-02 | DX | Habilitar acesso remoto ao EC2 no Cursor/VS Code via SSM (sem SSH aberto) com `ProxyCommand` e host por `instance-id` | Todo | 0% | Médio: configuração local depende de plugin/CLI e perfil AWS |  | 2026-02-17 |
 | DX-03 | DX | Documentar playbook de troubleshooting de acesso remoto (SSO expirado, session-manager-plugin, profile incorreto, known_hosts) | Todo | 0% | Baixo |  | 2026-02-17 |
@@ -309,3 +310,4 @@ Pendências de substituição controlada:
 | 2026-02-17 | CD Plan | Plano formal de automação de CD criado em `docs/CD_AUTOMATION_EXECUTION_PLAN.md` com fases, riscos, backlog e critérios de aceite. | n/a |
 | 2026-02-17 | DX Backlog | Itens DX adicionados: aliases de acesso no macOS, conexão VS Code/Cursor via SSM e runbook de troubleshooting remoto. | n/a |
 | 2026-02-17 | CD Hardening | Deploy SSM recebeu preflight obrigatório, switch TLS idempotente (`scripts/ensure_tls_runtime.sh`), smoke por edge/local e rollback automático no workflow `deploy.yml` (DEV/PROD), além de resumo de deploy no job summary. | pending-commit |
+| 2026-02-18 | CD Incident | Workflow DEV falhou com `missing required file: scripts/ensure_tls_runtime.sh` no alvo remoto. Plano aplicado: remover hard-fail pré-check de artefatos novos, bootstrap automático de templates/scripts legados no `aws_deploy_i6.py` e fallback de `git_ref` para `${GITHUB_SHA}` em `workflow_dispatch`. | pending-commit |
