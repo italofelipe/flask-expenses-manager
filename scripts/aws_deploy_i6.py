@@ -304,8 +304,15 @@ if [ "{env_name}" = "prod" ]; then
 fi
 
 echo "[i6] mode=$MODE git_ref=$GIT_REF"
+# Force GitHub SSH traffic over port 443 to avoid environments where port 22
+# is blocked (common in hardened VPC egress policies).
+GIT_SSH_COMMAND_AURAXIS="ssh -o StrictHostKeyChecking=accept-new \\
+  -o ConnectTimeout=15 -o HostName=ssh.github.com -p 443"
+echo "[i6] git transport=ssh-over-443"
 sudo -u "$OP_USER" bash -lc \\
-  "cd '$REPO' && git fetch --all --prune && git checkout -f '$GIT_REF' \\
+  "cd '$REPO' \\
+    && git -c core.sshCommand='$GIT_SSH_COMMAND_AURAXIS' fetch --all --prune \\
+    && git checkout -f '$GIT_REF' \\
     && git reset --hard '$GIT_REF'"
 
 NEW_REF="$(sudo -u "$OP_USER" bash -lc "cd '$REPO' && git rev-parse HEAD")"

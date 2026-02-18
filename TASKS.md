@@ -304,6 +304,7 @@ Pendências de substituição controlada:
 | DX-02 | DX | Habilitar acesso remoto ao EC2 no Cursor/VS Code via SSM (sem SSH aberto) com `ProxyCommand` e host por `instance-id` | Todo | 0% | Médio: configuração local depende de plugin/CLI e perfil AWS |  | 2026-02-17 |
 | DX-03 | DX | Documentar playbook de troubleshooting de acesso remoto (SSO expirado, session-manager-plugin, profile incorreto, known_hosts) | Todo | 0% | Baixo |  | 2026-02-17 |
 | GQL-ERR-01 | Technical Debt | Melhorar catálogo de erros GraphQL (mensagens claras e seguras por domínio, com códigos padronizados e mapeamento consistente entre REST/GraphQL) | In Progress | 35% | Médio: inconsistência pode degradar DX e observabilidade; excesso de detalhe pode vazar contexto interno | pending-commit | 2026-02-18 |
+| API-TEST-01 | Technical Debt | Gerar collections e suíte de testes confiáveis para Postman/API Dog (REST + GraphQL), com variáveis de ambiente, assertions e smoke/regression para aumentar robustez operacional | Todo | 0% | Médio: sem suíte externa padronizada, falhas de contrato e regressões podem passar despercebidas fora do CI |  | 2026-02-18 |
 
 ## Changelog
 | Data | Item | Descricao | Commit |
@@ -316,3 +317,4 @@ Pendências de substituição controlada:
 | 2026-02-18 | CD Incident 3 | Deploy DEV falhou no health check por validação incorreta de `127.0.0.1:8000` no host (porta não exposta). Ajuste aplicado: readiness do `web` via `docker compose exec web` + validação edge (`http/https`) e dump automático de diagnósticos (`compose ps/logs`) em caso de falha. | pending-commit |
 | 2026-02-18 | CD Incident 4 | Deploy DEV falhou com `syntax error near unexpected token fi` no script SSM temporário. Causa: bloco `if` com heredoc sem `then` explícito. Correção aplicada no `aws_deploy_i6.py` para restaurar sintaxe shell válida. | pending-commit |
 | 2026-02-18 | GraphQL UX/Security | Erros GraphQL endurecidos: formatter preserva somente erros com códigos públicos allowlisted em produção e mantém mascaramento para erros internos; mutações de auth passaram a emitir códigos explícitos (`VALIDATION_ERROR`, `UNAUTHORIZED`, `CONFLICT`) para mensagens claras sem leak de infraestrutura. | pending-commit |
+| 2026-02-18 | CD Incident 5 | Deploy PROD falhou por `git fetch` usando `github.com:22` em ambiente com egress restrito. Correção aplicada no `aws_deploy_i6.py` para forçar transporte Git via SSH sobre `443` (`ssh.github.com`) durante o fetch remoto via SSM. | pending-commit |
