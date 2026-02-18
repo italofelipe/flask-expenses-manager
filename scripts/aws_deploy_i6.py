@@ -320,6 +320,16 @@ if [ "$MODE" = "rollback" ]; then
       && git checkout -f '$GIT_REF' \\
       && git reset --hard '$GIT_REF'"
 else
+  if ! sudo -u "$OP_USER" bash -lc \\
+    "cd '$REPO' \\
+      && git -c core.sshCommand='$GIT_SSH_COMMAND_AURAXIS' \\
+         ls-remote --exit-code origin >/dev/null"; then
+    echo "[i6] git remote authentication failed for user: $OP_USER"
+    echo "[i6] expected: SSH key configured for git@ssh.github.com:443"
+    echo "[i6] fix: configure deploy key for $OP_USER on this instance"
+    echo "[i6] and add it to GitHub repo"
+    exit 15
+  fi
   sudo -u "$OP_USER" bash -lc \\
     "cd '$REPO' \\
       && git -c core.sshCommand='$GIT_SSH_COMMAND_AURAXIS' fetch --all --prune \\
