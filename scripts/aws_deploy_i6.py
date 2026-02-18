@@ -262,9 +262,6 @@ require_cmd() {{
 ENV_FILE=.env.prod
 require_file "$ENV_FILE"
 require_file "docker-compose.prod.yml"
-require_file "scripts/ensure_tls_runtime.sh"
-require_file "deploy/nginx/default.http.conf"
-require_file "deploy/nginx/default.tls.conf"
 
 require_cmd docker
 require_cmd curl
@@ -290,6 +287,160 @@ sudo -u "$OP_USER" bash -lc \\
 
 NEW_REF="$(sudo -u "$OP_USER" bash -lc "cd '$REPO' && git rev-parse HEAD")"
 echo "[i6] new_head=$NEW_REF"
+
+if [ ! -f "deploy/nginx/default.http.conf" ]; then
+  mkdir -p deploy/nginx
+  cat > deploy/nginx/default.http.conf <<'CONF'
+server {{
+    listen 80;
+    server_name __DOMAIN__;
+
+    client_max_body_size 10m;
+    location /.well-known/acme-challenge/ {{
+        root /var/www/certbot;
+    }}
+
+    location / {{
+        proxy_pass http://web:8000;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_set_header Connection "";
+    }}
+}}
+CONF
+  echo "[i6] bootstrapped deploy/nginx/default.http.conf"
+fi
+
+if [ ! -f "deploy/nginx/default.tls.conf" ]; then
+  mkdir -p deploy/nginx
+  cat > deploy/nginx/default.tls.conf <<'CONF'
+server {{
+    listen 80;
+    server_name __DOMAIN__;
+
+    location /.well-known/acme-challenge/ {{
+        root /var/www/certbot;
+    }}
+
+    location / {{
+        return 301 https://$host$request_uri;
+    }}
+}}
+
+server {{
+    listen 443 ssl http2;
+    server_name __DOMAIN__;
+
+    ssl_certificate /etc/letsencrypt/live/__DOMAIN__/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/__DOMAIN__/privkey.pem;
+
+    ssl_protocols TLSv1.2 TLSv1.3;
+    ssl_prefer_server_ciphers off;
+    ssl_session_cache shared:SSL:10m;
+    ssl_session_timeout 1d;
+
+    add_header Strict-Transport-Security "max-age=31536000; includeSubDomains" always;
+    add_header X-Frame-Options "SAMEORIGIN" always;
+    add_header X-Content-Type-Options "nosniff" always;
+    add_header Referrer-Policy "strict-origin-when-cross-origin" always;
+
+    client_max_body_size 10m;
+    location / {{
+        proxy_pass http://web:8000;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_set_header Connection "";
+    }}
+}}
+CONF
+  echo "[i6] bootstrapped deploy/nginx/default.tls.conf"
+fi
+
+if [ ! -f "scripts/ensure_tls_runtime.sh" ]; then
+  mkdir -p scripts
+  cat > scripts/ensure_tls_runtime.sh <<'SH'
+#!/bin/sh
+set -eu
+COMPOSE_FILE="${{COMPOSE_FILE:-docker-compose.prod.yml}}"
+ENV_FILE="${{ENV_FILE:-.env.prod}}"
+ENV_NAME="${{1:-${{AURAXIS_ENV:-prod}}}}"
+DOMAIN_INPUT="${{2:-}}"
+AUTO_REQUEST_TLS_CERT="${{AUTO_REQUEST_TLS_CERT:-true}}"
+
+read_env_value() {{
+  key="$1"
+  if [ ! -f "$ENV_FILE" ]; then
+    return 0
+  fi
+  awk -F= -v k="$key" '$1==k {{sub(/^[^=]*=/,""); print; exit}}' "$ENV_FILE"
+}}
+
+DOMAIN="${{DOMAIN_INPUT:-${{DOMAIN:-$(read_env_value DOMAIN)}}}}"
+CERTBOT_EMAIL="${{CERTBOT_EMAIL:-$(read_env_value CERTBOT_EMAIL)}}"
+
+cert_exists() {{
+  CERT_DIR="/etc/letsencrypt/live/${{DOMAIN}}"
+  docker compose --env-file "$ENV_FILE" -f "$COMPOSE_FILE" \\
+    run --rm --entrypoint sh certbot \\
+    -c "[ -f '${{CERT_DIR}}/fullchain.pem' ] && \\
+        [ -f '${{CERT_DIR}}/privkey.pem' ]" >/dev/null
+}}
+
+render_http_config() {{
+  sed "s/__DOMAIN__/${{DOMAIN}}/g" \\
+    deploy/nginx/default.http.conf > deploy/nginx/default.conf
+}}
+
+render_tls_config() {{
+  sed "s/__DOMAIN__/${{DOMAIN}}/g" \\
+    deploy/nginx/default.tls.conf > deploy/nginx/default.conf
+}}
+
+recreate_proxy() {{
+  docker compose --env-file "$ENV_FILE" -f "$COMPOSE_FILE" \\
+    up -d --force-recreate reverse-proxy
+}}
+
+request_certificate() {{
+  if [ -z "${{CERTBOT_EMAIL}}" ]; then
+    return 1
+  fi
+  docker compose --env-file "$ENV_FILE" -f "$COMPOSE_FILE" up -d reverse-proxy
+  docker compose --env-file "$ENV_FILE" -f "$COMPOSE_FILE" run --rm certbot certonly \
+    --webroot -w /var/www/certbot \
+    --email "${{CERTBOT_EMAIL}}" \
+    -d "${{DOMAIN}}" \
+    --rsa-key-size 4096 \
+    --agree-tos \
+    --non-interactive
+}}
+
+if cert_exists; then
+  render_tls_config
+  recreate_proxy
+  exit 0
+fi
+
+if [ "${{ENV_NAME}}" = "prod" ] && [ "${{AUTO_REQUEST_TLS_CERT}}" = "true" ]; then
+  if request_certificate && cert_exists; then
+    render_tls_config
+    recreate_proxy
+    exit 0
+  fi
+fi
+
+render_http_config
+recreate_proxy
+SH
+  chmod +x scripts/ensure_tls_runtime.sh
+  echo "[i6] bootstrapped scripts/ensure_tls_runtime.sh"
+fi
 
 python3 - "$ENV_FILE" "AURAXIS_ENV" "{env_name}" <<'PY'
 import sys
