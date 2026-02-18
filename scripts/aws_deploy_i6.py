@@ -540,8 +540,24 @@ fi
 echo "[i6] edge_scheme=$SCHEME domain={domain}"
 
 for i in $(seq 1 30); do
+  WEB_OK="false"
   EDGE_HEALTH_URL="$SCHEME://127.0.0.1/healthz"
-  if curl -fsS http://127.0.0.1:8000/healthz >/dev/null \\
+  WEB_HEALTH_HOST=127.0.0.1
+  WEB_HEALTH_PORT=8000
+  WEB_HEALTH_PATH=/healthz
+  WEB_HEALTH_URL="http://${{WEB_HEALTH_HOST}}:${{WEB_HEALTH_PORT}}"
+  WEB_HEALTH_URL="${{WEB_HEALTH_URL}}${{WEB_HEALTH_PATH}}"
+  if docker compose --env-file "$ENV_FILE" -f docker-compose.prod.yml \\
+    exec -T web python - "$WEB_HEALTH_URL" >/dev/null 2>&1 <<'PY'
+import sys
+import urllib.request
+
+urllib.request.urlopen(sys.argv[1], timeout=3)
+PY
+    WEB_OK="true"
+  fi
+
+  if [ "$WEB_OK" = "true" ] \\
     && curl $CURL_FLAGS "$EDGE_HEALTH_URL" -H "Host: {domain}" >/dev/null; then
     echo "[i6] OK"
     python3 - <<'PY' "$STATE_PATH" "$CURRENT_REF" "$NEW_REF"
@@ -559,6 +575,12 @@ PY
   sleep 2
 done
 echo "[i6] healthz validation failed"
+echo "[i6] dumping compose diagnostics..."
+docker compose --env-file "$ENV_FILE" -f docker-compose.prod.yml ps || true
+docker compose --env-file "$ENV_FILE" -f docker-compose.prod.yml \\
+  logs --tail=120 web || true
+docker compose --env-file "$ENV_FILE" -f docker-compose.prod.yml \\
+  logs --tail=120 reverse-proxy || true
 exit 5
 """
 
