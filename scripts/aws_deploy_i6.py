@@ -165,9 +165,33 @@ MODE="{mode}"
 REPO=""
 CANONICAL_REPO=/opt/auraxis
 LEGACY_REPO=/opt/flask_expenses
+CANONICAL_HAS_REPO="false"
+LEGACY_HAS_REPO="false"
 if [ -d "$CANONICAL_REPO/.git" ] || [ -f "$CANONICAL_REPO/.git" ]; then
+  CANONICAL_HAS_REPO="true"
+fi
+if [ -d "$LEGACY_REPO/.git" ] || [ -f "$LEGACY_REPO/.git" ]; then
+  LEGACY_HAS_REPO="true"
+fi
+
+if [ "$CANONICAL_HAS_REPO" = "true" ] && [ "$LEGACY_HAS_REPO" = "true" ]; then
+  CANONICAL_REAL="$(readlink -f "$CANONICAL_REPO" || echo "$CANONICAL_REPO")"
+  LEGACY_REAL="$(readlink -f "$LEGACY_REPO" || echo "$LEGACY_REPO")"
+  if [ "$CANONICAL_REAL" != "$LEGACY_REAL" ]; then
+    echo "[i6] repository drift detected between canonical and legacy paths"
+    echo "[i6] canonical: $CANONICAL_REPO -> $CANONICAL_REAL"
+    echo "[i6] legacy:    $LEGACY_REPO -> $LEGACY_REAL"
+    echo "[i6] aborting deploy to avoid updating wrong repository copy"
+    exit 16
+  fi
   REPO="$CANONICAL_REPO"
-elif [ -d "$LEGACY_REPO/.git" ] || [ -f "$LEGACY_REPO/.git" ]; then
+elif [ "$CANONICAL_HAS_REPO" = "true" ]; then
+  REPO="$CANONICAL_REPO"
+  if [ ! -e "$LEGACY_REPO" ]; then
+    sudo ln -s "$CANONICAL_REPO" "$LEGACY_REPO"
+    echo "[i6] canonicalized legacy path: $LEGACY_REPO -> $CANONICAL_REPO"
+  fi
+elif [ "$LEGACY_HAS_REPO" = "true" ]; then
   if [ ! -e "$CANONICAL_REPO" ]; then
     sudo ln -s "$LEGACY_REPO" "$CANONICAL_REPO"
     echo "[i6] canonicalized repo path: $CANONICAL_REPO -> $LEGACY_REPO"

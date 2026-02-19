@@ -84,6 +84,12 @@ class GitHubClient:
             raise RulesetError("Unexpected response for update ruleset")
         return result
 
+    def get_ruleset(self, owner: str, repo: str, ruleset_id: int) -> dict[str, Any]:
+        result = self._request("GET", f"/repos/{owner}/{repo}/rulesets/{ruleset_id}")
+        if not isinstance(result, dict):
+            raise RulesetError("Unexpected response for get ruleset")
+        return result
+
 
 def _load_config(path: Path) -> dict[str, Any]:
     try:
@@ -305,7 +311,13 @@ def main() -> int:
             raise RulesetError(
                 f"Ruleset '{ruleset_name}' not found in {args.owner}/{args.repo}"
             )
-        issues = audit_ruleset(current, config)
+        ruleset_id = current.get("id")
+        if not isinstance(ruleset_id, int):
+            raise RulesetError(
+                f"Invalid ruleset id for '{ruleset_name}': {ruleset_id!r}"
+            )
+        current_full = client.get_ruleset(args.owner, args.repo, ruleset_id)
+        issues = audit_ruleset(current_full, config)
         if issues:
             message = "\n- ".join(["Ruleset drift detected:"] + issues)
             raise RulesetError(message)
