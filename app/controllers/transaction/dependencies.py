@@ -1,0 +1,53 @@
+from __future__ import annotations
+
+from dataclasses import dataclass
+from typing import Callable, cast
+from uuid import UUID
+
+from flask import Flask, current_app
+
+from app.services.transaction_analytics_service import TransactionAnalyticsService
+
+TRANSACTION_DEPENDENCIES_EXTENSION_KEY = "transaction_dependencies"
+
+
+@dataclass(frozen=True)
+class TransactionDependencies:
+    analytics_service_factory: Callable[[UUID], TransactionAnalyticsService]
+
+
+def _analytics_service_factory(user_id: UUID) -> TransactionAnalyticsService:
+    # Keep compatibility with legacy monkeypatch targets:
+    # app.controllers.transaction.report_resources.TransactionAnalyticsService
+    from . import report_resources as report_resources_module
+
+    service_cls = getattr(
+        report_resources_module,
+        "TransactionAnalyticsService",
+        TransactionAnalyticsService,
+    )
+    return cast(TransactionAnalyticsService, service_cls(user_id))
+
+
+def _default_dependencies() -> TransactionDependencies:
+    return TransactionDependencies(
+        analytics_service_factory=_analytics_service_factory,
+    )
+
+
+def register_transaction_dependencies(
+    app: Flask,
+    dependencies: TransactionDependencies | None = None,
+) -> None:
+    if dependencies is None:
+        dependencies = _default_dependencies()
+    app.extensions.setdefault(TRANSACTION_DEPENDENCIES_EXTENSION_KEY, dependencies)
+
+
+def get_transaction_dependencies() -> TransactionDependencies:
+    configured = current_app.extensions.get(TRANSACTION_DEPENDENCIES_EXTENSION_KEY)
+    if isinstance(configured, TransactionDependencies):
+        return configured
+    fallback = _default_dependencies()
+    current_app.extensions[TRANSACTION_DEPENDENCIES_EXTENSION_KEY] = fallback
+    return fallback

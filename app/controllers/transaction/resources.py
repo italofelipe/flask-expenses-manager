@@ -16,20 +16,10 @@ from app.models.transaction import Transaction, TransactionStatus, TransactionTy
 from app.schemas.transaction_schema import TransactionSchema
 from app.utils.datetime_utils import utc_now_compatible_with
 
-from .blueprint import transaction_bp
 from .openapi import (
     TRANSACTION_CREATE_DOC,
     TRANSACTION_SOFT_DELETE_DOC,
     TRANSACTION_UPDATE_DOC,
-)
-from .report_resources import (
-    TransactionDeletedResource,
-    TransactionExpensePeriodResource,
-    TransactionForceDeleteResource,
-    TransactionListActiveResource,
-    TransactionMonthlyDashboardResource,
-    TransactionRestoreResource,
-    TransactionSummaryResource,
 )
 from .utils import (
     _apply_transaction_updates,
@@ -374,64 +364,3 @@ class TransactionResource(MethodResource):
                 message="Erro ao deletar transação",
                 log_context="transaction.soft_delete_failed",
             )
-
-
-transaction_bp.add_url_rule(
-    "", view_func=TransactionResource.as_view("transactionresource")
-)
-
-transaction_bp.add_url_rule(
-    "/<uuid:transaction_id>",
-    view_func=TransactionResource.as_view("transactionupdate"),
-    methods=["PUT"],
-)
-
-transaction_bp.add_url_rule(
-    "/<uuid:transaction_id>",
-    view_func=TransactionResource.as_view("transactiondelete"),
-    methods=["DELETE"],
-)
-
-transaction_bp.add_url_rule(
-    "/restore/<uuid:transaction_id>",
-    view_func=TransactionRestoreResource.as_view("transaction_restore"),
-    methods=["PATCH"],
-)
-
-transaction_bp.add_url_rule(
-    "/deleted",
-    view_func=TransactionDeletedResource.as_view("transaction_list_deleted"),
-    methods=["GET"],
-)
-
-transaction_bp.add_url_rule(
-    "/<uuid:transaction_id>/force",
-    view_func=TransactionForceDeleteResource.as_view("transaction_delete_force"),
-    methods=["DELETE"],
-)
-
-transaction_bp.add_url_rule(
-    "/summary",
-    view_func=TransactionSummaryResource.as_view("transaction_monthly_summary"),
-    methods=["GET"],
-)
-
-transaction_bp.add_url_rule(
-    "/dashboard",
-    view_func=TransactionMonthlyDashboardResource.as_view(
-        "transaction_monthly_dashboard"
-    ),
-    methods=["GET"],
-)
-
-transaction_bp.add_url_rule(
-    "/list",
-    view_func=TransactionListActiveResource.as_view("transaction_list_active"),
-    methods=["GET"],
-)
-
-transaction_bp.add_url_rule(
-    "/expenses",
-    view_func=TransactionExpensePeriodResource.as_view("transaction_expense_period"),
-    methods=["GET"],
-)

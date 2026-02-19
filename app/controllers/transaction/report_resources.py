@@ -15,6 +15,7 @@ from app.models.transaction import Transaction, TransactionStatus, TransactionTy
 from app.services.transaction_analytics_service import TransactionAnalyticsService
 from app.utils.pagination import PaginatedResponse
 
+from .dependencies import get_transaction_dependencies
 from .openapi import (
     TRANSACTION_ACTIVE_LIST_DOC,
     TRANSACTION_DASHBOARD_DOC,
@@ -64,7 +65,8 @@ class TransactionSummaryResource(MethodResource):
         user_uuid = UUID(get_jwt_identity())
         try:
             year, month_number, month = _parse_month_param(request.args.get("month"))
-            analytics = TransactionAnalyticsService(user_uuid)
+            dependencies = get_transaction_dependencies()
+            analytics = dependencies.analytics_service_factory(user_uuid)
             transactions = analytics.get_month_transactions(
                 year=year, month_number=month_number
             )
@@ -128,7 +130,8 @@ class TransactionMonthlyDashboardResource(MethodResource):
         user_uuid = UUID(get_jwt_identity())
         try:
             year, month_number, month = _parse_month_param(request.args.get("month"))
-            analytics = TransactionAnalyticsService(user_uuid)
+            dependencies = get_transaction_dependencies()
+            analytics = dependencies.analytics_service_factory(user_uuid)
             aggregates = analytics.get_month_aggregates(
                 year=year, month_number=month_number
             )
