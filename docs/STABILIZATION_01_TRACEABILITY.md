@@ -43,6 +43,30 @@ Scope for this block (item 1):
 3. Decide whether to keep/remove `buildspec.yml` (CodeBuild) and the `.flake8` placeholder field in current workflow strategy.
 4. Confirm if branch naming should remain dual-style (`codex/<tipo>/...`) or strict `tipo/...` for human-created branches.
 
+## Execution log (completed in this block)
+
+1. `docs(stabilization): create traceability recovery plan` (`21605ba`)
+- Added this document as source of execution context for stabilization item 1.
+
+2. `docs(ops): align runbooks and testing paths after reclone` (`25f4047`)
+- Fixed stale local absolute paths in `docs/TESTING.md`.
+- Fixed legacy folder names in local recovery flow in `docs/RUNBOOK.md`.
+- Updated `docs/CD_AUTOMATION_EXECUTION_PLAN.md` statuses for CD-01/CD-04 to match current backlog state.
+
+3. `chore(tasks): normalize timeline dates to current baseline` (`cd05eae`)
+- Normalized conflicting `2026-02-20` entries to `2026-02-19` where repository history is deterministic.
+
+4. `chore(tasks): in progress on this branch`
+- Deterministic hash mapping applied for high-confidence items (`A1`, `A5`, `A6`, `A7`, `A8`, `C4`, `D1..D8`, `G6`, `G7`, `G9`, `G11`, `G15`, `I8`, `CD-*`, `GQL-ERR-01`, `API-TEST-01` and recent changelog rows).
+- Placeholder `pending-commit` retired and replaced with explicit marker `traceability-debt` where canonical hash is not yet validated.
+- `TASKS.md` now documents marker semantics and explicit next step for debt burn-down.
+
+## Snapshot after execution
+
+- `pending-commit`: `0` occurrences in backlog/changelog rows of `TASKS.md`.
+- `traceability-debt`: `152` occurrences in backlog/changelog rows of `TASKS.md` (explicit, no hidden placeholder).
+- Date drift (`2026-02-20` vs current baseline): normalized in `TASKS.md`.
+
 ## Traceability policy used in this block
 
 - Deterministic mapping: when commit subject and date clearly match a task/changelog entry, use explicit hash(es).
@@ -61,4 +85,3 @@ Scope for this block (item 1):
 - `README.md` + `TASKS.md` + operational docs are mutually consistent for current status.
 - No hidden `pending-commit` remains in the sections touched by this stabilization block.
 - Remaining unresolved items are explicit, grouped, and actionable.
-
