@@ -13,6 +13,8 @@ TRANSACTION_DEPENDENCIES_EXTENSION_KEY = "transaction_dependencies"
 
 @dataclass(frozen=True)
 class TransactionDependencies:
+    """Container for transaction dependency factories."""
+
     analytics_service_factory: Callable[[UUID], TransactionAnalyticsService]
 
 

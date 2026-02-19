@@ -16,6 +16,8 @@ _ROUTES_REGISTERED = False
 
 
 def register_transaction_routes() -> None:
+    """Bind transaction REST endpoints once, preserving legacy endpoint names."""
+
     global _ROUTES_REGISTERED
     if _ROUTES_REGISTERED:
         return

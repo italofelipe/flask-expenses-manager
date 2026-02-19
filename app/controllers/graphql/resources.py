@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from flask import Flask, current_app, request
+from flask import current_app, request
 from graphql import GraphQLError
 
 from app.application.services.public_error_mapper_service import (
@@ -25,7 +25,7 @@ from app.graphql.security import (
     analyze_graphql_query,
 )
 
-from .blueprint import graphql_bp
+from .dependencies import get_graphql_authorization_policy, get_graphql_security_policy
 
 _PUBLIC_GRAPHQL_ERROR_CODES = {
     "AUTH_BACKEND_UNAVAILABLE",
@@ -159,7 +159,6 @@ def _enforce_graphql_policies(
     return None
 
 
-@graphql_bp.route("", methods=["POST"])
 def execute_graphql() -> tuple[dict[str, Any], int]:
     try:
         parsed_payload = parse_graphql_payload(request.get_json(silent=True))
@@ -195,28 +194,9 @@ def execute_graphql() -> tuple[dict[str, Any], int]:
     )
 
 
-def register_graphql_security(app: Flask) -> None:
-    app.extensions["graphql_security_policy"] = GraphQLSecurityPolicy.from_env()
-    app.extensions["graphql_authorization_policy"] = (
-        GraphQLAuthorizationPolicy.from_env()
-    )
-
-
 def _get_security_policy() -> GraphQLSecurityPolicy:
-    policy = current_app.extensions.get("graphql_security_policy")
-    if isinstance(policy, GraphQLSecurityPolicy):
-        return policy
-
-    fallback = GraphQLSecurityPolicy.from_env()
-    current_app.extensions["graphql_security_policy"] = fallback
-    return fallback
+    return get_graphql_security_policy()
 
 
 def _get_authorization_policy() -> GraphQLAuthorizationPolicy:
-    policy = current_app.extensions.get("graphql_authorization_policy")
-    if isinstance(policy, GraphQLAuthorizationPolicy):
-        return policy
-
-    fallback = GraphQLAuthorizationPolicy.from_env()
-    current_app.extensions["graphql_authorization_policy"] = fallback
-    return fallback
+    return get_graphql_authorization_policy()
