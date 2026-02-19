@@ -19,6 +19,7 @@ from app.graphql.authorization import (
     GraphQLAuthorizationViolation,
     enforce_graphql_authorization,
 )
+from app.graphql.errors import PUBLIC_GRAPHQL_ERROR_CODES
 from app.graphql.security import (
     GraphQLSecurityPolicy,
     GraphQLSecurityViolation,
@@ -26,16 +27,6 @@ from app.graphql.security import (
 )
 
 from .dependencies import get_graphql_authorization_policy, get_graphql_security_policy
-
-_PUBLIC_GRAPHQL_ERROR_CODES = {
-    "AUTH_BACKEND_UNAVAILABLE",
-    "CONFLICT",
-    "FORBIDDEN",
-    "NOT_FOUND",
-    "TOO_MANY_ATTEMPTS",
-    "UNAUTHORIZED",
-    "VALIDATION_ERROR",
-}
 
 
 def _sanitize_graphql_message(message: Any) -> str:
@@ -83,7 +74,7 @@ def _is_public_graphql_error(
     if not safe_extensions:
         return False
     code = safe_extensions.get("code")
-    return isinstance(code, str) and code in _PUBLIC_GRAPHQL_ERROR_CODES
+    return isinstance(code, str) and code in PUBLIC_GRAPHQL_ERROR_CODES
 
 
 def _format_graphql_execution_error(err: GraphQLError) -> dict[str, Any]:

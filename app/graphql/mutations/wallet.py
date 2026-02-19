@@ -6,11 +6,11 @@ from typing import Any
 from uuid import UUID
 
 import graphene
-from graphql import GraphQLError
 from marshmallow import ValidationError
 
 from app.extensions.database import db
 from app.graphql.auth import get_current_user_required
+from app.graphql.errors import GRAPHQL_ERROR_CODE_VALIDATION, build_public_graphql_error
 from app.graphql.schema_utils import (
     _get_owned_wallet_or_error,
     _wallet_to_graphql_payload,
@@ -55,7 +55,10 @@ class AddWalletEntryMutation(graphene.Mutation):
         try:
             validated_data = schema.load(raw_data)
         except ValidationError as exc:
-            raise GraphQLError(f"Dados inválidos: {exc.messages}") from exc
+            raise build_public_graphql_error(
+                f"Dados inválidos: {exc.messages}",
+                code=GRAPHQL_ERROR_CODE_VALIDATION,
+            ) from exc
         estimated_value = InvestmentService.calculate_estimated_value(validated_data)
         wallet = Wallet(
             user_id=user.id,
@@ -118,7 +121,10 @@ class UpdateWalletEntryMutation(graphene.Mutation):
         try:
             validated_data = schema.load(payload, partial=True)
         except ValidationError as exc:
-            raise GraphQLError(f"Dados inválidos: {exc.messages}") from exc
+            raise build_public_graphql_error(
+                f"Dados inválidos: {exc.messages}",
+                code=GRAPHQL_ERROR_CODE_VALIDATION,
+            ) from exc
 
         original_quantity = investment.quantity
         original_value = investment.value

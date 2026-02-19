@@ -18,6 +18,14 @@ from app.application.services.password_verification_service import (
 from app.controllers.user_controller import assign_user_profile_fields
 from app.extensions.database import db
 from app.graphql.auth import get_current_user_required
+from app.graphql.errors import (
+    GRAPHQL_ERROR_CODE_AUTH_BACKEND_UNAVAILABLE,
+    GRAPHQL_ERROR_CODE_CONFLICT,
+    GRAPHQL_ERROR_CODE_TOO_MANY_ATTEMPTS,
+    GRAPHQL_ERROR_CODE_UNAUTHORIZED,
+    GRAPHQL_ERROR_CODE_VALIDATION,
+    build_public_graphql_error,
+)
 from app.graphql.schema_utils import _user_basic_auth_payload, _user_to_graphql_payload
 from app.graphql.types import AuthPayloadType, UserType
 from app.models.user import User
@@ -34,19 +42,15 @@ AUTH_BACKEND_UNAVAILABLE_MESSAGE = (
     "Authentication temporarily unavailable. Try again later."
 )
 
-_GQL_VALIDATION_ERROR = "VALIDATION_ERROR"
-_GQL_UNAUTHORIZED = "UNAUTHORIZED"
-_GQL_CONFLICT = "CONFLICT"
-
 
 def _public_graphql_error(message: str, *, code: str) -> GraphQLError:
-    return GraphQLError(message, extensions={"code": code})
+    return build_public_graphql_error(message, code=code)
 
 
 def _raise_auth_backend_unavailable(exc: Exception) -> NoReturn:
-    raise GraphQLError(
+    raise build_public_graphql_error(
         AUTH_BACKEND_UNAVAILABLE_MESSAGE,
-        extensions={"code": "AUTH_BACKEND_UNAVAILABLE", "reason": str(exc)},
+        code=GRAPHQL_ERROR_CODE_AUTH_BACKEND_UNAVAILABLE,
     ) from exc
 
 
@@ -109,11 +113,11 @@ class RegisterUserMutation(graphene.Mutation):
                 )
                 raise _public_graphql_error(
                     flat or "Dados inválidos para registro.",
-                    code=_GQL_VALIDATION_ERROR,
+                    code=GRAPHQL_ERROR_CODE_VALIDATION,
                 ) from exc
             raise _public_graphql_error(
                 "Dados inválidos para registro.",
-                code=_GQL_VALIDATION_ERROR,
+                code=GRAPHQL_ERROR_CODE_VALIDATION,
             ) from exc
 
         duplicate_user = User.query.filter_by(email=validated["email"]).first()
@@ -124,7 +128,7 @@ class RegisterUserMutation(graphene.Mutation):
                 )
             raise _public_graphql_error(
                 auth_policy.registration.conflict_message,
-                code=_GQL_CONFLICT,
+                code=GRAPHQL_ERROR_CODE_CONFLICT,
             )
 
         user = User(
@@ -163,7 +167,7 @@ class LoginMutation(graphene.Mutation):
         if not (email or name):
             raise _public_graphql_error(
                 "Missing credentials",
-                code=_GQL_VALIDATION_ERROR,
+                code=GRAPHQL_ERROR_CODE_VALIDATION,
             )
 
         principal = str(email or name or "")
@@ -194,12 +198,10 @@ class LoginMutation(graphene.Mutation):
             login_context=login_context,
         )
         if not allowed:
-            raise GraphQLError(
+            raise build_public_graphql_error(
                 "Too many login attempts. Try again later.",
-                extensions={
-                    "code": "TOO_MANY_ATTEMPTS",
-                    "retry_after_seconds": retry_after,
-                },
+                code=GRAPHQL_ERROR_CODE_TOO_MANY_ATTEMPTS,
+                retry_after_seconds=retry_after,
             )
 
         password_hash = user.password if user is not None else None
@@ -214,7 +216,7 @@ class LoginMutation(graphene.Mutation):
             )
             raise _public_graphql_error(
                 "Invalid credentials",
-                code=_GQL_UNAUTHORIZED,
+                code=GRAPHQL_ERROR_CODE_UNAUTHORIZED,
             )
 
         _guard_register_success_or_raise(
@@ -267,13 +269,13 @@ class UpdateUserProfileMutation(graphene.Mutation):
         if result["error"]:
             raise _public_graphql_error(
                 str(result["message"]),
-                code=_GQL_VALIDATION_ERROR,
+                code=GRAPHQL_ERROR_CODE_VALIDATION,
             )
         errors = user.validate_profile_data()
         if errors:
             raise _public_graphql_error(
                 f"Erro de validação: {errors}",
-                code=_GQL_VALIDATION_ERROR,
+                code=GRAPHQL_ERROR_CODE_VALIDATION,
             )
         db.session.commit()
         return UpdateUserProfileMutation(

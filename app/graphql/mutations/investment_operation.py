@@ -4,9 +4,9 @@ from typing import Any
 from uuid import UUID
 
 import graphene
-from graphql import GraphQLError
 
 from app.graphql.auth import get_current_user_required
+from app.graphql.errors import build_public_graphql_error, to_public_graphql_code
 from app.graphql.schema_utils import _assert_owned_investment_access
 from app.graphql.types import InvestmentOperationType
 from app.services.investment_operation_service import (
@@ -40,7 +40,10 @@ class AddInvestmentOperationMutation(graphene.Mutation):
         try:
             operation = service.create_operation(investment_id, kwargs)
         except InvestmentOperationError as exc:
-            raise GraphQLError(exc.message) from exc
+            raise build_public_graphql_error(
+                exc.message,
+                code=to_public_graphql_code(exc.code),
+            ) from exc
         return AddInvestmentOperationMutation(
             message="Operação registrada com sucesso",
             item=InvestmentOperationType(
@@ -76,7 +79,10 @@ class UpdateInvestmentOperationMutation(graphene.Mutation):
         try:
             operation = service.update_operation(investment_id, operation_id, kwargs)
         except InvestmentOperationError as exc:
-            raise GraphQLError(exc.message) from exc
+            raise build_public_graphql_error(
+                exc.message,
+                code=to_public_graphql_code(exc.code),
+            ) from exc
         return UpdateInvestmentOperationMutation(
             message="Operação atualizada com sucesso",
             item=InvestmentOperationType(
@@ -102,7 +108,10 @@ class DeleteInvestmentOperationMutation(graphene.Mutation):
         try:
             service.delete_operation(investment_id, operation_id)
         except InvestmentOperationError as exc:
-            raise GraphQLError(exc.message) from exc
+            raise build_public_graphql_error(
+                exc.message,
+                code=to_public_graphql_code(exc.code),
+            ) from exc
         return DeleteInvestmentOperationMutation(
             ok=True, message="Operação removida com sucesso"
         )
