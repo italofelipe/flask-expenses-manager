@@ -230,9 +230,9 @@ unlink .git/index.lock
 3. Se o workspace seguir inconsistente, re-clone:
 ```bash
 cd ..
-mv flask-template flask-template-corrupted-$(date +%Y%m%d-%H%M%S)
-git clone git@github.com:italofelipe/flask-expenses-manager.git flask-template
-cd flask-template
+mv flask-expenses-manager flask-expenses-manager-corrupted-$(date +%Y%m%d-%H%M%S)
+git clone git@github.com:italofelipe/flask-expenses-manager.git flask-expenses-manager
+cd flask-expenses-manager
 ```
 
 4. Recriar ambiente local:

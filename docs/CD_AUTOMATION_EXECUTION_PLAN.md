@@ -1,6 +1,6 @@
 # CD Automation Plan (AWS + GitHub Actions + SSM)
 
-Last update: 2026-02-18
+Last update: 2026-02-19
 
 ## Objective
 Eliminate manual EC2 deploy operations (SSH/SSM interactive) and make deployments deterministic, auditable, and repeatable from GitHub Actions.
@@ -73,7 +73,7 @@ Move from "git pull on EC2" to immutable Docker image deployment.
 ## Detailed execution backlog
 
 ## CD-01 Path normalization (DEV + PROD)
-- Status: TODO
+- Status: DONE
 - Deliverable: `/opt/auraxis` as canonical path in both instances.
 - Acceptance:
   - `test -d /opt/auraxis` passes in DEV/PROD
@@ -97,7 +97,7 @@ Move from "git pull on EC2" to immutable Docker image deployment.
 - Acceptance: failed smoke leaves environment on previous stable ref.
 
 ## CD-04 Separate deploy role permissions by environment
-- Status: TODO
+- Status: DONE
 - Deliverable:
   - `auraxis-github-deploy-dev-role` scoped to DEV instance
   - `auraxis-github-deploy-prod-role` scoped to PROD instance
@@ -138,11 +138,11 @@ Move from "git pull on EC2" to immutable Docker image deployment.
 - Cost/budget threshold changes.
 
 ## Risk register
-- Drift risk while legacy and canonical paths coexist.
+- Residual drift risk if operators reintroduce ad-hoc paths outside `/opt/auraxis`.
 - Runtime config risk if `.env.prod` is manually edited without validation.
 - Security risk if deploy role permissions are broader than needed.
 
 ## Recommendation (priority order)
-1. Finalize CD-01 (canonical path migration to `/opt/auraxis` in PROD/DEV).
-2. Execute CD-04 (separate IAM roles by environment).
-3. Start Phase 2 (CD-06) to remove git dependency on instances.
+1. Start Phase 2 (CD-06) to remove git dependency on instances.
+2. Keep weekly governance/audit checks for deploy role least-privilege.
+3. Periodically validate rollback drill to avoid operational drift.
