@@ -1,11 +1,14 @@
 """Auth controller compatibility facade."""
 
 from app.controllers.auth import (
+    AuthDependencies,
     AuthResource,
     LogoutResource,
     RegisterResource,
     auth_bp,
+    get_auth_dependencies,
     handle_webargs_error,
+    register_auth_dependencies,
 )
 from app.controllers.auth.contracts import (
     AUTH_BACKEND_UNAVAILABLE_CODE,
@@ -26,6 +29,9 @@ from app.controllers.auth.guard import guard_register_success as _guard_register
 
 __all__ = [
     "auth_bp",
+    "AuthDependencies",
+    "register_auth_dependencies",
+    "get_auth_dependencies",
     "RegisterResource",
     "AuthResource",
     "LogoutResource",
