@@ -127,6 +127,13 @@ run_core_pipeline() {
   echo "[ci-like-local] step=quality:bandit"
   bandit -r app -lll -iii
 
+  if command -v gitleaks >/dev/null 2>&1; then
+    echo "[ci-like-local] step=security:gitleaks"
+    gitleaks detect --source . --verbose --redact --config .gitleaks.toml
+  else
+    echo "[ci-like-local] step=security:gitleaks skipped (gitleaks not installed)"
+  fi
+
   echo "[ci-like-local] step=tests:pytest+coverage"
   pytest -m "not schemathesis" \
     --cov=app \
@@ -137,7 +144,8 @@ run_core_pipeline() {
   if [[ "$RUN_SCHEMATHESIS" -eq 1 ]]; then
     echo "[ci-like-local] step=tests:schemathesis"
     SCHEMATHESIS_MAX_EXAMPLES="${SCHEMATHESIS_MAX_EXAMPLES:-5}" \
-      pytest -m schemathesis --maxfail=1
+    HYPOTHESIS_SEED="${HYPOTHESIS_SEED:-20260220}" \
+      bash scripts/run_schemathesis_contract.sh
   else
     echo "[ci-like-local] step=tests:schemathesis skipped (--fast)"
   fi

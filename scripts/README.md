@@ -19,5 +19,7 @@ Scripts operacionais e de engenharia para CI/CD, seguranca, deploy, observabilid
 ## Uso recomendado
 - Antes de push: rodar `scripts/run_ci_like_actions_local.sh`.
 - Para smoke API: `scripts/run_postman_suite.sh`.
+- Para smoke HTTP pós-deploy (REST + GraphQL): `python scripts/http_smoke_check.py --base-url <url> --env-name <dev|prod>`.
+- Para contrato OpenAPI determinístico: `bash scripts/run_schemathesis_contract.sh`.
 - Para governanca de branch: `python scripts/github_ruleset_manager.py --owner <owner> --repo <repo> --mode audit`.
 - Secret esperado no GitHub Actions para governanca: `TOKEN_GITHUB_ADMIN`.

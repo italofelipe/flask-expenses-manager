@@ -31,6 +31,8 @@ DEFAULT_REGION = "us-east-1"
 
 DEFAULT_PROD_INSTANCE_ID = "i-0057e3b52162f78f8"
 DEFAULT_DEV_INSTANCE_ID = "i-0bb5b392c2188dd3d"
+DEFAULT_DEPLOY_DEV_ROLE = "auraxis-github-deploy-dev-ssm-role"
+DEFAULT_DEPLOY_PROD_ROLE = "auraxis-github-deploy-prod-ssm-role"
 
 
 @dataclass(frozen=True)
@@ -81,6 +83,123 @@ def _role_from_instance_profile_arn(profile_arn: str) -> tuple[str, list[str]]:
     # arn:aws:iam::123456789012:instance-profile/NAME
     name = profile_arn.split("/")[-1]
     return name, [name]
+
+
+def _ensure_list(value: Any) -> list[Any]:
+    if isinstance(value, list):
+        return value
+    if value is None:
+        return []
+    return [value]
+
+
+def _is_action_allowed(action: str, allowed_actions: set[str]) -> bool:
+    action = action.lower()
+    if "*" in allowed_actions:
+        return True
+    if action in allowed_actions:
+        return True
+    service, _, _ = action.partition(":")
+    if f"{service}:*" in allowed_actions:
+        return True
+    return False
+
+
+def _get_role(ctx: AwsCtx, role_name: str) -> dict[str, Any] | None:
+    try:
+        out = _run_aws(ctx, ["iam", "get-role", "--role-name", role_name])
+    except AwsCliError:
+        return None
+    role = out.get("Role")
+    if isinstance(role, dict):
+        return role
+    return None
+
+
+def _iter_role_policy_documents(ctx: AwsCtx, role_name: str) -> list[dict[str, Any]]:
+    docs: list[dict[str, Any]] = []
+
+    inline_out = _run_aws(ctx, ["iam", "list-role-policies", "--role-name", role_name])
+    for policy_name in inline_out.get("PolicyNames") or []:
+        pol_out = _run_aws(
+            ctx,
+            [
+                "iam",
+                "get-role-policy",
+                "--role-name",
+                role_name,
+                "--policy-name",
+                str(policy_name),
+            ],
+        )
+        doc = pol_out.get("PolicyDocument")
+        if isinstance(doc, dict):
+            docs.append(doc)
+
+    attached_out = _run_aws(
+        ctx, ["iam", "list-attached-role-policies", "--role-name", role_name]
+    )
+    for attached in attached_out.get("AttachedPolicies") or []:
+        policy_arn = str(attached.get("PolicyArn") or "")
+        if not policy_arn:
+            continue
+        pol_meta = _run_aws(ctx, ["iam", "get-policy", "--policy-arn", policy_arn])
+        policy = pol_meta.get("Policy", {})
+        version_id = str(policy.get("DefaultVersionId") or "")
+        if not version_id:
+            continue
+        version = _run_aws(
+            ctx,
+            [
+                "iam",
+                "get-policy-version",
+                "--policy-arn",
+                policy_arn,
+                "--version-id",
+                version_id,
+            ],
+        )
+        doc = version.get("PolicyVersion", {}).get("Document")
+        if isinstance(doc, dict):
+            docs.append(doc)
+
+    return docs
+
+
+def _collect_allowed_actions(policy_docs: list[dict[str, Any]]) -> set[str]:
+    allowed: set[str] = set()
+    for doc in policy_docs:
+        statements = _ensure_list(doc.get("Statement"))
+        for statement in statements:
+            if not isinstance(statement, dict):
+                continue
+            if str(statement.get("Effect", "")).lower() != "allow":
+                continue
+            actions = _ensure_list(statement.get("Action"))
+            for action in actions:
+                if isinstance(action, str):
+                    allowed.add(action.lower())
+    return allowed
+
+
+def _extract_oidc_subs(assume_doc: dict[str, Any]) -> list[str]:
+    subs: list[str] = []
+    statements = _ensure_list(assume_doc.get("Statement"))
+    for statement in statements:
+        if not isinstance(statement, dict):
+            continue
+        condition = statement.get("Condition")
+        if not isinstance(condition, dict):
+            continue
+        for key in ("StringLike", "StringEquals"):
+            branch = condition.get(key)
+            if not isinstance(branch, dict):
+                continue
+            value = branch.get("token.actions.githubusercontent.com:sub")
+            for sub in _ensure_list(value):
+                if isinstance(sub, str):
+                    subs.append(sub)
+    return sorted(set(subs))
 
 
 def audit_instance(ctx: AwsCtx, instance_id: str) -> dict[str, Any]:
@@ -155,21 +274,88 @@ def audit_instance(ctx: AwsCtx, instance_id: str) -> dict[str, Any]:
     }
 
 
+def audit_deploy_role(
+    ctx: AwsCtx,
+    *,
+    role_name: str,
+    expected_subject_hint: str,
+) -> dict[str, Any]:
+    role = _get_role(ctx, role_name)
+    if role is None:
+        return {
+            "role": role_name,
+            "findings": ["FAIL: role not found"],
+            "allowed_actions": [],
+            "trust_subjects": [],
+        }
+
+    assume_doc = role.get("AssumeRolePolicyDocument")
+    trust_subjects = (
+        _extract_oidc_subs(assume_doc) if isinstance(assume_doc, dict) else []
+    )
+    policy_docs = _iter_role_policy_documents(ctx, role_name)
+    allowed_actions = _collect_allowed_actions(policy_docs)
+
+    required_actions = {
+        "ssm:sendcommand",
+        "ssm:getcommandinvocation",
+        "ssm:listcommandinvocations",
+        "ssm:listcommands",
+    }
+    findings: list[str] = []
+    for action in sorted(required_actions):
+        if not _is_action_allowed(action, allowed_actions):
+            findings.append(f"FAIL: missing required action {action}")
+
+    if expected_subject_hint not in trust_subjects:
+        findings.append(
+            "WARN: expected OIDC subject hint not found in trust policy: "
+            f"{expected_subject_hint}"
+        )
+
+    if _is_action_allowed("*", allowed_actions):
+        findings.append("FAIL: wildcard '*' action detected in deploy role")
+
+    return {
+        "role": role_name,
+        "allowed_actions": sorted(allowed_actions),
+        "trust_subjects": trust_subjects,
+        "findings": findings
+        or ["PASS: deploy role has required SSM actions and expected trust hints"],
+    }
+
+
 def build_parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(description="Auraxis IAM audit helper (I8)")
     p.add_argument("--profile", default=DEFAULT_PROFILE)
     p.add_argument("--region", default=DEFAULT_REGION)
     p.add_argument("--prod-instance-id", default=DEFAULT_PROD_INSTANCE_ID)
     p.add_argument("--dev-instance-id", default=DEFAULT_DEV_INSTANCE_ID)
+    p.add_argument("--deploy-dev-role", default=DEFAULT_DEPLOY_DEV_ROLE)
+    p.add_argument("--deploy-prod-role", default=DEFAULT_DEPLOY_PROD_ROLE)
     return p
 
 
 def main() -> int:
     args = build_parser().parse_args()
     ctx = AwsCtx(profile=args.profile, region=args.region)
+    dev_subject_hint = "repo:italofelipe/flask-expenses-manager:environment:dev"
+    prod_subject_hint = "repo:italofelipe/flask-expenses-manager:environment:prod"
     report = {
         "dev": audit_instance(ctx, str(args.dev_instance_id)),
         "prod": audit_instance(ctx, str(args.prod_instance_id)),
+        "deploy_roles": {
+            "dev": audit_deploy_role(
+                ctx,
+                role_name=str(args.deploy_dev_role),
+                expected_subject_hint=dev_subject_hint,
+            ),
+            "prod": audit_deploy_role(
+                ctx,
+                role_name=str(args.deploy_prod_role),
+                expected_subject_hint=prod_subject_hint,
+            ),
+        },
     }
     print(json.dumps(report, indent=2, sort_keys=True))
     return 0

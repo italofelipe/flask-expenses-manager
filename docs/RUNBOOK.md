@@ -58,12 +58,17 @@ Rollback (para o ref anterior bem sucedido, por instancia):
 
 Notas:
 - O estado do deploy fica em `/var/lib/auraxis/deploy_state.json` na instancia.
+- O workflow de deploy tambem executa smoke checks HTTP de REST + GraphQL apos cada deploy:
+  - `GET /healthz`
+  - `POST /graphql` com query vazia (espera `VALIDATION_ERROR`)
+  - login invalido em REST/GraphQL (nao pode retornar `INTERNAL_ERROR`)
 - O switch de Nginx/TLS é idempotente via `scripts/ensure_tls_runtime.sh`:
   - usa TLS quando o certificado existe
   - tenta emitir cert em PROD quando possível
   - mantém HTTP sem derrubar proxy quando cert ainda não existe
 - O deploy normal (`mode=deploy`) ainda depende de acesso Git remoto no host.
 - O rollback (`mode=rollback`) **não** depende de `git fetch` remoto; usa o commit local salvo no estado.
+- O deploy bloqueia se detectar drift real entre `/opt/auraxis` e `/opt/flask_expenses` para evitar update na copia errada.
 
 ### Pré-requisito Git (host PROD/DEV)
 
@@ -166,6 +171,19 @@ Status:
 ./.venv/bin/python scripts/aws_ufw_i8.py --profile auraxis-admin --region us-east-1 status --env prod --print-output
 ./.venv/bin/python scripts/aws_ufw_i8.py --profile auraxis-admin --region us-east-1 status --env dev --print-output
 ```
+
+## IAM (least-privilege) - auditoria operacional
+
+Auditar role das instancias e roles de deploy (DEV/PROD):
+
+```bash
+./.venv/bin/python scripts/aws_iam_audit_i8.py --profile auraxis-admin --region us-east-1
+```
+
+Valide principalmente:
+- ausência de `AdministratorAccess` / wildcard `*`
+- presença de ações SSM mínimas nas roles de deploy
+- trust policy OIDC com subjects por ambiente (`environment:dev` e `environment:prod`)
 
 ## Custos (Budget guardrails)
 

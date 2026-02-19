@@ -1,137 +1,133 @@
 # CI/CD (GitHub Actions)
 
-Ultima atualizacao: 2026-02-11
+Ultima atualizacao: 2026-02-20
 
-## Objetivo atual
-- Garantir qualidade, segurança e confiabilidade antes de merge/deploy.
-- Manter deploy fora deste workflow por enquanto.
+## Objetivo
+
+Garantir qualidade, seguranca e confiabilidade com gates obrigatorios no PR, deploy automatizado em DEV e deploy manual controlado em PROD.
 
 ## Workflows
 
-### 1. CI principal
+### 1) CI principal
 Arquivo: `.github/workflows/ci.yml`
 
 Gatilhos:
 - `push` em `main`, `develop`, `master`
 - `pull_request`
 
-Jobs:
+Jobs relevantes:
 1. `quality`
-- `black`, `isort`, `flake8`, `mypy`
-- `pip-audit` (dependências Python)
-- `bandit` (SAST, gate alto)
+- `pip-audit`, `black`, `isort`, `flake8`, `mypy`, `bandit`
 
 2. `secret-scan`
-- `gitleaks` em todo histórico do checkout
+- `gitleaks` com config versionada `.gitleaks.toml`
 
 3. `dependency-review` (somente PR)
-- gate para novas vulnerabilidades `high+`
+- bloqueia vulnerabilidades novas `high+`
 
 4. `tests`
-- `pytest` com cobertura (`-m "not schemathesis"`)
-- gate de cobertura mínima: `--cov-fail-under=85`
-- artefatos: `coverage.xml`, `pytest-report.xml`
+- `pytest` (sem marker schemathesis)
+- cobertura minima obrigatoria `85%`
 
-5. `schemathesis`
-- teste de confiabilidade de contrato OpenAPI com fuzzing controlado
-- usa marker `schemathesis`
+5. `api-smoke`
+- sobe stack local docker
+- executa suite Postman/Newman (`scripts/run_postman_suite.sh`)
+- publica `reports/newman-report.xml`
 
-6. `mutation`
-- gate de mutation testing com `cosmic-ray`
-- script: `scripts/mutation_gate.sh`
-- configuração: `scripts/cosmic_ray.toml`
-- `test-command` usa `python -m pytest ...` (sem path hardcoded de `.venv`) para compatibilidade com CI e execução local.
+6. `schemathesis`
+- contrato OpenAPI com seed deterministico (`HYPOTHESIS_SEED`)
+- execucao centralizada em `scripts/run_schemathesis_contract.sh`
 
-7. `trivy`
-- scan de vulnerabilidades no filesystem do repo
-- build da imagem prod e scan de imagem
-- imagem de produção endurecida com Docker multi-stage, usuário não-root e runtime mínimo.
-- `.dockerignore` bloqueia arquivos sensíveis (`.env*`, `*.pem`, `*.key`) para não entrarem no contexto/imagem.
+7. `mutation`
+- gate Cosmic Ray (`scripts/mutation_gate.sh`)
 
-8. `snyk` (condicional)
-- só roda quando `vars.SNYK_ENABLED == 'true'`
-- scan de dependências Python e de container
-- actions pinadas por commit SHA imutável (evita risco de supply-chain por branch mutável).
+8. `trivy`
+- scan de filesystem + imagem Docker
 
-9. `security-evidence`
+9. `snyk` (obrigatorio)
+- scan de dependencias Python
+- scan de container calibrado para reduzir ruido recorrente de base image
+
+10. `security-evidence`
 - executa `scripts/security_evidence_check.sh`
-- publica `reports/security/security-evidence.md`
 
-10. `sonar`
-- scan SonarCloud + quality gate
-- enforcement adicional via `scripts/sonar_enforce_ci.sh`
+11. `sonar`
+- scan SonarCloud + quality gate + enforce de ratings A
 
-11. `Cursor Bugbot` (GitHub App)
-- revisão automática adicional de PR com comentários de potenciais bugs/riscos.
-- funciona como camada complementar aos gates determinísticos (lint, testes, SAST, dependency scan).
-- recomendação: tornar check obrigatório no ruleset somente após 1-2 semanas de calibração de ruído/falso positivo.
+Notas:
+- `Cursor Bugbot` e camada complementar de review em PR.
+- Bugbot nao eh gate obrigatorio no ruleset (quota/ruido), mas continua util como sinal adicional.
 
-### 2. Recorrência
-Arquivo: `.github/workflows/recurrence-job.yml`
-- gera transações recorrentes por cron / execução manual
+### 2) Deploy
+Arquivo: `.github/workflows/deploy.yml`
+
+Fluxo:
+- `push` em `master`: deploy automatico em `dev`
+- `workflow_dispatch` com `env=prod`: deploy manual em `prod`
+
+Controles:
+- OIDC por ambiente (`AWS_ROLE_ARN_DEV` e `AWS_ROLE_ARN_PROD`)
+- validacao de variaveis obrigatorias antes do deploy
+- bloqueio de deploy PROD fora da branch `master`
+- rollback automatico em falha
+- smoke checks REST + GraphQL pos-deploy via `scripts/http_smoke_check.py`
+
+### 3) Governance
+Arquivo: `.github/workflows/governance.yml`
+
+Fluxo:
+- `mode=audit`: verifica drift do ruleset
+- `mode=sync`: cria/atualiza ruleset alvo
+
+Arquivos de suporte:
+- `config/github_master_ruleset.json`
+- `scripts/github_ruleset_manager.py`
+
+Secret requerido:
+- `TOKEN_GITHUB_ADMIN`
 
 ## Pre-commit (local)
+
 Arquivo: `.pre-commit-config.yaml`
 
-Hooks ativos:
-- `black`
-- `flake8`
-- `isort`
-- `mypy` (hook local `language: system`, executa `mypy app` no mesmo ambiente do desenvolvedor)
-- `bandit` (scan `app/`, severidade alta)
-- `gitleaks` (segredos em staged)
+Hooks:
+- `black`, `flake8`, `isort`
+- `bandit`
+- `gitleaks` com `.gitleaks.toml`
 - `detect-private-key`
+- `mypy`
 - `sonar-local-check`
+- pre-push: `security-evidence`, `pip-audit`
 
-## Reproducao local do job Quality (CI parity)
-- Script oficial: `scripts/run_ci_quality_local.sh`
-- Modo recomendado (paridade alta com CI):
-  - `scripts/run_ci_quality_local.sh`
-  - executa em container `python:3.11-slim` e roda os mesmos gates do job `Quality`.
-- Modo alternativo (ambiente local ja preparado):
-  - `PATH=".venv/bin:$PATH" scripts/run_ci_quality_local.sh --local`
-  - roda os mesmos gates usando o ambiente local atual.
+## Reproducao local (CI-like)
 
-Checks executados pelo script:
-- `pip-audit -r requirements.txt`
-- `black --check` (arquivos Python versionados)
-- `isort --check-only app tests config run.py run_without_db.py`
-- `flake8 app tests config run.py run_without_db.py`
-- `mypy app`
-- `bandit -r app -lll -iii`
+Script oficial:
+- `scripts/run_ci_like_actions_local.sh`
 
-## Cursor Bugbot: execução local
-- hoje não existe runner local oficial do GitHub App `Cursor Bugbot` equivalente ao comportamento de comentário em PR.
-- o fluxo local recomendado é:
-  1. `PATH=".venv/bin:$PATH" pre-commit run -a`
-  2. `scripts/run_ci_quality_local.sh` (Python 3.11 em Docker)
-  3. `PATH=".venv/bin:$PATH" pytest -m "not schemathesis" --cov=app --cov-fail-under=85`
-- para validação real do Bugbot, a execução continua sendo via PR no GitHub.
-- `act` pode simular jobs de GitHub Actions localmente, mas não simula checks de GitHub Apps externos (como Bugbot).
+Exemplos:
+- `bash scripts/run_ci_like_actions_local.sh`
+- `bash scripts/run_ci_like_actions_local.sh --local --with-postman`
+- `bash scripts/run_ci_like_actions_local.sh --local --with-mutation`
 
-## Variáveis e secrets necessários
+## Secrets e Vars esperados
 
-### Secrets
+Secrets:
 - `SONAR_TOKEN`
-- `SNYK_TOKEN` (para job `snyk`)
-- `RECURRENCE_DATABASE_URL`
-- `RECURRENCE_SECRET_KEY`
-- `RECURRENCE_JWT_SECRET_KEY`
+- `SNYK_TOKEN`
+- `TOKEN_GITHUB_ADMIN`
 
-### Variables
+Vars:
 - `SONAR_PROJECT_KEY`
 - `SONAR_ORGANIZATION`
-- `SNYK_ENABLED` (`true/false`)
+- `AWS_REGION`
+- `AWS_ROLE_ARN_DEV`
+- `AWS_ROLE_ARN_PROD`
+- `AURAXIS_DEV_INSTANCE_ID`
+- `AURAXIS_PROD_INSTANCE_ID`
+- opcionais: `AURAXIS_DEV_BASE_URL`, `AURAXIS_PROD_BASE_URL`
 
-## Governança recomendada (fora do repo)
-1. Habilitar branch protection exigindo checks obrigatórios.
-2. Habilitar GitHub Secret Scanning + Push Protection.
-3. Definir política de exceções de CVE (quem aprova, prazo, rastreabilidade).
+## Referencias
 
-## Convenções Git
-- Branches: usar padrão de conventional branch (`feat/*`, `fix/*`, `chore/*`, `refactor/*`, `docs/*`, `test/*`, `ci/*`).
-- Commits: seguir Conventional Commits (ex.: `feat(auth): ...`, `fix(ci): ...`, `chore(deps): ...`).
-- Pull requests: título alinhado com o tipo principal de mudança quando possível.
-
-## Referência de estratégia
-- `docs/CI_SECURITY_RESILIENCE_PLAN.md`
+- `docs/RUNBOOK.md`
+- `docs/CD_AUTOMATION_EXECUTION_PLAN.md`
+- `TASKS.md`

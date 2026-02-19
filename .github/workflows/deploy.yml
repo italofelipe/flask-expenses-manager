@@ -82,6 +82,16 @@ jobs:
             --prod-instance-id "${PROD_INSTANCE_ID}" \
             deploy --env dev --git-ref "${REF}"
 
+      - name: REST + GraphQL smoke checks (DEV)
+        env:
+          DEV_BASE_URL: ${{ vars.AURAXIS_DEV_BASE_URL }}
+        run: |
+          BASE_URL="${DEV_BASE_URL:-http://dev.api.auraxis.com.br}"
+          python scripts/http_smoke_check.py \
+            --env-name dev \
+            --base-url "${BASE_URL}" \
+            --timeout 20
+
       - name: Auto-rollback DEV on deploy failure
         if: ${{ failure() }}
         continue-on-error: true
@@ -107,6 +117,7 @@ jobs:
             echo "- event: \`${{ github.event_name }}\`"
             echo "- target env: \`dev\`"
             echo "- deploy step outcome: \`${{ steps.deploy_dev.outcome }}\`"
+            echo "- smoke checks: \`enabled (REST + GraphQL)\`"
             echo "- rollback on failure: \`enabled\`"
           } >> "$GITHUB_STEP_SUMMARY"
 
@@ -168,6 +179,16 @@ jobs:
             --prod-instance-id "${PROD_INSTANCE_ID}" \
             deploy --env prod --git-ref "${REF}"
 
+      - name: REST + GraphQL smoke checks (PROD)
+        env:
+          PROD_BASE_URL: ${{ vars.AURAXIS_PROD_BASE_URL }}
+        run: |
+          BASE_URL="${PROD_BASE_URL:-https://api.auraxis.com.br}"
+          python scripts/http_smoke_check.py \
+            --env-name prod \
+            --base-url "${BASE_URL}" \
+            --timeout 20
+
       - name: Auto-rollback PROD on deploy failure
         if: ${{ failure() }}
         continue-on-error: true
@@ -194,5 +215,6 @@ jobs:
             echo "- event: \`${{ github.event_name }}\`"
             echo "- target env: \`prod\`"
             echo "- deploy step outcome: \`${{ steps.deploy_prod.outcome }}\`"
+            echo "- smoke checks: \`enabled (REST + GraphQL)\`"
             echo "- rollback on failure: \`enabled\`"
           } >> "$GITHUB_STEP_SUMMARY"

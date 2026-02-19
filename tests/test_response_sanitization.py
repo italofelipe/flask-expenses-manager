@@ -101,3 +101,72 @@ def test_graphql_keeps_public_error_with_allowlisted_code_in_production(
     payload = response.get_json()
     assert payload["errors"][0]["message"] == "Invalid credentials"
     assert payload["errors"][0]["extensions"]["code"] == "UNAUTHORIZED"
+
+
+def test_graphql_normalizes_validation_errors_in_production(
+    app: Any,
+    client: Any,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    app.config["DEBUG"] = False
+    app.config["TESTING"] = False
+
+    from app.controllers import graphql_controller
+
+    def _fake_execute(*args: Any, **kwargs: Any) -> _FakeExecutionResult:
+        error = GraphQLError(
+            "Cannot query field 'unknown' on type 'Query'.",
+            original_error=None,
+        )
+        return _FakeExecutionResult(errors=[error], data=None)
+
+    monkeypatch.setattr(graphql_controller.schema, "execute", _fake_execute)
+
+    response = client.post(
+        "/graphql",
+        json={
+            "query": (
+                "mutation Login($email: String, $password: String!) { "
+                "login(email: $email, password: $password) { token } }"
+            ),
+            "variables": {"email": "fake@email.com", "password": "x"},
+        },
+    )
+    assert response.status_code == 400
+    payload = response.get_json()
+    assert (
+        payload["errors"][0]["message"]
+        == "Cannot query field 'unknown' on type 'Query'."
+    )
+    assert payload["errors"][0]["extensions"]["code"] == "VALIDATION_ERROR"
+
+
+def test_graphql_auth_backend_unavailable_never_leaks_reason(
+    app: Any,
+    client: Any,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    app.config["DEBUG"] = False
+    app.config["TESTING"] = False
+
+    from app.controllers import graphql_controller
+
+    def _fake_execute(*args: Any, **kwargs: Any) -> _FakeExecutionResult:
+        error = GraphQLError(
+            "Authentication temporarily unavailable. Try again later.",
+            extensions={
+                "code": "AUTH_BACKEND_UNAVAILABLE",
+                "reason": "redis backend unreachable",
+            },
+            original_error=RuntimeError("redis backend unreachable"),
+        )
+        return _FakeExecutionResult(errors=[error], data=None)
+
+    monkeypatch.setattr(graphql_controller.schema, "execute", _fake_execute)
+
+    response = client.post("/graphql", json={"query": "query { __typename }"})
+    assert response.status_code == 400
+    payload = response.get_json()
+    error = payload["errors"][0]
+    assert error["extensions"]["code"] == "AUTH_BACKEND_UNAVAILABLE"
+    assert "reason" not in error["extensions"]

@@ -196,7 +196,100 @@
       }
     },
     {
-      "name": "05 - GraphQL login invalid credentials (safe error)",
+      "name": "05 - Login invalid credentials (REST safe error)",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "var allowed = [401, 429, 503];",
+              "pm.test('invalid REST login returns controlled status', function () {",
+              "  pm.expect(allowed).to.include(pm.response.code);",
+              "});",
+              "var body = pm.response.json();",
+              "var code = body && body.error ? body.error.code : null;",
+              "pm.test('invalid REST login does not expose INTERNAL_ERROR', function () {",
+              "  pm.expect(code).to.not.eql('INTERNAL_ERROR');",
+              "});"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "X-API-Contract",
+            "value": "v2"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"email\": \"{{runEmail}}\",\n  \"password\": \"{{testPasswordWrong}}\"\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/auth/login",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "auth",
+            "login"
+          ]
+        }
+      }
+    },
+    {
+      "name": "06 - GraphQL empty query (validation error)",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('graphql empty query returns 400', function () {",
+              "  pm.response.to.have.status(400);",
+              "});",
+              "var body = pm.response.json();",
+              "var firstErr = body.errors && body.errors[0] ? body.errors[0] : {};",
+              "var code = firstErr.extensions ? firstErr.extensions.code : null;",
+              "pm.test('graphql empty query uses VALIDATION_ERROR code', function () {",
+              "  pm.expect(code).to.eql('VALIDATION_ERROR');",
+              "});"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"query\": \"   \"\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/graphql",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "graphql"
+          ]
+        }
+      }
+    },
+    {
+      "name": "07 - GraphQL login invalid credentials (safe error)",
       "event": [
         {
           "listen": "test",
@@ -243,7 +336,7 @@
       }
     },
     {
-      "name": "06 - GraphQL me query (auth required)",
+      "name": "08 - GraphQL me query (auth required)",
       "event": [
         {
           "listen": "test",
