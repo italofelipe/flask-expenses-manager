@@ -3,12 +3,16 @@ from __future__ import annotations
 from uuid import UUID
 
 import graphene
-from graphql import GraphQLError
 
 from app.application.services.public_error_mapper_service import (
     map_validation_exception,
 )
 from app.graphql.auth import get_current_user_required
+from app.graphql.errors import (
+    GRAPHQL_ERROR_CODE_VALIDATION,
+    build_public_graphql_error,
+    to_public_graphql_code,
+)
 from app.graphql.schema_utils import (
     _assert_owned_investment_access,
     _parse_optional_date,
@@ -83,7 +87,10 @@ class InvestmentQueryMixin:
                 investment_id=investment_id, page=page, per_page=per_page
             )
         except InvestmentOperationError as exc:
-            raise GraphQLError(exc.message) from exc
+            raise build_public_graphql_error(
+                exc.message,
+                code=to_public_graphql_code(exc.code),
+            ) from exc
 
         items = [
             InvestmentOperationType(**InvestmentOperationService.serialize(item))
@@ -108,7 +115,10 @@ class InvestmentQueryMixin:
         try:
             summary = service.get_summary(investment_id)
         except InvestmentOperationError as exc:
-            raise GraphQLError(exc.message) from exc
+            raise build_public_graphql_error(
+                exc.message,
+                code=to_public_graphql_code(exc.code),
+            ) from exc
         return InvestmentOperationSummaryType(**summary)
 
     def resolve_investment_position(
@@ -120,7 +130,10 @@ class InvestmentQueryMixin:
         try:
             position = service.get_position(investment_id)
         except InvestmentOperationError as exc:
-            raise GraphQLError(exc.message) from exc
+            raise build_public_graphql_error(
+                exc.message,
+                code=to_public_graphql_code(exc.code),
+            ) from exc
         return InvestmentPositionType(**position)
 
     def resolve_investment_invested_amount(
@@ -130,13 +143,19 @@ class InvestmentQueryMixin:
         _assert_owned_investment_access(investment_id, user.id)
         operation_date = _parse_optional_date(date, "date")
         if operation_date is None:
-            raise GraphQLError("Parâmetro 'date' é obrigatório.")
+            raise build_public_graphql_error(
+                "Parâmetro 'date' é obrigatório.",
+                code=GRAPHQL_ERROR_CODE_VALIDATION,
+            )
 
         service = InvestmentOperationService(user.id)
         try:
             result = service.get_invested_amount_by_date(investment_id, operation_date)
         except InvestmentOperationError as exc:
-            raise GraphQLError(exc.message) from exc
+            raise build_public_graphql_error(
+                exc.message,
+                code=to_public_graphql_code(exc.code),
+            ) from exc
         return InvestmentInvestedAmountType(**result)
 
     def resolve_investment_valuation(
@@ -148,7 +167,10 @@ class InvestmentQueryMixin:
         try:
             payload = service.get_investment_current_valuation(investment_id)
         except InvestmentOperationError as exc:
-            raise GraphQLError(exc.message) from exc
+            raise build_public_graphql_error(
+                exc.message,
+                code=to_public_graphql_code(exc.code),
+            ) from exc
         return PortfolioValuationItemType(**payload)
 
     def resolve_portfolio_valuation(
@@ -181,7 +203,10 @@ class InvestmentQueryMixin:
                 exc,
                 fallback_message="Parâmetros de período inválidos.",
             )
-            raise GraphQLError(mapped_error.message) from exc
+            raise build_public_graphql_error(
+                mapped_error.message,
+                code=to_public_graphql_code(mapped_error.code),
+            ) from exc
         return PortfolioHistoryPayloadType(
             summary=PortfolioHistorySummaryType(**payload["summary"]),
             items=[PortfolioHistoryItemType(**item) for item in payload["items"]],

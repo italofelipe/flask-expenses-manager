@@ -1,10 +1,14 @@
 from __future__ import annotations
 
 import graphene
-from graphql import GraphQLError
 
 from app.extensions.database import db
 from app.graphql.auth import get_current_user_required
+from app.graphql.errors import (
+    GRAPHQL_ERROR_CODE_CONFLICT,
+    GRAPHQL_ERROR_CODE_NOT_FOUND,
+    build_public_graphql_error,
+)
 from app.graphql.types import TickerType
 from app.models.user_ticker import UserTicker
 
@@ -30,7 +34,10 @@ class AddTickerMutation(graphene.Mutation):
             user_id=user.id, symbol=normalized_symbol
         ).first()
         if exists:
-            raise GraphQLError("Ticker já adicionado")
+            raise build_public_graphql_error(
+                "Ticker já adicionado",
+                code=GRAPHQL_ERROR_CODE_CONFLICT,
+            )
         ticker = UserTicker(
             symbol=normalized_symbol,
             quantity=quantity,
@@ -62,7 +69,10 @@ class DeleteTickerMutation(graphene.Mutation):
             user_id=user.id, symbol=symbol.upper()
         ).first()
         if not ticker:
-            raise GraphQLError("Ticker não encontrado")
+            raise build_public_graphql_error(
+                "Ticker não encontrado",
+                code=GRAPHQL_ERROR_CODE_NOT_FOUND,
+            )
         db.session.delete(ticker)
         db.session.commit()
         return DeleteTickerMutation(ok=True, message="Ticker removido com sucesso")

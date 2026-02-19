@@ -4,8 +4,12 @@ from datetime import date, datetime
 from typing import Any, cast
 from uuid import UUID
 
-from graphql import GraphQLError
-
+from app.graphql.errors import (
+    GRAPHQL_ERROR_CODE_FORBIDDEN,
+    GRAPHQL_ERROR_CODE_NOT_FOUND,
+    GRAPHQL_ERROR_CODE_VALIDATION,
+    build_public_graphql_error,
+)
 from app.models.transaction import Transaction, TransactionStatus, TransactionType
 from app.models.user import User
 from app.models.wallet import Wallet
@@ -21,8 +25,9 @@ def _parse_optional_date(value: str | None, field_name: str) -> date | None:
     try:
         return datetime.strptime(value, "%Y-%m-%d").date()
     except ValueError as exc:
-        raise GraphQLError(
-            f"Parâmetro '{field_name}' inválido. Use o formato YYYY-MM-DD."
+        raise build_public_graphql_error(
+            f"Parâmetro '{field_name}' inválido. Use o formato YYYY-MM-DD.",
+            code=GRAPHQL_ERROR_CODE_VALIDATION,
         ) from exc
 
 
@@ -30,9 +35,15 @@ def _parse_month(month: str) -> tuple[int, int]:
     try:
         year, month_number = map(int, month.split("-"))
     except ValueError as exc:
-        raise GraphQLError("Formato de mês inválido. Use YYYY-MM.") from exc
+        raise build_public_graphql_error(
+            "Formato de mês inválido. Use YYYY-MM.",
+            code=GRAPHQL_ERROR_CODE_VALIDATION,
+        ) from exc
     if month_number < 1 or month_number > 12:
-        raise GraphQLError("Formato de mês inválido. Use YYYY-MM.")
+        raise build_public_graphql_error(
+            "Formato de mês inválido. Use YYYY-MM.",
+            code=GRAPHQL_ERROR_CODE_VALIDATION,
+        )
     return year, month_number
 
 
@@ -95,10 +106,14 @@ def _validate_pagination_values(
     page: int, per_page: int, *, max_per_page: int = 100
 ) -> None:
     if page < 1:
-        raise GraphQLError("Parâmetro 'page' inválido. Informe um inteiro positivo.")
+        raise build_public_graphql_error(
+            "Parâmetro 'page' inválido. Informe um inteiro positivo.",
+            code=GRAPHQL_ERROR_CODE_VALIDATION,
+        )
     if per_page < 1 or per_page > max_per_page:
-        raise GraphQLError(
-            f"Parâmetro 'per_page' inválido. Use um valor entre 1 e {max_per_page}."
+        raise build_public_graphql_error(
+            f"Parâmetro 'per_page' inválido. Use um valor entre 1 e {max_per_page}.",
+            code=GRAPHQL_ERROR_CODE_VALIDATION,
         )
 
 
@@ -108,8 +123,9 @@ def _apply_type_filter(query: Any, raw_type: str | None) -> Any:
     try:
         return query.filter(Transaction.type == TransactionType(raw_type.lower()))
     except ValueError as exc:
-        raise GraphQLError(
-            "Parâmetro 'type' inválido. Use 'income' ou 'expense'."
+        raise build_public_graphql_error(
+            "Parâmetro 'type' inválido. Use 'income' ou 'expense'.",
+            code=GRAPHQL_ERROR_CODE_VALIDATION,
         ) from exc
 
 
@@ -119,9 +135,10 @@ def _apply_status_filter(query: Any, raw_status: str | None) -> Any:
     try:
         return query.filter(Transaction.status == TransactionStatus(raw_status.lower()))
     except ValueError as exc:
-        raise GraphQLError(
+        raise build_public_graphql_error(
             "Parâmetro 'status' inválido. "
-            "Use paid, pending, cancelled, postponed ou overdue."
+            "Use paid, pending, cancelled, postponed ou overdue.",
+            code=GRAPHQL_ERROR_CODE_VALIDATION,
         ) from exc
 
 
@@ -133,7 +150,10 @@ def _apply_due_date_range_filter(
     parsed_start_date = _parse_optional_date(start_date, "start_date")
     parsed_end_date = _parse_optional_date(end_date, "end_date")
     if parsed_start_date and parsed_end_date and parsed_start_date > parsed_end_date:
-        raise GraphQLError("Parâmetro 'start_date' não pode ser maior que 'end_date'.")
+        raise build_public_graphql_error(
+            "Parâmetro 'start_date' não pode ser maior que 'end_date'.",
+            code=GRAPHQL_ERROR_CODE_VALIDATION,
+        )
     if parsed_start_date:
         query = query.filter(Transaction.due_date >= parsed_start_date)
     if parsed_end_date:
@@ -149,9 +169,15 @@ def _get_owned_wallet_or_error(
 ) -> Wallet:
     investment = cast(Wallet | None, Wallet.query.filter_by(id=investment_id).first())
     if not investment:
-        raise GraphQLError("Investimento não encontrado")
+        raise build_public_graphql_error(
+            "Investimento não encontrado",
+            code=GRAPHQL_ERROR_CODE_NOT_FOUND,
+        )
     if str(investment.user_id) != str(user_id):
-        raise GraphQLError(forbidden_message)
+        raise build_public_graphql_error(
+            forbidden_message,
+            code=GRAPHQL_ERROR_CODE_FORBIDDEN,
+        )
     return investment
 
 

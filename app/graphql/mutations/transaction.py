@@ -6,7 +6,6 @@ from uuid import UUID, uuid4
 
 import graphene
 from dateutil.relativedelta import relativedelta
-from graphql import GraphQLError
 
 from app.controllers.transaction.utils import (
     _build_installment_amounts,
@@ -15,6 +14,12 @@ from app.controllers.transaction.utils import (
 )
 from app.extensions.database import db
 from app.graphql.auth import get_current_user_required
+from app.graphql.errors import (
+    GRAPHQL_ERROR_CODE_FORBIDDEN,
+    GRAPHQL_ERROR_CODE_NOT_FOUND,
+    GRAPHQL_ERROR_CODE_VALIDATION,
+    build_public_graphql_error,
+)
 from app.graphql.schema_utils import _parse_optional_date
 from app.graphql.types import TransactionTypeObject
 from app.models.transaction import Transaction, TransactionStatus, TransactionType
@@ -52,7 +57,10 @@ class CreateTransactionMutation(graphene.Mutation):
         user = get_current_user_required()
         due_date = _parse_optional_date(kwargs.get("due_date"), "due_date")
         if due_date is None:
-            raise GraphQLError("Parâmetro 'due_date' é obrigatório.")
+            raise build_public_graphql_error(
+                "Parâmetro 'due_date' é obrigatório.",
+                code=GRAPHQL_ERROR_CODE_VALIDATION,
+            )
         start_date = _parse_optional_date(kwargs.get("start_date"), "start_date")
         end_date = _parse_optional_date(kwargs.get("end_date"), "end_date")
         recurring_error = _validate_recurring_payload(
@@ -62,7 +70,10 @@ class CreateTransactionMutation(graphene.Mutation):
             end_date=end_date,
         )
         if recurring_error:
-            raise GraphQLError(recurring_error)
+            raise build_public_graphql_error(
+                recurring_error,
+                code=GRAPHQL_ERROR_CODE_VALIDATION,
+            )
 
         tx_type = str(kwargs["type"]).lower()
         tx_status = str(kwargs.get("status", "pending")).lower()
@@ -81,12 +92,18 @@ class CreateTransactionMutation(graphene.Mutation):
             message = (
                 str(exc.args[0]) if exc.args else "Referência inválida para transação."
             )
-            raise GraphQLError(message) from exc
+            raise build_public_graphql_error(
+                message,
+                code=GRAPHQL_ERROR_CODE_VALIDATION,
+            ) from exc
 
         if kwargs.get("is_installment") and kwargs.get("installment_count"):
             count = int(kwargs["installment_count"])
             if count < 1:
-                raise GraphQLError("'installment_count' deve ser maior que zero.")
+                raise build_public_graphql_error(
+                    "'installment_count' deve ser maior que zero.",
+                    code=GRAPHQL_ERROR_CODE_VALIDATION,
+                )
             group_id = uuid4()
             installment_amounts = _build_installment_amounts(amount, count)
             created: list[Transaction] = []
@@ -166,9 +183,15 @@ class DeleteTransactionMutation(graphene.Mutation):
             id=transaction_id, deleted=False
         ).first()
         if not transaction:
-            raise GraphQLError("Transação não encontrada.")
+            raise build_public_graphql_error(
+                "Transação não encontrada.",
+                code=GRAPHQL_ERROR_CODE_NOT_FOUND,
+            )
         if str(transaction.user_id) != str(user.id):
-            raise GraphQLError("Você não tem permissão para deletar esta transação.")
+            raise build_public_graphql_error(
+                "Você não tem permissão para deletar esta transação.",
+                code=GRAPHQL_ERROR_CODE_FORBIDDEN,
+            )
         transaction.deleted = True
         db.session.commit()
         return DeleteTransactionMutation(

@@ -3,9 +3,12 @@ from uuid import UUID
 
 from flask import request
 from flask_jwt_extended import decode_token
-from graphql import GraphQLError
 
 from app.extensions.database import db
+from app.graphql.errors import (
+    GRAPHQL_ERROR_CODE_UNAUTHORIZED,
+    build_public_graphql_error,
+)
 from app.models.user import User
 
 
@@ -40,5 +43,8 @@ def get_current_user_optional() -> User | None:
 def get_current_user_required() -> User:
     user = get_current_user_optional()
     if user is None:
-        raise GraphQLError("Token inválido ou ausente.")
+        raise build_public_graphql_error(
+            "Token inválido ou ausente.",
+            code=GRAPHQL_ERROR_CODE_UNAUTHORIZED,
+        )
     return user
