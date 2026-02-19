@@ -1,11 +1,14 @@
 """User controller compatibility facade."""
 
 from app.controllers.user import (
+    UserDependencies,
     UserMeResource,
     UserProfileResource,
     _parse_positive_int,
     assign_user_profile_fields,
     filter_transactions,
+    get_user_dependencies,
+    register_user_dependencies,
     user_bp,
     validate_user_token,
 )
@@ -19,6 +22,9 @@ from app.controllers.user.helpers import (
 
 __all__ = [
     "user_bp",
+    "UserDependencies",
+    "register_user_dependencies",
+    "get_user_dependencies",
     "UserProfileResource",
     "UserMeResource",
     "assign_user_profile_fields",
