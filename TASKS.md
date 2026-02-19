@@ -1,6 +1,6 @@
 # TASKS - Central de TODOs e Progresso
 
-Ultima atualizacao: 2026-02-13
+Ultima atualizacao: 2026-02-18
 
 ## Regras de uso deste arquivo
 - Este arquivo centraliza TODOs de produto, engenharia e qualidade.
@@ -12,6 +12,88 @@ Ultima atualizacao: 2026-02-13
 - `In Progress`: em andamento.
 - `Blocked`: bloqueada por dependencia/decisao.
 - `Done`: concluida e validada.
+
+## Legenda visual
+
+| Icone | Status |
+|---|---|
+| 🟢 | Done |
+| 🟡 | In Progress |
+| 🔴 | Blocked |
+| ⚪ | Todo |
+
+## Roadmap de execucao por ciclos (estrategia ativa)
+
+Backlog executado em ciclos curtos para equilibrar estabilidade operacional, entrega de negócio e controle de débito técnico.
+
+| Ciclo | Foco principal | Objetivo | Status |
+|---|---|---|---|
+| A | Melhorias/Ajustes de processos (agora) | Estabilizar deploy/CI/segurança operacional, reduzir risco sistêmico e incidentes repetidos | 🟡 |
+| B | Features (bloco 1) | Entregar funcionalidades de negócio em base estável com paridade REST + GraphQL | ⚪ |
+| C | Débitos técnicos não graves | Reduzir complexidade/custo de manutenção sem alterar regra de negócio | ⚪ |
+| D | Mais melhorias/refinamentos de processos | Evoluir DX, observabilidade e governança de entrega | ⚪ |
+| E | Features (bloco 2) | Segunda rodada de funcionalidades com qualidade/gates consolidados | ⚪ |
+
+### Ciclo A (ativo) - Estabilizacao, Automacao e Riscos graves/moderados
+
+Objetivo: fechar lacunas operacionais que ainda derrubam deploy, geram regressão silenciosa ou degradam segurança em produção.
+
+Critérios de saída do Ciclo A:
+- Deploy DEV automático e PROD manual com aprovação e rollback validados.
+- Paridade local x CI documentada e reproduzível (sem surpresa no Actions).
+- Gates críticos de segurança obrigatórios no PR (ruleset/branch protection).
+- Smoke REST + GraphQL automático no pipeline de deploy.
+
+| Prioridade | Item (ID) | Entrega esperada | Status |
+|---|---|---|---|
+| P0 | CD-01 | Convergir runtime/path de deploy sem drift entre hosts legado/novo | 🟡 |
+| P0 | CD-04 | OIDC por ambiente com least privilege e workflow de deploy confiável | 🟡 |
+| P0 | G11 | Branch protection/ruleset com checks obrigatórios efetivos | ⚪ |
+| P0 | API-TEST-01 | Suite REST+GraphQL integrada ao CI como gate de smoke/regressão | 🟡 |
+| P1 | G6 | Secret scanning e hardening no pre-commit/CI | 🟡 |
+| P1 | G7 | Schemathesis calibrado para contrato OpenAPI | 🟡 |
+| P1 | G9 | Snyk calibrado sem falso positivo recorrente | 🟡 |
+| P1 | G15 | Cursor Bugbot calibrado no fluxo de review | 🟡 |
+| P1 | GQL-ERR-01 | Catálogo de erros GraphQL claro + seguro (sem leak interno) | 🟡 |
+| P1 | I8 | Hardening de produção (IAM/secrets/TLS/least privilege/runbook) | 🟡 |
+
+### Ciclo B (planejado) - Features bloco 1
+
+| Sequencia | Itens alvo iniciais |
+|---|---|
+| B1 | E1, E2, E3 (metas: model + CRUD + serviço base) |
+| B2 | F1, F2, F3, F4 (auxiliares e integração em transações) |
+| B3 | C6 (vencimentos por range com paridade REST + GraphQL) |
+
+### Ciclo C (planejado) - Debitos tecnicos nao graves
+
+| Sequencia | Itens alvo iniciais |
+|---|---|
+| C1 | A2, A3, A4 (contrato/docs/nomenclatura/estratégia de validação) |
+| C2 | G16 remanescente + limpeza de warnings/deprecações não críticas |
+| C3 | Refactors pontuais de manutenibilidade com testes de regressão |
+
+### Ciclo D (planejado) - Refinamento de processo
+
+| Sequencia | Itens alvo iniciais |
+|---|---|
+| D1 | Baseline de métricas operacionais (lead time, fail rate, MTTR) |
+| D2 | Runbooks incrementais (deploy, rollback, incident response) |
+| D3 | DX local (aliases/scripts para login, checks e troubleshooting) |
+
+## Padrao de branches e fluxo de entrega
+
+Padrão adotado:
+- Branch naming: `tipo/escopo-descricao-curta` (ex.: `fix/deploy-prod-ssh-443`, `feat/goals-crud-v1`, `chore/ci-local-parity`).
+- Tipos recomendados: `feat`, `fix`, `refactor`, `chore`, `docs`, `test`, `perf`, `security`.
+- Commits: Conventional Commits (obrigatório).
+
+Fluxo por entrega:
+1. Iniciar da `master` local atualizada.
+2. Criar branch específica para a entrega.
+3. Implementar + testar local + atualizar `TASKS.md`.
+4. Abrir PR e validar gates do CI.
+5. Após merge: voltar para `master`, atualizar e abrir próxima branch.
 
 ## Backlog central
 
@@ -31,6 +113,7 @@ Ultima atualizacao: 2026-02-13
 | C3 | Transacoes | Consolidar regras de parcelamento (soma exata e arredondamento final) | Done | 100% | Baixo | 497f901 | 2026-02-09 |
 | C4 | Transacoes | Criar endpoint de dashboard mensal (receitas, despesas, saldo, categorias) | Done | 100% | Baixo | pending-commit | 2026-02-09 |
 | C5 | Transacoes | Endpoint de despesas por periodo com paginacao/ordenacao/metricas | Done | 100% | Baixo | f3ef3c0 | 2026-02-09 |
+| C6 | Transacoes | Endpoint unificado de vencimentos (receitas+despesas) por intervalo (`initialDate/finalDate`) com ordenação por vencidas primeiro, a vencer primeiro, data, título e cartão, com paridade REST + GraphQL | Todo | 0% | Alto: exige evolução de contrato e ordenação temporal com paridade exata entre REST/GraphQL sem regressão no C5 |  | 2026-02-18 |
 | D1 | Investimentos | Entidade de operacoes (`buy`/`sell`) com data, preco, quantidade, taxas | Done | 100% | Baixo | 94c94db, pending-commit | 2026-02-09 |
 | D2 | Investimentos | Calculo de custo medio por ativo e posicao atual | Done | 100% | Medio: requer evolucao para casos avancados (venda acima da posicao/short) | pending-commit | 2026-02-09 |
 | D3 | Investimentos | Calculo de quanto investiu no dia por data de operacao | Done | 100% | Medio: cobertura de regra baseline, faltam cenarios avancados (ex.: timezone/mercado) | pending-commit | 2026-02-09 |
@@ -84,6 +167,11 @@ Ultima atualizacao: 2026-02-13
 | I14 | Nginx/TLS | Ativar config TLS no Nginx (redirect 80->443 + headers de segurança) | Done | 100% | Baixo: TLS ativo em PROD com headers de segurança; DEV segue HTTP por enquanto | pending-commit | 2026-02-13 |
 | I15 | Nginx/TLS | Configurar renovação automática de certificado e validações pós-renovação | Done | 100% | Baixo: timer systemd instalado em PROD e validação dry-run executada via SSM | 575dcea, 3137cd9 | 2026-02-13 |
 | I16 | Nginx/TLS | Checklist de validação local/AWS (DNS, SG, health, curl, logs, rollback) | Done | 100% | Baixo: checklist automatizado em `scripts/aws_validate_i16.py` e validado contra DEV/PROD | 2af0a95 | 2026-02-13 |
+| CD-01 | CD | Normalizar path de deploy para `/opt/auraxis` em DEV/PROD e eliminar drift com legado | In Progress | 70% | Médio: migração automática por fallback reduz risco, mas ainda exige convergência final dos hosts | pending-commit | 2026-02-18 |
+| CD-04 | CD | Adotar role OIDC dedicada por ambiente (`AWS_ROLE_ARN_DEV`/`AWS_ROLE_ARN_PROD`) com menor privilégio | In Progress | 85% | Médio: depende de consistência de role/policy/trust em ambos ambientes | pending-commit | 2026-02-18 |
+| API-TEST-01 | Technical Debt | Gerar collections e suíte confiável para Postman/API Dog (REST + GraphQL), com smoke/regressão e integração ao CI | In Progress | 88% | Médio: suíte e job CI já implementados; pendente ampliar cenários críticos e consolidar como required check no ruleset | pending-commit | 2026-02-18 |
+| GQL-ERR-01 | Technical Debt | Melhorar catálogo de erros GraphQL com mensagens claras e seguras, códigos padronizados e paridade com REST | In Progress | 40% | Médio: detalhes demais vazam contexto interno; detalhes de menos pioram DX | pending-commit | 2026-02-18 |
+| G17 | Quality | Eliminar `ResourceWarning` remanescente da suíte para execução limpa/reproduzível em CI/local | Todo | 0% | Baixo: impacto funcional baixo, mas melhora confiabilidade do pipeline |  | 2026-02-18 |
 | R1 | Rebranding | Mapear todas ocorrências de nomenclatura legada do projeto e registrar plano de substituição para `auraxis` | Done | 100% | Baixo: mapeamento concluído em arquivos versionados | pending-commit | 2026-02-10 |
 | R2 | Rebranding | Substituir ocorrências versionadas de nomenclatura legada por `auraxis` (sem quebrar integrações externas) | Done | 100% | Medio: integrações externas podem manter identificador legado temporário | pending-commit | 2026-02-10 |
 | S1 | AWS Security | Restringir acesso e hardening de instâncias EC2 (SG, NACL, IMDSv2, SSH policy, patching baseline) | Done | 100% | Baixo: baseline aplicado e validado; pendência remanescente é apenas runbook operacional (I9) e ajustes contínuos | pending-commit | 2026-02-13 |
@@ -136,6 +224,9 @@ Ultima atualizacao: 2026-02-13
 
 | Data | Item | Atualizacao | Commit |
 |---|---|---|---|
+| 2026-02-18 | Cycle A Plan | Reorganização do backlog em roadmap cíclico (A/B/C/D/E) com status visual por ícones, critérios de saída do ciclo A e padrão de branch/fluxo de entrega documentados no topo deste arquivo. | pending-commit |
+| 2026-02-18 | G12/G4 (Cycle A) | Script `scripts/run_ci_like_actions_local.sh` evoluído para paridade maior com CI: inclui schemathesis por padrão, opções `--fast`, `--with-mutation` e `--with-postman`, modo docker/local e logs por etapa. | pending-commit |
+| 2026-02-18 | API-TEST-01 (Cycle A) | Reintroduzida suíte Postman/API Dog (`api-tests/postman`) + runner `scripts/run_postman_suite.sh` com precheck de health e erro explícito; workflow `CI` ganhou job `API Smoke (Postman/Newman)` com `docker compose`, health wait, execução Newman e artifact JUnit. | pending-commit |
 | 2026-02-09 | C2 | Job de recorrencia + servico idempotente para gerar ocorrencias | f3ef3c0 |
 | 2026-02-09 | C5 | Endpoint `GET /transactions/expenses` com filtros de periodo, paginacao, ordenacao e metricas | f3ef3c0 |
 | 2026-02-09 | C4 | Endpoint `GET /transactions/dashboard` com totais, contagens e top categorias no contrato legado/v2 | pending-commit |
@@ -260,8 +351,9 @@ Ultima atualizacao: 2026-02-13
 | 2026-02-09 | D (observacao) | Restaurados arquivos deletados acidentalmente: ticker/carteira | n/a |
 
 ## Proxima prioridade sugerida
-- S1/S3 (P1): fechar controles de infraestrutura OWASP em AWS (`S1`) e integrar exportação central de métricas/alertas de segurança (CloudWatch/Prometheus).
-- G17 (P1): eliminar `ResourceWarning` remanescente da suíte (`tests/test_transaction_contract.py`) para manter execução 100% limpa e reproduzível no CI/local.
+- Ciclo A / P0: estabilizar CD e governança de merge (`CD-01`, `CD-04`, `G11`), garantindo regras obrigatórias em PR.
+- Ciclo A / P0: consolidar suíte de smoke/regressão REST+GraphQL (`API-TEST-01`) como gate de CI.
+- Ciclo A / P1: fechar hardening e calibração de segurança em pipeline (`G6`, `G7`, `G9`, `G15`, `GQL-ERR-01`, `I8`).
 
 ## Mapeamento Rebranding (nomenclatura legada -> `auraxis`)
 
