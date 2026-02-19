@@ -37,7 +37,7 @@ max-complexity = 10
 # Convenções de ordenação de imports
 # Configure se usar flake8-import-order ou isort
 import-order-style = google
-application-import-names = your_package_name
+application-import-names = app
 
 # Configuração de docstrings (se usar flake8-docstrings)
 docstring-convention = google
