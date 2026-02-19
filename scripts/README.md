@@ -8,6 +8,7 @@ Scripts operacionais e de engenharia para CI/CD, seguranca, deploy, observabilid
 - Seguranca: evidencias, hardening, auditoria e enforce.
 - AWS/operacao: deploy via SSM, backups, patching, monitoramento.
 - Testes de API: execucao de suites Postman/Newman.
+- Governanca GitHub: auditoria/sincronizacao de ruleset de branch protegida.
 
 ## Padroes obrigatorios
 - Scripts devem ser idempotentes sempre que possivel.
@@ -18,3 +19,4 @@ Scripts operacionais e de engenharia para CI/CD, seguranca, deploy, observabilid
 ## Uso recomendado
 - Antes de push: rodar `scripts/run_ci_like_actions_local.sh`.
 - Para smoke API: `scripts/run_postman_suite.sh`.
+- Para governanca de branch: `python scripts/github_ruleset_manager.py --owner <owner> --repo <repo> --mode audit`.

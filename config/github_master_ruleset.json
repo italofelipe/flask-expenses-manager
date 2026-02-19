@@ -1,0 +1,84 @@
+{
+  "name": "Auraxis Master Governance",
+  "target": "branch",
+  "enforcement": "active",
+  "conditions": {
+    "ref_name": {
+      "include": [
+        "refs/heads/master"
+      ],
+      "exclude": []
+    }
+  },
+  "bypass_actors": [],
+  "rules": [
+    {
+      "type": "deletion"
+    },
+    {
+      "type": "non_fast_forward"
+    },
+    {
+      "type": "pull_request",
+      "parameters": {
+        "required_approving_review_count": 1,
+        "dismiss_stale_reviews_on_push": true,
+        "require_code_owner_review": false,
+        "require_last_push_approval": false,
+        "required_review_thread_resolution": true
+      }
+    },
+    {
+      "type": "required_status_checks",
+      "parameters": {
+        "strict_required_status_checks_policy": true,
+        "required_status_checks": [
+          {
+            "context": "Quality (Lint + Type Check)",
+            "integration_id": null
+          },
+          {
+            "context": "Secret Scan (Gitleaks)",
+            "integration_id": null
+          },
+          {
+            "context": "Tests (Pytest + Coverage)",
+            "integration_id": null
+          },
+          {
+            "context": "API Smoke (Postman/Newman)",
+            "integration_id": null
+          },
+          {
+            "context": "API Reliability (Schemathesis)",
+            "integration_id": null
+          },
+          {
+            "context": "Mutation Testing (Cosmic Ray)",
+            "integration_id": null
+          },
+          {
+            "context": "Container Security (Trivy)",
+            "integration_id": null
+          },
+          {
+            "context": "Security Scan (Snyk)",
+            "integration_id": null
+          },
+          {
+            "context": "Security Evidence (S3)",
+            "integration_id": null
+          },
+          {
+            "context": "Dependency Review (PR gate)",
+            "integration_id": null
+          },
+          {
+            "context": "SonarQube Cloud",
+            "integration_id": null
+          }
+        ]
+      }
+    }
+  ]
+}
