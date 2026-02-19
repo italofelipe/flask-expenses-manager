@@ -39,6 +39,18 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Validate required DEV deploy variables
+        run: |
+          [ -n "${AWS_REGION:-}" ] || { echo "Missing var AWS_REGION"; exit 1; }
+          [ -n "${AWS_ROLE_ARN_DEV:-}" ] || { echo "Missing var AWS_ROLE_ARN_DEV"; exit 1; }
+          [ -n "${AURAXIS_DEV_INSTANCE_ID:-}" ] || { echo "Missing var AURAXIS_DEV_INSTANCE_ID"; exit 1; }
+          [ -n "${AURAXIS_PROD_INSTANCE_ID:-}" ] || { echo "Missing var AURAXIS_PROD_INSTANCE_ID"; exit 1; }
+        env:
+          AWS_REGION: ${{ vars.AWS_REGION }}
+          AWS_ROLE_ARN_DEV: ${{ vars.AWS_ROLE_ARN_DEV }}
+          AURAXIS_DEV_INSTANCE_ID: ${{ vars.AURAXIS_DEV_INSTANCE_ID }}
+          AURAXIS_PROD_INSTANCE_ID: ${{ vars.AURAXIS_PROD_INSTANCE_ID }}
+
       - name: Setup Python
         uses: actions/setup-python@v5
         with:
@@ -107,6 +119,25 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+
+      - name: Enforce PROD deploy from master branch
+        run: |
+          if [ "${GITHUB_REF}" != "refs/heads/master" ]; then
+            echo "PROD deploy must run from master branch. Current ref: ${GITHUB_REF}" >&2
+            exit 1
+          fi
+
+      - name: Validate required PROD deploy variables
+        run: |
+          [ -n "${AWS_REGION:-}" ] || { echo "Missing var AWS_REGION"; exit 1; }
+          [ -n "${AWS_ROLE_ARN_PROD:-}" ] || { echo "Missing var AWS_ROLE_ARN_PROD"; exit 1; }
+          [ -n "${AURAXIS_DEV_INSTANCE_ID:-}" ] || { echo "Missing var AURAXIS_DEV_INSTANCE_ID"; exit 1; }
+          [ -n "${AURAXIS_PROD_INSTANCE_ID:-}" ] || { echo "Missing var AURAXIS_PROD_INSTANCE_ID"; exit 1; }
+        env:
+          AWS_REGION: ${{ vars.AWS_REGION }}
+          AWS_ROLE_ARN_PROD: ${{ vars.AWS_ROLE_ARN_PROD }}
+          AURAXIS_DEV_INSTANCE_ID: ${{ vars.AURAXIS_DEV_INSTANCE_ID }}
+          AURAXIS_PROD_INSTANCE_ID: ${{ vars.AURAXIS_PROD_INSTANCE_ID }}
 
       - name: Setup Python
         uses: actions/setup-python@v5
