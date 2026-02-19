@@ -28,17 +28,17 @@ jobs:
 
       - name: Validate token
         env:
-          GITHUB_ADMIN_TOKEN: ${{ secrets.GITHUB_ADMIN_TOKEN }}
+          TOKEN_GITHUB_ADMIN: ${{ secrets.TOKEN_GITHUB_ADMIN }}
         run: |
-          if [ -z "${GITHUB_ADMIN_TOKEN:-}" ]; then
-            echo "Missing required secret: GITHUB_ADMIN_TOKEN" >&2
+          if [ -z "${TOKEN_GITHUB_ADMIN:-}" ]; then
+            echo "Missing required secret: TOKEN_GITHUB_ADMIN" >&2
             echo "Create a token with repository administration permission." >&2
             exit 1
           fi
 
       - name: Audit or sync ruleset
         env:
-          GITHUB_ADMIN_TOKEN: ${{ secrets.GITHUB_ADMIN_TOKEN }}
+          TOKEN_GITHUB_ADMIN: ${{ secrets.TOKEN_GITHUB_ADMIN }}
           MODE_INPUT: ${{ github.event.inputs.mode }}
           REPOSITORY: ${{ github.repository }}
         run: |

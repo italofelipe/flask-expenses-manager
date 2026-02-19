@@ -220,7 +220,7 @@ def parse_args() -> argparse.Namespace:
     )
     parser.add_argument(
         "--token-env",
-        default="GITHUB_ADMIN_TOKEN",
+        default="TOKEN_GITHUB_ADMIN",
         help="Environment variable containing GitHub admin token",
     )
     parser.add_argument(
@@ -235,6 +235,9 @@ def parse_args() -> argparse.Namespace:
 def main() -> int:
     args = parse_args()
     token = os.getenv(args.token_env, "").strip()
+    if not token and args.token_env == "TOKEN_GITHUB_ADMIN":
+        # Backward-compatible fallback for previous secret naming.
+        token = os.getenv("GITHUB_ADMIN_TOKEN", "").strip()
     if not token:
         raise RulesetError(
             f"Missing token in environment variable '{args.token_env}'. "
