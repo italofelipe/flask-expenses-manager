@@ -176,10 +176,38 @@ npm install -g newman
 
 - Estado de execução detalhado e histórico de progresso: `TASKS.md`
 - Prioridades atuais:
-  1. Consolidar CD com least-privilege por ambiente
-  2. Avançar para deploy imutável por imagem (ECR)
-  3. Expandir suíte externa de API (Postman/API Dog) para cenários críticos
-  4. Fechar débitos de padronização de erros GraphQL e documentação OpenAPI
+  1. Iniciar Ciclo B com metas (`E1 -> E2 -> E3`)
+  2. Evoluir para deploy imutável por imagem (ECR) como próximo passo de maturidade
+  3. Expandir suíte externa de API (Postman/API Dog) para cenários críticos adicionais
+  4. Fechar débitos de padronização restante de OpenAPI/documentação de contrato
+
+## Retomada rápida após re-clone
+
+1. Re-clone do repositório:
+```bash
+git clone git@github.com:italofelipe/flask-expenses-manager.git
+cd flask-expenses-manager
+```
+
+2. Preparar ambiente local:
+```bash
+cp .env.dev.example .env.dev
+python3 -m venv .venv
+source .venv/bin/activate
+pip install -r requirements.txt -r requirements-dev.txt
+pre-commit install
+```
+
+3. Validar baseline local:
+```bash
+./scripts/run_ci_quality_local.sh
+./scripts/run_ci_like_actions_local.sh --local
+```
+
+4. Ler contexto mínimo para continuar sem perda:
+- `TASKS.md` (snapshot + backlog por ciclo)
+- `docs/RUNBOOK.md` (operação AWS/SSM/deploy)
+- `docs/CI_CD.md` (gates e workflows)
 
 ---
 Se você acabou de chegar no projeto, comece por:
