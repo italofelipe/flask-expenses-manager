@@ -15,6 +15,88 @@ Ultima atualizacao: 2026-02-18
 - `Blocked`: bloqueada por dependencia/decisao.
 - `Done`: concluida e validada.
 
+## Legenda visual
+
+| Icone | Status |
+|---|---|
+| 🟢 | Done |
+| 🟡 | In Progress |
+| 🔴 | Blocked |
+| ⚪ | Todo |
+
+## Roadmap de execucao por ciclos (estrategia ativa)
+
+Backlog executado em ciclos curtos para equilibrar estabilidade operacional, entrega de negócio e controle de débito técnico.
+
+| Ciclo | Foco principal | Objetivo | Status |
+|---|---|---|---|
+| A | Melhorias/Ajustes de processos (agora) | Estabilizar deploy/CI/segurança operacional, reduzir risco sistêmico e incidentes repetidos | 🟡 |
+| B | Features (bloco 1) | Entregar funcionalidades de negócio em base estável com paridade REST + GraphQL | ⚪ |
+| C | Débitos técnicos não graves | Reduzir complexidade/custo de manutenção sem alterar regra de negócio | ⚪ |
+| D | Mais melhorias/refinamentos de processos | Evoluir DX, observabilidade e governança de entrega | ⚪ |
+| E | Features (bloco 2) | Segunda rodada de funcionalidades com qualidade/gates consolidados | ⚪ |
+
+### Ciclo A (ativo) - Estabilizacao, Automacao e Riscos graves/moderados
+
+Objetivo: fechar lacunas operacionais que ainda derrubam deploy, geram regressão silenciosa ou degradam segurança em produção.
+
+Critérios de saída do Ciclo A:
+- Deploy DEV automático e PROD manual com aprovação e rollback validados.
+- Paridade local x CI documentada e reproduzível (sem surpresa no Actions).
+- Gates críticos de segurança obrigatórios no PR (ruleset/branch protection).
+- Smoke REST + GraphQL automático no pipeline de deploy.
+
+| Prioridade | Item (ID) | Entrega esperada | Status |
+|---|---|---|---|
+| P0 | CD-01 | Convergir runtime/path de deploy sem drift entre hosts legado/novo | 🟡 |
+| P0 | CD-04 | OIDC por ambiente com least privilege e workflow de deploy confiável | 🟡 |
+| P0 | G11 | Branch protection/ruleset com checks obrigatórios efetivos | ⚪ |
+| P0 | API-TEST-01 | Suite REST+GraphQL integrada ao CI como gate de smoke/regressão | 🟡 |
+| P1 | G6 | Secret scanning e hardening no pre-commit/CI | 🟡 |
+| P1 | G7 | Schemathesis calibrado para contrato OpenAPI | 🟡 |
+| P1 | G9 | Snyk calibrado sem falso positivo recorrente | 🟡 |
+| P1 | G15 | Cursor Bugbot calibrado no fluxo de review | 🟡 |
+| P1 | GQL-ERR-01 | Catálogo de erros GraphQL claro + seguro (sem leak interno) | 🟡 |
+| P1 | I8 | Hardening de produção (IAM/secrets/TLS/least privilege/runbook) | 🟡 |
+
+### Ciclo B (planejado) - Features bloco 1
+
+| Sequencia | Itens alvo iniciais |
+|---|---|
+| B1 | E1, E2, E3 (metas: model + CRUD + serviço base) |
+| B2 | F1, F2, F3, F4 (auxiliares e integração em transações) |
+| B3 | C6 (vencimentos por range com paridade REST + GraphQL) |
+
+### Ciclo C (planejado) - Debitos tecnicos nao graves
+
+| Sequencia | Itens alvo iniciais |
+|---|---|
+| C1 | A2, A3, A4 (contrato/docs/nomenclatura/estratégia de validação) |
+| C2 | G16 remanescente + limpeza de warnings/deprecações não críticas |
+| C3 | Refactors pontuais de manutenibilidade com testes de regressão |
+
+### Ciclo D (planejado) - Refinamento de processo
+
+| Sequencia | Itens alvo iniciais |
+|---|---|
+| D1 | Baseline de métricas operacionais (lead time, fail rate, MTTR) |
+| D2 | Runbooks incrementais (deploy, rollback, incident response) |
+| D3 | DX local (aliases/scripts para login, checks e troubleshooting) |
+
+## Padrao de branches e fluxo de entrega
+
+Padrão adotado:
+- Branch naming: `tipo/escopo-descricao-curta` (ex.: `fix/deploy-prod-ssh-443`, `feat/goals-crud-v1`, `chore/ci-local-parity`).
+- Tipos recomendados: `feat`, `fix`, `refactor`, `chore`, `docs`, `test`, `perf`, `security`.
+- Commits: Conventional Commits (obrigatório).
+
+Fluxo por entrega:
+1. Iniciar da `master` local atualizada.
+2. Criar branch específica para a entrega.
+3. Implementar + testar local + atualizar `TASKS.md`.
+4. Abrir PR e validar gates do CI.
+5. Após merge: voltar para `master`, atualizar e abrir próxima branch.
+
 ## Backlog central
 
 
