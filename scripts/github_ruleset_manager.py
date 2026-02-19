@@ -99,6 +99,53 @@ def _load_config(path: Path) -> dict[str, Any]:
     return data
 
 
+def _normalize_status_check(check: Any) -> dict[str, Any] | None:
+    if not isinstance(check, dict):
+        return None
+    context = check.get("context")
+    if not isinstance(context, str) or not context:
+        return None
+
+    normalized_check: dict[str, Any] = {"context": context}
+    integration_id = check.get("integration_id")
+    if isinstance(integration_id, int):
+        normalized_check["integration_id"] = integration_id
+    return normalized_check
+
+
+def _normalize_required_status_checks_rule(rule: dict[str, Any]) -> None:
+    if rule.get("type") != "required_status_checks":
+        return
+
+    parameters = rule.get("parameters")
+    if not isinstance(parameters, dict):
+        return
+
+    required = parameters.get("required_status_checks")
+    if not isinstance(required, list):
+        return
+
+    cleaned_required: list[dict[str, Any]] = []
+    for check in required:
+        normalized_check = _normalize_status_check(check)
+        if normalized_check is not None:
+            cleaned_required.append(normalized_check)
+    parameters["required_status_checks"] = cleaned_required
+
+
+def _normalize_ruleset_payload(payload: dict[str, Any]) -> dict[str, Any]:
+    """Normalize payload to GitHub Rulesets API accepted shape."""
+    normalized: dict[str, Any] = json.loads(json.dumps(payload))
+    rules = normalized.get("rules")
+    if not isinstance(rules, list):
+        return normalized
+
+    for rule in rules:
+        if isinstance(rule, dict):
+            _normalize_required_status_checks_rule(rule)
+    return normalized
+
+
 def _rules_by_type(rules: list[dict[str, Any]]) -> dict[str, dict[str, Any]]:
     mapping: dict[str, dict[str, Any]] = {}
     for rule in rules:
@@ -244,7 +291,7 @@ def main() -> int:
             "Use a GitHub token with repository administration permissions."
         )
 
-    config = _load_config(Path(args.config))
+    config = _normalize_ruleset_payload(_load_config(Path(args.config)))
     ruleset_name = config.get("name")
     if not isinstance(ruleset_name, str) or not ruleset_name:
         raise RulesetError("Ruleset config must define a non-empty 'name'")

@@ -34,48 +34,37 @@
         "strict_required_status_checks_policy": true,
         "required_status_checks": [
           {
-            "context": "Quality (Lint + Type Check)",
-            "integration_id": null
+            "context": "Quality (Lint + Type Check)"
           },
           {
-            "context": "Secret Scan (Gitleaks)",
-            "integration_id": null
+            "context": "Secret Scan (Gitleaks)"
           },
           {
-            "context": "Tests (Pytest + Coverage)",
-            "integration_id": null
+            "context": "Tests (Pytest + Coverage)"
           },
           {
-            "context": "API Smoke (Postman/Newman)",
-            "integration_id": null
+            "context": "API Smoke (Postman/Newman)"
           },
           {
-            "context": "API Reliability (Schemathesis)",
-            "integration_id": null
+            "context": "API Reliability (Schemathesis)"
           },
           {
-            "context": "Mutation Testing (Cosmic Ray)",
-            "integration_id": null
+            "context": "Mutation Testing (Cosmic Ray)"
           },
           {
-            "context": "Container Security (Trivy)",
-            "integration_id": null
+            "context": "Container Security (Trivy)"
           },
           {
-            "context": "Security Scan (Snyk)",
-            "integration_id": null
+            "context": "Security Scan (Snyk)"
           },
           {
-            "context": "Security Evidence (S3)",
-            "integration_id": null
+            "context": "Security Evidence (S3)"
           },
           {
-            "context": "Dependency Review (PR gate)",
-            "integration_id": null
+            "context": "Dependency Review (PR gate)"
           },
           {
-            "context": "SonarQube Cloud",
-            "integration_id": null
+            "context": "SonarQube Cloud"
           }
         ]
       }
