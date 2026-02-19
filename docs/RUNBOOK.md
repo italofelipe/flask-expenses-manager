@@ -212,3 +212,40 @@ Sintomas comuns e respostas:
 3) Necessidade de restore
 - Executar restore drill para validar ferramenta
 - Em caso de restore real, documentar o plano de RTO/RPO e executar em janela
+
+## Recuperacao de workspace local (Git/index.lock)
+
+Quando acontecer corrupcao local de workspace (`.git/index.lock`, fetch/checkout falhando), use este fluxo de retomada:
+
+1. Preservar estado local (se houver algo relevante):
+```bash
+git stash push -u -m "recovery-before-reclone"
+```
+
+2. Se o lock estiver preso:
+```bash
+unlink .git/index.lock
+```
+
+3. Se o workspace seguir inconsistente, re-clone:
+```bash
+cd ..
+mv flask-template flask-template-corrupted-$(date +%Y%m%d-%H%M%S)
+git clone git@github.com:italofelipe/flask-expenses-manager.git flask-template
+cd flask-template
+```
+
+4. Recriar ambiente local:
+```bash
+cp .env.dev.example .env.dev
+python3 -m venv .venv
+source .venv/bin/activate
+pip install -r requirements.txt -r requirements-dev.txt
+pre-commit install
+```
+
+5. Validar baseline antes de continuar:
+```bash
+./scripts/run_ci_quality_local.sh
+./scripts/run_ci_like_actions_local.sh --local
+```

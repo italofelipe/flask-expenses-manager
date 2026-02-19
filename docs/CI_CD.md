@@ -1,10 +1,17 @@
 # CI/CD (GitHub Actions)
 
-Ultima atualizacao: 2026-02-20
+Ultima atualizacao: 2026-02-19
 
 ## Objetivo
 
 Garantir qualidade, seguranca e confiabilidade com gates obrigatorios no PR, deploy automatizado em DEV e deploy manual controlado em PROD.
+
+## Status consolidado (checkpoint)
+
+- Governanca (`governance.yml`) validada em modo `audit`.
+- Deploy DEV/PROD validado com OIDC por ambiente.
+- Workflow `AWS Security Audit` executado com sucesso (I8 concluido).
+- Proximo bloco: ciclo de features (`E1 -> E2 -> E3`) mantendo os mesmos gates.
 
 ## Workflows
 

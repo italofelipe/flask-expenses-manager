@@ -1,6 +1,6 @@
 # TASKS - Central de TODOs e Progresso
 
-Ultima atualizacao: 2026-02-19
+Ultima atualizacao: 2026-02-19 (higienizacao e handoff para re-clone)
 
 ## Regras de uso deste arquivo
 
@@ -30,13 +30,13 @@ Backlog executado em ciclos curtos para equilibrar estabilidade operacional, ent
 
 | Ciclo | Foco principal | Objetivo | Status |
 |---|---|---|---|
-| A | Melhorias/Ajustes de processos (agora) | Estabilizar deploy/CI/segurança operacional, reduzir risco sistêmico e incidentes repetidos | 🟡 |
-| B | Features (bloco 1) | Entregar funcionalidades de negócio em base estável com paridade REST + GraphQL | ⚪ |
+| A | Melhorias/Ajustes de processos (agora) | Estabilizar deploy/CI/segurança operacional, reduzir risco sistêmico e incidentes repetidos | 🟢 |
+| B | Features (bloco 1) | Entregar funcionalidades de negócio em base estável com paridade REST + GraphQL | 🟡 |
 | C | Débitos técnicos não graves | Reduzir complexidade/custo de manutenção sem alterar regra de negócio | ⚪ |
 | D | Mais melhorias/refinamentos de processos | Evoluir DX, observabilidade e governança de entrega | ⚪ |
 | E | Features (bloco 2) | Segunda rodada de funcionalidades com qualidade/gates consolidados | ⚪ |
 
-### Ciclo A (ativo) - Estabilizacao, Automacao e Riscos graves/moderados
+### Ciclo A (concluido) - Estabilizacao, Automacao e Riscos graves/moderados
 
 Objetivo: fechar lacunas operacionais que ainda derrubam deploy, geram regressão silenciosa ou degradam segurança em produção.
 
@@ -57,7 +57,20 @@ Critérios de saída do Ciclo A:
 | P1 | G9 | Snyk calibrado sem falso positivo recorrente | 🟢 |
 | P1 | G15 | Cursor Bugbot calibrado no fluxo de review | 🟢 |
 | P1 | GQL-ERR-01 | Catálogo de erros GraphQL claro + seguro (sem leak interno) | 🟢 |
-| P1 | I8 | Hardening de produção (IAM/secrets/TLS/least privilege/runbook) | 🟡 |
+| P1 | I8 | Hardening de produção (IAM/secrets/TLS/least privilege/runbook) | 🟢 |
+
+### Snapshot de retomada (para re-clone e continuidade)
+
+Estado atual consolidado:
+- Ciclo A concluido com deploy DEV/PROD validado, governanca ativa e auditoria de seguranca operacional em execucao.
+- Workflow `AWS Security Audit` executado com sucesso apos merge (validacao operacional do I8).
+- Proximo foco efetivo: iniciar Ciclo B (features) com `E1 -> E2 -> E3` (metas), preservando paridade REST + GraphQL.
+
+Pendencias de execucao imediata (ordem sugerida):
+1. `E1` model de metas (`Goal`) + migration + testes de modelo.
+2. `E2` CRUD `/goals` (REST) com validacao e ownership.
+3. `E2` paridade GraphQL para metas reutilizando mesmo dominio.
+4. `E3` servico de planejamento de metas (curto/medio/longo prazo).
 
 ### Ciclo B (planejado) - Features bloco 1
 
@@ -182,7 +195,7 @@ Fluxo por entrega:
 | I5    | Deploy AWS    | Provisionar banco no plano B (RDS PostgreSQL) e documentar critérios de fallback                                                           | Done        | 100%      | Baixo: RDS nao foi provisionado por budget; guardrails (Budgets/Anomaly) aplicados e plano B documentado                                                                 | 877c0cc                          | 2026-02-14         |
 | I6    | Deploy AWS    | Configurar deploy automático (GitHub Actions -> servidor) com rollback básico                                                              | Done        | 100%      | Medio: deploy DEV automatico (push master) e deploy PROD manual (workflow_dispatch) via OIDC+SSM; requer env approval para PROD no GitHub                                | 14adf1b                          | 2026-02-14         |
 | I7    | Deploy AWS    | Observabilidade mínima (logs centralizados, métricas, alertas básicos)                                                                     | Done        | 100%      | Médio: DEV canary via HTTP:80 (sem TLS), PROD via HTTPS:443; logs em CloudWatch Logs confirmados para web/nginx/db/redis                                                 | pending-commit                   | 2026-02-13         |
-| I8    | Deploy AWS    | Hardening de produção (secrets, TLS, firewall, least-privilege IAM)                                                                        | In Progress | 92%       | Médio: hardening operacional consolidado; pendente fechamento de role dedicada de auditoria (`AWS_ROLE_ARN_AUDIT`) e execução contínua com evidência em artefato           | 5825206, 2b2459c, c76957f, pending-commit | 2026-02-19         |
+| I8    | Deploy AWS    | Hardening de produção (secrets, TLS, firewall, least-privilege IAM)                                                                        | Done        | 100%      | Baixo: hardening operacional consolidado com auditoria IAM contínua e validação de workflow de segurança executada com sucesso em ambiente real                               | 5825206, 2b2459c, c76957f, pending-commit | 2026-02-19         |
 | I9    | Deploy AWS    | Runbook de operação (backup, restore, rotação de credenciais, incidentes)                                                                  | Done        | 100%      | Baixo: runbook consolidado em docs + scripts de validacao/operacao                                                                                                       | 877c0cc                          | 2026-02-14         |
 | I10   | Deploy Cloud  | Primeiro deploy em produção (MVP) imediatamente após fechar Bloco D                                                                        | Done        | 100%      | Medio: operação em VM única (sem HA) exige runbook e rotinas de backup/restore (I9/S1-03)                                                                                | pending-commit                   | 2026-02-13         |
 | I11   | Nginx/TLS     | Configurar Nginx em HTTP com suporte a ACME challenge (`/.well-known/acme-challenge`)                                                      | Done        | 100%      | Baixo                                                                                                                                                                    | pending-commit                   | 2026-02-10         |
@@ -465,6 +478,8 @@ Pendências de substituição controlada:
 | 2026-02-20 | GQL-ERR-01 Completion  | Catálogo de erros GraphQL consolidado por domínio: utilitário central (`app/graphql/errors.py`), códigos públicos padronizados (`VALIDATION_ERROR`, `UNAUTHORIZED`, `FORBIDDEN`, `NOT_FOUND`, `CONFLICT`, `TOO_MANY_ATTEMPTS`, `AUTH_BACKEND_UNAVAILABLE`) e cobertura dedicada em `tests/test_graphql_error_catalog.py`. | pending-commit |
 | 2026-02-20 | I8 Progress            | Auditoria IAM evoluída (`aws_iam_audit_i8.py`) para incluir roles de deploy DEV/PROD (ações SSM mínimas + subjects OIDC), reforçando verificação contínua de least-privilege.                                                                                                                        | pending-commit |
 | 2026-02-19 | I8 Progress 2          | Auditoria contínua de IAM adicionada: novo workflow `aws-security-audit.yml` (agendado + manual), `aws_iam_audit_i8.py` com limiar de falha (`--fail-on`) e saída versionável (`--output-json`) + testes unitários dedicados do script.                                                            | pending-commit |
+| 2026-02-19 | I8 Completion          | Validação operacional concluída: PR mergeado e workflow `AWS Security Audit` executado com sucesso, fechando o ciclo de hardening de produção planejado no bloco A.                                                                                                                                  | n/a            |
+| 2026-02-19 | Handoff / Re-clone     | Documentação consolidada para retomada pós re-clone: snapshot de estado, prioridades executáveis do Ciclo B e checklist de continuidade sem perda de contexto operacional/técnico.                                                                                                                  | pending-commit |
 | 2026-02-19 | B4 Planning            | Backlog de recuperação de senha adicionado para próximo ciclo de features (`B4..B7`): fluxo por link priorizado (endpoint + envio + reset) e OTP por SMS mantido em discovery com análise de viabilidade, risco e custo.                                                                              | n/a            |
 | 2026-02-19 | A8 Completion          | `GraphQL Query` modularizado em pacote `app/graphql/queries` por domínio (`user`, `transaction`, `wallet`, `investment`) no mesmo estilo de organização de `mutations`, com facade de compatibilidade preservada em `app/graphql/query.py`.                                                          | pending-commit |
 | 2026-02-19 | A7 Review              | Revisão arquitetural registrada: `wallet` permanece baseline mais maduro (DI explícita); `auth/user/transaction/graphql` mapeados para convergência gradual (dependencies/providers + serializers + recursos por caso de uso), sem alteração de regra de negócio.                                     | pending-commit |
