@@ -8,6 +8,9 @@ Definir pipelines de CI/CD e gates de qualidade, seguranca e deploy.
 - `deploy.yml`: deploy automatizado/controlado por ambiente (DEV/PROD).
 - `governance.yml`: auditoria/sincronizacao do ruleset de branch protection via API do GitHub.
 
+## Secrets relevantes
+- `TOKEN_GITHUB_ADMIN`: token com permissao de administracao do repositório para auditoria/sync de ruleset no `governance.yml`.
+
 ## Padroes obrigatorios
 - Toda mudanca de workflow deve manter reproducibilidade local quando aplicavel.
 - Actions de terceiros devem ser pinadas em versao/commit imutavel.
