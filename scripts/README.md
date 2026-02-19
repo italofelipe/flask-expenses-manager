@@ -21,5 +21,7 @@ Scripts operacionais e de engenharia para CI/CD, seguranca, deploy, observabilid
 - Para smoke API: `scripts/run_postman_suite.sh`.
 - Para smoke HTTP pós-deploy (REST + GraphQL): `python scripts/http_smoke_check.py --base-url <url> --env-name <dev|prod>`.
 - Para contrato OpenAPI determinístico: `bash scripts/run_schemathesis_contract.sh`.
+- Para sinal de review Cursor Bugbot: `python scripts/pr_review_signal_check.py --repo <owner/repo> --pr-number <numero> --mode advisory`.
 - Para governanca de branch: `python scripts/github_ruleset_manager.py --owner <owner> --repo <repo> --mode audit`.
+- Para auditoria IAM contínua: `python scripts/aws_iam_audit_i8.py --profile auraxis-admin --region us-east-1 --fail-on fail --output-json reports/aws-iam-audit.json`.
 - Secret esperado no GitHub Actions para governanca: `TOKEN_GITHUB_ADMIN`.

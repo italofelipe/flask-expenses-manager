@@ -25,38 +25,43 @@ Jobs relevantes:
 3. `dependency-review` (somente PR)
 - bloqueia vulnerabilidades novas `high+`
 
-4. `tests`
+4. `review-signal` (somente PR, advisory)
+- executa `scripts/pr_review_signal_check.py` para resumir findings do Cursor Bugbot em review threads
+- modo `advisory` (nao bloqueia merge por padrao), mantendo sinal de qualidade com baixo ruido
+
+5. `tests`
 - `pytest` (sem marker schemathesis)
 - cobertura minima obrigatoria `85%`
 
-5. `api-smoke`
+6. `api-smoke`
 - sobe stack local docker
 - executa suite Postman/Newman (`scripts/run_postman_suite.sh`)
 - publica `reports/newman-report.xml`
 
-6. `schemathesis`
+7. `schemathesis`
 - contrato OpenAPI com seed deterministico (`HYPOTHESIS_SEED`)
 - execucao centralizada em `scripts/run_schemathesis_contract.sh`
 
-7. `mutation`
+8. `mutation`
 - gate Cosmic Ray (`scripts/mutation_gate.sh`)
 
-8. `trivy`
+9. `trivy`
 - scan de filesystem + imagem Docker
 
-9. `snyk` (obrigatorio)
+10. `snyk` (obrigatorio)
 - scan de dependencias Python
 - scan de container calibrado para reduzir ruido recorrente de base image
 
-10. `security-evidence`
+11. `security-evidence`
 - executa `scripts/security_evidence_check.sh`
 
-11. `sonar`
+12. `sonar`
 - scan SonarCloud + quality gate + enforce de ratings A
 
 Notas:
 - `Cursor Bugbot` e camada complementar de review em PR.
 - Bugbot nao eh gate obrigatorio no ruleset (quota/ruido), mas continua util como sinal adicional.
+- O job `Review Signal (Cursor Bugbot)` publica resumo no `Step Summary` para triagem objetiva.
 
 ### 2) Deploy
 Arquivo: `.github/workflows/deploy.yml`
@@ -86,6 +91,19 @@ Arquivos de suporte:
 Secret requerido:
 - `TOKEN_GITHUB_ADMIN`
 
+### 4) AWS Security Audit (I8)
+Arquivo: `.github/workflows/aws-security-audit.yml`
+
+Fluxo:
+- `schedule` semanal (segunda) e `workflow_dispatch` manual
+- assume role OIDC dedicada de auditoria (`AWS_ROLE_ARN_AUDIT`)
+- executa `scripts/aws_iam_audit_i8.py`
+- publica artefato `aws-iam-audit-report` (JSON)
+
+Notas:
+- Se `AWS_ROLE_ARN_AUDIT` nao estiver configurada, o workflow entra em modo `skip` sem falhar.
+- Para gate estrito, use `fail_on=fail` (default) no `workflow_dispatch`.
+
 ## Pre-commit (local)
 
 Arquivo: `.pre-commit-config.yaml`
@@ -103,6 +121,9 @@ Hooks:
 
 Script oficial:
 - `scripts/run_ci_like_actions_local.sh`
+- Sinal de review no PR:
+  - `python scripts/pr_review_signal_check.py --repo <owner/repo> --pr-number <numero> --mode advisory`
+  - `python scripts/pr_review_signal_check.py --repo <owner/repo> --pr-number <numero> --mode strict`
 
 Exemplos:
 - `bash scripts/run_ci_like_actions_local.sh`
@@ -122,6 +143,7 @@ Vars:
 - `AWS_REGION`
 - `AWS_ROLE_ARN_DEV`
 - `AWS_ROLE_ARN_PROD`
+- `AWS_ROLE_ARN_AUDIT` (recomendado para auditoria IAM contínua)
 - `AURAXIS_DEV_INSTANCE_ID`
 - `AURAXIS_PROD_INSTANCE_ID`
 - opcionais: `AURAXIS_DEV_BASE_URL`, `AURAXIS_PROD_BASE_URL`
