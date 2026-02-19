@@ -1,0 +1,55 @@
+name: Governance
+
+on:
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: "Mode: audit (default) or sync ruleset"
+        required: false
+        default: "audit"
+  schedule:
+    - cron: "0 10 * * 1"
+
+jobs:
+  branch-governance:
+    name: Branch Governance Ruleset
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Validate token
+        env:
+          GITHUB_ADMIN_TOKEN: ${{ secrets.GITHUB_ADMIN_TOKEN }}
+        run: |
+          if [ -z "${GITHUB_ADMIN_TOKEN:-}" ]; then
+            echo "Missing required secret: GITHUB_ADMIN_TOKEN" >&2
+            echo "Create a token with repository administration permission." >&2
+            exit 1
+          fi
+
+      - name: Audit or sync ruleset
+        env:
+          GITHUB_ADMIN_TOKEN: ${{ secrets.GITHUB_ADMIN_TOKEN }}
+          MODE_INPUT: ${{ github.event.inputs.mode }}
+          REPOSITORY: ${{ github.repository }}
+        run: |
+          OWNER="${REPOSITORY%%/*}"
+          REPO="${REPOSITORY##*/}"
+          MODE="${MODE_INPUT:-audit}"
+          if [ "$MODE" != "audit" ] && [ "$MODE" != "sync" ]; then
+            echo "Invalid mode: $MODE (allowed: audit|sync)" >&2
+            exit 2
+          fi
+          python scripts/github_ruleset_manager.py \
+            --owner "$OWNER" \
+            --repo "$REPO" \
+            --mode "$MODE"

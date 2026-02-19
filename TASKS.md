@@ -1,6 +1,6 @@
 # TASKS - Central de TODOs e Progresso
 
-Ultima atualizacao: 2026-02-18
+Ultima atualizacao: 2026-02-19
 
 ## Regras de uso deste arquivo
 
@@ -50,7 +50,7 @@ Critérios de saída do Ciclo A:
 |---|---|---|---|
 | P0 | CD-01 | Convergir runtime/path de deploy sem drift entre hosts legado/novo | 🟡 |
 | P0 | CD-04 | OIDC por ambiente com least privilege e workflow de deploy confiável | 🟡 |
-| P0 | G11 | Branch protection/ruleset com checks obrigatórios efetivos | ⚪ |
+| P0 | G11 | Branch protection/ruleset com checks obrigatórios efetivos | 🟡 |
 | P0 | API-TEST-01 | Suite REST+GraphQL integrada ao CI como gate de smoke/regressão | 🟡 |
 | P1 | G6 | Secret scanning e hardening no pre-commit/CI | 🟡 |
 | P1 | G7 | Schemathesis calibrado para contrato OpenAPI | 🟡 |
@@ -145,7 +145,7 @@ Fluxo por entrega:
 | G8    | CI/Quality    | Adicionar gate de mutation testing (Cosmic Ray) para módulos críticos                                                                      | Done        | 100%      | Médio: custo de execução controlado por escopo e filtro de operadores                                                                                                    | pending-commit                   | 2026-02-11         |
 | G9    | CI/Security   | Integrar Snyk (dependências e container) com gate condicional por `SNYK_ENABLED`                                                           | In Progress | 85%       | Baixo: actions fixadas por SHA imutável; pendente somente calibração fina de baseline/ruleset                                                                            |                                  | 2026-02-11         |
 | G10   | CI/Security   | Integrar scan de imagem/container com Trivy em todo PR/push                                                                                | Done        | 100%      | Baixo: pipeline validado com imagem hardenizada e scan HIGH/CRITICAL limpo no baseline atual                                                                             | pending-commit                   | 2026-02-11         |
-| G11   | CI/Governance | Formalizar política de branch protection + required checks + push protection no GitHub                                                     | Todo        | 0%        | Alto: sem enforcement central, gates podem ser ignorados                                                                                                                 |                                  | 2026-02-11         |
+| G11   | CI/Governance | Formalizar política de branch protection + required checks + push protection no GitHub                                                     | In Progress | 55%       | Médio: automação de auditoria/sync de ruleset criada; pendente ativar secret admin e executar `sync` inicial no repositório                                             | pending-commit                   | 2026-02-19         |
 | G12   | CI/Quality    | Garantir paridade local do job `Quality` (script Python 3.11 + hook mypy alinhado ao CI)                                                   | Done        | 100%      | Baixo                                                                                                                                                                    | pending-commit                   | 2026-02-11         |
 | G13   | CI/Quality    | Adicionar matrix de tipagem (`mypy`) em Python 3.11 e 3.13 para reduzir regressão entre ambientes                                          | Done        | 100%      | Baixo: job dedicado `mypy-matrix` cobre 3.11/3.13 em paralelo                                                                                                            | pending-commit                   | 2026-02-12         |
 | G14   | CI/Quality    | Avaliar lock/constraints de dependências de tooling (lint/type/security) para builds determinísticos                                       | Done        | 100%      | Baixo: `pip-audit` e stubs de tipagem fixados em versão e CI sem instalação avulsa não determinística                                                                    | pending-commit                   | 2026-02-12         |
@@ -424,3 +424,4 @@ Pendências de substituição controlada:
 | 2026-02-18 | API-TEST-01 Progress   | Suite inicial Postman/API Dog criada (`api-tests/postman` + `scripts/run_postman_suite.sh`) cobrindo smoke/regression REST+GraphQL com assertions de segurança para erro GraphQL público sem leak de `INTERNAL_ERROR`.                                                                                       | pending-commit |
 | 2026-02-18 | API-TEST-01 Validation | Suite Postman/API Dog executada com sucesso em DEV via Newman (6 requests / 13 assertions / 0 falhas); ajuste aplicado no cenário GraphQL para refletir contrato HTTP 200 + `errors` no payload.                                                                                                             | pending-commit |
 | 2026-02-18 | C6 Planning            | Gap confirmado: existe suporte parcial em REST (`/transactions/expenses`) com range e paginação, mas sem paridade completa com GraphQL e sem todas as ordenações solicitadas (ex.: por cartão / vencidas primeiro). Feature C6 adicionada ao backlog com plano de execução compartilhado REST+GraphQL.     | n/a            |
+| 2026-02-19 | G11 Progress           | Implementados artefatos de governança como código: `config/github_master_ruleset.json` (policy alvo), `scripts/github_ruleset_manager.py` (modo `audit/sync`) e workflow `Governance` para auditoria periódica/manual de ruleset em `master`.                                                            | pending-commit |
