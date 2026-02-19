@@ -40,7 +40,7 @@ Scope for this block (item 1):
 
 1. Validate ambiguous historical mappings where one delivery spans many commits and no single hash is canonical.
 2. Decide policy for legacy items that are operationally done but include external/manual actions (`n/a`) versus forcing a repo hash.
-3. Decide whether to keep/remove `buildspec.yml` (CodeBuild) and the `.flake8` placeholder field in current workflow strategy.
+3. Decide whether to keep/remove `buildspec.yml` (CodeBuild) in current workflow strategy.
 4. Confirm if branch naming should remain dual-style (`codex/<tipo>/...`) or strict `tipo/...` for human-created branches.
 
 ## Execution log (completed in this block)
@@ -60,6 +60,12 @@ Scope for this block (item 1):
 - Deterministic hash mapping applied for high-confidence items (`A1`, `A5`, `A6`, `A7`, `A8`, `C4`, `D1..D8`, `G6`, `G7`, `G9`, `G11`, `G15`, `I8`, `CD-*`, `GQL-ERR-01`, `API-TEST-01` and recent changelog rows).
 - Placeholder `pending-commit` retired and replaced with explicit marker `traceability-debt` where canonical hash is not yet validated.
 - `TASKS.md` now documents marker semantics and explicit next step for debt burn-down.
+
+5. `chore(lint): replace placeholder application import name` (`e5c2e65`)
+- Replaced `.flake8` placeholder value `your_package_name` by project package `app`.
+
+6. `chore(ci): remove sonar placeholders from buildspec` (`24143aa`)
+- Replaced hardcoded placeholders in `buildspec.yml` by required env vars (`SONAR_PROJECT_KEY`, `SONAR_ORGANIZATION`, `SONAR_TOKEN`).
 
 ## Snapshot after execution
 
