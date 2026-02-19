@@ -88,8 +88,8 @@ def create_app() -> Flask:
     Migrate(app, db)
     jwt.init_app(app)
 
-    # Mantem retrocompatibilidade local, mas evita create_all automatico em producao.
-    auto_create_db = os.getenv("AUTO_CREATE_DB", "true").lower() == "true"
+    # Schema bootstrap deve ser explicito para evitar drift em runtime seguro.
+    auto_create_db = os.getenv("AUTO_CREATE_DB", "false").lower() == "true"
     if auto_create_db:
         with app.app_context():
             db.create_all()

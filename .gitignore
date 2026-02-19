@@ -42,8 +42,7 @@ instance/
 # Pytest cache
 .pytest_cache/
 
-# Migrations
-migrations/
+# Migrations must be versioned to keep schema deterministic across environments.
 
 # DBeaver connections (se usar .dbeaver-data-sources.xml)
 .dbeaver/

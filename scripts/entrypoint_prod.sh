@@ -32,8 +32,14 @@ if [ "${MIGRATE_ON_START:-true}" = "true" ]; then
     echo "Running database migrations..."
     flask db upgrade
   else
-    echo "Migrations folder not found. Falling back to AUTO_CREATE_DB=true."
-    export AUTO_CREATE_DB=true
+    if [ "${ALLOW_SCHEMA_BOOTSTRAP_WITHOUT_MIGRATIONS:-false}" = "true" ]; then
+      echo "Migrations folder not found. Explicit fallback enabled."
+      export AUTO_CREATE_DB=true
+    else
+      echo "ERROR: migrations folder not found and fallback is disabled." >&2
+      echo "Set ALLOW_SCHEMA_BOOTSTRAP_WITHOUT_MIGRATIONS=true only for controlled recovery." >&2
+      exit 1
+    fi
   fi
 fi
 
