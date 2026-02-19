@@ -30,7 +30,7 @@ curl -fsS http://dev.api.auraxis.com.br/healthz
 
 ## Deploy (sem SSH) via SSM
 
-O deploy via SSM aplica um `git checkout` do ref desejado na instancia, renderiza Nginx por ambiente e reinicia o compose. Ao final, valida `/healthz`.
+O deploy via SSM aplica um `git checkout` do ref desejado na instancia, executa preflight de runtime, reinicia o compose, ajusta TLS de forma idempotente e valida `/healthz`.
 
 Comandos:
 
@@ -58,12 +58,49 @@ Rollback (para o ref anterior bem sucedido, por instancia):
 
 Notas:
 - O estado do deploy fica em `/var/lib/auraxis/deploy_state.json` na instancia.
-- DEV renderiza Nginx em HTTP; PROD renderiza Nginx em TLS usando `deploy/nginx/default.tls.conf`.
+- O switch de Nginx/TLS é idempotente via `scripts/ensure_tls_runtime.sh`:
+  - usa TLS quando o certificado existe
+  - tenta emitir cert em PROD quando possível
+  - mantém HTTP sem derrubar proxy quando cert ainda não existe
+- O deploy normal (`mode=deploy`) ainda depende de acesso Git remoto no host.
+- O rollback (`mode=rollback`) **não** depende de `git fetch` remoto; usa o commit local salvo no estado.
+
+### Pré-requisito Git (host PROD/DEV)
+
+Se ocorrer `Permission denied (publickey)` no deploy:
+
+1. No host, garantir chave SSH no usuário operacional (`ubuntu`) e config para GitHub em `443`:
+```bash
+sudo -iu ubuntu
+mkdir -p ~/.ssh && chmod 700 ~/.ssh
+test -f ~/.ssh/id_ed25519 || ssh-keygen -t ed25519 -C auraxis-deploy -f ~/.ssh/id_ed25519 -N ''
+cat > ~/.ssh/config <<'EOF'
+Host github.com
+  HostName ssh.github.com
+  Port 443
+  User git
+  IdentityFile ~/.ssh/id_ed25519
+  IdentitiesOnly yes
+  StrictHostKeyChecking accept-new
+EOF
+chmod 600 ~/.ssh/config ~/.ssh/id_ed25519
+chmod 644 ~/.ssh/id_ed25519.pub
+ssh-keyscan -p 443 ssh.github.com >> ~/.ssh/known_hosts
+chmod 644 ~/.ssh/known_hosts
+```
+
+2. Cadastrar `~/.ssh/id_ed25519.pub` em `GitHub -> Repository -> Settings -> Deploy keys` (read-only).
+
+3. Validar:
+```bash
+sudo -iu ubuntu bash -lc 'ssh -T git@github.com || true'
+sudo -iu ubuntu bash -lc 'cd /opt/auraxis && git ls-remote origin -h refs/heads/master'
+```
 
 ## TLS (PROD)
 
 Emissao inicial:
-- Script: `scripts/request_tls_cert.sh` (webroot, certbot container)
+- Script: `scripts/request_tls_cert.sh` (webroot, certbot container, ativa TLS automaticamente ao final)
 
 Renovacao automatica:
 - Script: `scripts/renew_tls_cert.sh`
@@ -157,4 +194,3 @@ Sintomas comuns e respostas:
 3) Necessidade de restore
 - Executar restore drill para validar ferramenta
 - Em caso de restore real, documentar o plano de RTO/RPO e executar em janela
-

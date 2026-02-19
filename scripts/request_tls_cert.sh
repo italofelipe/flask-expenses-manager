@@ -23,6 +23,7 @@ docker compose --env-file "${ENV_FILE}" -f "${COMPOSE_FILE}" run --rm certbot ce
   --agree-tos \
   --non-interactive
 
-echo "Certificate issued. To enable TLS config:"
-echo "1) cp deploy/nginx/default.tls.conf deploy/nginx/default.conf"
-echo "2) docker compose --env-file ${ENV_FILE} -f ${COMPOSE_FILE} up -d --force-recreate reverse-proxy"
+echo "Certificate issued. Applying runtime TLS config..."
+COMPOSE_FILE="${COMPOSE_FILE}" ENV_FILE="${ENV_FILE}" DOMAIN="${DOMAIN}" \
+  ./scripts/ensure_tls_runtime.sh prod "${DOMAIN}"
+echo "TLS enabled for ${DOMAIN}."

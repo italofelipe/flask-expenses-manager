@@ -17,10 +17,11 @@ Why this exists
 What it does on the instance
 - Locates repo dir in `/opt/auraxis` (preferred) or `/opt/flask_expenses` (legacy).
 - Runs `git fetch` and force-checkouts a ref (defaults to `origin/master`).
-- Ensures required runtime env keys for hardened prod configs.
-- Renders Nginx config:
-  - PROD: TLS (requires cert already provisioned)
-  - DEV: HTTP (until dev TLS is provisioned)
+- Runs preflight checks (repo/env/required keys/docker).
+- Applies runtime TLS mode idempotently:
+  - uses TLS only when certificate exists
+  - auto-requests cert in PROD when possible
+  - falls back to HTTP safely without crashing Nginx
 - Restarts compose with `docker-compose.prod.yml` (+ optional overlays).
  - Tracks deploy state in `/var/lib/auraxis/deploy_state.json` (per-instance).
 
@@ -153,39 +154,6 @@ def _build_script(
         if env_name == "prod"
         else "http://localhost:3000,http://localhost:5173"
     )
-    render_nginx = (
-        f"""python3 - <<'PY'
-from pathlib import Path
-root = Path("deploy/nginx")
-src = root / "default.tls.conf"
-dst = root / "default.conf"
-text = src.read_text(encoding="utf-8").replace("__DOMAIN__", "{domain}")
-dst.write_text(text, encoding="utf-8")
-print("[i6] rendered nginx tls config:", dst)
-PY"""
-        if env_name == "prod"
-        else f"""cat > deploy/nginx/default.conf <<'CONF'
-server {{
-    listen 80;
-    server_name {domain};
-
-    client_max_body_size 10m;
-    location /.well-known/acme-challenge/ {{ root /var/www/certbot; }}
-
-    location / {{
-        proxy_pass http://web:8000;
-        proxy_http_version 1.1;
-        proxy_set_header Host $host;
-        proxy_set_header X-Real-IP $remote_addr;
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto $scheme;
-        proxy_set_header Connection "";
-    }}
-}}
-CONF
-echo "[i6] rendered nginx http config: deploy/nginx/default.conf" """
-    )
-
     git_ref_setup = f'GIT_REF="{git_ref}"' if git_ref is not None else 'GIT_REF=""'
 
     return f"""\
@@ -195,12 +163,23 @@ MODE="{mode}"
 {git_ref_setup}
 
 REPO=""
-if [ -d /opt/auraxis ]; then
-  REPO=/opt/auraxis
-elif [ -d /opt/flask_expenses ]; then
-  REPO=/opt/flask_expenses
-else
-  echo "Repo not found in /opt."
+CANONICAL_REPO=/opt/auraxis
+LEGACY_REPO=/opt/flask_expenses
+if [ -d "$CANONICAL_REPO/.git" ] || [ -f "$CANONICAL_REPO/.git" ]; then
+  REPO="$CANONICAL_REPO"
+elif [ -d "$LEGACY_REPO/.git" ] || [ -f "$LEGACY_REPO/.git" ]; then
+  if [ ! -e "$CANONICAL_REPO" ]; then
+    sudo ln -s "$LEGACY_REPO" "$CANONICAL_REPO"
+    echo "[i6] canonicalized repo path: $CANONICAL_REPO -> $LEGACY_REPO"
+  fi
+  if [ -d "$CANONICAL_REPO/.git" ] || [ -f "$CANONICAL_REPO/.git" ]; then
+    REPO="$CANONICAL_REPO"
+  else
+    REPO="$LEGACY_REPO"
+  fi
+fi
+if [ -z "$REPO" ]; then
+  echo "Repo not found in /opt (expected $CANONICAL_REPO or $LEGACY_REPO)."
   exit 2
 fi
 cd "$REPO"
@@ -267,20 +246,263 @@ if [ -z "$GIT_REF" ]; then
   exit 13
 fi
 
+require_file() {{
+  path="$1"
+  if [ ! -f "$path" ]; then
+    echo "[i6] missing required file: $path"
+    exit 21
+  fi
+}}
+
+require_env_key() {{
+  key="$1"
+  if ! grep -qE "^${{key}}=" "$ENV_FILE"; then
+    echo "[i6] missing required env key in $ENV_FILE: $key"
+    exit 22
+  fi
+}}
+
+require_cmd() {{
+  cmd="$1"
+  if ! command -v "$cmd" >/dev/null 2>&1; then
+    echo "[i6] missing command: $cmd"
+    exit 23
+  fi
+}}
+
+ENV_FILE=.env.prod
+require_file "$ENV_FILE"
+require_file "docker-compose.prod.yml"
+
+require_cmd docker
+require_cmd curl
+if ! docker info >/dev/null 2>&1; then
+  echo "[i6] docker daemon unavailable"
+  exit 24
+fi
+
+ensure_env_default() {{
+  key="$1"
+  value="$2"
+  if grep -qE "^${{key}}=" "$ENV_FILE"; then
+    return 0
+  fi
+  echo "${{key}}=${{value}}" >> "$ENV_FILE"
+  echo "[i6] defaulted $key"
+}}
+
+# Backward-compatibility for older .env.prod files on long-lived instances.
+ensure_env_default RATE_LIMIT_BACKEND redis
+ensure_env_default RATE_LIMIT_REDIS_URL redis://redis:6379/0
+ensure_env_default RATE_LIMIT_FAIL_CLOSED true
+ensure_env_default LOGIN_GUARD_ENABLED true
+ensure_env_default LOGIN_GUARD_BACKEND redis
+ensure_env_default LOGIN_GUARD_REDIS_URL redis://redis:6379/0
+ensure_env_default LOGIN_GUARD_FAIL_CLOSED true
+
+for key in \\
+  SECRET_KEY JWT_SECRET_KEY DOMAIN \\
+  POSTGRES_DB POSTGRES_USER POSTGRES_PASSWORD \\
+  DB_HOST DB_PORT DB_NAME DB_USER DB_PASS \\
+  RATE_LIMIT_BACKEND RATE_LIMIT_REDIS_URL RATE_LIMIT_FAIL_CLOSED \\
+  LOGIN_GUARD_ENABLED LOGIN_GUARD_BACKEND LOGIN_GUARD_REDIS_URL \\
+  LOGIN_GUARD_FAIL_CLOSED; do
+  require_env_key "$key"
+done
+
+if [ "{env_name}" = "prod" ]; then
+  require_env_key CERTBOT_EMAIL
+fi
+
 echo "[i6] mode=$MODE git_ref=$GIT_REF"
-sudo -u "$OP_USER" bash -lc \\
-  "cd '$REPO' && git fetch --all --prune && git checkout -f '$GIT_REF' \\
-    && git reset --hard '$GIT_REF'"
+# Force GitHub SSH traffic over port 443 to avoid environments where port 22
+# is blocked (common in hardened VPC egress policies).
+GIT_SSH_COMMAND_AURAXIS="ssh -o StrictHostKeyChecking=accept-new \\
+  -o ConnectTimeout=15 -o HostName=ssh.github.com -p 443"
+echo "[i6] git transport=ssh-over-443"
+if [ "$MODE" = "rollback" ]; then
+  if ! sudo -u "$OP_USER" bash -lc \\
+    "cd '$REPO' && git cat-file -e '$GIT_REF^{{commit}}'"; then
+    echo "[i6] rollback ref not available locally: $GIT_REF"
+    exit 14
+  fi
+  sudo -u "$OP_USER" bash -lc \\
+    "cd '$REPO' \\
+      && git checkout -f '$GIT_REF' \\
+      && git reset --hard '$GIT_REF'"
+else
+  if ! sudo -u "$OP_USER" bash -lc \\
+    "cd '$REPO' \\
+      && git -c core.sshCommand='$GIT_SSH_COMMAND_AURAXIS' \\
+         ls-remote --exit-code origin >/dev/null"; then
+    echo "[i6] git remote authentication failed for user: $OP_USER"
+    echo "[i6] expected: SSH key configured for git@ssh.github.com:443"
+    echo "[i6] fix: configure deploy key for $OP_USER on this instance"
+    echo "[i6] and add it to GitHub repo"
+    exit 15
+  fi
+  sudo -u "$OP_USER" bash -lc \\
+    "cd '$REPO' \\
+      && git -c core.sshCommand='$GIT_SSH_COMMAND_AURAXIS' fetch --all --prune \\
+      && git checkout -f '$GIT_REF' \\
+      && git reset --hard '$GIT_REF'"
+fi
 
 NEW_REF="$(sudo -u "$OP_USER" bash -lc "cd '$REPO' && git rev-parse HEAD")"
 echo "[i6] new_head=$NEW_REF"
 
-{render_nginx}
+if [ ! -f "deploy/nginx/default.http.conf" ]; then
+  mkdir -p deploy/nginx
+  cat > deploy/nginx/default.http.conf <<'CONF'
+server {{
+    listen 80;
+    server_name __DOMAIN__;
 
-ENV_FILE=.env.prod
-if [ ! -f "$ENV_FILE" ]; then
-  echo "Missing $ENV_FILE."
-  exit 3
+    client_max_body_size 10m;
+    location /.well-known/acme-challenge/ {{
+        root /var/www/certbot;
+    }}
+
+    location / {{
+        proxy_pass http://web:8000;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_set_header Connection "";
+    }}
+}}
+CONF
+  echo "[i6] bootstrapped deploy/nginx/default.http.conf"
+fi
+
+if [ ! -f "deploy/nginx/default.tls.conf" ]; then
+  mkdir -p deploy/nginx
+  cat > deploy/nginx/default.tls.conf <<'CONF'
+server {{
+    listen 80;
+    server_name __DOMAIN__;
+
+    location /.well-known/acme-challenge/ {{
+        root /var/www/certbot;
+    }}
+
+    location / {{
+        return 301 https://$host$request_uri;
+    }}
+}}
+
+server {{
+    listen 443 ssl http2;
+    server_name __DOMAIN__;
+
+    ssl_certificate /etc/letsencrypt/live/__DOMAIN__/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/__DOMAIN__/privkey.pem;
+
+    ssl_protocols TLSv1.2 TLSv1.3;
+    ssl_prefer_server_ciphers off;
+    ssl_session_cache shared:SSL:10m;
+    ssl_session_timeout 1d;
+
+    add_header Strict-Transport-Security "max-age=31536000; includeSubDomains" always;
+    add_header X-Frame-Options "SAMEORIGIN" always;
+    add_header X-Content-Type-Options "nosniff" always;
+    add_header Referrer-Policy "strict-origin-when-cross-origin" always;
+
+    client_max_body_size 10m;
+    location / {{
+        proxy_pass http://web:8000;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_set_header Connection "";
+    }}
+}}
+CONF
+  echo "[i6] bootstrapped deploy/nginx/default.tls.conf"
+fi
+
+if [ ! -f "scripts/ensure_tls_runtime.sh" ]; then
+  mkdir -p scripts
+  cat > scripts/ensure_tls_runtime.sh <<'SH'
+#!/bin/sh
+set -eu
+COMPOSE_FILE="${{COMPOSE_FILE:-docker-compose.prod.yml}}"
+ENV_FILE="${{ENV_FILE:-.env.prod}}"
+ENV_NAME="${{1:-${{AURAXIS_ENV:-prod}}}}"
+DOMAIN_INPUT="${{2:-}}"
+AUTO_REQUEST_TLS_CERT="${{AUTO_REQUEST_TLS_CERT:-true}}"
+
+read_env_value() {{
+  key="$1"
+  if [ ! -f "$ENV_FILE" ]; then
+    return 0
+  fi
+  awk -F= -v k="$key" '$1==k {{sub(/^[^=]*=/,""); print; exit}}' "$ENV_FILE"
+}}
+
+DOMAIN="${{DOMAIN_INPUT:-${{DOMAIN:-$(read_env_value DOMAIN)}}}}"
+CERTBOT_EMAIL="${{CERTBOT_EMAIL:-$(read_env_value CERTBOT_EMAIL)}}"
+
+cert_exists() {{
+  CERT_DIR="/etc/letsencrypt/live/${{DOMAIN}}"
+  docker compose --env-file "$ENV_FILE" -f "$COMPOSE_FILE" \\
+    run --rm --entrypoint sh certbot \\
+    -c "[ -f '${{CERT_DIR}}/fullchain.pem' ] && \\
+        [ -f '${{CERT_DIR}}/privkey.pem' ]" >/dev/null
+}}
+
+render_http_config() {{
+  sed "s/__DOMAIN__/${{DOMAIN}}/g" \\
+    deploy/nginx/default.http.conf > deploy/nginx/default.conf
+}}
+
+render_tls_config() {{
+  sed "s/__DOMAIN__/${{DOMAIN}}/g" \\
+    deploy/nginx/default.tls.conf > deploy/nginx/default.conf
+}}
+
+recreate_proxy() {{
+  docker compose --env-file "$ENV_FILE" -f "$COMPOSE_FILE" \\
+    up -d --force-recreate reverse-proxy
+}}
+
+request_certificate() {{
+  if [ -z "${{CERTBOT_EMAIL}}" ]; then
+    return 1
+  fi
+  docker compose --env-file "$ENV_FILE" -f "$COMPOSE_FILE" up -d reverse-proxy
+  docker compose --env-file "$ENV_FILE" -f "$COMPOSE_FILE" run --rm certbot certonly \
+    --webroot -w /var/www/certbot \
+    --email "${{CERTBOT_EMAIL}}" \
+    -d "${{DOMAIN}}" \
+    --rsa-key-size 4096 \
+    --agree-tos \
+    --non-interactive
+}}
+
+if cert_exists; then
+  render_tls_config
+  recreate_proxy
+  exit 0
+fi
+
+if [ "${{ENV_NAME}}" = "prod" ] && [ "${{AUTO_REQUEST_TLS_CERT}}" = "true" ]; then
+  if request_certificate && cert_exists; then
+    render_tls_config
+    recreate_proxy
+    exit 0
+  fi
+fi
+
+render_http_config
+recreate_proxy
+SH
+  chmod +x scripts/ensure_tls_runtime.sh
+  echo "[i6] bootstrapped scripts/ensure_tls_runtime.sh"
 fi
 
 python3 - "$ENV_FILE" "AURAXIS_ENV" "{env_name}" <<'PY'
@@ -338,9 +560,46 @@ echo "[i6] restarting compose..."
 docker compose --env-file "$ENV_FILE" -f docker-compose.prod.yml \\
   up -d --build --force-recreate
 
+echo "[i6] ensuring runtime TLS mode..."
+AUTO_REQUEST_TLS_CERT="true"
+if [ "{env_name}" = "dev" ]; then
+  AUTO_REQUEST_TLS_CERT="false"
+fi
+chmod +x scripts/ensure_tls_runtime.sh
+COMPOSE_FILE="docker-compose.prod.yml" ENV_FILE="$ENV_FILE" \\
+  AUTO_REQUEST_TLS_CERT="$AUTO_REQUEST_TLS_CERT" \\
+  ./scripts/ensure_tls_runtime.sh "{env_name}" "{domain}"
+
 echo "[i6] validating healthz..."
-for i in $(seq 1 20); do
-  if curl -fsS http://127.0.0.1/healthz >/dev/null; then
+SCHEME="http"
+CURL_FLAGS="-fsS"
+if grep -q "listen 443" deploy/nginx/default.conf; then
+  SCHEME="https"
+  CURL_FLAGS="-kfsS"
+fi
+echo "[i6] edge_scheme=$SCHEME domain={domain}"
+
+for i in $(seq 1 30); do
+  WEB_OK="false"
+  EDGE_HEALTH_URL="$SCHEME://127.0.0.1/healthz"
+  WEB_HEALTH_HOST=127.0.0.1
+  WEB_HEALTH_PORT=8000
+  WEB_HEALTH_PATH=/healthz
+  WEB_HEALTH_URL="http://${{WEB_HEALTH_HOST}}:${{WEB_HEALTH_PORT}}"
+  WEB_HEALTH_URL="${{WEB_HEALTH_URL}}${{WEB_HEALTH_PATH}}"
+  if docker compose --env-file "$ENV_FILE" -f docker-compose.prod.yml \\
+    exec -T web python - "$WEB_HEALTH_URL" >/dev/null 2>&1 <<'PY'
+import sys
+import urllib.request
+
+urllib.request.urlopen(sys.argv[1], timeout=3)
+PY
+  then
+    WEB_OK="true"
+  fi
+
+  if [ "$WEB_OK" = "true" ] \\
+    && curl $CURL_FLAGS "$EDGE_HEALTH_URL" -H "Host: {domain}" >/dev/null; then
     echo "[i6] OK"
     python3 - <<'PY' "$STATE_PATH" "$CURRENT_REF" "$NEW_REF"
 import json,sys
@@ -357,6 +616,12 @@ PY
   sleep 2
 done
 echo "[i6] healthz validation failed"
+echo "[i6] dumping compose diagnostics..."
+docker compose --env-file "$ENV_FILE" -f docker-compose.prod.yml ps || true
+docker compose --env-file "$ENV_FILE" -f docker-compose.prod.yml \\
+  logs --tail=120 web || true
+docker compose --env-file "$ENV_FILE" -f docker-compose.prod.yml \\
+  logs --tail=120 reverse-proxy || true
 exit 5
 """
 
