@@ -11,9 +11,12 @@ phases:
   pre_build:
     commands:
       - echo "Rodando análise Sonar..."
+      - : "${SONAR_PROJECT_KEY:?SONAR_PROJECT_KEY is required}"
+      - : "${SONAR_ORGANIZATION:?SONAR_ORGANIZATION is required}"
+      - : "${SONAR_TOKEN:?SONAR_TOKEN is required}"
       - sonar-scanner \
-        -Dsonar.projectKey=seu_projeto \
-        -Dsonar.organization=sua_org \
+        -Dsonar.projectKey=$SONAR_PROJECT_KEY \
+        -Dsonar.organization=$SONAR_ORGANIZATION \
         -Dsonar.host.url=https://sonarcloud.io \
         -Dsonar.login=$SONAR_TOKEN
 

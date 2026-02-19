@@ -24,12 +24,12 @@ pytest tests/test_response_contract.py
 ## Suíte Postman / API Dog (Smoke + Regression)
 
 Coleção versionada:
-- `/Users/italochagas/Desktop/projetos/flask/flask-template/api-tests/postman/auraxis.postman_collection.json`
+- `api-tests/postman/auraxis.postman_collection.json`
 
 Environments:
-- `/Users/italochagas/Desktop/projetos/flask/flask-template/api-tests/postman/environments/local.postman_environment.json`
-- `/Users/italochagas/Desktop/projetos/flask/flask-template/api-tests/postman/environments/dev.postman_environment.json`
-- `/Users/italochagas/Desktop/projetos/flask/flask-template/api-tests/postman/environments/prod.postman_environment.json`
+- `api-tests/postman/environments/local.postman_environment.json`
+- `api-tests/postman/environments/dev.postman_environment.json`
+- `api-tests/postman/environments/prod.postman_environment.json`
 
 Runner local (Newman):
 ```bash
