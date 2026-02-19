@@ -38,6 +38,16 @@ _PUBLIC_GRAPHQL_ERROR_CODES = {
 }
 
 
+def _sanitize_graphql_message(message: Any) -> str:
+    raw = str(message or "").strip()
+    compact = " ".join(raw.split())
+    if not compact:
+        return "An unexpected error occurred."
+    if len(compact) > 240:
+        return f"{compact[:240]}..."
+    return compact
+
+
 def _sanitize_graphql_extensions(extensions: Any) -> dict[str, Any] | None:
     """
     Sanitize GraphQL extensions before returning them to clients.
@@ -80,13 +90,22 @@ def _format_graphql_execution_error(err: GraphQLError) -> dict[str, Any]:
     is_debug = bool(
         current_app.config.get("DEBUG") or current_app.config.get("TESTING")
     )
+    safe_message = _sanitize_graphql_message(err.message)
     safe_extensions = _sanitize_graphql_extensions(err.extensions)
-    if not is_debug and err.original_error is not None:
+    if not is_debug:
         if _is_public_graphql_error(err, safe_extensions):
-            public_payload: dict[str, Any] = {"message": err.message}
+            public_payload: dict[str, Any] = {"message": safe_message}
             if safe_extensions:
                 public_payload["extensions"] = safe_extensions
             return public_payload
+
+        # GraphQL parser/validation errors (usually without original_error)
+        # should stay actionable to clients while preserving a safe code.
+        if err.original_error is None:
+            return {
+                "message": safe_message,
+                "extensions": {"code": "VALIDATION_ERROR"},
+            }
 
         current_app.logger.exception("GraphQL internal execution error", exc_info=err)
         return {
@@ -94,7 +113,7 @@ def _format_graphql_execution_error(err: GraphQLError) -> dict[str, Any]:
             "extensions": {"code": "INTERNAL_ERROR", "details": {}},
         }
 
-    payload: dict[str, Any] = {"message": err.message}
+    payload: dict[str, Any] = {"message": safe_message}
     if safe_extensions:
         payload["extensions"] = safe_extensions
     return payload

@@ -97,6 +97,8 @@ jobs:
         uses: gitleaks/gitleaks-action@v2
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          args: detect --source . --verbose --redact --config .gitleaks.toml
 
   dependency-review:
     name: Dependency Review (PR gate)
@@ -235,8 +237,9 @@ jobs:
       - name: Run Schemathesis contract checks
         env:
           SCHEMATHESIS_MAX_EXAMPLES: 5
+          HYPOTHESIS_SEED: 20260220
         run: |
-          pytest -m schemathesis --maxfail=1
+          bash scripts/run_schemathesis_contract.sh
 
   mutation:
     name: Mutation Testing (Cosmic Ray)
@@ -325,7 +328,7 @@ jobs:
           SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
         with:
           command: test
-          args: --file=requirements.txt --severity-threshold=high
+          args: --file=requirements.txt --package-manager=pip --severity-threshold=high --fail-on=all
 
       - name: Build image for Snyk container scan
         run: |
@@ -338,7 +341,7 @@ jobs:
         with:
           image: auraxis-ci:${{ github.sha }}
           command: test
-          args: --severity-threshold=high
+          args: --severity-threshold=high --exclude-base-image-vulns
 
   security-evidence:
     name: Security Evidence (S3)

@@ -36,6 +36,20 @@ check_exists() {
   fi
 }
 
+check_not_contains() {
+  local file="$1"
+  local pattern="$2"
+  local label="$3"
+
+  if [[ -f "$file" ]] && ! grep -qE "$pattern" "$file"; then
+    echo "- [PASS] ${label}" >>"${REPORT_FILE}"
+    pass_count=$((pass_count + 1))
+  else
+    echo "- [FAIL] ${label}" >>"${REPORT_FILE}"
+    fail_count=$((fail_count + 1))
+  fi
+}
+
 {
   echo "# Security Evidence Report"
   echo
@@ -69,6 +83,15 @@ check_contains "app/graphql/security.py" "GRAPHQL_DEPTH_LIMIT_EXCEEDED" "GraphQL
 check_contains "app/graphql/security.py" "GRAPHQL_COMPLEXITY_LIMIT_EXCEEDED" "GraphQL complexity limit guard implemented"
 check_contains "app/middleware/auth_guard.py" "verify_jwt_in_request\(\)" "Global auth guard verifies JWT for protected routes"
 check_contains "app/controllers/auth/resources.py" "generate_password_hash" "Password hashing present for user registration"
+
+{
+  echo
+  echo "## CI security gates"
+} >>"${REPORT_FILE}"
+
+check_exists ".gitleaks.toml" "Gitleaks config is versioned in repository"
+check_contains ".github/workflows/ci.yml" "name: Security Scan \(Snyk\)" "Snyk security scan job configured"
+check_not_contains ".github/workflows/ci.yml" "SNYK_ENABLED" "Snyk security scan is mandatory (no conditional gate)"
 
 if command -v rg >/dev/null 2>&1; then
   jwt_count=$(rg -n "@jwt_required\(" app/controllers | wc -l | tr -d ' ')
