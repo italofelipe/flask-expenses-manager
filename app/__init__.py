@@ -15,11 +15,21 @@ from app.controllers.auth_controller import (
     LogoutResource,
     RegisterResource,
     auth_bp,
+    register_auth_dependencies,
 )
-from app.controllers.graphql_controller import graphql_bp, register_graphql_security
+from app.controllers.graphql_controller import graphql_bp, register_graphql_dependencies
 from app.controllers.health_controller import health_bp
-from app.controllers.transaction_controller import TransactionResource, transaction_bp
-from app.controllers.user_controller import UserMeResource, UserProfileResource, user_bp
+from app.controllers.transaction_controller import (
+    TransactionResource,
+    register_transaction_dependencies,
+    transaction_bp,
+)
+from app.controllers.user_controller import (
+    UserMeResource,
+    UserProfileResource,
+    register_user_dependencies,
+    user_bp,
+)
 from app.controllers.wallet_controller import register_wallet_dependencies, wallet_bp
 from app.docs.api_documentation import API_INFO, TAGS
 from app.docs.schema_name_resolver import resolve_openapi_schema_name
@@ -121,7 +131,10 @@ def create_app() -> Flask:
 
     # Registra erros globais
     register_error_handlers(app)
-    register_graphql_security(app)
+    register_graphql_dependencies(app)
+    register_auth_dependencies(app)
+    register_user_dependencies(app)
+    register_transaction_dependencies(app)
     register_cors(app)
     register_security_headers(app)
     register_docs_access_guard(app)
