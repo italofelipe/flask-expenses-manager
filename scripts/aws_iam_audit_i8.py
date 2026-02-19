@@ -24,6 +24,7 @@ import argparse
 import json
 import subprocess
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Any
 
 DEFAULT_PROFILE = "auraxis-admin"
@@ -45,8 +46,55 @@ class AwsCliError(RuntimeError):
     pass
 
 
+def _finding_level(finding: str) -> str:
+    normalized = finding.strip().upper()
+    if normalized.startswith("FAIL:"):
+        return "fail"
+    if normalized.startswith("WARN:"):
+        return "warn"
+    return "pass"
+
+
+def _should_fail(summary: dict[str, int], fail_on: str) -> bool:
+    if fail_on == "none":
+        return False
+    if fail_on == "warn":
+        return summary.get("fail", 0) > 0 or summary.get("warn", 0) > 0
+    return summary.get("fail", 0) > 0
+
+
+def _collect_findings(report: dict[str, Any]) -> list[str]:
+    findings: list[str] = []
+    for env_key in ("dev", "prod"):
+        env_report = report.get(env_key)
+        if isinstance(env_report, dict):
+            for finding in env_report.get("findings") or []:
+                if isinstance(finding, str):
+                    findings.append(finding)
+    deploy_roles = report.get("deploy_roles")
+    if isinstance(deploy_roles, dict):
+        for env_key in ("dev", "prod"):
+            env_report = deploy_roles.get(env_key)
+            if isinstance(env_report, dict):
+                for finding in env_report.get("findings") or []:
+                    if isinstance(finding, str):
+                        findings.append(finding)
+    return findings
+
+
+def _build_summary(report: dict[str, Any]) -> dict[str, int]:
+    summary = {"pass": 0, "warn": 0, "fail": 0}
+    for finding in _collect_findings(report):
+        level = _finding_level(finding)
+        summary[level] = summary.get(level, 0) + 1
+    return summary
+
+
 def _run_aws(ctx: AwsCtx, args: list[str], *, expect_json: bool = True) -> Any:
-    cmd = ["aws", "--profile", ctx.profile, "--region", ctx.region, *args]
+    cmd = ["aws"]
+    if ctx.profile:
+        cmd.extend(["--profile", ctx.profile])
+    cmd.extend(["--region", ctx.region, *args])
     p = subprocess.run(cmd, capture_output=True, text=True, check=False)
     if p.returncode != 0:
         raise AwsCliError(
@@ -333,6 +381,20 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--dev-instance-id", default=DEFAULT_DEV_INSTANCE_ID)
     p.add_argument("--deploy-dev-role", default=DEFAULT_DEPLOY_DEV_ROLE)
     p.add_argument("--deploy-prod-role", default=DEFAULT_DEPLOY_PROD_ROLE)
+    p.add_argument(
+        "--fail-on",
+        choices=("none", "warn", "fail"),
+        default="fail",
+        help=(
+            "Failure threshold for findings. "
+            "fail=only FAIL, warn=FAIL/WARN, none=always 0."
+        ),
+    )
+    p.add_argument(
+        "--output-json",
+        default="",
+        help="Optional path to persist JSON report (e.g. reports/aws-iam-audit.json).",
+    )
     return p
 
 
@@ -357,7 +419,20 @@ def main() -> int:
             ),
         },
     }
+    summary = _build_summary(report)
+    report["summary"] = summary
     print(json.dumps(report, indent=2, sort_keys=True))
+
+    if args.output_json:
+        output_path = Path(args.output_json)
+        output_path.parent.mkdir(parents=True, exist_ok=True)
+        output_path.write_text(
+            json.dumps(report, indent=2, sort_keys=True),
+            encoding="utf-8",
+        )
+
+    if _should_fail(summary, str(args.fail_on)):
+        return 1
     return 0
 
 

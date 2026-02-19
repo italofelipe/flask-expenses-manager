@@ -117,6 +117,29 @@ jobs:
         with:
           fail-on-severity: high
 
+  review-signal:
+    name: Review Signal (Cursor Bugbot)
+    if: ${{ github.event_name == 'pull_request' }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: read
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Evaluate PR review signal (advisory)
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: |
+          python scripts/pr_review_signal_check.py \
+            --repo "${GITHUB_REPOSITORY}" \
+            --pr-number "${PR_NUMBER}" \
+            --mode advisory
+
   tests:
     name: Tests (Pytest + Coverage)
     runs-on: ubuntu-latest

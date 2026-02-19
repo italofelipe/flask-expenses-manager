@@ -1,0 +1,74 @@
+name: AWS Security Audit
+
+on:
+  workflow_dispatch:
+    inputs:
+      fail_on:
+        description: "Failure threshold: none|warn|fail"
+        required: false
+        default: "fail"
+  schedule:
+    - cron: "30 10 * * 1"
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  iam-audit:
+    name: IAM Least-Privilege Audit (I8)
+    runs-on: ubuntu-latest
+    env:
+      AWS_REGION: ${{ vars.AWS_REGION }}
+      AUDIT_ROLE_ARN: ${{ vars.AWS_ROLE_ARN_AUDIT }}
+      DEV_INSTANCE_ID: ${{ vars.AURAXIS_DEV_INSTANCE_ID }}
+      PROD_INSTANCE_ID: ${{ vars.AURAXIS_PROD_INSTANCE_ID }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Validate audit role configuration
+        id: guard
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ -z "${AUDIT_ROLE_ARN:-}" ]; then
+            echo "configured=false" >> "$GITHUB_OUTPUT"
+            echo "AWS_ROLE_ARN_AUDIT not configured. Skipping IAM audit."
+          else
+            echo "configured=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Configure AWS credentials (OIDC)
+        if: ${{ steps.guard.outputs.configured == 'true' }}
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ env.AUDIT_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+          audience: sts.amazonaws.com
+
+      - name: Run IAM audit
+        if: ${{ steps.guard.outputs.configured == 'true' }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          FAIL_ON="${{ github.event.inputs.fail_on }}"
+          if [ -z "${FAIL_ON}" ]; then
+            FAIL_ON="fail"
+          fi
+          python scripts/aws_iam_audit_i8.py \
+            --profile "" \
+            --region "${AWS_REGION}" \
+            --dev-instance-id "${DEV_INSTANCE_ID}" \
+            --prod-instance-id "${PROD_INSTANCE_ID}" \
+            --fail-on "${FAIL_ON}" \
+            --output-json reports/aws-iam-audit.json
+
+      - name: Upload IAM audit artifact
+        if: ${{ steps.guard.outputs.configured == 'true' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: aws-iam-audit-report
+          path: reports/aws-iam-audit.json
+
