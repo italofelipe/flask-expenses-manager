@@ -4,6 +4,7 @@ from typing import Any
 from uuid import UUID
 
 import graphene
+from marshmallow import ValidationError
 
 from app.graphql.auth import get_current_user_required
 from app.graphql.errors import (
@@ -12,7 +13,9 @@ from app.graphql.errors import (
     GRAPHQL_ERROR_CODE_VALIDATION,
     build_public_graphql_error,
 )
-from app.graphql.types import GoalTypeObject
+from app.graphql.types import GoalPlanType, GoalRecommendationType, GoalTypeObject
+from app.schemas.goal_planning_schema import GoalSimulationSchema
+from app.services.goal_planning_service import GoalPlanningInput, GoalPlanningService
 from app.services.goal_service import GoalService, GoalServiceError
 
 _GOAL_ERROR_CODE_MAP = {
@@ -45,6 +48,17 @@ def _to_goal_type(goal_data: dict[str, Any]) -> GoalTypeObject:
         key: value for key, value in goal_data.items() if key in _GOAL_GRAPHQL_FIELDS
     }
     return GoalTypeObject(**filtered)
+
+
+def _to_goal_plan_type(plan_data: dict[str, Any]) -> GoalPlanType:
+    recommendations = [
+        GoalRecommendationType(**item)
+        for item in plan_data.get("recommendations", [])
+        if isinstance(item, dict)
+    ]
+    payload = dict(plan_data)
+    payload["recommendations"] = recommendations
+    return GoalPlanType(**payload)
 
 
 class CreateGoalMutation(graphene.Mutation):
@@ -121,4 +135,47 @@ class DeleteGoalMutation(graphene.Mutation):
         return DeleteGoalMutation(
             ok=True,
             message="Meta removida com sucesso",
+        )
+
+
+class SimulateGoalPlanMutation(graphene.Mutation):
+    class Arguments:
+        target_amount = graphene.String(required=True)
+        current_amount = graphene.String()
+        target_date = graphene.String()
+        monthly_income = graphene.String()
+        monthly_expenses = graphene.String()
+        monthly_contribution = graphene.String()
+
+    message = graphene.String(required=True)
+    goal_plan = graphene.Field(GoalPlanType, required=True)
+
+    def mutate(
+        self, info: graphene.ResolveInfo, **kwargs: Any
+    ) -> "SimulateGoalPlanMutation":
+        get_current_user_required()
+        schema = GoalSimulationSchema()
+        try:
+            validated = schema.load(kwargs)
+        except ValidationError as exc:
+            raise build_public_graphql_error(
+                f"Dados inválidos para simulação: {exc.messages}",
+                code=GRAPHQL_ERROR_CODE_VALIDATION,
+            ) from exc
+
+        planning_service = GoalPlanningService()
+        planning_input = GoalPlanningInput(
+            target_amount=validated["target_amount"],
+            current_amount=validated["current_amount"],
+            target_date=validated.get("target_date"),
+            monthly_income=validated.get("monthly_income"),
+            monthly_expenses=validated.get("monthly_expenses"),
+            monthly_contribution=validated.get("monthly_contribution"),
+        )
+        plan_payload = planning_service.serialize_plan(
+            planning_service.build_plan(planning_input)
+        )
+        return SimulateGoalPlanMutation(
+            message="Simulação da meta calculada com sucesso",
+            goal_plan=_to_goal_plan_type(plan_payload),
         )

@@ -6,7 +6,12 @@ from .dependencies import (
     get_goal_dependencies,
     register_goal_dependencies,
 )
-from .resources import GoalCollectionResource, GoalResource
+from .resources import (
+    GoalCollectionResource,
+    GoalPlanResource,
+    GoalResource,
+    GoalSimulationResource,
+)
 
 __all__ = [
     "goal_bp",
@@ -15,4 +20,6 @@ __all__ = [
     "get_goal_dependencies",
     "GoalCollectionResource",
     "GoalResource",
+    "GoalPlanResource",
+    "GoalSimulationResource",
 ]

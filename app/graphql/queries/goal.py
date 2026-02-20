@@ -13,7 +13,13 @@ from app.graphql.errors import (
     build_public_graphql_error,
 )
 from app.graphql.queries.common import paginate
-from app.graphql.types import GoalListPayloadType, GoalTypeObject
+from app.graphql.types import (
+    GoalListPayloadType,
+    GoalPlanType,
+    GoalRecommendationType,
+    GoalTypeObject,
+)
+from app.services.goal_planning_service import GoalPlanningInput, GoalPlanningService
 from app.services.goal_service import GoalService, GoalServiceError
 
 _GOAL_ERROR_CODE_MAP = {
@@ -48,6 +54,17 @@ def _raise_mapped_goal_error(exc: GoalServiceError) -> None:
     raise build_public_graphql_error(exc.message, code=graphql_code) from exc
 
 
+def _to_goal_plan_type(plan_data: dict[str, Any]) -> GoalPlanType:
+    recommendations = [
+        GoalRecommendationType(**item)
+        for item in plan_data.get("recommendations", [])
+        if isinstance(item, dict)
+    ]
+    payload = dict(plan_data)
+    payload["recommendations"] = recommendations
+    return GoalPlanType(**payload)
+
+
 class GoalQueryMixin:
     goals = graphene.Field(
         GoalListPayloadType,
@@ -57,6 +74,10 @@ class GoalQueryMixin:
     )
     goal = graphene.Field(
         GoalTypeObject,
+        goal_id=graphene.UUID(required=True),
+    )
+    goal_plan = graphene.Field(
+        GoalPlanType,
         goal_id=graphene.UUID(required=True),
     )
 
@@ -100,3 +121,29 @@ class GoalQueryMixin:
         except GoalServiceError as exc:
             _raise_mapped_goal_error(exc)
         return _to_goal_type(service.serialize(goal))
+
+    def resolve_goal_plan(
+        self,
+        info: graphene.ResolveInfo,
+        goal_id: UUID,
+    ) -> GoalPlanType:
+        user = get_current_user_required()
+        goal_service = GoalService(UUID(str(user.id)))
+        try:
+            goal = goal_service.get_goal(goal_id)
+        except GoalServiceError as exc:
+            _raise_mapped_goal_error(exc)
+
+        planning_service = GoalPlanningService()
+        planning_input = GoalPlanningInput(
+            target_amount=goal.target_amount,
+            current_amount=goal.current_amount,
+            target_date=goal.target_date,
+            monthly_income=user.monthly_income,
+            monthly_expenses=user.monthly_expenses,
+            monthly_contribution=user.monthly_investment,
+        )
+        plan_payload = planning_service.serialize_plan(
+            planning_service.build_plan(planning_input)
+        )
+        return _to_goal_plan_type(plan_payload)

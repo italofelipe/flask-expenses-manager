@@ -132,6 +132,81 @@ def test_graphql_goals_crud_flow(client) -> None:
     assert update_body["data"]["updateGoal"]["goal"]["status"] == "paused"
     assert update_body["data"]["updateGoal"]["goal"]["currentAmount"] == "10000.00"
 
+    profile_mutation = """
+    mutation UpdateProfile {
+      updateUserProfile(
+        monthlyIncome: 10000
+        monthlyExpenses: 5500
+        monthlyInvestment: 1400
+      ) {
+        user { id }
+      }
+    }
+    """
+    profile_response = _graphql(client, profile_mutation, token=token)
+    assert profile_response.status_code == 200
+    assert "errors" not in profile_response.get_json()
+
+    goal_plan_query = """
+    query GoalPlan($goalId: UUID!) {
+      goalPlan(goalId: $goalId) {
+        horizon
+        goalHealth
+        remainingAmount
+        projectedMonthlyContribution
+        recommendedMonthlyContribution
+        estimatedCompletionDate
+        recommendations { priority title action estimatedDate }
+      }
+    }
+    """
+    plan_response = _graphql(client, goal_plan_query, {"goalId": goal_id}, token=token)
+    assert plan_response.status_code == 200
+    plan_body = plan_response.get_json()
+    assert "errors" not in plan_body
+    assert plan_body["data"]["goalPlan"]["goalHealth"] in {
+        "on_track",
+        "at_risk",
+        "off_track",
+        "completed",
+    }
+    assert isinstance(plan_body["data"]["goalPlan"]["recommendations"], list)
+
+    simulate_mutation = """
+    mutation SimulateGoalPlan {
+      simulateGoalPlan(
+        targetAmount: "50000.00"
+        currentAmount: "15000.00"
+        monthlyIncome: "12000.00"
+        monthlyExpenses: "7000.00"
+        monthlyContribution: "2500.00"
+        targetDate: "2029-12-31"
+      ) {
+        message
+        goalPlan {
+          horizon
+          goalHealth
+          estimatedCompletionDate
+          recommendations { priority title }
+        }
+      }
+    }
+    """
+    simulation_response = _graphql(client, simulate_mutation, token=token)
+    assert simulation_response.status_code == 200
+    simulation_body = simulation_response.get_json()
+    assert "errors" not in simulation_body
+    assert (
+        simulation_body["data"]["simulateGoalPlan"]["message"]
+        == "Simulação da meta calculada com sucesso"
+    )
+    assert simulation_body["data"]["simulateGoalPlan"]["goalPlan"]["goalHealth"] in {
+        "on_track",
+        "at_risk",
+        "off_track",
+        "completed",
+    }
+
     delete_mutation = """
     mutation DeleteGoal($goalId: UUID!) {
       deleteGoal(goalId: $goalId) {

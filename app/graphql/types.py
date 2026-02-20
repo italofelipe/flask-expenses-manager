@@ -124,6 +124,27 @@ class GoalListPayloadType(graphene.ObjectType):
     pagination = graphene.Field(PaginationType, required=True)
 
 
+class GoalRecommendationType(graphene.ObjectType):
+    priority = graphene.String(required=True)
+    title = graphene.String(required=True)
+    action = graphene.String(required=True)
+    estimated_date = graphene.String()
+
+
+class GoalPlanType(graphene.ObjectType):
+    horizon = graphene.String(required=True)
+    remaining_amount = graphene.String(required=True)
+    capacity_amount = graphene.String(required=True)
+    projected_monthly_contribution = graphene.String(required=True)
+    recommended_monthly_contribution = graphene.String(required=True)
+    months_to_goal = graphene.Int()
+    months_until_target_date = graphene.Int()
+    estimated_completion_date = graphene.String()
+    target_date = graphene.String()
+    goal_health = graphene.String(required=True)
+    recommendations = graphene.List(GoalRecommendationType, required=True)
+
+
 class WalletType(graphene.ObjectType):
     id = graphene.ID(required=True)
     name = graphene.String(required=True)

@@ -3,7 +3,9 @@
 from app.controllers.goal import (
     GoalCollectionResource,
     GoalDependencies,
+    GoalPlanResource,
     GoalResource,
+    GoalSimulationResource,
     get_goal_dependencies,
     goal_bp,
     register_goal_dependencies,
@@ -16,4 +18,6 @@ __all__ = [
     "get_goal_dependencies",
     "GoalCollectionResource",
     "GoalResource",
+    "GoalPlanResource",
+    "GoalSimulationResource",
 ]

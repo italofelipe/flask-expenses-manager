@@ -156,3 +156,59 @@ def test_goal_list_invalid_status_returns_validation_error(client) -> None:
     body = response.get_json()
     assert body["success"] is False
     assert body["error"]["code"] == "VALIDATION_ERROR"
+
+
+def test_goal_plan_and_simulation_v2_contract(client) -> None:
+    token = _register_and_login(client, prefix="goal-plan")
+
+    profile_update = client.put(
+        "/user/profile",
+        json={
+            "monthly_income": "9000.00",
+            "monthly_expenses": "5000.00",
+            "monthly_investment": "1200.00",
+        },
+        headers=_auth_headers(token, "v2"),
+    )
+    assert profile_update.status_code == 200
+
+    create_response = client.post(
+        "/goals",
+        json=_goal_payload(target_amount="36000.00", current_amount="6000.00"),
+        headers=_auth_headers(token, "v2"),
+    )
+    assert create_response.status_code == 201
+    goal_id = create_response.get_json()["data"]["goal"]["id"]
+
+    plan_response = client.get(
+        f"/goals/{goal_id}/plan",
+        headers=_auth_headers(token, "v2"),
+    )
+    assert plan_response.status_code == 200
+    plan_body = plan_response.get_json()
+    assert plan_body["success"] is True
+    assert plan_body["data"]["goal_plan"]["horizon"] in {
+        "short_term",
+        "medium_term",
+        "long_term",
+    }
+    assert "recommended_monthly_contribution" in plan_body["data"]["goal_plan"]
+    assert isinstance(plan_body["data"]["goal_plan"]["recommendations"], list)
+
+    simulation_response = client.post(
+        "/goals/simulate",
+        json={
+            "target_amount": "50000.00",
+            "current_amount": "10000.00",
+            "monthly_income": "12000.00",
+            "monthly_expenses": "7000.00",
+            "monthly_contribution": "2000.00",
+            "target_date": "2028-12-31",
+        },
+        headers=_auth_headers(token, "v2"),
+    )
+    assert simulation_response.status_code == 200
+    simulation_body = simulation_response.get_json()
+    assert simulation_body["success"] is True
+    assert "goal_plan" in simulation_body["data"]
+    assert "estimated_completion_date" in simulation_body["data"]["goal_plan"]
