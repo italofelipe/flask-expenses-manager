@@ -23,9 +23,13 @@ def snapshot_metrics(prefix: str | None = None) -> dict[str, int]:
     return {key: value for key, value in raw.items() if key.startswith(prefix)}
 
 
-def reset_metrics_for_tests() -> None:
+def reset_metrics() -> None:
     with _lock:
         _counters.clear()
+
+
+def reset_metrics_for_tests() -> None:
+    reset_metrics()
 
 
 def build_brapi_metrics_payload() -> dict[str, Any]:
