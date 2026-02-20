@@ -2,6 +2,10 @@ from app.application.services.auth_security_policy_service import (
     get_auth_security_policy,
     reset_auth_security_policy_for_tests,
 )
+from app.application.services.goal_application_service import (
+    GoalApplicationError,
+    GoalApplicationService,
+)
 from app.application.services.public_error_mapper_service import (
     DefaultPublicErrorMapper,
     get_public_error_mapper,
@@ -10,6 +14,8 @@ from app.application.services.public_error_mapper_service import (
 
 __all__ = [
     "DefaultPublicErrorMapper",
+    "GoalApplicationError",
+    "GoalApplicationService",
     "get_auth_security_policy",
     "get_public_error_mapper",
     "map_validation_exception",

@@ -6,22 +6,19 @@ from uuid import UUID
 
 from flask import Flask, current_app
 
-from app.services.goal_planning_service import GoalPlanningService
-from app.services.goal_service import GoalService
+from app.application.services.goal_application_service import GoalApplicationService
 
 GOAL_DEPENDENCIES_EXTENSION_KEY = "goal_dependencies"
 
 
 @dataclass(frozen=True)
 class GoalDependencies:
-    goal_service_factory: Callable[[UUID], GoalService]
-    goal_planning_service_factory: Callable[[], GoalPlanningService]
+    goal_application_service_factory: Callable[[UUID], GoalApplicationService]
 
 
 def _default_dependencies() -> GoalDependencies:
     return GoalDependencies(
-        goal_service_factory=GoalService,
-        goal_planning_service_factory=GoalPlanningService,
+        goal_application_service_factory=GoalApplicationService.with_defaults,
     )
 
 
