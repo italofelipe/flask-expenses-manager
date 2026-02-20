@@ -6,6 +6,8 @@ import threading
 from dataclasses import dataclass
 from typing import Any, Protocol
 
+DEFAULT_LOGIN_GUARD_KEY_PREFIX = "auraxis:login-guard"
+
 
 @dataclass
 class LoginAttemptState:
@@ -98,7 +100,7 @@ class RedisLoginAttemptStorage:
         self,
         client: Any,
         *,
-        key_prefix: str = "auraxis:login-guard",
+        key_prefix: str = DEFAULT_LOGIN_GUARD_KEY_PREFIX,
     ) -> None:
         self._client = client
         self._key_prefix = key_prefix
@@ -219,11 +221,11 @@ def build_login_attempt_storage_from_env() -> tuple[
         )
 
     key_prefix = str(
-        os.getenv("LOGIN_GUARD_REDIS_KEY_PREFIX", "auraxis:login-guard")
+        os.getenv("LOGIN_GUARD_REDIS_KEY_PREFIX", DEFAULT_LOGIN_GUARD_KEY_PREFIX)
     ).strip()
     return (
         RedisLoginAttemptStorage(
-            client, key_prefix=key_prefix or "auraxis:login-guard"
+            client, key_prefix=key_prefix or DEFAULT_LOGIN_GUARD_KEY_PREFIX
         ),
         "redis",
         True,
