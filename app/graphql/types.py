@@ -105,6 +105,46 @@ class TransactionDashboardPayloadType(graphene.ObjectType):
     top_categories = graphene.Field(DashboardCategoriesType, required=True)
 
 
+class GoalTypeObject(graphene.ObjectType):
+    id = graphene.ID(required=True)
+    title = graphene.String(required=True)
+    description = graphene.String()
+    category = graphene.String()
+    target_amount = graphene.String(required=True)
+    current_amount = graphene.String(required=True)
+    priority = graphene.Int(required=True)
+    target_date = graphene.String()
+    status = graphene.String(required=True)
+    created_at = graphene.String()
+    updated_at = graphene.String()
+
+
+class GoalListPayloadType(graphene.ObjectType):
+    items = graphene.List(GoalTypeObject, required=True)
+    pagination = graphene.Field(PaginationType, required=True)
+
+
+class GoalRecommendationType(graphene.ObjectType):
+    priority = graphene.String(required=True)
+    title = graphene.String(required=True)
+    action = graphene.String(required=True)
+    estimated_date = graphene.String()
+
+
+class GoalPlanType(graphene.ObjectType):
+    horizon = graphene.String(required=True)
+    remaining_amount = graphene.String(required=True)
+    capacity_amount = graphene.String(required=True)
+    projected_monthly_contribution = graphene.String(required=True)
+    recommended_monthly_contribution = graphene.String(required=True)
+    months_to_goal = graphene.Int()
+    months_until_target_date = graphene.Int()
+    estimated_completion_date = graphene.String()
+    target_date = graphene.String()
+    goal_health = graphene.String(required=True)
+    recommendations = graphene.List(GoalRecommendationType, required=True)
+
+
 class WalletType(graphene.ObjectType):
     id = graphene.ID(required=True)
     name = graphene.String(required=True)

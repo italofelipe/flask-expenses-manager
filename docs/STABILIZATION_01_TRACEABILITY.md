@@ -6,12 +6,12 @@ Branch: `codex/chore/estabilizacao-rastreabilidade-01`
 
 ## Goal
 
-Stabilize the project baseline after re-clone by resolving source-of-truth drift between `README.md`, `TASKS.md`, and operational docs.
+Stabilize the project baseline after workspace recovery by resolving source-of-truth drift between `README.md`, `TASKS.md`, and operational docs.
 
 Scope for this block (item 1):
 - reduce/resolve `pending-commit` references in `TASKS.md` where deterministic mapping is possible;
 - align dates/status fields that conflict with current repository history;
-- fix stale documentation references that break continuity after re-clone.
+- fix stale documentation references that break continuity after workspace recovery.
 
 ## Diagnostic snapshot (before changes)
 
@@ -48,7 +48,7 @@ Scope for this block (item 1):
 1. `docs(stabilization): create traceability recovery plan` (`21605ba`)
 - Added this document as source of execution context for stabilization item 1.
 
-2. `docs(ops): align runbooks and testing paths after reclone` (`25f4047`)
+2. `docs(ops): align runbooks and testing paths after workspace recovery` (`25f4047`)
 - Fixed stale local absolute paths in `docs/TESTING.md`.
 - Fixed legacy folder names in local recovery flow in `docs/RUNBOOK.md`.
 - Updated `docs/CD_AUTOMATION_EXECUTION_PLAN.md` statuses for CD-01/CD-04 to match current backlog state.

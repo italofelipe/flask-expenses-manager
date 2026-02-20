@@ -8,6 +8,12 @@ from app.graphql.mutations.auth import (
     RegisterUserMutation,
     UpdateUserProfileMutation,
 )
+from app.graphql.mutations.goal import (
+    CreateGoalMutation,
+    DeleteGoalMutation,
+    SimulateGoalPlanMutation,
+    UpdateGoalMutation,
+)
 from app.graphql.mutations.investment_operation import (
     AddInvestmentOperationMutation,
     DeleteInvestmentOperationMutation,
@@ -32,6 +38,10 @@ class Mutation(graphene.ObjectType):
     update_user_profile = UpdateUserProfileMutation.Field()
     create_transaction = CreateTransactionMutation.Field()
     delete_transaction = DeleteTransactionMutation.Field()
+    create_goal = CreateGoalMutation.Field()
+    update_goal = UpdateGoalMutation.Field()
+    delete_goal = DeleteGoalMutation.Field()
+    simulate_goal_plan = SimulateGoalPlanMutation.Field()
     add_wallet_entry = AddWalletEntryMutation.Field()
     update_wallet_entry = UpdateWalletEntryMutation.Field()
     delete_wallet_entry = DeleteWalletEntryMutation.Field()

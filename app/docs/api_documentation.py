@@ -30,6 +30,10 @@ TAGS = [
         "description": "Criação, edição e consulta de transações financeiras",
     },
     {
+        "name": "Metas",
+        "description": "Gerenciamento de metas financeiras e planejamento",
+    },
+    {
         "name": "Wallet",
         "description": "Gerenciamento da carteira de investimentos",
     },
