@@ -149,6 +149,7 @@ npm install -g newman
 
 ### API e contratos
 - API geral: `docs/API_DOCUMENTATION.md`
+- Nomenclatura de domínio: `docs/NOMENCLATURE.md`
 - Contrato de resposta: `docs/API_RESPONSE_CONTRACT.md`
 - Schema GraphQL: `schema.graphql`
 - Docs por controller: `docs/controllers/`

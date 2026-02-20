@@ -1,16 +1,13 @@
-"""
-Documentação da API - Not Enough Cash, Stranger!
-
-Este arquivo contém informações gerais sobre a API para documentação Swagger.
-"""
+"""Metadados da documentação OpenAPI/Swagger da Auraxis API."""
 
 API_INFO = {
-    "title": "Not Enough Cash, Stranger!",
+    "title": "Auraxis API",
     "version": "1.0.0",
     "description": (
-        "API para gerenciamento financeiro pessoal.\n\n"
+        "API para gestão financeira pessoal.\n\n"
         "- Controle de transações, carteira e dados de usuário.\n"
         "- Autenticação JWT.\n"
+        "- Ticker representa o símbolo de mercado de ativos da carteira.\n"
         "- Consulte os documentos técnicos em docs/."
     ),
     "termsOfService": "https://seusite.com/termos",
