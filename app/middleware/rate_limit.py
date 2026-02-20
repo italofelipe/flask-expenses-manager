@@ -287,10 +287,12 @@ class RateLimitStorage(Protocol):
         key: str,
         window_seconds: int,
     ) -> tuple[int, int]:
-        pass
+        # Protocol contract only; concrete storage tracks per-window consumption.
+        ...
 
     def reset(self) -> None:
-        pass
+        # Protocol contract only; tests may clear in-memory state.
+        ...
 
 
 class InMemoryRateLimitStorage:

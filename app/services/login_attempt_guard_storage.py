@@ -33,19 +33,24 @@ class LoginAttemptState:
 
 class LoginAttemptStorage(Protocol):
     def get(self, key: str) -> LoginAttemptState | None:
-        pass
+        # Protocol contract only; concrete backends provide state retrieval.
+        ...
 
     def set(self, key: str, state: LoginAttemptState, *, ttl_seconds: int) -> None:
-        pass
+        # Protocol contract only; concrete backends persist state with TTL.
+        ...
 
     def delete(self, key: str) -> None:
-        pass
+        # Protocol contract only; concrete backends remove persisted state.
+        ...
 
     def prune(self, *, now: float, retention_seconds: int, max_keys: int) -> None:
-        pass
+        # Protocol contract only; backend chooses pruning implementation strategy.
+        ...
 
     def reset_for_tests(self) -> None:
-        pass
+        # Protocol contract only; used by tests to clear backend state.
+        ...
 
 
 class InMemoryLoginAttemptStorage:
