@@ -37,6 +37,7 @@ from app.extensions.audit_retention_cli import register_audit_retention_commands
 from app.extensions.audit_trail import register_audit_trail
 from app.extensions.database import db
 from app.extensions.error_handlers import register_error_handlers
+from app.extensions.integration_metrics_cli import register_integration_metrics_commands
 from app.middleware.cors import register_cors
 from app.middleware.docs_access import register_docs_access_guard
 from app.middleware.security_headers import register_security_headers
@@ -140,6 +141,7 @@ def create_app() -> Flask:
     register_docs_access_guard(app)
     register_audit_trail(app)
     register_audit_retention_commands(app)
+    register_integration_metrics_commands(app)
     register_wallet_dependencies(app)
 
     # Registra blueprints ANTES dos endpoints no Swagger
