@@ -129,10 +129,11 @@ def _wait(ctx: AwsCtx, *, command_id: str, instance_id: str) -> None:
         if status != "Success":
             stdout = str(out.get("StandardOutputContent") or "").strip()
             stderr = str(out.get("StandardErrorContent") or "").strip()
+            tail_limit = 12000
             raise AwsCliError(
                 "Deploy failed. "
                 f"instance_id={instance_id} command_id={command_id} status={status}\n"
-                f"STDOUT:\n{stdout[-2000:]}\nSTDERR:\n{stderr[-2000:]}"
+                f"STDOUT:\n{stdout[-tail_limit:]}\nSTDERR:\n{stderr[-tail_limit:]}"
             )
         return
     raise AwsCliError(
@@ -581,8 +582,71 @@ p.write_text('\\n'.join(out)+'\\n', encoding="utf-8")
 PY
 
 echo "[i6] restarting compose..."
-docker compose --env-file "$ENV_FILE" -f docker-compose.prod.yml \\
-  up -d --build --force-recreate
+dump_compose_diagnostics() {{
+  echo "[i6] dumping compose diagnostics..."
+  docker compose --env-file "$ENV_FILE" -f docker-compose.prod.yml ps || true
+  WEB_CID="$(
+    docker compose --env-file "$ENV_FILE" -f docker-compose.prod.yml \\
+      ps -q web || true
+  )"
+  if [ -n "$WEB_CID" ]; then
+    echo "[i6] web container id: $WEB_CID"
+    docker inspect --format '{{{{json .State}}}}' "$WEB_CID" || true
+  fi
+  docker compose --env-file "$ENV_FILE" -f docker-compose.prod.yml \\
+    logs --tail=200 web || true
+  docker compose --env-file "$ENV_FILE" -f docker-compose.prod.yml \\
+    logs --tail=200 reverse-proxy || true
+  docker compose --env-file "$ENV_FILE" -f docker-compose.prod.yml \\
+    logs --tail=120 db || true
+  docker compose --env-file "$ENV_FILE" -f docker-compose.prod.yml \\
+    logs --tail=120 redis || true
+}}
+
+if ! docker compose --env-file "$ENV_FILE" -f docker-compose.prod.yml \\
+  up -d --build --force-recreate db redis web; then
+  echo "[i6] compose up failed for db/redis/web"
+  dump_compose_diagnostics
+  exit 31
+fi
+
+WEB_CID="$(
+  docker compose --env-file "$ENV_FILE" -f docker-compose.prod.yml \\
+    ps -q web || true
+)"
+if [ -z "$WEB_CID" ]; then
+  echo "[i6] web container id not found after compose up"
+  dump_compose_diagnostics
+  exit 32
+fi
+
+WEB_HEALTH="starting"
+for i in $(seq 1 45); do
+  WEB_HEALTH="$(
+    docker inspect \\
+      --format '{{{{.State.Health.Status}}}}' \\
+      "$WEB_CID" 2>/dev/null || echo "unknown"
+  )"
+  if [ -z "$WEB_HEALTH" ] || [ "$WEB_HEALTH" = "<no value>" ]; then
+    WEB_HEALTH="none"
+  fi
+  if [ "$WEB_HEALTH" = "healthy" ]; then
+    echo "[i6] web health=healthy"
+    break
+  fi
+  if [ "$WEB_HEALTH" = "unhealthy" ]; then
+    echo "[i6] web health=unhealthy"
+    dump_compose_diagnostics
+    exit 33
+  fi
+  sleep 2
+done
+
+if [ "$WEB_HEALTH" != "healthy" ]; then
+  echo "[i6] web did not become healthy in time (status=$WEB_HEALTH)"
+  dump_compose_diagnostics
+  exit 34
+fi
 
 echo "[i6] ensuring runtime TLS mode..."
 AUTO_REQUEST_TLS_CERT="true"
