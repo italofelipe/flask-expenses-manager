@@ -4,15 +4,15 @@ from uuid import UUID
 
 import graphene
 
+from app.application.services.investment_application_service import (
+    InvestmentApplicationError,
+    InvestmentApplicationService,
+)
 from app.application.services.public_error_mapper_service import (
     map_validation_exception,
 )
 from app.graphql.auth import get_current_user_required
-from app.graphql.errors import (
-    GRAPHQL_ERROR_CODE_VALIDATION,
-    build_public_graphql_error,
-    to_public_graphql_code,
-)
+from app.graphql.errors import build_public_graphql_error, to_public_graphql_code
 from app.graphql.schema_utils import (
     _assert_owned_investment_access,
     _parse_optional_date,
@@ -38,6 +38,9 @@ from app.services.investment_operation_service import (
 )
 from app.services.portfolio_history_service import PortfolioHistoryService
 from app.services.portfolio_valuation_service import PortfolioValuationService
+
+# Keep legacy import path stable for tests and compatibility facades.
+_LEGACY_INVESTMENT_OPERATION_SERVICE = InvestmentOperationService
 
 
 class InvestmentQueryMixin:
@@ -80,22 +83,25 @@ class InvestmentQueryMixin:
     ) -> InvestmentOperationListPayloadType:
         _validate_pagination_values(page, per_page)
         user = get_current_user_required()
-        _assert_owned_investment_access(investment_id, user.id)
-        service = InvestmentOperationService(user.id)
+        service = InvestmentApplicationService.with_defaults(user.id)
         try:
-            operations, pagination = service.list_operations(
-                investment_id=investment_id, page=page, per_page=per_page
+            result = service.list_operations(
+                investment_id=investment_id,
+                page=page,
+                per_page=per_page,
             )
-        except InvestmentOperationError as exc:
+        except InvestmentApplicationError as exc:
             raise build_public_graphql_error(
                 exc.message,
                 code=to_public_graphql_code(exc.code),
             ) from exc
 
         items = [
-            InvestmentOperationType(**InvestmentOperationService.serialize(item))
-            for item in operations
+            InvestmentOperationType(**item)
+            for item in result["items"]
+            if isinstance(item, dict)
         ]
+        pagination = result["pagination"]
         return InvestmentOperationListPayloadType(
             items=items,
             pagination=PaginationType(
@@ -110,11 +116,10 @@ class InvestmentQueryMixin:
         self, info: graphene.ResolveInfo, investment_id: UUID
     ) -> InvestmentOperationSummaryType:
         user = get_current_user_required()
-        _assert_owned_investment_access(investment_id, user.id)
-        service = InvestmentOperationService(user.id)
+        service = InvestmentApplicationService.with_defaults(user.id)
         try:
             summary = service.get_summary(investment_id)
-        except InvestmentOperationError as exc:
+        except InvestmentApplicationError as exc:
             raise build_public_graphql_error(
                 exc.message,
                 code=to_public_graphql_code(exc.code),
@@ -125,11 +130,10 @@ class InvestmentQueryMixin:
         self, info: graphene.ResolveInfo, investment_id: UUID
     ) -> InvestmentPositionType:
         user = get_current_user_required()
-        _assert_owned_investment_access(investment_id, user.id)
-        service = InvestmentOperationService(user.id)
+        service = InvestmentApplicationService.with_defaults(user.id)
         try:
             position = service.get_position(investment_id)
-        except InvestmentOperationError as exc:
+        except InvestmentApplicationError as exc:
             raise build_public_graphql_error(
                 exc.message,
                 code=to_public_graphql_code(exc.code),
@@ -140,18 +144,10 @@ class InvestmentQueryMixin:
         self, info: graphene.ResolveInfo, investment_id: UUID, date: str
     ) -> InvestmentInvestedAmountType:
         user = get_current_user_required()
-        _assert_owned_investment_access(investment_id, user.id)
-        operation_date = _parse_optional_date(date, "date")
-        if operation_date is None:
-            raise build_public_graphql_error(
-                "Parâmetro 'date' é obrigatório.",
-                code=GRAPHQL_ERROR_CODE_VALIDATION,
-            )
-
-        service = InvestmentOperationService(user.id)
+        service = InvestmentApplicationService.with_defaults(user.id)
         try:
-            result = service.get_invested_amount_by_date(investment_id, operation_date)
-        except InvestmentOperationError as exc:
+            result = service.get_invested_amount_by_date(investment_id, date)
+        except InvestmentApplicationError as exc:
             raise build_public_graphql_error(
                 exc.message,
                 code=to_public_graphql_code(exc.code),

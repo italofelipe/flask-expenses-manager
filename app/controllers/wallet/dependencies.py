@@ -6,6 +6,9 @@ from uuid import UUID
 
 from flask import Flask, current_app
 
+from app.application.services.investment_application_service import (
+    InvestmentApplicationService,
+)
 from app.services.investment_operation_service import InvestmentOperationService
 from app.services.investment_service import InvestmentService
 from app.services.portfolio_history_service import PortfolioHistoryService
@@ -16,6 +19,9 @@ WALLET_DEPENDENCIES_EXTENSION_KEY = "wallet_dependencies"
 
 @dataclass(frozen=True)
 class WalletDependencies:
+    investment_application_service_factory: Callable[
+        [UUID], InvestmentApplicationService
+    ]
     investment_operation_service_factory: Callable[[UUID], InvestmentOperationService]
     portfolio_history_service_factory: Callable[[UUID], PortfolioHistoryService]
     portfolio_valuation_service_factory: Callable[[UUID], PortfolioValuationService]
@@ -25,6 +31,9 @@ class WalletDependencies:
 
 def _default_dependencies() -> WalletDependencies:
     return WalletDependencies(
+        investment_application_service_factory=(
+            InvestmentApplicationService.with_defaults
+        ),
         investment_operation_service_factory=InvestmentOperationService,
         portfolio_history_service_factory=PortfolioHistoryService,
         portfolio_valuation_service_factory=PortfolioValuationService,
