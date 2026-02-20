@@ -158,6 +158,12 @@ Validacao rapida:
 ./.venv/bin/python scripts/aws_validate_i16.py --profile auraxis-admin --region us-east-1 --target route53 --target logs
 ```
 
+Snapshot local de métricas de integração (JSON):
+```bash
+FLASK_APP=run.py ./.venv/bin/flask integration-metrics snapshot --prefix brapi.
+FLASK_APP=run.py ./.venv/bin/flask integration-metrics snapshot --prefix rate_limit. --reset
+```
+
 ## Firewall host (UFW)
 
 Aplicacao via SSM (mantem SSM funcionando, nao abre SSH):
