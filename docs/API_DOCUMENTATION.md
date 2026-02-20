@@ -23,6 +23,13 @@ Fluxo atual:
 - Transações
 - Carteira (investimentos)
 
+## Nomenclatura oficial de domínio
+- `wallet`: domínio de carteira do usuário.
+- `investment`: posição/ativo específico dentro da carteira (`investment_id`).
+- `investment operation`: evento de compra/venda vinculado a um `investment_id`.
+- `ticker`: símbolo de mercado usado para cotação de ativos (ex.: `PETR4`).
+- Não existe endpoint REST `/ticker`; operações de ticker ficam no domínio GraphQL e no contexto de carteira.
+
 ## Endpoints
 
 ## 1) Auth
