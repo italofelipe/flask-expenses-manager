@@ -69,12 +69,23 @@ jobs:
           DEV_INSTANCE_ID: ${{ vars.AURAXIS_DEV_INSTANCE_ID }}
           PROD_INSTANCE_ID: ${{ vars.AURAXIS_PROD_INSTANCE_ID }}
         run: |
-          REF="${{ inputs.git_ref }}"
+          INPUT_REF="${{ inputs.git_ref }}"
+          REF="${INPUT_REF}"
           if [ "${{ github.event_name }}" = "push" ]; then
             REF="origin/master"
           elif [ -z "${REF}" ]; then
-            REF="${GITHUB_SHA}"
+            REF="origin/${GITHUB_REF_NAME}"
           fi
+          if [ -z "${REF}" ]; then
+            echo "Unable to resolve deploy ref for DEV." >&2
+            exit 1
+          fi
+          echo "Resolved DEV deploy ref:"
+          echo "  event=${{ github.event_name }}"
+          echo "  github_ref=${GITHUB_REF}"
+          echo "  github_ref_name=${GITHUB_REF_NAME}"
+          echo "  input_ref=${INPUT_REF:-<empty>}"
+          echo "  resolved_ref=${REF}"
           python scripts/aws_deploy_i6.py \
             --profile "" \
             --region "${AWS_REGION}" \
@@ -119,6 +130,11 @@ jobs:
             echo "- deploy step outcome: \`${{ steps.deploy_dev.outcome }}\`"
             echo "- smoke checks: \`enabled (REST + GraphQL)\`"
             echo "- rollback on failure: \`enabled\`"
+            echo "- ref resolution:"
+            echo "  - event: \`${{ github.event_name }}\`"
+            echo "  - github ref: \`${{ github.ref }}\`"
+            echo "  - github ref name: \`${{ github.ref_name }}\`"
+            echo "  - input git_ref: \`${{ inputs.git_ref }}\`"
           } >> "$GITHUB_STEP_SUMMARY"
 
   deploy-prod:
@@ -168,10 +184,21 @@ jobs:
           DEV_INSTANCE_ID: ${{ vars.AURAXIS_DEV_INSTANCE_ID }}
           PROD_INSTANCE_ID: ${{ vars.AURAXIS_PROD_INSTANCE_ID }}
         run: |
-          REF="${{ inputs.git_ref }}"
+          INPUT_REF="${{ inputs.git_ref }}"
+          REF="${INPUT_REF}"
           if [ -z "${REF}" ]; then
-            REF="${GITHUB_SHA}"
+            REF="origin/master"
           fi
+          if [ -z "${REF}" ]; then
+            echo "Unable to resolve deploy ref for PROD." >&2
+            exit 1
+          fi
+          echo "Resolved PROD deploy ref:"
+          echo "  event=${{ github.event_name }}"
+          echo "  github_ref=${GITHUB_REF}"
+          echo "  github_ref_name=${GITHUB_REF_NAME}"
+          echo "  input_ref=${INPUT_REF:-<empty>}"
+          echo "  resolved_ref=${REF}"
           python scripts/aws_deploy_i6.py \
             --profile "" \
             --region "${AWS_REGION}" \
@@ -217,4 +244,9 @@ jobs:
             echo "- deploy step outcome: \`${{ steps.deploy_prod.outcome }}\`"
             echo "- smoke checks: \`enabled (REST + GraphQL)\`"
             echo "- rollback on failure: \`enabled\`"
+            echo "- ref resolution:"
+            echo "  - event: \`${{ github.event_name }}\`"
+            echo "  - github ref: \`${{ github.ref }}\`"
+            echo "  - github ref name: \`${{ github.ref_name }}\`"
+            echo "  - input git_ref: \`${{ inputs.git_ref }}\`"
           } >> "$GITHUB_STEP_SUMMARY"
