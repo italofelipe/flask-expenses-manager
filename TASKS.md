@@ -1,6 +1,6 @@
 # TASKS - Central de TODOs e Progresso
 
-Ultima atualizacao: 2026-02-19 (estabilizacao de rastreabilidade pos re-clone)
+Ultima atualizacao: 2026-02-19 (estabilizacao de rastreabilidade e continuidade)
 
 ## Regras de uso deste arquivo
 
@@ -63,7 +63,7 @@ Critérios de saída do Ciclo A:
 | P1 | GQL-ERR-01 | Catálogo de erros GraphQL claro + seguro (sem leak interno) | 🟢 |
 | P1 | I8 | Hardening de produção (IAM/secrets/TLS/least privilege/runbook) | 🟢 |
 
-### Snapshot de retomada (para re-clone e continuidade)
+### Snapshot de retomada (continuidade)
 
 Estado atual consolidado:
 - Ciclo A concluido com deploy DEV/PROD validado, governanca ativa e auditoria de seguranca operacional em execucao.
@@ -493,7 +493,7 @@ Pendências de substituição controlada:
 | 2026-02-19 | I8 Progress            | Auditoria IAM evoluída (`aws_iam_audit_i8.py`) para incluir roles de deploy DEV/PROD (ações SSM mínimas + subjects OIDC), reforçando verificação contínua de least-privilege.                                                                                                                        | 53b8f41       |
 | 2026-02-19 | I8 Progress 2          | Auditoria contínua de IAM adicionada: novo workflow `aws-security-audit.yml` (agendado + manual), `aws_iam_audit_i8.py` com limiar de falha (`--fail-on`) e saída versionável (`--output-json`) + testes unitários dedicados do script.                                                            | 53b8f41       |
 | 2026-02-19 | I8 Completion          | Validação operacional concluída: PR mergeado e workflow `AWS Security Audit` executado com sucesso, fechando o ciclo de hardening de produção planejado no bloco A.                                                                                                                                  | n/a            |
-| 2026-02-19 | Handoff / Re-clone     | Documentação consolidada para retomada pós re-clone: snapshot de estado, prioridades executáveis do Ciclo B e checklist de continuidade sem perda de contexto operacional/técnico.                                                                                                                  | 3a04fb9       |
+| 2026-02-19 | Handoff / Retomada     | Documentação consolidada para retomada: snapshot de estado, prioridades executáveis do Ciclo B e checklist de continuidade sem perda de contexto operacional/técnico.                                                                                                                               | 3a04fb9       |
 | 2026-02-19 | B4 Planning            | Backlog de recuperação de senha adicionado para próximo ciclo de features (`B4..B7`): fluxo por link priorizado (endpoint + envio + reset) e OTP por SMS mantido em discovery com análise de viabilidade, risco e custo.                                                                              | n/a            |
 | 2026-02-19 | A8 Completion          | `GraphQL Query` modularizado em pacote `app/graphql/queries` por domínio (`user`, `transaction`, `wallet`, `investment`) no mesmo estilo de organização de `mutations`, com facade de compatibilidade preservada em `app/graphql/query.py`.                                                          | 3de9e06       |
 | 2026-02-19 | A7 Review              | Revisão arquitetural registrada: `wallet` permanece baseline mais maduro (DI explícita); `auth/user/transaction/graphql` mapeados para convergência gradual (dependencies/providers + serializers + recursos por caso de uso), sem alteração de regra de negócio.                                     | d767a82       |

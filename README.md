@@ -185,15 +185,9 @@ npm install -g newman
   3. Expandir suíte externa de API (Postman/API Dog) para cenários críticos adicionais
   4. Fechar débitos de padronização restante de OpenAPI/documentação de contrato
 
-## Retomada rápida após re-clone
+## Retomada rápida do ambiente
 
-1. Re-clone do repositório:
-```bash
-git clone git@github.com:italofelipe/flask-expenses-manager.git
-cd flask-expenses-manager
-```
-
-2. Preparar ambiente local:
+1. Preparar ambiente local:
 ```bash
 cp .env.dev.example .env.dev
 ./scripts/bootstrap_local_env.sh
@@ -204,13 +198,13 @@ Ativação manual do ambiente virtual:
 source .venv/bin/activate
 ```
 
-3. Validar baseline local:
+2. Validar baseline local:
 ```bash
 ./scripts/run_ci_quality_local.sh
 ./scripts/run_ci_like_actions_local.sh --local
 ```
 
-4. Ler contexto mínimo para continuar sem perda:
+3. Ler contexto mínimo para continuar sem perda:
 - `TASKS.md` (snapshot + backlog por ciclo)
 - `docs/RUNBOOK.md` (operação AWS/SSM/deploy)
 - `docs/CI_CD.md` (gates e workflows)

@@ -225,7 +225,7 @@ Quando acontecer corrupcao local de workspace (`.git/index.lock`, fetch/checkout
 
 1. Preservar estado local (se houver algo relevante):
 ```bash
-git stash push -u -m "recovery-before-reclone"
+git stash push -u -m "recovery-before-workspace-reset"
 ```
 
 2. Se o lock estiver preso:
@@ -233,7 +233,7 @@ git stash push -u -m "recovery-before-reclone"
 unlink .git/index.lock
 ```
 
-3. Se o workspace seguir inconsistente, re-clone:
+3. Se o workspace seguir inconsistente, recriar workspace limpo:
 ```bash
 cd ..
 mv flask-expenses-manager flask-expenses-manager-corrupted-$(date +%Y%m%d-%H%M%S)
