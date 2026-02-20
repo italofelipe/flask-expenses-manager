@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Any, Dict, Union, cast
+from typing import Any, cast
 from uuid import UUID
 
 from flask import Response
@@ -19,7 +19,7 @@ from app.models.user import User
 from .contracts import compat_error
 
 
-def _serialize_user_profile(user: User) -> Dict[str, Any]:
+def _serialize_user_profile(user: User) -> dict[str, Any]:
     return {
         "id": str(user.id),
         "name": user.name,
@@ -44,8 +44,8 @@ def _serialize_user_profile(user: User) -> Dict[str, Any]:
 
 
 def assign_user_profile_fields(
-    user: User, data: Dict[str, Any]
-) -> Dict[str, Union[str, bool]]:
+    user: User, data: dict[str, Any]
+) -> dict[str, str | bool]:
     date_fields = ["birth_date", "investment_goal_date"]
     for field in [
         "gender",
@@ -73,7 +73,7 @@ def assign_user_profile_fields(
     return {"error": False}
 
 
-def validate_user_token(user_id: UUID, jti: str) -> Union[User, Response]:
+def validate_user_token(user_id: UUID, jti: str) -> User | Response:
     user = cast(User | None, db.session.get(User, user_id))
     if not user or not hasattr(user, "current_jti") or user.current_jti != jti:
         return compat_error(
@@ -87,7 +87,7 @@ def validate_user_token(user_id: UUID, jti: str) -> Union[User, Response]:
 
 def filter_transactions(
     user_id: UUID, status: str | None, month: str | None
-) -> Union[Query[Any], Response]:
+) -> Query[Any] | Response:
     query = cast(
         Query[Any], Transaction.query.filter_by(user_id=user_id, deleted=False)
     )
