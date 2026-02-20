@@ -16,7 +16,7 @@ from app.application.services.investment_application_service import (
 )
 
 from .blueprint import wallet_bp
-from .contracts import compat_error, compat_success
+from .contracts import application_error_response, compat_success
 from .dependencies import get_wallet_dependencies
 
 
@@ -54,13 +54,7 @@ def add_investment_operation(investment_id: UUID) -> tuple[dict[str, Any], int]:
         service = dependencies.investment_application_service_factory(user_id)
         operation_data = service.create_operation(investment_id, payload)
     except InvestmentApplicationError as exc:
-        return compat_error(
-            legacy_payload={"error": exc.message, "details": exc.details},
-            status_code=exc.status_code,
-            message=exc.message,
-            error_code=exc.code,
-            details=exc.details,
-        )
+        return application_error_response(exc)
 
     return compat_success(
         legacy_payload={
@@ -116,13 +110,7 @@ def list_investment_operations(
         service = dependencies.investment_application_service_factory(user_id)
         result = service.list_operations(investment_id, page=page, per_page=per_page)
     except InvestmentApplicationError as exc:
-        return compat_error(
-            legacy_payload={"error": exc.message, "details": exc.details},
-            status_code=exc.status_code,
-            message=exc.message,
-            error_code=exc.code,
-            details=exc.details,
-        )
+        return application_error_response(exc)
 
     items = result["items"]
     pagination = result["pagination"]
@@ -186,13 +174,7 @@ def update_investment_operation(
         service = dependencies.investment_application_service_factory(user_id)
         operation_data = service.update_operation(investment_id, operation_id, payload)
     except InvestmentApplicationError as exc:
-        return compat_error(
-            legacy_payload={"error": exc.message, "details": exc.details},
-            status_code=exc.status_code,
-            message=exc.message,
-            error_code=exc.code,
-            details=exc.details,
-        )
+        return application_error_response(exc)
 
     return compat_success(
         legacy_payload={
@@ -240,13 +222,7 @@ def delete_investment_operation(
         service = dependencies.investment_application_service_factory(user_id)
         service.delete_operation(investment_id, operation_id)
     except InvestmentApplicationError as exc:
-        return compat_error(
-            legacy_payload={"error": exc.message, "details": exc.details},
-            status_code=exc.status_code,
-            message=exc.message,
-            error_code=exc.code,
-            details=exc.details,
-        )
+        return application_error_response(exc)
 
     return compat_success(
         legacy_payload={"message": "Operação removida com sucesso"},
@@ -288,13 +264,7 @@ def get_investment_operations_summary(
         service = dependencies.investment_application_service_factory(user_id)
         summary = service.get_summary(investment_id)
     except InvestmentApplicationError as exc:
-        return compat_error(
-            legacy_payload={"error": exc.message, "details": exc.details},
-            status_code=exc.status_code,
-            message=exc.message,
-            error_code=exc.code,
-            details=exc.details,
-        )
+        return application_error_response(exc)
 
     return compat_success(
         legacy_payload={"summary": summary},
@@ -339,13 +309,7 @@ def get_investment_operations_position(
         service = dependencies.investment_application_service_factory(user_id)
         position = service.get_position(investment_id)
     except InvestmentApplicationError as exc:
-        return compat_error(
-            legacy_payload={"error": exc.message, "details": exc.details},
-            status_code=exc.status_code,
-            message=exc.message,
-            error_code=exc.code,
-            details=exc.details,
-        )
+        return application_error_response(exc)
 
     return compat_success(
         legacy_payload={"position": position},
@@ -399,13 +363,7 @@ def get_invested_amount_by_date(
         service = dependencies.investment_application_service_factory(user_id)
         result = service.get_invested_amount_by_date(investment_id, date)
     except InvestmentApplicationError as exc:
-        return compat_error(
-            legacy_payload={"error": exc.message, "details": exc.details},
-            status_code=exc.status_code,
-            message=exc.message,
-            error_code=exc.code,
-            details=exc.details,
-        )
+        return application_error_response(exc)
 
     return compat_success(
         legacy_payload={"result": result},

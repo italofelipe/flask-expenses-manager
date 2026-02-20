@@ -10,7 +10,7 @@ from app.application.services.investment_application_service import (
     InvestmentApplicationService,
 )
 from app.graphql.auth import get_current_user_required
-from app.graphql.errors import build_public_graphql_error, to_public_graphql_code
+from app.graphql.investment_presenters import raise_investment_graphql_error
 from app.graphql.types import InvestmentOperationType
 from app.services.investment_operation_service import InvestmentOperationError
 
@@ -42,10 +42,7 @@ class AddInvestmentOperationMutation(graphene.Mutation):
         try:
             operation_data = service.create_operation(investment_id, kwargs)
         except InvestmentApplicationError as exc:
-            raise build_public_graphql_error(
-                exc.message,
-                code=to_public_graphql_code(exc.code),
-            ) from exc
+            raise_investment_graphql_error(exc)
         return AddInvestmentOperationMutation(
             message="Operação registrada com sucesso",
             item=InvestmentOperationType(**operation_data),
@@ -80,10 +77,7 @@ class UpdateInvestmentOperationMutation(graphene.Mutation):
                 investment_id, operation_id, kwargs
             )
         except InvestmentApplicationError as exc:
-            raise build_public_graphql_error(
-                exc.message,
-                code=to_public_graphql_code(exc.code),
-            ) from exc
+            raise_investment_graphql_error(exc)
         return UpdateInvestmentOperationMutation(
             message="Operação atualizada com sucesso",
             item=InvestmentOperationType(**operation_data),
@@ -106,10 +100,7 @@ class DeleteInvestmentOperationMutation(graphene.Mutation):
         try:
             service.delete_operation(investment_id, operation_id)
         except InvestmentApplicationError as exc:
-            raise build_public_graphql_error(
-                exc.message,
-                code=to_public_graphql_code(exc.code),
-            ) from exc
+            raise_investment_graphql_error(exc)
         return DeleteInvestmentOperationMutation(
             ok=True, message="Operação removida com sucesso"
         )
