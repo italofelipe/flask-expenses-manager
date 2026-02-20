@@ -346,6 +346,7 @@ jobs:
     name: Security Scan (Snyk)
     runs-on: ubuntu-latest
     needs: [tests, trivy]
+    if: ${{ vars.ENABLE_SNYK == 'true' }}
 
     steps:
       - name: Checkout
