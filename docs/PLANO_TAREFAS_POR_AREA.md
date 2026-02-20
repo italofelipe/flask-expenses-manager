@@ -1,6 +1,7 @@
-# Plano de Tarefas por Área - Not Enough Cash, Stranger!
+# Plano de Tarefas por Área - Auraxis API
 
 > Fonte de verdade para acompanhamento operacional (status, progresso, risco e commit): `TASKS.md`.
+> Este documento é histórico/contextual. Para execução ativa e status atual, use sempre `TASKS.md`.
 
 ## 1) Diagnóstico rápido (estado atual)
 
