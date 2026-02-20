@@ -111,7 +111,6 @@ def _sanitize_graphql_extensions(extensions: Any) -> dict[str, Any] | None:
 
 
 def _is_public_graphql_error(
-    err: GraphQLError,
     safe_extensions: dict[str, Any] | None,
 ) -> bool:
     if not safe_extensions:
@@ -127,7 +126,7 @@ def _format_graphql_execution_error(err: GraphQLError) -> dict[str, Any]:
     safe_message = _sanitize_graphql_message(err.message)
     safe_extensions = _sanitize_graphql_extensions(err.extensions)
     if not is_debug:
-        if _is_public_graphql_error(err, safe_extensions):
+        if _is_public_graphql_error(safe_extensions):
             public_payload: dict[str, Any] = {"message": safe_message}
             if safe_extensions:
                 public_payload["extensions"] = safe_extensions

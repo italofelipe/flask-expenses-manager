@@ -74,7 +74,7 @@ class InvestmentQueryMixin:
 
     def resolve_investment_operations(
         self,
-        info: graphene.ResolveInfo,
+        _info: graphene.ResolveInfo,
         investment_id: UUID,
         page: int,
         per_page: int,
@@ -108,7 +108,7 @@ class InvestmentQueryMixin:
         )
 
     def resolve_investment_operation_summary(
-        self, info: graphene.ResolveInfo, investment_id: UUID
+        self, _info: graphene.ResolveInfo, investment_id: UUID
     ) -> InvestmentOperationSummaryType:
         user = get_current_user_required()
         service = InvestmentApplicationService.with_defaults(user.id)
@@ -119,7 +119,7 @@ class InvestmentQueryMixin:
         return InvestmentOperationSummaryType(**summary)
 
     def resolve_investment_position(
-        self, info: graphene.ResolveInfo, investment_id: UUID
+        self, _info: graphene.ResolveInfo, investment_id: UUID
     ) -> InvestmentPositionType:
         user = get_current_user_required()
         service = InvestmentApplicationService.with_defaults(user.id)
@@ -130,7 +130,7 @@ class InvestmentQueryMixin:
         return InvestmentPositionType(**position)
 
     def resolve_investment_invested_amount(
-        self, info: graphene.ResolveInfo, investment_id: UUID, date: str
+        self, _info: graphene.ResolveInfo, investment_id: UUID, date: str
     ) -> InvestmentInvestedAmountType:
         user = get_current_user_required()
         service = InvestmentApplicationService.with_defaults(user.id)
@@ -141,7 +141,7 @@ class InvestmentQueryMixin:
         return InvestmentInvestedAmountType(**result)
 
     def resolve_investment_valuation(
-        self, info: graphene.ResolveInfo, investment_id: UUID
+        self, _info: graphene.ResolveInfo, investment_id: UUID
     ) -> PortfolioValuationItemType:
         user = get_current_user_required()
         _assert_owned_investment_access(investment_id, user.id)
@@ -153,7 +153,7 @@ class InvestmentQueryMixin:
         return PortfolioValuationItemType(**payload)
 
     def resolve_portfolio_valuation(
-        self, info: graphene.ResolveInfo
+        self, _info: graphene.ResolveInfo
     ) -> PortfolioValuationPayloadType:
         user = get_current_user_required()
         service = PortfolioValuationService(user.id)
@@ -165,7 +165,7 @@ class InvestmentQueryMixin:
 
     def resolve_portfolio_valuation_history(
         self,
-        info: graphene.ResolveInfo,
+        _info: graphene.ResolveInfo,
         start_date: str | None = None,
         final_date: str | None = None,
     ) -> PortfolioHistoryPayloadType:

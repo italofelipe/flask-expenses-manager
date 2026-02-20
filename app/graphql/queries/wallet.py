@@ -40,7 +40,7 @@ class WalletQueryMixin:
     tickers = graphene.List(TickerType)
 
     def resolve_wallet_entries(
-        self, info: graphene.ResolveInfo, page: int, per_page: int
+        self, _info: graphene.ResolveInfo, page: int, per_page: int
     ) -> WalletListPayloadType:
         _validate_pagination_values(page, per_page)
         user = get_current_user_required()
@@ -63,7 +63,7 @@ class WalletQueryMixin:
 
     def resolve_wallet_history(
         self,
-        info: graphene.ResolveInfo,
+        _info: graphene.ResolveInfo,
         investment_id: UUID,
         page: int,
         per_page: int,
@@ -96,7 +96,7 @@ class WalletQueryMixin:
             ),
         )
 
-    def resolve_tickers(self, info: graphene.ResolveInfo) -> list[TickerType]:
+    def resolve_tickers(self, _info: graphene.ResolveInfo) -> list[TickerType]:
         user = get_current_user_required()
         tickers = UserTicker.query.filter_by(user_id=user.id).all()
         return [
