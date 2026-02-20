@@ -33,6 +33,10 @@ TAGS = [
         "name": "Wallet",
         "description": "Gerenciamento da carteira de investimentos",
     },
+    {
+        "name": "Health",
+        "description": "Endpoint público para liveness/readiness de infraestrutura",
+    },
     {"name": "Contas", "description": "Gerenciamento de contas bancárias (pendente)"},
     {
         "name": "Cartões de Crédito",
