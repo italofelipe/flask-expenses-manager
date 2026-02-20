@@ -2,13 +2,17 @@ from __future__ import annotations
 
 import graphene
 
+from app.application.services.transaction_application_service import (
+    TransactionApplicationError,
+    TransactionApplicationService,
+)
 from app.graphql.auth import get_current_user_required
+from app.graphql.errors import build_public_graphql_error, to_public_graphql_code
 from app.graphql.queries.common import paginate, serialize_transaction_items
 from app.graphql.schema_utils import (
     _apply_due_date_range_filter,
     _apply_status_filter,
     _apply_type_filter,
-    _parse_month,
     _validate_pagination_values,
 )
 from app.graphql.types import (
@@ -20,9 +24,9 @@ from app.graphql.types import (
     TransactionDashboardPayloadType,
     TransactionListPayloadType,
     TransactionSummaryPayloadType,
+    TransactionTypeObject,
 )
-from app.models.transaction import Transaction, TransactionType
-from app.services.transaction_analytics_service import TransactionAnalyticsService
+from app.models.transaction import Transaction
 
 
 class TransactionQueryMixin:
@@ -84,71 +88,78 @@ class TransactionQueryMixin:
     ) -> TransactionSummaryPayloadType:
         _validate_pagination_values(page, page_size)
         user = get_current_user_required()
-        year, month_number = _parse_month(month)
-        analytics = TransactionAnalyticsService(user.id)
-        transactions = analytics.get_month_transactions(
-            year=year, month_number=month_number
-        )
-        aggregates = analytics.get_month_aggregates(
-            year=year, month_number=month_number
-        )
+        service = TransactionApplicationService.with_defaults(user.id)
+        try:
+            result = service.get_month_summary(
+                month=month,
+                page=page,
+                page_size=page_size,
+            )
+        except TransactionApplicationError as exc:
+            raise build_public_graphql_error(
+                exc.message,
+                code=to_public_graphql_code(exc.code),
+            ) from exc
 
-        total = len(transactions)
-        start = (page - 1) * page_size
-        end = start + page_size
-        paged_items = transactions[start:end]
+        paginated = result["paginated"]
         return TransactionSummaryPayloadType(
-            month=month,
-            income_total=float(aggregates["income_total"]),
-            expense_total=float(aggregates["expense_total"]),
-            items=serialize_transaction_items(paged_items),
-            pagination=paginate(total=total, page=page, per_page=page_size),
+            month=str(result["month"]),
+            income_total=float(result["income_total"]),
+            expense_total=float(result["expense_total"]),
+            items=[
+                TransactionTypeObject(**item)
+                for item in paginated["data"]
+                if isinstance(item, dict)
+            ],
+            pagination=paginate(
+                total=int(paginated["total"]),
+                page=int(paginated["page"]),
+                per_page=int(paginated["page_size"]),
+            ),
         )
 
     def resolve_transaction_dashboard(
         self, info: graphene.ResolveInfo, month: str
     ) -> TransactionDashboardPayloadType:
         user = get_current_user_required()
-        year, month_number = _parse_month(month)
-        analytics = TransactionAnalyticsService(user.id)
-        aggregates = analytics.get_month_aggregates(
-            year=year, month_number=month_number
-        )
-        status_counts = analytics.get_status_counts(
-            year=year, month_number=month_number
-        )
-        top_expense = analytics.get_top_categories(
-            year=year,
-            month_number=month_number,
-            transaction_type=TransactionType.EXPENSE,
-        )
-        top_income = analytics.get_top_categories(
-            year=year,
-            month_number=month_number,
-            transaction_type=TransactionType.INCOME,
-        )
+        service = TransactionApplicationService.with_defaults(user.id)
+        try:
+            result = service.get_month_dashboard(month=month)
+        except TransactionApplicationError as exc:
+            raise build_public_graphql_error(
+                exc.message,
+                code=to_public_graphql_code(exc.code),
+            ) from exc
 
         return TransactionDashboardPayloadType(
-            month=month,
+            month=str(result["month"]),
             totals=DashboardTotalsType(
-                income_total=float(aggregates["income_total"]),
-                expense_total=float(aggregates["expense_total"]),
-                balance=float(aggregates["balance"]),
+                income_total=float(result["income_total"]),
+                expense_total=float(result["expense_total"]),
+                balance=float(result["balance"]),
             ),
             counts=DashboardCountsType(
-                total_transactions=aggregates["total_transactions"],
-                income_transactions=aggregates["income_transactions"],
-                expense_transactions=aggregates["expense_transactions"],
+                total_transactions=int(result["counts"]["total_transactions"]),
+                income_transactions=int(result["counts"]["income_transactions"]),
+                expense_transactions=int(result["counts"]["expense_transactions"]),
                 status=DashboardStatusCountsType(
-                    paid=status_counts["paid"],
-                    pending=status_counts["pending"],
-                    cancelled=status_counts["cancelled"],
-                    postponed=status_counts["postponed"],
-                    overdue=status_counts["overdue"],
+                    paid=int(result["counts"]["status"]["paid"]),
+                    pending=int(result["counts"]["status"]["pending"]),
+                    cancelled=int(result["counts"]["status"]["cancelled"]),
+                    postponed=int(result["counts"]["status"]["postponed"]),
+                    overdue=int(result["counts"]["status"]["overdue"]),
                 ),
             ),
             top_categories=DashboardCategoriesType(
-                expense=[DashboardCategoryType(**item) for item in top_expense],
-                income=[DashboardCategoryType(**item) for item in top_income],
+                expense=[
+                    DashboardCategoryType(**item)
+                    for item in result["top_expense_categories"]
+                    if isinstance(item, dict)
+                ],
+                income=[
+                    DashboardCategoryType(**item)
+                    for item in result["top_income_categories"]
+                    if isinstance(item, dict)
+                ],
             ),
         )

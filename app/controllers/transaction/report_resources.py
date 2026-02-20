@@ -10,10 +10,12 @@ from flask_jwt_extended import get_jwt_identity, jwt_required
 from app.application.services.public_error_mapper_service import (
     map_validation_exception,
 )
+from app.application.services.transaction_application_service import (
+    TransactionApplicationError,
+)
 from app.extensions.database import db
 from app.models.transaction import Transaction, TransactionStatus, TransactionType
 from app.services.transaction_analytics_service import TransactionAnalyticsService
-from app.utils.pagination import PaginatedResponse
 
 from .dependencies import get_transaction_dependencies
 from .openapi import (
@@ -30,13 +32,15 @@ from .utils import (
     _compat_success,
     _guard_revoked_token,
     _internal_error_response,
-    _parse_month_param,
     _parse_optional_date,
     _parse_optional_uuid,
     _parse_positive_int,
     _resolve_transaction_ordering,
     serialize_transaction,
 )
+
+# Keep symbol available as monkeypatch target for legacy tests.
+_LEGACY_ANALYTICS_SERVICE = TransactionAnalyticsService
 
 
 def _validation_error_response(
@@ -64,37 +68,28 @@ class TransactionSummaryResource(MethodResource):
 
         user_uuid = UUID(get_jwt_identity())
         try:
-            year, month_number, month = _parse_month_param(request.args.get("month"))
             dependencies = get_transaction_dependencies()
-            analytics = dependencies.analytics_service_factory(user_uuid)
-            transactions = analytics.get_month_transactions(
-                year=year, month_number=month_number
+            service = dependencies.transaction_application_service_factory(user_uuid)
+            result = service.get_month_summary(
+                month=str(request.args.get("month", "")),
+                page=int(request.args.get("page", 1)),
+                page_size=int(request.args.get("page_size", 10)),
             )
-            aggregates = analytics.get_month_aggregates(
-                year=year, month_number=month_number
-            )
-
-            page = int(request.args.get("page", 1))
-            page_size = int(request.args.get("page_size", 10))
-
-            serialized = [serialize_transaction(item) for item in transactions]
-            paginated = PaginatedResponse.format(
-                serialized, len(transactions), page, page_size
-            )
+            paginated = result["paginated"]
 
             return _compat_success(
                 legacy_payload={
-                    "month": month,
-                    "income_total": float(aggregates["income_total"]),
-                    "expense_total": float(aggregates["expense_total"]),
+                    "month": result["month"],
+                    "income_total": result["income_total"],
+                    "expense_total": result["expense_total"],
                     **paginated,
                 },
                 status_code=200,
                 message="Resumo mensal calculado com sucesso",
                 data={
-                    "month": month,
-                    "income_total": float(aggregates["income_total"]),
-                    "expense_total": float(aggregates["expense_total"]),
+                    "month": result["month"],
+                    "income_total": result["income_total"],
+                    "expense_total": result["expense_total"],
                     "items": paginated["data"],
                 },
                 meta={
@@ -105,6 +100,14 @@ class TransactionSummaryResource(MethodResource):
                         "has_next_page": paginated["has_next_page"],
                     }
                 },
+            )
+        except TransactionApplicationError as exc:
+            return _compat_error(
+                legacy_payload={"error": exc.message, "details": exc.details},
+                status_code=exc.status_code,
+                message=exc.message,
+                error_code=exc.code,
+                details=exc.details,
             )
         except ValueError as exc:
             return _validation_error_response(
@@ -129,61 +132,45 @@ class TransactionMonthlyDashboardResource(MethodResource):
 
         user_uuid = UUID(get_jwt_identity())
         try:
-            year, month_number, month = _parse_month_param(request.args.get("month"))
             dependencies = get_transaction_dependencies()
-            analytics = dependencies.analytics_service_factory(user_uuid)
-            aggregates = analytics.get_month_aggregates(
-                year=year, month_number=month_number
-            )
-            status_counts = analytics.get_status_counts(
-                year=year, month_number=month_number
-            )
-            top_expense_categories = analytics.get_top_categories(
-                year=year,
-                month_number=month_number,
-                transaction_type=TransactionType.EXPENSE,
-            )
-            top_income_categories = analytics.get_top_categories(
-                year=year,
-                month_number=month_number,
-                transaction_type=TransactionType.INCOME,
+            service = dependencies.transaction_application_service_factory(user_uuid)
+            result = service.get_month_dashboard(
+                month=str(request.args.get("month", "")),
             )
 
             return _compat_success(
                 legacy_payload={
-                    "month": month,
-                    "income_total": float(aggregates["income_total"]),
-                    "expense_total": float(aggregates["expense_total"]),
-                    "balance": float(aggregates["balance"]),
-                    "counts": {
-                        "total_transactions": aggregates["total_transactions"],
-                        "income_transactions": aggregates["income_transactions"],
-                        "expense_transactions": aggregates["expense_transactions"],
-                        "status": status_counts,
-                    },
-                    "top_expense_categories": top_expense_categories,
-                    "top_income_categories": top_income_categories,
+                    "month": result["month"],
+                    "income_total": result["income_total"],
+                    "expense_total": result["expense_total"],
+                    "balance": result["balance"],
+                    "counts": result["counts"],
+                    "top_expense_categories": result["top_expense_categories"],
+                    "top_income_categories": result["top_income_categories"],
                 },
                 status_code=200,
                 message="Dashboard mensal calculado com sucesso",
                 data={
-                    "month": month,
+                    "month": result["month"],
                     "totals": {
-                        "income_total": float(aggregates["income_total"]),
-                        "expense_total": float(aggregates["expense_total"]),
-                        "balance": float(aggregates["balance"]),
+                        "income_total": result["income_total"],
+                        "expense_total": result["expense_total"],
+                        "balance": result["balance"],
                     },
-                    "counts": {
-                        "total_transactions": aggregates["total_transactions"],
-                        "income_transactions": aggregates["income_transactions"],
-                        "expense_transactions": aggregates["expense_transactions"],
-                        "status": status_counts,
-                    },
+                    "counts": result["counts"],
                     "top_categories": {
-                        "expense": top_expense_categories,
-                        "income": top_income_categories,
+                        "expense": result["top_expense_categories"],
+                        "income": result["top_income_categories"],
                     },
                 },
+            )
+        except TransactionApplicationError as exc:
+            return _compat_error(
+                legacy_payload={"error": exc.message, "details": exc.details},
+                status_code=exc.status_code,
+                message=exc.message,
+                error_code=exc.code,
+                details=exc.details,
             )
         except ValueError as exc:
             return _validation_error_response(

@@ -1,32 +1,18 @@
 from __future__ import annotations
 
-from decimal import Decimal
 from typing import Any
-from uuid import UUID, uuid4
+from uuid import UUID
 
 import graphene
-from dateutil.relativedelta import relativedelta
 
-from app.controllers.transaction.utils import (
-    _build_installment_amounts,
-    _validate_recurring_payload,
-    serialize_transaction,
+from app.application.services.transaction_application_service import (
+    TransactionApplicationError,
+    TransactionApplicationService,
 )
-from app.extensions.database import db
+from app.controllers.transaction.utils import _build_installment_amounts
 from app.graphql.auth import get_current_user_required
-from app.graphql.errors import (
-    GRAPHQL_ERROR_CODE_FORBIDDEN,
-    GRAPHQL_ERROR_CODE_NOT_FOUND,
-    GRAPHQL_ERROR_CODE_VALIDATION,
-    build_public_graphql_error,
-)
-from app.graphql.schema_utils import _parse_optional_date
+from app.graphql.errors import build_public_graphql_error, to_public_graphql_code
 from app.graphql.types import TransactionTypeObject
-from app.models.transaction import Transaction, TransactionStatus, TransactionType
-from app.services.transaction_reference_authorization_service import (
-    TransactionReferenceAuthorizationError,
-    enforce_transaction_reference_ownership,
-)
 
 
 class CreateTransactionMutation(graphene.Mutation):
@@ -55,116 +41,31 @@ class CreateTransactionMutation(graphene.Mutation):
         self, info: graphene.ResolveInfo, **kwargs: Any
     ) -> "CreateTransactionMutation":
         user = get_current_user_required()
-        due_date = _parse_optional_date(kwargs.get("due_date"), "due_date")
-        if due_date is None:
-            raise build_public_graphql_error(
-                "Parâmetro 'due_date' é obrigatório.",
-                code=GRAPHQL_ERROR_CODE_VALIDATION,
-            )
-        start_date = _parse_optional_date(kwargs.get("start_date"), "start_date")
-        end_date = _parse_optional_date(kwargs.get("end_date"), "end_date")
-        recurring_error = _validate_recurring_payload(
-            is_recurring=bool(kwargs.get("is_recurring", False)),
-            due_date=due_date,
-            start_date=start_date,
-            end_date=end_date,
+        service = TransactionApplicationService.with_defaults(UUID(str(user.id)))
+        payload = dict(kwargs)
+        payload["tag_id"] = kwargs.get("tag_id") or kwargs.get("tagId")
+        payload["account_id"] = kwargs.get("account_id") or kwargs.get("accountId")
+        payload["credit_card_id"] = kwargs.get("credit_card_id") or kwargs.get(
+            "creditCardId"
         )
-        if recurring_error:
-            raise build_public_graphql_error(
-                recurring_error,
-                code=GRAPHQL_ERROR_CODE_VALIDATION,
-            )
-
-        tx_type = str(kwargs["type"]).lower()
-        tx_status = str(kwargs.get("status", "pending")).lower()
-        amount = Decimal(str(kwargs["amount"]))
-        tag_id = kwargs.get("tag_id") or kwargs.get("tagId")
-        account_id = kwargs.get("account_id") or kwargs.get("accountId")
-        credit_card_id = kwargs.get("credit_card_id") or kwargs.get("creditCardId")
         try:
-            enforce_transaction_reference_ownership(
-                user_id=UUID(str(user.id)),
-                tag_id=tag_id,
-                account_id=account_id,
-                credit_card_id=credit_card_id,
+            result = service.create_transaction(
+                payload,
+                installment_amount_builder=_build_installment_amounts,
             )
-        except TransactionReferenceAuthorizationError as exc:
-            message = (
-                str(exc.args[0]) if exc.args else "Referência inválida para transação."
-            )
+        except TransactionApplicationError as exc:
             raise build_public_graphql_error(
-                message,
-                code=GRAPHQL_ERROR_CODE_VALIDATION,
+                exc.message,
+                code=to_public_graphql_code(exc.code),
             ) from exc
 
-        if kwargs.get("is_installment") and kwargs.get("installment_count"):
-            count = int(kwargs["installment_count"])
-            if count < 1:
-                raise build_public_graphql_error(
-                    "'installment_count' deve ser maior que zero.",
-                    code=GRAPHQL_ERROR_CODE_VALIDATION,
-                )
-            group_id = uuid4()
-            installment_amounts = _build_installment_amounts(amount, count)
-            created: list[Transaction] = []
-            for idx in range(count):
-                month_due_date = due_date + relativedelta(months=idx)
-                created.append(
-                    Transaction(
-                        user_id=UUID(str(user.id)),
-                        title=f"{kwargs['title']} ({idx + 1}/{count})",
-                        amount=installment_amounts[idx],
-                        type=TransactionType(tx_type),
-                        due_date=month_due_date,
-                        start_date=start_date,
-                        end_date=end_date,
-                        description=kwargs.get("description"),
-                        observation=kwargs.get("observation"),
-                        is_recurring=bool(kwargs.get("is_recurring", False)),
-                        is_installment=True,
-                        installment_count=count,
-                        tag_id=tag_id,
-                        account_id=account_id,
-                        credit_card_id=credit_card_id,
-                        status=TransactionStatus(tx_status),
-                        currency=str(kwargs.get("currency", "BRL")),
-                        installment_group_id=group_id,
-                    )
-                )
-            db.session.add_all(created)
-            db.session.commit()
-            return CreateTransactionMutation(
-                message="Transações parceladas criadas com sucesso",
-                items=[
-                    TransactionTypeObject(**serialize_transaction(item))
-                    for item in created
-                ],
-            )
-
-        transaction = Transaction(
-            user_id=UUID(str(user.id)),
-            title=kwargs["title"],
-            amount=amount,
-            type=TransactionType(tx_type),
-            due_date=due_date,
-            start_date=start_date,
-            end_date=end_date,
-            description=kwargs.get("description"),
-            observation=kwargs.get("observation"),
-            is_recurring=bool(kwargs.get("is_recurring", False)),
-            is_installment=bool(kwargs.get("is_installment", False)),
-            installment_count=kwargs.get("installment_count"),
-            tag_id=tag_id,
-            account_id=account_id,
-            credit_card_id=credit_card_id,
-            status=TransactionStatus(tx_status),
-            currency=str(kwargs.get("currency", "BRL")),
-        )
-        db.session.add(transaction)
-        db.session.commit()
         return CreateTransactionMutation(
-            message="Transação criada com sucesso",
-            items=[TransactionTypeObject(**serialize_transaction(transaction))],
+            message=str(result["message"]),
+            items=[
+                TransactionTypeObject(**item)
+                for item in result["items"]
+                if isinstance(item, dict)
+            ],
         )
 
 
@@ -179,21 +80,14 @@ class DeleteTransactionMutation(graphene.Mutation):
         self, info: graphene.ResolveInfo, transaction_id: UUID
     ) -> "DeleteTransactionMutation":
         user = get_current_user_required()
-        transaction = Transaction.query.filter_by(
-            id=transaction_id, deleted=False
-        ).first()
-        if not transaction:
+        service = TransactionApplicationService.with_defaults(UUID(str(user.id)))
+        try:
+            service.delete_transaction(transaction_id)
+        except TransactionApplicationError as exc:
             raise build_public_graphql_error(
-                "Transação não encontrada.",
-                code=GRAPHQL_ERROR_CODE_NOT_FOUND,
-            )
-        if str(transaction.user_id) != str(user.id):
-            raise build_public_graphql_error(
-                "Você não tem permissão para deletar esta transação.",
-                code=GRAPHQL_ERROR_CODE_FORBIDDEN,
-            )
-        transaction.deleted = True
-        db.session.commit()
+                exc.message,
+                code=to_public_graphql_code(exc.code),
+            ) from exc
         return DeleteTransactionMutation(
             ok=True, message="Transação deletada com sucesso (soft delete)."
         )
