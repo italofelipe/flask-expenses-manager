@@ -65,6 +65,18 @@ class TransactionSummaryPayloadType(graphene.ObjectType):
     pagination = graphene.Field(PaginationType, required=True)
 
 
+class TransactionDueCountsType(graphene.ObjectType):
+    total_transactions = graphene.Int(required=True)
+    income_transactions = graphene.Int(required=True)
+    expense_transactions = graphene.Int(required=True)
+
+
+class TransactionDueRangePayloadType(graphene.ObjectType):
+    items = graphene.List(TransactionTypeObject, required=True)
+    counts = graphene.Field(TransactionDueCountsType, required=True)
+    pagination = graphene.Field(PaginationType, required=True)
+
+
 class DashboardStatusCountsType(graphene.ObjectType):
     paid = graphene.Int(required=True)
     pending = graphene.Int(required=True)

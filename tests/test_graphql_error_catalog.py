@@ -319,6 +319,20 @@ def test_graphql_create_transaction_negative_installment_count_returns_validatio
     assert _first_error_code(response) == "VALIDATION_ERROR"
 
 
+def test_graphql_due_range_missing_period_returns_validation_code(client: Any) -> None:
+    token = _register_and_login_graphql(client, "graphql-due-range-missing-period")
+    query = """
+    query DueRange {
+      transactionDueRange(page: 1, perPage: 10) {
+        pagination { total }
+      }
+    }
+    """
+    response = _graphql(client, query, token=token)
+    assert response.status_code in {200, 400}
+    assert _first_error_code(response) == "VALIDATION_ERROR"
+
+
 def test_graphql_delete_transaction_not_found_returns_not_found_code(
     client: Any,
 ) -> None:
