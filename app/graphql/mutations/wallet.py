@@ -1,25 +1,18 @@
 from __future__ import annotations
 
 from datetime import date
-from decimal import Decimal
 from typing import Any
 from uuid import UUID
 
 import graphene
-from marshmallow import ValidationError
 
-from app.extensions.database import db
-from app.graphql.auth import get_current_user_required
-from app.graphql.errors import GRAPHQL_ERROR_CODE_VALIDATION, build_public_graphql_error
-from app.graphql.schema_utils import (
-    _get_owned_wallet_or_error,
-    _wallet_to_graphql_payload,
+from app.application.services.wallet_application_service import (
+    WalletApplicationError,
+    WalletApplicationService,
 )
+from app.graphql.auth import get_current_user_required
 from app.graphql.types import WalletType
-from app.models.wallet import Wallet
-from app.schemas.wallet_schema import WalletSchema
-from app.services.investment_service import InvestmentService
-from app.utils.datetime_utils import iso_utc_now_naive
+from app.graphql.wallet_presenters import raise_wallet_graphql_error, to_wallet_type
 
 
 class AddWalletEntryMutation(graphene.Mutation):
@@ -51,33 +44,12 @@ class AddWalletEntryMutation(graphene.Mutation):
             "target_withdraw_date": kwargs.get("target_withdraw_date"),
             "should_be_on_wallet": kwargs["should_be_on_wallet"],
         }
-        schema = WalletSchema()
+        service = WalletApplicationService.with_defaults(UUID(str(user.id)))
         try:
-            validated_data = schema.load(raw_data)
-        except ValidationError as exc:
-            raise build_public_graphql_error(
-                f"Dados inválidos: {exc.messages}",
-                code=GRAPHQL_ERROR_CODE_VALIDATION,
-            ) from exc
-        estimated_value = InvestmentService.calculate_estimated_value(validated_data)
-        wallet = Wallet(
-            user_id=user.id,
-            name=validated_data["name"],
-            value=validated_data.get("value"),
-            estimated_value_on_create_date=estimated_value,
-            ticker=validated_data.get("ticker"),
-            quantity=validated_data.get("quantity"),
-            asset_class=str(validated_data.get("asset_class", "custom")).lower(),
-            annual_rate=validated_data.get("annual_rate"),
-            register_date=validated_data["register_date"],
-            target_withdraw_date=validated_data.get("target_withdraw_date"),
-            should_be_on_wallet=validated_data["should_be_on_wallet"],
-        )
-        db.session.add(wallet)
-        db.session.commit()
-        return AddWalletEntryMutation(
-            item=WalletType(**_wallet_to_graphql_payload(wallet))
-        )
+            wallet_data = service.create_entry(raw_data)
+        except WalletApplicationError as exc:
+            raise_wallet_graphql_error(exc)
+        return AddWalletEntryMutation(item=to_wallet_type(wallet_data))
 
 
 class UpdateWalletEntryMutation(graphene.Mutation):
@@ -99,12 +71,6 @@ class UpdateWalletEntryMutation(graphene.Mutation):
         self, info: graphene.ResolveInfo, investment_id: UUID, **kwargs: Any
     ) -> "UpdateWalletEntryMutation":
         user = get_current_user_required()
-        investment = _get_owned_wallet_or_error(
-            investment_id,
-            user.id,
-            forbidden_message="Você não tem permissão para editar este investimento.",
-        )
-
         raw_payload: dict[str, Any] = {
             "name": kwargs.get("name"),
             "value": kwargs.get("value"),
@@ -116,59 +82,15 @@ class UpdateWalletEntryMutation(graphene.Mutation):
             "target_withdraw_date": kwargs.get("target_withdraw_date"),
             "should_be_on_wallet": kwargs.get("should_be_on_wallet"),
         }
-        payload = {k: v for k, v in raw_payload.items() if v is not None}
-        schema = WalletSchema(partial=True)
+        payload = {
+            key: value for key, value in raw_payload.items() if value is not None
+        }
+        service = WalletApplicationService.with_defaults(UUID(str(user.id)))
         try:
-            validated_data = schema.load(payload, partial=True)
-        except ValidationError as exc:
-            raise build_public_graphql_error(
-                f"Dados inválidos: {exc.messages}",
-                code=GRAPHQL_ERROR_CODE_VALIDATION,
-            ) from exc
-
-        original_quantity = investment.quantity
-        original_value = investment.value
-        for key, value in validated_data.items():
-            if key == "asset_class":
-                setattr(investment, key, str(value).lower())
-            elif key in {"value", "annual_rate"} and value is not None:
-                setattr(investment, key, Decimal(str(value)))
-            else:
-                setattr(investment, key, value)
-
-        if investment.ticker:
-            estimated_value = InvestmentService.calculate_estimated_value(
-                {"ticker": investment.ticker, "quantity": investment.quantity}
-            )
-            investment.estimated_value_on_create_date = estimated_value
-
-        if (
-            original_quantity != investment.quantity
-            or original_value != investment.value
-        ):
-            history = investment.history or []
-            history.append(
-                {
-                    "originalQuantity": original_quantity,
-                    "originalValue": (
-                        float(original_value) if original_value is not None else None
-                    ),
-                    "newQuantity": investment.quantity,
-                    "newValue": (
-                        float(investment.value)
-                        if investment.value is not None
-                        else None
-                    ),
-                    "changeType": "update",
-                    "changeDate": iso_utc_now_naive(),
-                }
-            )
-            investment.history = history
-
-        db.session.commit()
-        return UpdateWalletEntryMutation(
-            item=WalletType(**_wallet_to_graphql_payload(investment))
-        )
+            wallet_data = service.update_entry(investment_id, payload)
+        except WalletApplicationError as exc:
+            raise_wallet_graphql_error(exc)
+        return UpdateWalletEntryMutation(item=to_wallet_type(wallet_data))
 
 
 class DeleteWalletEntryMutation(graphene.Mutation):
@@ -182,13 +104,16 @@ class DeleteWalletEntryMutation(graphene.Mutation):
         self, info: graphene.ResolveInfo, investment_id: UUID
     ) -> "DeleteWalletEntryMutation":
         user = get_current_user_required()
-        investment = _get_owned_wallet_or_error(
-            investment_id,
-            user.id,
-            forbidden_message="Você não tem permissão para remover este investimento.",
-        )
-        db.session.delete(investment)
-        db.session.commit()
+        service = WalletApplicationService.with_defaults(UUID(str(user.id)))
+        try:
+            service.delete_entry(
+                investment_id,
+                forbidden_message=(
+                    "Você não tem permissão para remover este investimento."
+                ),
+            )
+        except WalletApplicationError as exc:
+            raise_wallet_graphql_error(exc)
         return DeleteWalletEntryMutation(
             ok=True, message="Investimento removido com sucesso"
         )

@@ -2,26 +2,19 @@
 
 from __future__ import annotations
 
-from datetime import date
-from decimal import Decimal
 from typing import Any
 from uuid import UUID
 
-from flask import current_app, request
+from flask import request
 from flask_apispec import doc, use_kwargs
 from flask_jwt_extended import get_jwt_identity, jwt_required
-from marshmallow import ValidationError, fields
+from marshmallow import fields
 
-from app.extensions.database import db
-from app.models.wallet import Wallet
-from app.schemas.wallet_schema import WalletSchema
-from app.utils.datetime_utils import iso_utc_now_naive
-from app.utils.pagination import PaginatedResponse
+from app.application.services.wallet_application_service import WalletApplicationError
 
 from .blueprint import wallet_bp
-from .contracts import compat_error, compat_success
+from .contracts import application_error_response, compat_success
 from .dependencies import get_wallet_dependencies
-from .serializers import serialize_wallet_item, serialize_wallet_items
 
 
 @wallet_bp.route("", methods=["POST"])
@@ -54,66 +47,26 @@ from .serializers import serialize_wallet_item, serialize_wallet_items
 )
 @jwt_required()
 def add_wallet_entry() -> tuple[dict[str, Any], int]:
-    """Adiciona um novo item à carteira do usuário com validação de ticker."""
-    user_id: UUID = UUID(get_jwt_identity())
-    data: dict[str, Any] = request.get_json()
-
-    schema = WalletSchema()
-
-    try:
-        validated_data = schema.load(data)
-    except ValidationError as err:
-        return compat_error(
-            legacy_payload={"error": "Dados inválidos", "messages": str(err.messages)},
-            status_code=400,
-            message="Dados inválidos",
-            error_code="VALIDATION_ERROR",
-            details={"messages": err.messages},
-        )
-
+    user_id = UUID(get_jwt_identity())
+    payload = request.get_json() or {}
     dependencies = get_wallet_dependencies()
-    estimated_value = dependencies.calculate_estimated_value(validated_data)
-    validated_data["estimated_value_on_create_date"] = estimated_value
+    service = dependencies.wallet_application_service_factory(user_id)
 
     try:
-        new_wallet = Wallet(
-            user_id=user_id,
-            name=validated_data["name"],
-            value=validated_data.get("value"),
-            estimated_value_on_create_date=validated_data[
-                "estimated_value_on_create_date"
-            ],
-            ticker=validated_data.get("ticker"),
-            quantity=validated_data.get("quantity"),
-            asset_class=str(validated_data.get("asset_class", "custom")).lower(),
-            annual_rate=validated_data.get("annual_rate"),
-            register_date=validated_data.get("register_date", date.today()),
-            target_withdraw_date=validated_data.get("target_withdraw_date"),
-            should_be_on_wallet=validated_data["should_be_on_wallet"],
-        )
-        db.session.add(new_wallet)
-        db.session.commit()
+        investment_data = service.create_entry(payload)
+    except WalletApplicationError as exc:
+        return application_error_response(exc)
 
-        investment_data = serialize_wallet_item(new_wallet)
-        legacy_payload = {
-            "message": "Ativo cadastrado com sucesso",
-            "investment": investment_data,
-        }
-        return compat_success(
-            legacy_payload=legacy_payload,
-            status_code=201,
-            message="Ativo cadastrado com sucesso",
-            data={"investment": investment_data},
-        )
-    except Exception:
-        db.session.rollback()
-        current_app.logger.exception("Erro inesperado ao criar investimento.")
-        return compat_error(
-            legacy_payload={"error": "Internal Server Error"},
-            status_code=500,
-            message="Internal Server Error",
-            error_code="INTERNAL_ERROR",
-        )
+    legacy_payload = {
+        "message": "Ativo cadastrado com sucesso",
+        "investment": investment_data,
+    }
+    return compat_success(
+        legacy_payload=legacy_payload,
+        status_code=201,
+        message="Ativo cadastrado com sucesso",
+        data={"investment": investment_data},
+    )
 
 
 @wallet_bp.route("", methods=["GET"])
@@ -143,22 +96,19 @@ def add_wallet_entry() -> tuple[dict[str, Any], int]:
 )
 @jwt_required()
 def list_wallet_entries(page: int, per_page: int) -> tuple[dict[str, Any], int]:
-    """Lista paginada dos investimentos do usuário autenticado."""
-    user_id: UUID = UUID(get_jwt_identity())
+    user_id = UUID(get_jwt_identity())
+    dependencies = get_wallet_dependencies()
+    service = dependencies.wallet_application_service_factory(user_id)
+    result = service.list_entries(page=page, per_page=per_page)
+    items = result["items"]
+    pagination = result["pagination"]
 
-    pagination = (
-        Wallet.query.filter_by(user_id=user_id)
-        .order_by(Wallet.created_at.desc())
-        .paginate(page=page, per_page=per_page, error_out=False)
-    )
-
-    items = serialize_wallet_items(pagination.items)
     legacy_payload = {
         "items": items,
-        "total": pagination.total,
-        "page": pagination.page,
-        "per_page": pagination.per_page,
-        "pages": pagination.pages,
+        "total": pagination["total"],
+        "page": pagination["page"],
+        "per_page": pagination["per_page"],
+        "pages": pagination["pages"],
     }
     return compat_success(
         legacy_payload=legacy_payload,
@@ -167,10 +117,10 @@ def list_wallet_entries(page: int, per_page: int) -> tuple[dict[str, Any], int]:
         data={"items": items},
         meta={
             "pagination": {
-                "total": pagination.total,
-                "page": pagination.page,
-                "per_page": pagination.per_page,
-                "pages": pagination.pages,
+                "total": pagination["total"],
+                "page": pagination["page"],
+                "per_page": pagination["per_page"],
+                "pages": pagination["pages"],
             }
         },
     )
@@ -203,71 +153,40 @@ def list_wallet_entries(page: int, per_page: int) -> tuple[dict[str, Any], int]:
 )
 @jwt_required()
 def get_wallet_history(investment_id: UUID) -> tuple[dict[str, Any], int]:
-    """Retorna histórico de alterações de um investimento específico, paginado."""
-    user_id: UUID = UUID(get_jwt_identity())
-    investment = Wallet.query.filter_by(id=investment_id).first()
-    if not investment:
-        return compat_error(
-            legacy_payload={"error": "Investimento não encontrado"},
-            status_code=404,
-            message="Investimento não encontrado",
-            error_code="NOT_FOUND",
-        )
-    if str(investment.user_id) != str(user_id):
-        return compat_error(
-            legacy_payload={
-                "error": "Você não tem permissão para ver o histórico "
-                "deste investimento."
-            },
-            status_code=403,
-            message="Você não tem permissão para ver o histórico deste investimento.",
-            error_code="FORBIDDEN",
-        )
-
+    user_id = UUID(get_jwt_identity())
+    dependencies = get_wallet_dependencies()
+    service = dependencies.wallet_application_service_factory(user_id)
     page = request.args.get("page", default=1, type=int)
     per_page = request.args.get("per_page", default=5, type=int)
+    if page is None:
+        page = 1
+    if per_page is None:
+        per_page = 5
 
-    history = investment.history or []
+    try:
+        result = service.get_history(investment_id, page=page, per_page=per_page)
+    except WalletApplicationError as exc:
+        return application_error_response(exc)
 
-    def _sort_key(item: dict[str, Any]) -> tuple[Any, str]:
-        qty = item.get("originalQuantity", 0) or 0
-        date_str = item.get("changeDate", "")
-        return (qty, date_str)
-
-    sorted_history = sorted(history, key=_sort_key, reverse=True)
-    total = len(sorted_history)
-
-    if per_page < 1 or per_page > 100:
-        return compat_error(
-            legacy_payload={"error": "Parâmetro 'per_page' inválido. Use 1-100."},
-            status_code=400,
-            message="Parâmetro 'per_page' inválido. Use 1-100.",
-            error_code="VALIDATION_ERROR",
-        )
-
-    start = (page - 1) * per_page
-    end = start + per_page
-    items = sorted_history[start:end]
-    current_page = page
-    current_per_page = per_page
-
-    response = PaginatedResponse.format(
-        data=items,
-        total=total,
-        page=current_page,
-        page_size=current_per_page,
-    )
+    pagination = result["pagination"]
+    history_response = {
+        "data": result["items"],
+        "total": pagination["total"],
+        "page": pagination["page"],
+        "page_size": pagination["page_size"],
+        "has_next_page": pagination["has_next_page"],
+    }
     return compat_success(
-        legacy_payload=response,
+        legacy_payload=history_response,
         status_code=200,
         message="Histórico do investimento retornado com sucesso",
-        data={"items": response["data"]},
+        data={"items": history_response["data"]},
         meta={
             "pagination": {
-                "total": response["total"],
-                "page": response["page"],
-                "per_page": response["page_size"],
-                "has_next_page": response["has_next_page"],
+                "total": history_response["total"],
+                "page": history_response["page"],
+                "per_page": history_response["page_size"],
+                "has_next_page": history_response["has_next_page"],
             }
         },
     )
@@ -296,143 +215,26 @@ def get_wallet_history(investment_id: UUID) -> tuple[dict[str, Any], int]:
 )
 @jwt_required()
 def update_wallet_entry(investment_id: UUID) -> tuple[dict[str, Any], int]:
-    """Atualiza um investimento existente (pertencente ao usuário autenticado)."""
-    user_id: UUID = UUID(get_jwt_identity())
-    data: dict[str, Any] = request.get_json()
-
-    investment = Wallet.query.filter_by(id=investment_id).first()
-    if investment and str(investment.user_id) != str(user_id):
-        return compat_error(
-            legacy_payload={
-                "error": "Você não tem permissão para editar este investimento."
-            },
-            status_code=403,
-            message="Você não tem permissão para editar este investimento.",
-            error_code="FORBIDDEN",
-        )
-    if not investment:
-        return compat_error(
-            legacy_payload={"error": "Investimento não encontrado"},
-            status_code=404,
-            message="Investimento não encontrado",
-            error_code="NOT_FOUND",
-        )
-
-    schema = WalletSchema(partial=True)
-    try:
-        validated_data = schema.load(data, partial=True)
-    except ValidationError as err:
-        return compat_error(
-            legacy_payload={"error": "Dados inválidos", "messages": str(err.messages)},
-            status_code=400,
-            message="Dados inválidos",
-            error_code="VALIDATION_ERROR",
-            details={"messages": err.messages},
-        )
-
-    _update_investment_history(investment, validated_data)
-    _apply_validated_fields(investment, validated_data)
-
-    return _commit_investment_update(investment)
-
-
-def _build_quantity_change(
-    investment: Wallet,
-    old_quantity: Any,
-    old_estimated: Any,
-) -> dict[str, Any]:
-    """Constrói registro de histórico para mudança de quantidade."""
+    user_id = UUID(get_jwt_identity())
+    payload = request.get_json() or {}
     dependencies = get_wallet_dependencies()
-    price = dependencies.get_market_price(investment.ticker)
-    return {
-        "changeDate": iso_utc_now_naive(),
-        "originalQuantity": old_quantity,
-        "estimated_value_on_create_date": (
-            float(old_estimated)
-            if isinstance(old_estimated, Decimal)
-            else old_estimated
-        ),
-        "originalValue": (
-            float(price) if isinstance(price, (int, float, Decimal)) else price
-        ),
-    }
+    service = dependencies.wallet_application_service_factory(user_id)
 
-
-def _build_value_change(old_value: Any) -> dict[str, Any]:
-    """Constrói registro de histórico para mudança de valor."""
-    return {
-        "originalValue": (
-            float(old_value) if isinstance(old_value, Decimal) else old_value
-        ),
-        "changeDate": iso_utc_now_naive(),
-    }
-
-
-def _update_investment_history(
-    investment: Wallet,
-    validated_data: dict[str, Any],
-) -> None:
-    """Atualiza o histórico do investimento se houver mudanças relevantes."""
-    old_quantity = investment.quantity
-    old_estimated = investment.estimated_value_on_create_date
-    old_value = investment.value
-
-    changes: dict[str, Any] = {}
-    if "quantity" in validated_data and validated_data["quantity"] != old_quantity:
-        changes = _build_quantity_change(investment, old_quantity, old_estimated)
-    elif "value" in validated_data and validated_data["value"] != old_value:
-        changes = _build_value_change(old_value)
-
-    if changes:
-        history = investment.history or []
-        history.append(changes)
-        investment.history = history
-
-
-def _apply_validated_fields(investment: Wallet, validated_data: dict[str, Any]) -> None:
-    """Aplica campos validados e recalcula valor estimado."""
-    for field, value in validated_data.items():
-        if field == "asset_class" and value is not None:
-            setattr(investment, field, str(value).lower())
-            continue
-        setattr(investment, field, value)
-
-    recalc_data = {
-        **validated_data,
-        "ticker": investment.ticker,
-        "value": investment.value,
-        "quantity": investment.quantity,
-    }
-    dependencies = get_wallet_dependencies()
-    new_estimate = dependencies.calculate_estimated_value(recalc_data)
-    investment.estimated_value_on_create_date = new_estimate
-
-
-def _commit_investment_update(investment: Wallet) -> tuple[dict[str, Any], int]:
-    """Persiste as alterações e retorna resposta formatada."""
     try:
-        db.session.commit()
-        investment_data = serialize_wallet_item(investment)
-        investment_data["history"] = investment.history
-        legacy_payload = {
-            "message": "Investimento atualizado com sucesso",
-            "investment": investment_data,
-        }
-        return compat_success(
-            legacy_payload=legacy_payload,
-            status_code=200,
-            message="Investimento atualizado com sucesso",
-            data={"investment": investment_data},
-        )
-    except Exception:
-        db.session.rollback()
-        current_app.logger.exception("Erro inesperado ao atualizar investimento.")
-        return compat_error(
-            legacy_payload={"error": "Erro interno"},
-            status_code=500,
-            message="Erro interno",
-            error_code="INTERNAL_ERROR",
-        )
+        investment_data = service.update_entry(investment_id, payload)
+    except WalletApplicationError as exc:
+        return application_error_response(exc)
+
+    legacy_payload = {
+        "message": "Investimento atualizado com sucesso",
+        "investment": investment_data,
+    }
+    return compat_success(
+        legacy_payload=legacy_payload,
+        status_code=200,
+        message="Investimento atualizado com sucesso",
+        data={"investment": investment_data},
+    )
 
 
 @wallet_bp.route("/<uuid:investment_id>", methods=["DELETE"])
@@ -458,40 +260,18 @@ def _commit_investment_update(investment: Wallet) -> tuple[dict[str, Any], int]:
 )
 @jwt_required()
 def delete_wallet_entry(investment_id: UUID) -> tuple[dict[str, Any], int]:
-    """Deleta um investimento existente (pertencente ao usuário autenticado)."""
-    user_id: UUID = UUID(get_jwt_identity())
-    investment = Wallet.query.filter_by(id=investment_id).first()
-    if not investment:
-        return compat_error(
-            legacy_payload={"error": "Investimento não encontrado"},
-            status_code=404,
-            message="Investimento não encontrado",
-            error_code="NOT_FOUND",
-        )
-    if str(investment.user_id) != str(user_id):
-        return compat_error(
-            legacy_payload={
-                "error": "Você não tem permissão para deletar este investimento."
-            },
-            status_code=403,
-            message="Você não tem permissão para deletar este investimento.",
-            error_code="FORBIDDEN",
-        )
+    user_id = UUID(get_jwt_identity())
+    dependencies = get_wallet_dependencies()
+    service = dependencies.wallet_application_service_factory(user_id)
+
     try:
-        db.session.delete(investment)
-        db.session.commit()
-        return compat_success(
-            legacy_payload={"message": "Investimento deletado com sucesso"},
-            status_code=200,
-            message="Investimento deletado com sucesso",
-            data={},
-        )
-    except Exception:
-        db.session.rollback()
-        current_app.logger.exception("Erro ao deletar investimento.")
-        return compat_error(
-            legacy_payload={"error": "Erro ao deletar investimento"},
-            status_code=500,
-            message="Erro ao deletar investimento",
-            error_code="INTERNAL_ERROR",
-        )
+        service.delete_entry(investment_id)
+    except WalletApplicationError as exc:
+        return application_error_response(exc)
+
+    return compat_success(
+        legacy_payload={"message": "Investimento deletado com sucesso"},
+        status_code=200,
+        message="Investimento deletado com sucesso",
+        data={},
+    )

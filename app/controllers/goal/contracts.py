@@ -4,11 +4,11 @@ from typing import Any
 
 from flask import Response
 
+from app.application.services.goal_application_service import GoalApplicationError
 from app.controllers.response_contract import (
     compat_error_response,
     compat_success_response,
 )
-from app.services.goal_service import GoalServiceError
 
 
 def compat_success(
@@ -45,7 +45,7 @@ def compat_error(
     )
 
 
-def goal_service_error_response(exc: GoalServiceError) -> Response:
+def goal_application_error_response(exc: GoalApplicationError) -> Response:
     return compat_error(
         legacy_payload={"error": exc.message, "details": exc.details},
         status_code=exc.status_code,

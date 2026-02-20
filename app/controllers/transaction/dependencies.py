@@ -6,6 +6,9 @@ from uuid import UUID
 
 from flask import Flask, current_app
 
+from app.application.services.transaction_application_service import (
+    TransactionApplicationService,
+)
 from app.services.transaction_analytics_service import TransactionAnalyticsService
 
 TRANSACTION_DEPENDENCIES_EXTENSION_KEY = "transaction_dependencies"
@@ -16,6 +19,9 @@ class TransactionDependencies:
     """Container for transaction dependency factories."""
 
     analytics_service_factory: Callable[[UUID], TransactionAnalyticsService]
+    transaction_application_service_factory: Callable[
+        [UUID], TransactionApplicationService
+    ]
 
 
 def _analytics_service_factory(user_id: UUID) -> TransactionAnalyticsService:
@@ -32,8 +38,19 @@ def _analytics_service_factory(user_id: UUID) -> TransactionAnalyticsService:
 
 
 def _default_dependencies() -> TransactionDependencies:
+    def _transaction_application_service_factory(
+        user_id: UUID,
+    ) -> TransactionApplicationService:
+        return TransactionApplicationService(
+            user_id=user_id,
+            analytics_service_factory=_analytics_service_factory,
+        )
+
     return TransactionDependencies(
         analytics_service_factory=_analytics_service_factory,
+        transaction_application_service_factory=(
+            _transaction_application_service_factory
+        ),
     )
 
 

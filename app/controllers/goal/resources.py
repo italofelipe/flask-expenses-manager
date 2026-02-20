@@ -9,14 +9,11 @@ from flask import request
 from flask_apispec import doc, use_kwargs
 from flask_apispec.views import MethodResource
 from flask_jwt_extended import get_jwt_identity, jwt_required
-from marshmallow import ValidationError, fields
+from marshmallow import fields
 
-from app.models.user import User
-from app.schemas.goal_planning_schema import GoalSimulationSchema
-from app.services.goal_planning_service import GoalPlanningInput
-from app.services.goal_service import GoalServiceError
+from app.application.services.goal_application_service import GoalApplicationError
 
-from .contracts import compat_error, compat_success, goal_service_error_response
+from .contracts import compat_success, goal_application_error_response
 from .dependencies import get_goal_dependencies
 
 
@@ -36,13 +33,12 @@ class GoalCollectionResource(MethodResource):
         user_id = UUID(get_jwt_identity())
         payload = request.get_json() or {}
         dependencies = get_goal_dependencies()
-        service = dependencies.goal_service_factory(user_id)
+        service = dependencies.goal_application_service_factory(user_id)
         try:
-            goal = service.create_goal(payload)
-        except GoalServiceError as exc:
-            return goal_service_error_response(exc)
+            goal_data = service.create_goal(payload)
+        except GoalApplicationError as exc:
+            return goal_application_error_response(exc)
 
-        goal_data = service.serialize(goal)
         return compat_success(
             legacy_payload={
                 "message": "Meta criada com sucesso",
@@ -91,17 +87,18 @@ class GoalCollectionResource(MethodResource):
     ) -> Any:
         user_id = UUID(get_jwt_identity())
         dependencies = get_goal_dependencies()
-        service = dependencies.goal_service_factory(user_id)
+        service = dependencies.goal_application_service_factory(user_id)
         try:
-            goals, pagination = service.list_goals(
+            result = service.list_goals(
                 page=page,
                 per_page=per_page,
                 status=status,
             )
-        except GoalServiceError as exc:
-            return goal_service_error_response(exc)
+        except GoalApplicationError as exc:
+            return goal_application_error_response(exc)
 
-        items = [service.serialize(goal) for goal in goals]
+        items = result["items"]
+        pagination = result["pagination"]
         return compat_success(
             legacy_payload={
                 "items": items,
@@ -131,13 +128,12 @@ class GoalResource(MethodResource):
     def get(self, goal_id: UUID) -> Any:
         user_id = UUID(get_jwt_identity())
         dependencies = get_goal_dependencies()
-        service = dependencies.goal_service_factory(user_id)
+        service = dependencies.goal_application_service_factory(user_id)
         try:
-            goal = service.get_goal(goal_id)
-        except GoalServiceError as exc:
-            return goal_service_error_response(exc)
+            goal_data = service.get_goal(goal_id)
+        except GoalApplicationError as exc:
+            return goal_application_error_response(exc)
 
-        goal_data = service.serialize(goal)
         return compat_success(
             legacy_payload={"goal": goal_data},
             status_code=200,
@@ -163,13 +159,12 @@ class GoalResource(MethodResource):
         user_id = UUID(get_jwt_identity())
         payload = request.get_json() or {}
         dependencies = get_goal_dependencies()
-        service = dependencies.goal_service_factory(user_id)
+        service = dependencies.goal_application_service_factory(user_id)
         try:
-            goal = service.update_goal(goal_id, payload)
-        except GoalServiceError as exc:
-            return goal_service_error_response(exc)
+            goal_data = service.update_goal(goal_id, payload)
+        except GoalApplicationError as exc:
+            return goal_application_error_response(exc)
 
-        goal_data = service.serialize(goal)
         return compat_success(
             legacy_payload={
                 "message": "Meta atualizada com sucesso",
@@ -196,11 +191,11 @@ class GoalResource(MethodResource):
     def delete(self, goal_id: UUID) -> Any:
         user_id = UUID(get_jwt_identity())
         dependencies = get_goal_dependencies()
-        service = dependencies.goal_service_factory(user_id)
+        service = dependencies.goal_application_service_factory(user_id)
         try:
             service.delete_goal(goal_id)
-        except GoalServiceError as exc:
-            return goal_service_error_response(exc)
+        except GoalApplicationError as exc:
+            return goal_application_error_response(exc)
 
         return compat_success(
             legacy_payload={"message": "Meta removida com sucesso"},
@@ -230,44 +225,22 @@ class GoalPlanResource(MethodResource):
     def get(self, goal_id: UUID) -> Any:
         user_id = UUID(get_jwt_identity())
         dependencies = get_goal_dependencies()
-        goal_service = dependencies.goal_service_factory(user_id)
+        service = dependencies.goal_application_service_factory(user_id)
         try:
-            goal = goal_service.get_goal(goal_id)
-        except GoalServiceError as exc:
-            return goal_service_error_response(exc)
-
-        user = User.query.filter_by(id=user_id).first()
-        if user is None:
-            return compat_error(
-                legacy_payload={"error": "Usuário não encontrado."},
-                status_code=404,
-                message="Usuário não encontrado.",
-                error_code="NOT_FOUND",
-            )
-
-        planning_service = dependencies.goal_planning_service_factory()
-        planning_input = GoalPlanningInput(
-            target_amount=goal.target_amount,
-            current_amount=goal.current_amount,
-            target_date=goal.target_date,
-            monthly_income=user.monthly_income,
-            monthly_expenses=user.monthly_expenses,
-            monthly_contribution=user.monthly_investment,
-        )
-        plan_payload = planning_service.serialize_plan(
-            planning_service.build_plan(planning_input)
-        )
+            result = service.get_goal_plan(goal_id)
+        except GoalApplicationError as exc:
+            return goal_application_error_response(exc)
 
         return compat_success(
             legacy_payload={
-                "goal": goal_service.serialize(goal),
-                "goal_plan": plan_payload,
+                "goal": result["goal"],
+                "goal_plan": result["goal_plan"],
             },
             status_code=200,
             message="Planejamento da meta calculado com sucesso",
             data={
-                "goal": goal_service.serialize(goal),
-                "goal_plan": plan_payload,
+                "goal": result["goal"],
+                "goal_plan": result["goal_plan"],
             },
         )
 
@@ -289,38 +262,17 @@ class GoalSimulationResource(MethodResource):
     @jwt_required()
     def post(self) -> Any:
         payload = request.get_json() or {}
-        schema = GoalSimulationSchema()
-        try:
-            validated = schema.load(payload)
-        except ValidationError as exc:
-            return compat_error(
-                legacy_payload={
-                    "error": "Dados inválidos para simulação de meta.",
-                    "details": {"messages": exc.messages},
-                },
-                status_code=400,
-                message="Dados inválidos para simulação de meta.",
-                error_code="VALIDATION_ERROR",
-                details={"messages": exc.messages},
-            )
-
+        user_id = UUID(get_jwt_identity())
         dependencies = get_goal_dependencies()
-        planning_service = dependencies.goal_planning_service_factory()
-        planning_input = GoalPlanningInput(
-            target_amount=validated["target_amount"],
-            current_amount=validated["current_amount"],
-            target_date=validated.get("target_date"),
-            monthly_income=validated.get("monthly_income"),
-            monthly_expenses=validated.get("monthly_expenses"),
-            monthly_contribution=validated.get("monthly_contribution"),
-        )
-        plan_payload = planning_service.serialize_plan(
-            planning_service.build_plan(planning_input)
-        )
+        service = dependencies.goal_application_service_factory(user_id)
+        try:
+            result = service.simulate_goal_plan(payload)
+        except GoalApplicationError as exc:
+            return goal_application_error_response(exc)
 
         return compat_success(
-            legacy_payload={"goal_plan": plan_payload},
+            legacy_payload={"goal_plan": result["goal_plan"]},
             status_code=200,
             message="Simulação da meta calculada com sucesso",
-            data={"goal_plan": plan_payload},
+            data={"goal_plan": result["goal_plan"]},
         )
