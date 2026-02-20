@@ -38,9 +38,10 @@ instance/
 *.gz
 *.zip
 *.tgz
-
+.mypy
 # Pytest cache
 .pytest_cache/
+.mypy_cache/
 
 # Migrations
 migrations/

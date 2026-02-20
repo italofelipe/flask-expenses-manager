@@ -14,11 +14,17 @@ Contract
 from __future__ import annotations
 
 from flask import Blueprint, Response, jsonify
+from flask_apispec import doc
 
 health_bp = Blueprint("health", __name__)
 
 
 @health_bp.get("/healthz")
+@doc(
+    description="Endpoint público de liveness para probes de infraestrutura.",
+    tags=["Health"],
+    responses={200: {"description": "Serviço saudável"}},
+)
 def healthz() -> tuple[Response, int]:
     """Liveness probe endpoint (public)."""
 

@@ -10,26 +10,14 @@ from flask_marshmallow import Marshmallow
 from flask_migrate import Migrate
 from sqlalchemy.pool import NullPool
 
-from app.controllers.auth_controller import (
-    AuthResource,
-    LogoutResource,
-    RegisterResource,
-    auth_bp,
-    register_auth_dependencies,
-)
+from app.controllers.auth_controller import auth_bp, register_auth_dependencies
 from app.controllers.graphql_controller import graphql_bp, register_graphql_dependencies
 from app.controllers.health_controller import health_bp
 from app.controllers.transaction_controller import (
-    TransactionResource,
     register_transaction_dependencies,
     transaction_bp,
 )
-from app.controllers.user_controller import (
-    UserMeResource,
-    UserProfileResource,
-    register_user_dependencies,
-    user_bp,
-)
+from app.controllers.user_controller import register_user_dependencies, user_bp
 from app.controllers.wallet_controller import register_wallet_dependencies, wallet_bp
 from app.docs.api_documentation import API_INFO, TAGS
 from app.docs.schema_name_resolver import resolve_openapi_schema_name
@@ -152,15 +140,15 @@ def create_app() -> Flask:
     app.register_blueprint(graphql_bp)
     app.register_blueprint(health_bp)
 
-    # Registra os endpoints documentados no Swagger
-    docs.register(RegisterResource, blueprint="auth", endpoint="registerresource")
-    docs.register(AuthResource, blueprint="auth", endpoint="authresource")
-    docs.register(UserProfileResource, blueprint="user", endpoint="profile")
-    docs.register(UserMeResource, blueprint="user", endpoint="me")
-    docs.register(LogoutResource, blueprint="auth", endpoint="logoutresource")
-    docs.register(
-        TransactionResource, blueprint="transaction", endpoint="transactionresource"
-    )
+    # Registra os endpoints documentados no Swagger com base no mapa real de rotas.
+    documented_blueprints = {"auth", "user", "transaction", "wallet", "health"}
+    for endpoint, view_func in sorted(app.view_functions.items()):
+        if "." not in endpoint:
+            continue
+        blueprint, endpoint_name = endpoint.split(".", 1)
+        if blueprint not in documented_blueprints:
+            continue
+        docs.register(view_func, blueprint=blueprint, endpoint=endpoint_name)
     from app.extensions.jwt_callbacks import register_jwt_callbacks
     from app.middleware.auth_guard import register_auth_guard
     from app.middleware.rate_limit import register_rate_limit_guard
