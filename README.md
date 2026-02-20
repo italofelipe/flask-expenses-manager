@@ -154,6 +154,9 @@ npm install -g newman
 - Schema GraphQL: `schema.graphql`
 - Docs por controller: `docs/controllers/`
 
+### Arquitetura
+- ADR validação runtime: `docs/adr/0001-validation-strategy.md`
+
 ### Segurança
 - Baseline OWASP: `docs/OWASP_S3_BASELINE.md`
 - Inventário de superfície: `docs/OWASP_S3_INVENTORY.md`
