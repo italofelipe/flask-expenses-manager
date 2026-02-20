@@ -416,12 +416,11 @@ Referência de padronização (Fase 0):
 - `/opt/auraxis/docs/PHASE0_RESPONSE_ADOPTION_PLAN.md`
 
 ## Lacunas e TODOs identificados no código (Fase 0)
-1. `transaction_controller.py` contém comentário TODO de enum para status/tipo, mas enums já existem no model e o TODO está desatualizado.
-2. Geração de recorrência foi implementada em serviço/script e com job agendado no GitHub Actions (`.github/workflows/recurrence-job.yml`), dependente de secrets para conexão no banco.
-3. Não há módulo de metas financeiras implementado (`goals`).
-4. Não há CRUD exposto para `Tag`, `Account` e `CreditCard` (existem model/schema, mas sem controller).
-5. A documentação histórica citava endpoints `/ticker` e `/transaction`; o código atual usa `/wallet` e `/transactions`, e o antigo `ticker_controller` REST foi removido.
-6. Projeto usa Marshmallow/Webargs em runtime; Pydantic não está implementado no fluxo atual.
+1. Geração de recorrência foi implementada em serviço/script e com job agendado no GitHub Actions (`.github/workflows/recurrence-job.yml`), dependente de secrets para conexão no banco.
+2. Não há módulo de metas financeiras implementado (`goals`).
+3. Não há CRUD exposto para `Tag`, `Account` e `CreditCard` (existem model/schema, mas sem controller).
+4. A documentação histórica citava endpoints `/ticker` e `/transaction`; o código atual usa `/wallet` e `/transactions`, e o antigo `ticker_controller` REST foi removido.
+5. Projeto usa Marshmallow/Webargs em runtime; Pydantic não está implementado no fluxo atual.
 
 ## Diretrizes para próximas implementações (senior baseline)
 - SOLID e separação clara entre Controller, Service e regras de domínio.
