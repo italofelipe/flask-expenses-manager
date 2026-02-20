@@ -1,0 +1,903 @@
+{
+  "info": {
+    "name": "Flask Expenses Manager API",
+    "description": "Complete API collection for the Flask Expenses Manager application.\n\n## Authentication\nMost endpoints require a JWT Bearer token. After logging in via `POST /auth/login`, copy the returned `token` and set it in the `auth_token` collection variable.\n\n## Variables\n- `base_url`: Your API base URL (e.g., `http://localhost:5000`)\n- `auth_token`: JWT token obtained from login\n- `investment_id`: UUID of a wallet investment entry\n- `operation_id`: UUID of an investment operation\n- `transaction_id`: UUID of a transaction\n- `goal_id`: UUID of a goal",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "auth": {
+    "type": "bearer",
+    "bearer": [
+      {
+        "key": "token",
+        "value": "{{auth_token}}",
+        "type": "string"
+      }
+    ]
+  },
+  "variable": [
+    {
+      "key": "base_url",
+      "value": "http://localhost:5000",
+      "type": "string"
+    },
+    {
+      "key": "auth_token",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "transaction_id",
+      "value": "00000000-0000-0000-0000-000000000000",
+      "type": "string"
+    },
+    {
+      "key": "goal_id",
+      "value": "00000000-0000-0000-0000-000000000000",
+      "type": "string"
+    },
+    {
+      "key": "investment_id",
+      "value": "00000000-0000-0000-0000-000000000000",
+      "type": "string"
+    },
+    {
+      "key": "operation_id",
+      "value": "00000000-0000-0000-0000-000000000000",
+      "type": "string"
+    }
+  ],
+  "item": [
+    {
+      "name": "Health",
+      "item": [
+        {
+          "name": "Health Check",
+          "request": {
+            "auth": {
+              "type": "noauth"
+            },
+            "method": "GET",
+            "header": [],
+            "url": "{{base_url}}/healthz",
+            "description": "Public liveness probe endpoint. Returns HTTP 200 with `{\"status\": \"ok\"}`. No authentication required."
+          }
+        }
+      ]
+    },
+    {
+      "name": "Auth",
+      "item": [
+        {
+          "name": "Register",
+          "request": {
+            "auth": {
+              "type": "noauth"
+            },
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"João Silva\",\n  \"email\": \"joao.silva@email.com\",\n  \"password\": \"MinhaSenha@123\"\n}"
+            },
+            "url": "{{base_url}}/auth/register",
+            "description": "Register a new user. Password must have at least 10 characters, one uppercase letter, one number, and one symbol."
+          }
+        },
+        {
+          "name": "Login",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.response.code === 200) {",
+                  "    var jsonData = pm.response.json();",
+                  "    var token = jsonData.token || (jsonData.data && jsonData.data.token);",
+                  "    if (token) {",
+                  "        pm.collectionVariables.set('auth_token', token);",
+                  "    }",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "auth": {
+              "type": "noauth"
+            },
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"joao.silva@email.com\",\n  \"password\": \"MinhaSenha@123\"\n}"
+            },
+            "url": "{{base_url}}/auth/login",
+            "description": "Authenticate with email (or name) and password. Returns a JWT token. The test script automatically saves the token to the `auth_token` collection variable."
+          }
+        },
+        {
+          "name": "Logout",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": "{{base_url}}/auth/logout",
+            "description": "Logout the authenticated user. Requires JWT Bearer token."
+          }
+        }
+      ]
+    },
+    {
+      "name": "User",
+      "item": [
+        {
+          "name": "Get My Profile",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/user/me?page=1&limit=10",
+              "host": ["{{base_url}}"],
+              "path": ["user", "me"],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "1",
+                  "description": "Page number"
+                },
+                {
+                  "key": "limit",
+                  "value": "10",
+                  "description": "Items per page"
+                },
+                {
+                  "key": "status",
+                  "value": "pending",
+                  "description": "Filter by transaction status (paid, pending, cancelled, postponed)",
+                  "disabled": true
+                },
+                {
+                  "key": "month",
+                  "value": "2024-01",
+                  "description": "Filter transactions by month (YYYY-MM)",
+                  "disabled": true
+                }
+              ]
+            },
+            "description": "Returns the authenticated user's profile data along with paginated transactions and wallet entries."
+          }
+        },
+        {
+          "name": "Update Profile",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"gender\": \"masculino\",\n  \"birth_date\": \"1990-05-15\",\n  \"monthly_income\": \"5000.00\",\n  \"net_worth\": \"100000.00\",\n  \"monthly_expenses\": \"2000.00\",\n  \"initial_investment\": \"10000.00\",\n  \"monthly_investment\": \"500.00\",\n  \"investment_goal_date\": \"2025-12-31\"\n}"
+            },
+            "url": "{{base_url}}/user/profile",
+            "description": "Update the authenticated user's profile. Accepts gender, birth_date, financial fields (monthly_income, net_worth, monthly_expenses, initial_investment, monthly_investment), and investment_goal_date."
+          }
+        }
+      ]
+    },
+    {
+      "name": "Transactions",
+      "item": [
+        {
+          "name": "Create Transaction",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"Pagamento da conta de luz\",\n  \"description\": \"Conta de energia elétrica do mês de janeiro\",\n  \"observation\": \"Pagar até o dia 10 para evitar multa\",\n  \"amount\": \"150.50\",\n  \"type\": \"expense\",\n  \"status\": \"pending\",\n  \"due_date\": \"2024-02-15\",\n  \"currency\": \"BRL\",\n  \"is_recurring\": false,\n  \"is_installment\": false\n}"
+            },
+            "url": "{{base_url}}/transactions",
+            "description": "Create a new transaction. Required fields: title, amount, type (income/expense), due_date. Optional: description, observation, status, currency, is_recurring, is_installment, installment_count, tag_id, account_id, credit_card_id, start_date, end_date, paid_at."
+          }
+        },
+        {
+          "name": "Update Transaction",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"Conta de luz atualizada\",\n  \"amount\": \"175.00\",\n  \"status\": \"paid\"\n}"
+            },
+            "url": "{{base_url}}/transactions/{{transaction_id}}",
+            "description": "Update an existing transaction by ID."
+          }
+        },
+        {
+          "name": "Delete Transaction (Soft)",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": "{{base_url}}/transactions/{{transaction_id}}",
+            "description": "Soft-delete a transaction by ID. The transaction can be restored later."
+          }
+        },
+        {
+          "name": "Restore Transaction",
+          "request": {
+            "method": "PATCH",
+            "header": [],
+            "url": "{{base_url}}/transactions/restore/{{transaction_id}}",
+            "description": "Restore a previously soft-deleted transaction."
+          }
+        },
+        {
+          "name": "Force Delete Transaction",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": "{{base_url}}/transactions/{{transaction_id}}/force",
+            "description": "Permanently delete a soft-deleted transaction. The transaction must already be in deleted state."
+          }
+        },
+        {
+          "name": "List Active Transactions",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/transactions/list?page=1&per_page=10",
+              "host": ["{{base_url}}"],
+              "path": ["transactions", "list"],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "1"
+                },
+                {
+                  "key": "per_page",
+                  "value": "10"
+                },
+                {
+                  "key": "type",
+                  "value": "expense",
+                  "description": "Filter by type: income or expense",
+                  "disabled": true
+                },
+                {
+                  "key": "status",
+                  "value": "pending",
+                  "description": "Filter by status: paid, pending, cancelled, postponed, overdue",
+                  "disabled": true
+                },
+                {
+                  "key": "start_date",
+                  "value": "2024-01-01",
+                  "description": "Filter by due_date >= start_date (YYYY-MM-DD)",
+                  "disabled": true
+                },
+                {
+                  "key": "end_date",
+                  "value": "2024-12-31",
+                  "description": "Filter by due_date <= end_date (YYYY-MM-DD)",
+                  "disabled": true
+                },
+                {
+                  "key": "tag_id",
+                  "value": "",
+                  "description": "Filter by tag UUID",
+                  "disabled": true
+                },
+                {
+                  "key": "account_id",
+                  "value": "",
+                  "description": "Filter by account UUID",
+                  "disabled": true
+                },
+                {
+                  "key": "credit_card_id",
+                  "value": "",
+                  "description": "Filter by credit card UUID",
+                  "disabled": true
+                }
+              ]
+            },
+            "description": "List active (non-deleted) transactions with pagination and optional filters."
+          }
+        },
+        {
+          "name": "List Deleted Transactions",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/transactions/deleted?page=1&per_page=10",
+              "host": ["{{base_url}}"],
+              "path": ["transactions", "deleted"],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "1"
+                },
+                {
+                  "key": "per_page",
+                  "value": "10"
+                }
+              ]
+            },
+            "description": "List soft-deleted transactions with pagination."
+          }
+        },
+        {
+          "name": "Monthly Summary",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/transactions/summary?month=2024-01&page=1&page_size=10",
+              "host": ["{{base_url}}"],
+              "path": ["transactions", "summary"],
+              "query": [
+                {
+                  "key": "month",
+                  "value": "2024-01",
+                  "description": "Month in YYYY-MM format"
+                },
+                {
+                  "key": "page",
+                  "value": "1"
+                },
+                {
+                  "key": "page_size",
+                  "value": "10"
+                }
+              ]
+            },
+            "description": "Get monthly income/expense summary with paginated transaction list."
+          }
+        },
+        {
+          "name": "Monthly Dashboard",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/transactions/dashboard?month=2024-01",
+              "host": ["{{base_url}}"],
+              "path": ["transactions", "dashboard"],
+              "query": [
+                {
+                  "key": "month",
+                  "value": "2024-01",
+                  "description": "Month in YYYY-MM format"
+                }
+              ]
+            },
+            "description": "Get monthly dashboard with totals, balance, counts, and top expense/income categories."
+          }
+        },
+        {
+          "name": "List Expenses by Period",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/transactions/expenses?startDate=2024-01-01&finalDate=2024-12-31&page=1&per_page=10&order_by=due_date&order=desc",
+              "host": ["{{base_url}}"],
+              "path": ["transactions", "expenses"],
+              "query": [
+                {
+                  "key": "startDate",
+                  "value": "2024-01-01",
+                  "description": "Start date (YYYY-MM-DD). At least one date param required."
+                },
+                {
+                  "key": "finalDate",
+                  "value": "2024-12-31",
+                  "description": "End date (YYYY-MM-DD). At least one date param required."
+                },
+                {
+                  "key": "page",
+                  "value": "1"
+                },
+                {
+                  "key": "per_page",
+                  "value": "10"
+                },
+                {
+                  "key": "order_by",
+                  "value": "due_date",
+                  "description": "Order field (default: due_date)"
+                },
+                {
+                  "key": "order",
+                  "value": "desc",
+                  "description": "Order direction: asc or desc"
+                }
+              ]
+            },
+            "description": "List expense transactions within a date range. At least one of startDate or finalDate is required."
+          }
+        },
+        {
+          "name": "List Due Transactions by Range",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/transactions/due-range?startDate=2024-01-01&finalDate=2024-12-31&page=1&per_page=10",
+              "host": ["{{base_url}}"],
+              "path": ["transactions", "due-range"],
+              "query": [
+                {
+                  "key": "startDate",
+                  "value": "2024-01-01",
+                  "description": "Start date (YYYY-MM-DD)"
+                },
+                {
+                  "key": "finalDate",
+                  "value": "2024-12-31",
+                  "description": "End date (YYYY-MM-DD)"
+                },
+                {
+                  "key": "page",
+                  "value": "1"
+                },
+                {
+                  "key": "per_page",
+                  "value": "10"
+                }
+              ]
+            },
+            "description": "List transactions due within a date range with pagination."
+          }
+        }
+      ]
+    },
+    {
+      "name": "Goals",
+      "item": [
+        {
+          "name": "List Goals",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/goals?page=1&per_page=10",
+              "host": ["{{base_url}}"],
+              "path": ["goals"],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "1"
+                },
+                {
+                  "key": "per_page",
+                  "value": "10"
+                },
+                {
+                  "key": "status",
+                  "value": "active",
+                  "description": "Filter by status: active, completed, paused, cancelled",
+                  "disabled": true
+                }
+              ]
+            },
+            "description": "List the authenticated user's goals with pagination and optional status filter."
+          }
+        },
+        {
+          "name": "Create Goal",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"Reserva de emergência\",\n  \"description\": \"Juntar 6 meses de despesas\",\n  \"category\": \"savings\",\n  \"target_amount\": \"18000.00\",\n  \"current_amount\": \"5000.00\",\n  \"priority\": 1,\n  \"target_date\": \"2025-12-31\",\n  \"status\": \"active\"\n}"
+            },
+            "url": "{{base_url}}/goals",
+            "description": "Create a new financial goal. Required: title, target_amount. Optional: description, category, current_amount, priority (1-5), target_date, status."
+          }
+        },
+        {
+          "name": "Get Goal",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{base_url}}/goals/{{goal_id}}",
+            "description": "Get a specific goal by ID."
+          }
+        },
+        {
+          "name": "Update Goal",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"current_amount\": \"8000.00\",\n  \"priority\": 2\n}"
+            },
+            "url": "{{base_url}}/goals/{{goal_id}}",
+            "description": "Update an existing goal by ID."
+          }
+        },
+        {
+          "name": "Delete Goal",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": "{{base_url}}/goals/{{goal_id}}",
+            "description": "Delete a goal by ID."
+          }
+        },
+        {
+          "name": "Get Goal Plan",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{base_url}}/goals/{{goal_id}}/plan",
+            "description": "Calculate the goal plan considering user's income, expenses, and contribution capacity."
+          }
+        },
+        {
+          "name": "Simulate Goal Plan",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"target_amount\": \"50000.00\",\n  \"current_amount\": \"10000.00\",\n  \"target_date\": \"2026-06-30\",\n  \"monthly_income\": \"8000.00\",\n  \"monthly_expenses\": \"5000.00\",\n  \"monthly_contribution\": \"1500.00\"\n}"
+            },
+            "url": "{{base_url}}/goals/simulate",
+            "description": "Run a what-if goal simulation without persisting data. Returns projection and actionable recommendations."
+          }
+        }
+      ]
+    },
+    {
+      "name": "Wallet",
+      "item": [
+        {
+          "name": "Entries",
+          "item": [
+            {
+              "name": "Add Wallet Entry",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"name\": \"Poupança\",\n  \"value\": 1500.00,\n  \"register_date\": \"2024-07-01\",\n  \"should_be_on_wallet\": true,\n  \"asset_class\": \"custom\"\n}"
+                },
+                "url": "{{base_url}}/wallet",
+                "description": "Add a new wallet entry. Use `value` for fixed-value assets or `ticker` + `quantity` for market assets. If ticker is provided, value is ignored. Asset classes: custom, stock, fii, etf, bdr, crypto, cdb, cdi, lci, lca, tesouro, fund."
+              }
+            },
+            {
+              "name": "Add Wallet Entry (with Ticker)",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"name\": \"Investimento PETR4\",\n  \"ticker\": \"PETR4\",\n  \"quantity\": 10,\n  \"register_date\": \"2024-07-01\",\n  \"should_be_on_wallet\": true,\n  \"asset_class\": \"stock\"\n}"
+                },
+                "url": "{{base_url}}/wallet",
+                "description": "Add a market asset to the wallet using a ticker symbol. Requires ticker, quantity, and asset_class (stock, fii, etf, bdr, crypto)."
+              }
+            },
+            {
+              "name": "List Wallet Entries",
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{base_url}}/wallet?page=1&per_page=10",
+                  "host": ["{{base_url}}"],
+                  "path": ["wallet"],
+                  "query": [
+                    {
+                      "key": "page",
+                      "value": "1"
+                    },
+                    {
+                      "key": "per_page",
+                      "value": "10"
+                    }
+                  ]
+                },
+                "description": "List wallet entries with pagination."
+              }
+            },
+            {
+              "name": "Update Wallet Entry",
+              "request": {
+                "method": "PUT",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"name\": \"Poupança Atualizada\",\n  \"value\": 2000.00,\n  \"should_be_on_wallet\": true\n}"
+                },
+                "url": "{{base_url}}/wallet/{{investment_id}}",
+                "description": "Update an existing wallet entry by investment ID."
+              }
+            },
+            {
+              "name": "Delete Wallet Entry",
+              "request": {
+                "method": "DELETE",
+                "header": [],
+                "url": "{{base_url}}/wallet/{{investment_id}}",
+                "description": "Delete a wallet entry by investment ID."
+              }
+            },
+            {
+              "name": "Get Wallet Entry History",
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{base_url}}/wallet/{{investment_id}}/history?page=1&per_page=5",
+                  "host": ["{{base_url}}"],
+                  "path": ["wallet", "{{investment_id}}", "history"],
+                  "query": [
+                    {
+                      "key": "page",
+                      "value": "1"
+                    },
+                    {
+                      "key": "per_page",
+                      "value": "5",
+                      "description": "Items per page (0 for all)"
+                    }
+                  ]
+                },
+                "description": "Get the change history of a wallet entry, paginated and ordered."
+              }
+            }
+          ]
+        },
+        {
+          "name": "Operations",
+          "item": [
+            {
+              "name": "Create Operation",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"operation_type\": \"buy\",\n  \"quantity\": \"10\",\n  \"unit_price\": \"35.50\",\n  \"fees\": \"5.00\",\n  \"executed_at\": \"2024-07-15\",\n  \"notes\": \"Compra mensal programada\"\n}"
+                },
+                "url": "{{base_url}}/wallet/{{investment_id}}/operations",
+                "description": "Register a buy or sell operation for a wallet investment. Required: operation_type (buy/sell), quantity, unit_price. Optional: fees, executed_at, notes."
+              }
+            },
+            {
+              "name": "List Operations",
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{base_url}}/wallet/{{investment_id}}/operations?page=1&per_page=10",
+                  "host": ["{{base_url}}"],
+                  "path": ["wallet", "{{investment_id}}", "operations"],
+                  "query": [
+                    {
+                      "key": "page",
+                      "value": "1"
+                    },
+                    {
+                      "key": "per_page",
+                      "value": "10"
+                    }
+                  ]
+                },
+                "description": "List investment operations with pagination."
+              }
+            },
+            {
+              "name": "Update Operation",
+              "request": {
+                "method": "PUT",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"quantity\": \"15\",\n  \"unit_price\": \"36.00\",\n  \"fees\": \"7.50\"\n}"
+                },
+                "url": "{{base_url}}/wallet/{{investment_id}}/operations/{{operation_id}}",
+                "description": "Update an existing investment operation."
+              }
+            },
+            {
+              "name": "Delete Operation",
+              "request": {
+                "method": "DELETE",
+                "header": [],
+                "url": "{{base_url}}/wallet/{{investment_id}}/operations/{{operation_id}}",
+                "description": "Delete an investment operation."
+              }
+            },
+            {
+              "name": "Get Operations Summary",
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": "{{base_url}}/wallet/{{investment_id}}/operations/summary",
+                "description": "Get an aggregated summary of all operations for an investment."
+              }
+            },
+            {
+              "name": "Get Investment Position",
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": "{{base_url}}/wallet/{{investment_id}}/operations/position",
+                "description": "Get the current position and average cost of an investment based on registered operations."
+              }
+            },
+            {
+              "name": "Get Invested Amount by Date",
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{base_url}}/wallet/{{investment_id}}/operations/invested-amount?date=2024-07-15",
+                  "host": ["{{base_url}}"],
+                  "path": ["wallet", "{{investment_id}}", "operations", "invested-amount"],
+                  "query": [
+                    {
+                      "key": "date",
+                      "value": "2024-07-15",
+                      "description": "Date in YYYY-MM-DD format (required)"
+                    }
+                  ]
+                },
+                "description": "Get the invested amount on a specific date, considering buy and sell operations."
+              }
+            }
+          ]
+        },
+        {
+          "name": "Valuation",
+          "item": [
+            {
+              "name": "Get Portfolio Valuation",
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": "{{base_url}}/wallet/valuation",
+                "description": "Get the current consolidated portfolio valuation with per-investment breakdown."
+              }
+            },
+            {
+              "name": "Get Portfolio Valuation History",
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{base_url}}/wallet/valuation/history",
+                  "host": ["{{base_url}}"],
+                  "path": ["wallet", "valuation", "history"],
+                  "query": [
+                    {
+                      "key": "startDate",
+                      "value": "2024-01-01",
+                      "description": "Start date (YYYY-MM-DD, optional)",
+                      "disabled": true
+                    },
+                    {
+                      "key": "finalDate",
+                      "value": "2024-12-31",
+                      "description": "End date (YYYY-MM-DD, optional)",
+                      "disabled": true
+                    }
+                  ]
+                },
+                "description": "Get daily portfolio evolution history with buy/sell totals and cumulative net invested value."
+              }
+            },
+            {
+              "name": "Get Investment Valuation",
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": "{{base_url}}/wallet/{{investment_id}}/valuation",
+                "description": "Get the current valuation of a specific investment."
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "GraphQL",
+      "item": [
+        {
+          "name": "GraphQL Query",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "graphql",
+              "graphql": {
+                "query": "query {\n  me {\n    id\n    name\n    email\n  }\n}",
+                "variables": "{}"
+              }
+            },
+            "url": "{{base_url}}/graphql",
+            "description": "Execute GraphQL queries and mutations. The API supports queries for users, transactions, goals, wallet, and investments, as well as mutations for CRUD operations."
+          }
+        }
+      ]
+    }
+  ]
+}

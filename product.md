@@ -72,6 +72,26 @@ A proposta central e transformar dados financeiros do usuario em visibilidade de
 3. Privacidade, minimizacao de dados e trilha de auditoria.
 4. Modo advisory-only, sem execucao automatica financeira.
 
+## Discovery de Produto & Analise Competitiva (2026-02-20)
+
+### Posicionamento de Mercado
+O Auraxis diferencia-se de apps como **Mobills, Despezzas e Organizze** ao mover o foco do "Registro de Passado" (Fluxo de Caixa) para o "Planejamento de Futuro" (Investimentos e Metas). Enquanto os concorrentes focam em automacao de despesas, o Auraxis foca em simulacao de destino e impacto de comportamento.
+
+### Gaps e Lacunas Identificadas
+| Feature | Descricao | Impacto (0-10) | ETA Estimado |
+| :--- | :--- | :---: | :---: |
+| **Open Finance** | Integracao automatica com bancos para reduzir atrito de entrada de dados. | 10 | 6-8 semanas |
+| **Gestao de Cartao** | Controle detalhado de faturas, limites e parcelamentos (dor central do BR). | 8 | 3-4 semanas |
+| **Recorrencia Inteligente** | Previsao automatica de contas fixas no fluxo de caixa futuro. | 7 | 2 semanas |
+
+### Oportunidades e "Oceanos Azuis"
+| Feature | Descricao | Impacto (0-10) | ETA Estimado |
+| :--- | :--- | :---: | :---: |
+| **Sinergia Investimento x Meta** | O rendimento real da carteira atualiza automaticamente a previsao de conclusao da meta. | 9 | 3 semanas |
+| **IA com Explicabilidade** | Sugestoes que explicam o "porquê" (ex: "Sugerimos X porque sua liquidez em Y permite"). | 9 | 6-10 semanas |
+| **Goal Sandbox (Simulador)** | Interface em tempo real para o usuario testar cenarios "e se eu aportar mais R$ 100?". | 8 | 2 semanas |
+| **Indice de Sobrevivencia** | Calculo de "Burn Rate" - quanto tempo o patrimonio sustenta o custo de vida atual. | 7 | 1 semana |
+
 ## Governanca documental
 1. `product.md`: estrategia, direcao e decisoes de produto.
 2. `TASKS.md`: backlog executavel, prioridades, riscos, progresso e commits.
