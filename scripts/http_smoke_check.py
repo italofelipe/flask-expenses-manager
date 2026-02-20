@@ -61,6 +61,13 @@ def _result_from_status(status: int, body_text: str) -> HttpResult:
     )
 
 
+def _safe_http_error_body(exc: urllib.error.HTTPError) -> str:
+    try:
+        return exc.read().decode("utf-8", errors="replace")
+    except OSError:
+        return ""
+
+
 def _request_json(
     *,
     method: str,
@@ -95,7 +102,7 @@ def _request_json(
                 body_text = response.read().decode("utf-8", errors="replace")
                 return _result_from_status(response.status, body_text)
         except urllib.error.HTTPError as exc:
-            body_text = exc.read().decode("utf-8", errors="replace")
+            body_text = _safe_http_error_body(exc)
             status = int(exc.code)
             if status in redirect_statuses:
                 location = exc.headers.get("Location")
