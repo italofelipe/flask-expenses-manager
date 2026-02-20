@@ -1,6 +1,6 @@
-# wallet_controller.py
+# wallet controller
 
-Arquivo: `/opt/auraxis/app/controllers/wallet_controller.py`
+Pacote: `app/controllers/wallet/`
 
 ## Responsabilidade
 Gerenciar carteira de investimentos do usuário:

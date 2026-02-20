@@ -1,10 +1,4 @@
 type Query {
-  me: UserType
-  transactions(page: Int = 1, perPage: Int = 10, type: String, status: String, startDate: String, endDate: String): TransactionListPayloadType
-  transactionSummary(month: String!, page: Int = 1, pageSize: Int = 10): TransactionSummaryPayloadType
-  transactionDashboard(month: String!): TransactionDashboardPayloadType
-  walletEntries(page: Int = 1, perPage: Int = 10): WalletListPayloadType
-  walletHistory(investmentId: UUID!, page: Int = 1, perPage: Int = 5): WalletHistoryPayloadType
   investmentOperations(investmentId: UUID!, page: Int = 1, perPage: Int = 10): InvestmentOperationListPayloadType
   investmentOperationSummary(investmentId: UUID!): InvestmentOperationSummaryType
   investmentPosition(investmentId: UUID!): InvestmentPositionType
@@ -12,141 +6,18 @@ type Query {
   investmentValuation(investmentId: UUID!): PortfolioValuationItemType
   portfolioValuation: PortfolioValuationPayloadType
   portfolioValuationHistory(startDate: String, finalDate: String): PortfolioHistoryPayloadType
+  walletEntries(page: Int = 1, perPage: Int = 10): WalletListPayloadType
+  walletHistory(investmentId: UUID!, page: Int = 1, perPage: Int = 5): WalletHistoryPayloadType
   tickers: [TickerType]
+  goals(page: Int = 1, perPage: Int = 10, status: String): GoalListPayloadType
+  goal(goalId: UUID!): GoalTypeObject
+  goalPlan(goalId: UUID!): GoalPlanType
+  transactions(page: Int = 1, perPage: Int = 10, type: String, status: String, startDate: String, endDate: String): TransactionListPayloadType
+  transactionSummary(month: String!, page: Int = 1, pageSize: Int = 10): TransactionSummaryPayloadType
+  transactionDashboard(month: String!): TransactionDashboardPayloadType
+  transactionDueRange(initialDate: String, finalDate: String, page: Int = 1, perPage: Int = 10, orderBy: String = "overdue_first"): TransactionDueRangePayloadType
+  me: UserType
 }
-
-type UserType {
-  id: ID!
-  name: String!
-  email: String!
-  gender: String
-  birthDate: String
-  monthlyIncome: Float
-  netWorth: Float
-  monthlyExpenses: Float
-  initialInvestment: Float
-  monthlyInvestment: Float
-  investmentGoalDate: String
-}
-
-type TransactionListPayloadType {
-  items: [TransactionTypeObject]!
-  pagination: PaginationType!
-}
-
-type TransactionTypeObject {
-  id: ID!
-  title: String!
-  amount: String!
-  type: String!
-  dueDate: String!
-  startDate: String
-  endDate: String
-  description: String
-  observation: String
-  isRecurring: Boolean!
-  isInstallment: Boolean!
-  installmentCount: Int
-  tagId: String
-  accountId: String
-  creditCardId: String
-  status: String!
-  currency: String!
-  createdAt: String
-  updatedAt: String
-}
-
-type PaginationType {
-  total: Int!
-  page: Int!
-  perPage: Int!
-  pages: Int
-}
-
-type TransactionSummaryPayloadType {
-  month: String!
-  incomeTotal: Float!
-  expenseTotal: Float!
-  items: [TransactionTypeObject]!
-  pagination: PaginationType!
-}
-
-type TransactionDashboardPayloadType {
-  month: String!
-  totals: DashboardTotalsType!
-  counts: DashboardCountsType!
-  topCategories: DashboardCategoriesType!
-}
-
-type DashboardTotalsType {
-  incomeTotal: Float!
-  expenseTotal: Float!
-  balance: Float!
-}
-
-type DashboardCountsType {
-  totalTransactions: Int!
-  incomeTransactions: Int!
-  expenseTransactions: Int!
-  status: DashboardStatusCountsType!
-}
-
-type DashboardStatusCountsType {
-  paid: Int!
-  pending: Int!
-  cancelled: Int!
-  postponed: Int!
-  overdue: Int!
-}
-
-type DashboardCategoriesType {
-  expense: [DashboardCategoryType]!
-  income: [DashboardCategoryType]!
-}
-
-type DashboardCategoryType {
-  tagId: String
-  categoryName: String!
-  totalAmount: Float!
-  transactionsCount: Int!
-}
-
-type WalletListPayloadType {
-  items: [WalletType]!
-  pagination: PaginationType!
-}
-
-type WalletType {
-  id: ID!
-  name: String!
-  value: Float
-  estimatedValueOnCreateDate: Float
-  ticker: String
-  quantity: Int
-  assetClass: String!
-  annualRate: Float
-  registerDate: String!
-  targetWithdrawDate: String
-  shouldBeOnWallet: Boolean!
-}
-
-type WalletHistoryPayloadType {
-  items: [WalletHistoryItemType]!
-  pagination: PaginationType!
-}
-
-type WalletHistoryItemType {
-  originalQuantity: Float
-  originalValue: Float
-  changeType: String
-  changeDate: String
-}
-
-"""
-Leverages the internal Python implementation of UUID (uuid.UUID) to provide native UUID objects
-in fields, resolvers and input.
-"""
-scalar UUID
 
 type InvestmentOperationListPayloadType {
   items: [InvestmentOperationType]!
@@ -166,6 +37,19 @@ type InvestmentOperationType {
   createdAt: String
   updatedAt: String
 }
+
+type PaginationType {
+  total: Int!
+  page: Int!
+  perPage: Int!
+  pages: Int
+}
+
+"""
+Leverages the internal Python implementation of UUID (uuid.UUID) to provide native UUID objects
+in fields, resolvers and input.
+"""
+scalar UUID
 
 type InvestmentOperationSummaryType {
   totalOperations: Int!
@@ -264,11 +148,183 @@ type PortfolioHistoryItemType {
   totalProfitLossEstimate: String!
 }
 
+type WalletListPayloadType {
+  items: [WalletType]!
+  pagination: PaginationType!
+}
+
+type WalletType {
+  id: ID!
+  name: String!
+  value: Float
+  estimatedValueOnCreateDate: Float
+  ticker: String
+  quantity: Int
+  assetClass: String!
+  annualRate: Float
+  registerDate: String!
+  targetWithdrawDate: String
+  shouldBeOnWallet: Boolean!
+}
+
+type WalletHistoryPayloadType {
+  items: [WalletHistoryItemType]!
+  pagination: PaginationType!
+}
+
+type WalletHistoryItemType {
+  originalQuantity: Float
+  originalValue: Float
+  changeType: String
+  changeDate: String
+}
+
 type TickerType {
   id: ID!
   symbol: String!
   quantity: Float!
   type: String
+}
+
+type GoalListPayloadType {
+  items: [GoalTypeObject]!
+  pagination: PaginationType!
+}
+
+type GoalTypeObject {
+  id: ID!
+  title: String!
+  description: String
+  category: String
+  targetAmount: String!
+  currentAmount: String!
+  priority: Int!
+  targetDate: String
+  status: String!
+  createdAt: String
+  updatedAt: String
+}
+
+type GoalPlanType {
+  horizon: String!
+  remainingAmount: String!
+  capacityAmount: String!
+  projectedMonthlyContribution: String!
+  recommendedMonthlyContribution: String!
+  monthsToGoal: Int
+  monthsUntilTargetDate: Int
+  estimatedCompletionDate: String
+  targetDate: String
+  goalHealth: String!
+  recommendations: [GoalRecommendationType]!
+}
+
+type GoalRecommendationType {
+  priority: String!
+  title: String!
+  action: String!
+  estimatedDate: String
+}
+
+type TransactionListPayloadType {
+  items: [TransactionTypeObject]!
+  pagination: PaginationType!
+}
+
+type TransactionTypeObject {
+  id: ID!
+  title: String!
+  amount: String!
+  type: String!
+  dueDate: String!
+  startDate: String
+  endDate: String
+  description: String
+  observation: String
+  isRecurring: Boolean!
+  isInstallment: Boolean!
+  installmentCount: Int
+  tagId: String
+  accountId: String
+  creditCardId: String
+  status: String!
+  currency: String!
+  createdAt: String
+  updatedAt: String
+}
+
+type TransactionSummaryPayloadType {
+  month: String!
+  incomeTotal: Float!
+  expenseTotal: Float!
+  items: [TransactionTypeObject]!
+  pagination: PaginationType!
+}
+
+type TransactionDashboardPayloadType {
+  month: String!
+  totals: DashboardTotalsType!
+  counts: DashboardCountsType!
+  topCategories: DashboardCategoriesType!
+}
+
+type DashboardTotalsType {
+  incomeTotal: Float!
+  expenseTotal: Float!
+  balance: Float!
+}
+
+type DashboardCountsType {
+  totalTransactions: Int!
+  incomeTransactions: Int!
+  expenseTransactions: Int!
+  status: DashboardStatusCountsType!
+}
+
+type DashboardStatusCountsType {
+  paid: Int!
+  pending: Int!
+  cancelled: Int!
+  postponed: Int!
+  overdue: Int!
+}
+
+type DashboardCategoriesType {
+  expense: [DashboardCategoryType]!
+  income: [DashboardCategoryType]!
+}
+
+type DashboardCategoryType {
+  tagId: String
+  categoryName: String!
+  totalAmount: Float!
+  transactionsCount: Int!
+}
+
+type TransactionDueRangePayloadType {
+  items: [TransactionTypeObject]!
+  counts: TransactionDueCountsType!
+  pagination: PaginationType!
+}
+
+type TransactionDueCountsType {
+  totalTransactions: Int!
+  incomeTransactions: Int!
+  expenseTransactions: Int!
+}
+
+type UserType {
+  id: ID!
+  name: String!
+  email: String!
+  gender: String
+  birthDate: String
+  monthlyIncome: Float
+  netWorth: Float
+  monthlyExpenses: Float
+  initialInvestment: Float
+  monthlyInvestment: Float
+  investmentGoalDate: String
 }
 
 type Mutation {
@@ -278,6 +334,10 @@ type Mutation {
   updateUserProfile(birthDate: String, gender: String, initialInvestment: Float, investmentGoalDate: String, monthlyExpenses: Float, monthlyIncome: Float, monthlyInvestment: Float, netWorth: Float): UpdateUserProfileMutation
   createTransaction(accountId: UUID, amount: String!, creditCardId: UUID, currency: String = "BRL", description: String, dueDate: String!, endDate: String, installmentCount: Int, isInstallment: Boolean = false, isRecurring: Boolean = false, observation: String, startDate: String, status: String = "pending", tagId: UUID, title: String!, type: String!): CreateTransactionMutation
   deleteTransaction(transactionId: UUID!): DeleteTransactionMutation
+  createGoal(category: String, currentAmount: String, description: String, priority: Int, status: String, targetAmount: String!, targetDate: String, title: String!): CreateGoalMutation
+  updateGoal(category: String, currentAmount: String, description: String, goalId: UUID!, priority: Int, status: String, targetAmount: String, targetDate: String, title: String): UpdateGoalMutation
+  deleteGoal(goalId: UUID!): DeleteGoalMutation
+  simulateGoalPlan(currentAmount: String, monthlyContribution: String, monthlyExpenses: String, monthlyIncome: String, targetAmount: String!, targetDate: String): SimulateGoalPlanMutation
   addWalletEntry(annualRate: Float, assetClass: String, name: String!, quantity: Int, registerDate: String, shouldBeOnWallet: Boolean!, targetWithdrawDate: String, ticker: String, value: Float): AddWalletEntryMutation
   updateWalletEntry(annualRate: Float, assetClass: String, investmentId: UUID!, name: String, quantity: Int, registerDate: String, shouldBeOnWallet: Boolean, targetWithdrawDate: String, ticker: String, value: Float): UpdateWalletEntryMutation
   deleteWalletEntry(investmentId: UUID!): DeleteWalletEntryMutation
@@ -311,6 +371,26 @@ type CreateTransactionMutation {
 type DeleteTransactionMutation {
   ok: Boolean!
   message: String!
+}
+
+type CreateGoalMutation {
+  message: String!
+  goal: GoalTypeObject!
+}
+
+type UpdateGoalMutation {
+  message: String!
+  goal: GoalTypeObject!
+}
+
+type DeleteGoalMutation {
+  ok: Boolean!
+  message: String!
+}
+
+type SimulateGoalPlanMutation {
+  message: String!
+  goalPlan: GoalPlanType!
 }
 
 type AddWalletEntryMutation {

@@ -2,12 +2,13 @@
 
 ## 1. Source of Truth
 - Backlog, status e rastreabilidade: `TASKS.md`.
-- Contexto funcional e operacional: `README.md`.
+- Direcao de produto (P.O./stakeholders): `product.md`.
+- `README.md` deve permanecer curto, apenas como capa do repositorio.
 - Este arquivo define o modo de execucao da IA no projeto.
 
 ## 2. Sequencia de ciclos
 - Ordem oficial: `estabilizacao > features > debitos > refinamento > features`.
-- Em retomadas apos re-clone, assumir `estabilizacao` ate validar baseline local e CI.
+- Em retomadas de contexto, assumir `estabilizacao` ate validar baseline local e CI.
 
 ## 3. Fluxo obrigatorio por tarefa
 1. `git checkout master`
@@ -48,6 +49,7 @@
 
 ## 8. Rastreabilidade e documentacao
 - Toda entrega deve refletir status/progresso/risco/commit no `TASKS.md`.
+- Decisoes de produto e escopo funcional devem ser registradas em `product.md`.
 - Registrar decisoes arquiteturais relevantes em docs dedicadas (ex.: ADR).
 - Marcar debitos tecnicos explicitos quando houver trade-off deliberado.
 
