@@ -105,6 +105,25 @@ class TransactionDashboardPayloadType(graphene.ObjectType):
     top_categories = graphene.Field(DashboardCategoriesType, required=True)
 
 
+class GoalTypeObject(graphene.ObjectType):
+    id = graphene.ID(required=True)
+    title = graphene.String(required=True)
+    description = graphene.String()
+    category = graphene.String()
+    target_amount = graphene.String(required=True)
+    current_amount = graphene.String(required=True)
+    priority = graphene.Int(required=True)
+    target_date = graphene.String()
+    status = graphene.String(required=True)
+    created_at = graphene.String()
+    updated_at = graphene.String()
+
+
+class GoalListPayloadType(graphene.ObjectType):
+    items = graphene.List(GoalTypeObject, required=True)
+    pagination = graphene.Field(PaginationType, required=True)
+
+
 class WalletType(graphene.ObjectType):
     id = graphene.ID(required=True)
     name = graphene.String(required=True)
