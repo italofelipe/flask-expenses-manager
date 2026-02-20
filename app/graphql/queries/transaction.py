@@ -62,7 +62,7 @@ class TransactionQueryMixin:
 
     def resolve_transactions(
         self,
-        info: graphene.ResolveInfo,
+        _info: graphene.ResolveInfo,
         page: int,
         per_page: int,
         type: str | None = None,
@@ -91,7 +91,7 @@ class TransactionQueryMixin:
 
     def resolve_transaction_summary(
         self,
-        info: graphene.ResolveInfo,
+        _info: graphene.ResolveInfo,
         month: str,
         page: int,
         page_size: int,
@@ -129,7 +129,7 @@ class TransactionQueryMixin:
         )
 
     def resolve_transaction_dashboard(
-        self, info: graphene.ResolveInfo, month: str
+        self, _info: graphene.ResolveInfo, month: str
     ) -> TransactionDashboardPayloadType:
         user = get_current_user_required()
         service = TransactionApplicationService.with_defaults(user.id)
@@ -176,7 +176,7 @@ class TransactionQueryMixin:
 
     def resolve_transaction_due_range(
         self,
-        info: graphene.ResolveInfo,
+        _info: graphene.ResolveInfo,
         initial_date: str | None = None,
         final_date: str | None = None,
         page: int = 1,

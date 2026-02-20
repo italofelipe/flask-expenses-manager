@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from typing import Any
 from uuid import UUID
 
 from flask import Response, request
@@ -57,6 +58,109 @@ def _validation_error_response(
         error_code=mapped_error.code,
         details=mapped_error.details,
     )
+
+
+def _parse_active_list_query_params() -> dict[str, Any]:
+    return {
+        "page": _parse_positive_int(
+            request.args.get("page"), default=1, field_name="page"
+        ),
+        "per_page": _parse_positive_int(
+            request.args.get("per_page"),
+            default=10,
+            field_name="per_page",
+        ),
+        "transaction_type": request.args.get("type"),
+        "status": request.args.get("status"),
+        "start_date": _parse_optional_date(
+            request.args.get("start_date"), "start_date"
+        ),
+        "end_date": _parse_optional_date(request.args.get("end_date"), "end_date"),
+        "tag_id": _parse_optional_uuid(request.args.get("tag_id"), "tag_id"),
+        "account_id": _parse_optional_uuid(
+            request.args.get("account_id"), "account_id"
+        ),
+        "credit_card_id": _parse_optional_uuid(
+            request.args.get("credit_card_id"), "credit_card_id"
+        ),
+    }
+
+
+def _active_list_date_range_error(*, start_date: Any, end_date: Any) -> Response | None:
+    if not start_date or not end_date or start_date <= end_date:
+        return None
+    message = "Parâmetro 'start_date' não pode ser maior que 'end_date'."
+    return _compat_error(
+        legacy_payload={"error": message},
+        status_code=400,
+        message=message,
+        error_code="VALIDATION_ERROR",
+    )
+
+
+def _apply_active_list_type_filter(
+    query: Any, transaction_type: str | None
+) -> tuple[Any, Response | None]:
+    if not transaction_type:
+        return query, None
+    try:
+        return (
+            query.filter(Transaction.type == TransactionType(transaction_type.lower())),
+            None,
+        )
+    except ValueError:
+        message = "Parâmetro 'type' inválido. Use 'income' ou 'expense'."
+        return query, _compat_error(
+            legacy_payload={"error": message},
+            status_code=400,
+            message=message,
+            error_code="VALIDATION_ERROR",
+        )
+
+
+def _apply_active_list_status_filter(
+    query: Any, status: str | None
+) -> tuple[Any, Response | None]:
+    if not status:
+        return query, None
+    try:
+        return (
+            query.filter(Transaction.status == TransactionStatus(status.lower())),
+            None,
+        )
+    except ValueError:
+        message = (
+            "Parâmetro 'status' inválido. "
+            "Use paid, pending, cancelled, postponed ou overdue."
+        )
+        return query, _compat_error(
+            legacy_payload={"error": message},
+            status_code=400,
+            message=message,
+            error_code="VALIDATION_ERROR",
+        )
+
+
+def _apply_active_list_optional_filters(
+    query: Any,
+    *,
+    start_date: Any,
+    end_date: Any,
+    tag_id: Any,
+    account_id: Any,
+    credit_card_id: Any,
+) -> Any:
+    if start_date:
+        query = query.filter(Transaction.due_date >= start_date)
+    if end_date:
+        query = query.filter(Transaction.due_date <= end_date)
+    if tag_id:
+        query = query.filter(Transaction.tag_id == tag_id)
+    if account_id:
+        query = query.filter(Transaction.account_id == account_id)
+    if credit_card_id:
+        query = query.filter(Transaction.credit_card_id == credit_card_id)
+    return query
 
 
 class TransactionSummaryResource(MethodResource):
@@ -490,81 +594,40 @@ class TransactionListActiveResource(MethodResource):
 
         user_uuid = UUID(get_jwt_identity())
         try:
-            page = _parse_positive_int(
-                request.args.get("page"), default=1, field_name="page"
+            params = _parse_active_list_query_params()
+            range_error = _active_list_date_range_error(
+                start_date=params["start_date"],
+                end_date=params["end_date"],
             )
-            per_page = _parse_positive_int(
-                request.args.get("per_page"), default=10, field_name="per_page"
-            )
-
-            transaction_type = request.args.get("type")
-            status = request.args.get("status")
-            start_date = _parse_optional_date(
-                request.args.get("start_date"), "start_date"
-            )
-            end_date = _parse_optional_date(request.args.get("end_date"), "end_date")
-            tag_id = _parse_optional_uuid(request.args.get("tag_id"), "tag_id")
-            account_id = _parse_optional_uuid(
-                request.args.get("account_id"), "account_id"
-            )
-            credit_card_id = _parse_optional_uuid(
-                request.args.get("credit_card_id"), "credit_card_id"
-            )
-
-            if start_date and end_date and start_date > end_date:
-                start_date_error = (
-                    "Parâmetro 'start_date' não pode ser maior que 'end_date'."
-                )
-                return _compat_error(
-                    legacy_payload={"error": start_date_error},
-                    status_code=400,
-                    message=start_date_error,
-                    error_code="VALIDATION_ERROR",
-                )
+            if range_error is not None:
+                return range_error
 
             query = Transaction.query.filter_by(user_id=user_uuid, deleted=False)
-            if transaction_type:
-                try:
-                    query = query.filter(
-                        Transaction.type == TransactionType(transaction_type.lower())
-                    )
-                except ValueError:
-                    type_error = "Parâmetro 'type' inválido. Use 'income' ou 'expense'."
-                    return _compat_error(
-                        legacy_payload={"error": type_error},
-                        status_code=400,
-                        message=type_error,
-                        error_code="VALIDATION_ERROR",
-                    )
-            if status:
-                try:
-                    query = query.filter(
-                        Transaction.status == TransactionStatus(status.lower())
-                    )
-                except ValueError:
-                    status_error = (
-                        "Parâmetro 'status' inválido. "
-                        "Use paid, pending, cancelled, postponed ou overdue."
-                    )
-                    return _compat_error(
-                        legacy_payload={"error": status_error},
-                        status_code=400,
-                        message=status_error,
-                        error_code="VALIDATION_ERROR",
-                    )
 
-            if start_date:
-                query = query.filter(Transaction.due_date >= start_date)
-            if end_date:
-                query = query.filter(Transaction.due_date <= end_date)
-            if tag_id:
-                query = query.filter(Transaction.tag_id == tag_id)
-            if account_id:
-                query = query.filter(Transaction.account_id == account_id)
-            if credit_card_id:
-                query = query.filter(Transaction.credit_card_id == credit_card_id)
+            query, type_error = _apply_active_list_type_filter(
+                query, params["transaction_type"]
+            )
+            if type_error is not None:
+                return type_error
+
+            query, status_error = _apply_active_list_status_filter(
+                query, params["status"]
+            )
+            if status_error is not None:
+                return status_error
+
+            query = _apply_active_list_optional_filters(
+                query,
+                start_date=params["start_date"],
+                end_date=params["end_date"],
+                tag_id=params["tag_id"],
+                account_id=params["account_id"],
+                credit_card_id=params["credit_card_id"],
+            )
 
             total = query.count()
+            per_page = params["per_page"]
+            page = params["page"]
             pages = (total + per_page - 1) // per_page if total else 0
             transactions = (
                 query.order_by(

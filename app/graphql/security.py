@@ -158,63 +158,135 @@ def _analyze_selection_set(
     complexity = 0
 
     for selection in selection_set.selections:
-        if isinstance(selection, ast.FieldNode):
-            field_depth = current_depth + 1
-            field_complexity = 1
-
-            if selection.selection_set:
-                nested_depth, nested_complexity = _analyze_selection_set(
-                    selection.selection_set,
-                    current_depth=field_depth,
-                    fragments=fragments,
-                    variable_values=variable_values,
-                    max_list_multiplier=max_list_multiplier,
-                    visited_fragments=visited_fragments.copy(),
-                )
-                multiplier = _resolve_field_multiplier(
-                    selection, variable_values, max_list_multiplier
-                )
-                field_depth = max(field_depth, nested_depth)
-                field_complexity += nested_complexity * multiplier
-
-            max_depth = max(max_depth, field_depth)
-            complexity += field_complexity
-            continue
-
-        if isinstance(selection, ast.InlineFragmentNode) and selection.selection_set:
-            nested_depth, nested_complexity = _analyze_selection_set(
-                selection.selection_set,
-                current_depth=current_depth,
-                fragments=fragments,
-                variable_values=variable_values,
-                max_list_multiplier=max_list_multiplier,
-                visited_fragments=visited_fragments.copy(),
-            )
-            max_depth = max(max_depth, nested_depth)
-            complexity += nested_complexity
-            continue
-
-        if isinstance(selection, ast.FragmentSpreadNode):
-            fragment_name = selection.name.value
-            if fragment_name in visited_fragments:
-                continue
-            fragment_node = fragments.get(fragment_name)
-            if fragment_node is None:
-                continue
-            next_visited = visited_fragments.copy()
-            next_visited.add(fragment_name)
-            nested_depth, nested_complexity = _analyze_selection_set(
-                fragment_node.selection_set,
-                current_depth=current_depth,
-                fragments=fragments,
-                variable_values=variable_values,
-                max_list_multiplier=max_list_multiplier,
-                visited_fragments=next_visited,
-            )
-            max_depth = max(max_depth, nested_depth)
-            complexity += nested_complexity
+        nested_depth, nested_complexity = _analyze_single_selection(
+            selection,
+            current_depth=current_depth,
+            fragments=fragments,
+            variable_values=variable_values,
+            max_list_multiplier=max_list_multiplier,
+            visited_fragments=visited_fragments,
+        )
+        max_depth = max(max_depth, nested_depth)
+        complexity += nested_complexity
 
     return max_depth, complexity
+
+
+def _analyze_single_selection(
+    selection: ast.SelectionNode,
+    *,
+    current_depth: int,
+    fragments: dict[str, ast.FragmentDefinitionNode],
+    variable_values: dict[str, Any] | None,
+    max_list_multiplier: int,
+    visited_fragments: set[str],
+) -> tuple[int, int]:
+    if isinstance(selection, ast.FieldNode):
+        return _analyze_field_selection(
+            selection,
+            current_depth=current_depth,
+            fragments=fragments,
+            variable_values=variable_values,
+            max_list_multiplier=max_list_multiplier,
+            visited_fragments=visited_fragments,
+        )
+    if isinstance(selection, ast.InlineFragmentNode):
+        return _analyze_inline_fragment_selection(
+            selection,
+            current_depth=current_depth,
+            fragments=fragments,
+            variable_values=variable_values,
+            max_list_multiplier=max_list_multiplier,
+            visited_fragments=visited_fragments,
+        )
+    if isinstance(selection, ast.FragmentSpreadNode):
+        return _analyze_fragment_spread_selection(
+            selection,
+            current_depth=current_depth,
+            fragments=fragments,
+            variable_values=variable_values,
+            max_list_multiplier=max_list_multiplier,
+            visited_fragments=visited_fragments,
+        )
+    return current_depth, 0
+
+
+def _analyze_field_selection(
+    selection: ast.FieldNode,
+    *,
+    current_depth: int,
+    fragments: dict[str, ast.FragmentDefinitionNode],
+    variable_values: dict[str, Any] | None,
+    max_list_multiplier: int,
+    visited_fragments: set[str],
+) -> tuple[int, int]:
+    field_depth = current_depth + 1
+    field_complexity = 1
+    if not selection.selection_set:
+        return field_depth, field_complexity
+
+    nested_depth, nested_complexity = _analyze_selection_set(
+        selection.selection_set,
+        current_depth=field_depth,
+        fragments=fragments,
+        variable_values=variable_values,
+        max_list_multiplier=max_list_multiplier,
+        visited_fragments=visited_fragments.copy(),
+    )
+    multiplier = _resolve_field_multiplier(
+        selection, variable_values, max_list_multiplier
+    )
+    field_depth = max(field_depth, nested_depth)
+    field_complexity += nested_complexity * multiplier
+    return field_depth, field_complexity
+
+
+def _analyze_inline_fragment_selection(
+    selection: ast.InlineFragmentNode,
+    *,
+    current_depth: int,
+    fragments: dict[str, ast.FragmentDefinitionNode],
+    variable_values: dict[str, Any] | None,
+    max_list_multiplier: int,
+    visited_fragments: set[str],
+) -> tuple[int, int]:
+    if not selection.selection_set:
+        return current_depth, 0
+    return _analyze_selection_set(
+        selection.selection_set,
+        current_depth=current_depth,
+        fragments=fragments,
+        variable_values=variable_values,
+        max_list_multiplier=max_list_multiplier,
+        visited_fragments=visited_fragments.copy(),
+    )
+
+
+def _analyze_fragment_spread_selection(
+    selection: ast.FragmentSpreadNode,
+    *,
+    current_depth: int,
+    fragments: dict[str, ast.FragmentDefinitionNode],
+    variable_values: dict[str, Any] | None,
+    max_list_multiplier: int,
+    visited_fragments: set[str],
+) -> tuple[int, int]:
+    fragment_name = selection.name.value
+    if fragment_name in visited_fragments:
+        return current_depth, 0
+    fragment_node = fragments.get(fragment_name)
+    if fragment_node is None:
+        return current_depth, 0
+    next_visited = visited_fragments.copy()
+    next_visited.add(fragment_name)
+    return _analyze_selection_set(
+        fragment_node.selection_set,
+        current_depth=current_depth,
+        fragments=fragments,
+        variable_values=variable_values,
+        max_list_multiplier=max_list_multiplier,
+        visited_fragments=next_visited,
+    )
 
 
 def _parse_document(query: str) -> ast.DocumentNode:

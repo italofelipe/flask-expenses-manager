@@ -129,7 +129,8 @@ def list_wallet_entries(page: int, per_page: int) -> tuple[dict[str, Any], int]:
 @wallet_bp.route("/<uuid:investment_id>/history", methods=["GET"])
 @doc(
     description=(
-        "Retorna o histórico de alterações de um investimento, " "paginado e ordenado."
+        "Retorna o histórico de alterações de um investimento, "
+        + "paginado e ordenado."
     ),
     tags=["Wallet"],
     security=[{"BearerAuth": []}],

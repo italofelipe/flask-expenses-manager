@@ -69,6 +69,8 @@ _GRAPHQL_ROOT_FIELD_DOMAIN_MAP = {
     "deleteTicker": "ticker",
 }
 
+GRAPHQL_REQUEST_REJECTED_METRIC = "graphql.request.rejected"
+
 
 def _sanitize_graphql_message(message: Any) -> str:
     raw = str(message or "").strip()
@@ -109,7 +111,6 @@ def _sanitize_graphql_extensions(extensions: Any) -> dict[str, Any] | None:
 
 
 def _is_public_graphql_error(
-    err: GraphQLError,
     safe_extensions: dict[str, Any] | None,
 ) -> bool:
     if not safe_extensions:
@@ -125,7 +126,7 @@ def _format_graphql_execution_error(err: GraphQLError) -> dict[str, Any]:
     safe_message = _sanitize_graphql_message(err.message)
     safe_extensions = _sanitize_graphql_extensions(err.extensions)
     if not is_debug:
-        if _is_public_graphql_error(err, safe_extensions):
+        if _is_public_graphql_error(safe_extensions):
             public_payload: dict[str, Any] = {"message": safe_message}
             if safe_extensions:
                 public_payload["extensions"] = safe_extensions
@@ -215,7 +216,7 @@ def _enforce_graphql_policies(
             policy=security_policy,
         )
     except GraphQLSecurityViolation as exc:
-        increment_metric("graphql.request.rejected")
+        increment_metric(GRAPHQL_REQUEST_REJECTED_METRIC)
         increment_metric("graphql.security_violation.total")
         increment_metric(
             f"graphql.security_violation.code.{_normalize_metric_suffix(exc.code)}"
@@ -235,7 +236,7 @@ def _enforce_graphql_policies(
             policy=authorization_policy,
         )
     except GraphQLAuthorizationViolation as exc:
-        increment_metric("graphql.request.rejected")
+        increment_metric(GRAPHQL_REQUEST_REJECTED_METRIC)
         increment_metric("graphql.authorization_violation.total")
         increment_metric(
             f"graphql.authorization_violation.code.{_normalize_metric_suffix(exc.code)}"
@@ -256,7 +257,7 @@ def execute_graphql() -> tuple[dict[str, Any], int]:
     try:
         parsed_payload = parse_graphql_payload(request.get_json(silent=True))
     except ValueError as exc:
-        increment_metric("graphql.request.rejected")
+        increment_metric(GRAPHQL_REQUEST_REJECTED_METRIC)
         increment_metric("graphql.payload.invalid")
         mapped_error = map_validation_exception(
             exc,

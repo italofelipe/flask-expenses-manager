@@ -6,6 +6,8 @@ import threading
 from dataclasses import dataclass
 from typing import Any, Protocol
 
+DEFAULT_LOGIN_GUARD_KEY_PREFIX = "auraxis:login-guard"
+
 
 @dataclass
 class LoginAttemptState:
@@ -31,19 +33,24 @@ class LoginAttemptState:
 
 class LoginAttemptStorage(Protocol):
     def get(self, key: str) -> LoginAttemptState | None:
-        pass
+        # Protocol contract only; concrete backends provide state retrieval.
+        ...
 
     def set(self, key: str, state: LoginAttemptState, *, ttl_seconds: int) -> None:
-        pass
+        # Protocol contract only; concrete backends persist state with TTL.
+        ...
 
     def delete(self, key: str) -> None:
-        pass
+        # Protocol contract only; concrete backends remove persisted state.
+        ...
 
     def prune(self, *, now: float, retention_seconds: int, max_keys: int) -> None:
-        pass
+        # Protocol contract only; backend chooses pruning implementation strategy.
+        ...
 
     def reset_for_tests(self) -> None:
-        pass
+        # Protocol contract only; used by tests to clear backend state.
+        ...
 
 
 class InMemoryLoginAttemptStorage:
@@ -98,7 +105,7 @@ class RedisLoginAttemptStorage:
         self,
         client: Any,
         *,
-        key_prefix: str = "auraxis:login-guard",
+        key_prefix: str = DEFAULT_LOGIN_GUARD_KEY_PREFIX,
     ) -> None:
         self._client = client
         self._key_prefix = key_prefix
@@ -219,11 +226,11 @@ def build_login_attempt_storage_from_env() -> tuple[
         )
 
     key_prefix = str(
-        os.getenv("LOGIN_GUARD_REDIS_KEY_PREFIX", "auraxis:login-guard")
+        os.getenv("LOGIN_GUARD_REDIS_KEY_PREFIX", DEFAULT_LOGIN_GUARD_KEY_PREFIX)
     ).strip()
     return (
         RedisLoginAttemptStorage(
-            client, key_prefix=key_prefix or "auraxis:login-guard"
+            client, key_prefix=key_prefix or DEFAULT_LOGIN_GUARD_KEY_PREFIX
         ),
         "redis",
         True,

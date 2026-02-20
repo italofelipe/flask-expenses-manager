@@ -139,43 +139,70 @@ class PortfolioHistoryService:
 
         for wallet in wallets:
             if wallet.operations:
-                for operation in wallet.operations:
-                    operation_date = operation.executed_at
-                    if (
-                        operation_date < history_range.start_date
-                        or operation_date > history_range.end_date
-                    ):
-                        continue
-                    day_event = self._ensure_day_event(events, operation_date)
-                    quantity = Decimal(str(operation.quantity))
-                    unit_price = Decimal(str(operation.unit_price))
-                    fees = Decimal(str(operation.fees or 0))
-                    if operation.operation_type == "buy":
-                        amount = (quantity * unit_price) + fees
-                        day_event["buy_amount"] += amount
-                        day_event["buy_operations"] += 1
-                    else:
-                        amount = (quantity * unit_price) - fees
-                        day_event["sell_amount"] += amount
-                        day_event["sell_operations"] += 1
-                    day_event["total_operations"] += 1
+                self._append_operation_events(
+                    events=events,
+                    operations=wallet.operations,
+                    history_range=history_range,
+                )
                 continue
 
-            register_date = wallet.register_date
-            if (
-                register_date < history_range.start_date
-                or register_date > history_range.end_date
-            ):
-                continue
-            base_amount = self._wallet_base_amount(wallet)
-            if base_amount <= 0:
-                continue
-            day_event = self._ensure_day_event(events, register_date)
-            day_event["buy_amount"] += base_amount
-            day_event["buy_operations"] += 1
-            day_event["total_operations"] += 1
+            self._append_wallet_registration_event(
+                events=events,
+                wallet=wallet,
+                history_range=history_range,
+            )
 
         return events
+
+    @staticmethod
+    def _is_date_within_range(
+        event_date: date, history_range: PortfolioHistoryRange
+    ) -> bool:
+        return history_range.start_date <= event_date <= history_range.end_date
+
+    def _append_operation_events(
+        self,
+        *,
+        events: dict[date, dict[str, Any]],
+        operations: list[InvestmentOperation],
+        history_range: PortfolioHistoryRange,
+    ) -> None:
+        for operation in operations:
+            operation_date = operation.executed_at
+            if not self._is_date_within_range(operation_date, history_range):
+                continue
+
+            day_event = self._ensure_day_event(events, operation_date)
+            quantity = Decimal(str(operation.quantity))
+            unit_price = Decimal(str(operation.unit_price))
+            fees = Decimal(str(operation.fees or 0))
+            if operation.operation_type == "buy":
+                amount = (quantity * unit_price) + fees
+                day_event["buy_amount"] += amount
+                day_event["buy_operations"] += 1
+            else:
+                amount = (quantity * unit_price) - fees
+                day_event["sell_amount"] += amount
+                day_event["sell_operations"] += 1
+            day_event["total_operations"] += 1
+
+    def _append_wallet_registration_event(
+        self,
+        *,
+        events: dict[date, dict[str, Any]],
+        wallet: Wallet,
+        history_range: PortfolioHistoryRange,
+    ) -> None:
+        register_date = wallet.register_date
+        if not self._is_date_within_range(register_date, history_range):
+            return
+        base_amount = self._wallet_base_amount(wallet)
+        if base_amount <= 0:
+            return
+        day_event = self._ensure_day_event(events, register_date)
+        day_event["buy_amount"] += base_amount
+        day_event["buy_operations"] += 1
+        day_event["total_operations"] += 1
 
     def _build_wallet_states(
         self, wallets: list[Wallet], start_date: date

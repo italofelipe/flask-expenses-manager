@@ -4,6 +4,7 @@ from marshmallow import Schema, fields, pre_load, validate
 from app.schemas.sanitization import sanitize_string_fields
 
 ma = Marshmallow()
+USER_FULL_NAME_DESCRIPTION = "Nome completo do usuário"
 
 
 class UserRegistrationSchema(Schema):
@@ -12,7 +13,7 @@ class UserRegistrationSchema(Schema):
     name = fields.Str(
         required=True,
         validate=validate.Length(min=2, max=128),
-        metadata={"description": "Nome completo do usuário", "example": "João Silva"},
+        metadata={"description": USER_FULL_NAME_DESCRIPTION, "example": "João Silva"},
     )
     email = fields.Email(
         required=True,
@@ -105,7 +106,7 @@ class UserSchema(Schema):
     """Schema para resposta de dados do usuário"""
 
     id = fields.UUID(metadata={"description": "ID único do usuário"})
-    name = fields.String(metadata={"description": "Nome completo do usuário"})
+    name = fields.String(metadata={"description": USER_FULL_NAME_DESCRIPTION})
     email = fields.Email(metadata={"description": "Endereço de email do usuário"})
     created_at = fields.DateTime(metadata={"description": "Data de criação da conta"})
     updated_at = fields.DateTime(metadata={"description": "Data da última atualização"})
@@ -115,7 +116,7 @@ class UserCompleteSchema(Schema):
     """Schema completo com todos os dados do usuário"""
 
     id = fields.UUID(metadata={"description": "ID único do usuário"})
-    name = fields.String(metadata={"description": "Nome completo do usuário"})
+    name = fields.String(metadata={"description": USER_FULL_NAME_DESCRIPTION})
     email = fields.Email(metadata={"description": "Endereço de email do usuário"})
     gender = fields.String(metadata={"description": "Gênero do usuário"})
     birth_date = fields.Date(metadata={"description": "Data de nascimento"})

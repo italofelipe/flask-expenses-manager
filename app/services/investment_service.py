@@ -122,6 +122,43 @@ class InvestmentService:
         return price
 
     @staticmethod
+    def _extract_historical_rows(payload: Any) -> list[dict[str, Any]] | None:
+        if not isinstance(payload, dict):
+            return None
+        results = payload.get("results")
+        if not isinstance(results, list) or not results:
+            return None
+        first_result = results[0]
+        if not isinstance(first_result, dict):
+            return None
+        historical_rows = first_result.get("historicalDataPrice")
+        if historical_rows is None:
+            return []
+        if not isinstance(historical_rows, list):
+            return None
+        return [row for row in historical_rows if isinstance(row, dict)]
+
+    @staticmethod
+    def _build_historical_price_map(
+        *,
+        historical_rows: list[dict[str, Any]],
+        start_date: str,
+        end_date: str,
+    ) -> dict[str, float]:
+        prices: dict[str, float] = {}
+        for row in historical_rows:
+            unix_ts = row.get("date")
+            close_price = row.get("close")
+            if not isinstance(unix_ts, (int, float)) or not isinstance(
+                close_price, (int, float)
+            ):
+                continue
+            day = datetime.fromtimestamp(float(unix_ts), tz=UTC).date().isoformat()
+            if start_date <= day <= end_date:
+                prices[day] = float(close_price)
+        return prices
+
+    @staticmethod
     def get_market_price(ticker: str) -> Optional[float]:
         """Consulta preço de mercado via BRAPI com timeout, retry e cache curto."""
         normalized_ticker = InvestmentService._normalize_ticker(ticker)
@@ -170,39 +207,18 @@ class InvestmentService:
                 "interval": "1d",
             },
         )
-        if not isinstance(payload, dict):
+        historical_rows = InvestmentService._extract_historical_rows(payload)
+        if historical_rows is None:
             InvestmentService._record_brapi_event(
                 "invalid_payload",
                 detail=f"historical:{normalized_ticker}",
             )
             return {}
-        results = payload.get("results")
-        if (
-            not isinstance(results, list)
-            or not results
-            or not isinstance(results[0], dict)
-        ):
-            InvestmentService._record_brapi_event(
-                "invalid_payload",
-                detail=f"historical:{normalized_ticker}",
-            )
-            return {}
-
-        historical_rows = results[0].get("historicalDataPrice") or []
-        prices: dict[str, float] = {}
-        for row in historical_rows:
-            if not isinstance(row, dict):
-                continue
-            unix_ts = row.get("date")
-            if not isinstance(unix_ts, (int, float)):
-                continue
-            close_price = row.get("close")
-            if not isinstance(close_price, (int, float)):
-                continue
-            day = datetime.fromtimestamp(float(unix_ts), tz=UTC).date().isoformat()
-            if day < start_date or day > end_date:
-                continue
-            prices[day] = float(close_price)
+        prices = InvestmentService._build_historical_price_map(
+            historical_rows=historical_rows,
+            start_date=start_date,
+            end_date=end_date,
+        )
 
         InvestmentService._cache_set(cache_key, prices, cache_ttl_seconds)
         return prices

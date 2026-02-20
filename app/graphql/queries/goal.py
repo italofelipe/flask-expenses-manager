@@ -37,7 +37,7 @@ class GoalQueryMixin:
 
     def resolve_goals(
         self,
-        info: graphene.ResolveInfo,
+        _info: graphene.ResolveInfo,
         page: int,
         per_page: int,
         status: str | None = None,
@@ -66,7 +66,7 @@ class GoalQueryMixin:
 
     def resolve_goal(
         self,
-        info: graphene.ResolveInfo,
+        _info: graphene.ResolveInfo,
         goal_id: UUID,
     ) -> GoalTypeObject:
         user = get_current_user_required()
@@ -79,7 +79,7 @@ class GoalQueryMixin:
 
     def resolve_goal_plan(
         self,
-        info: graphene.ResolveInfo,
+        _info: graphene.ResolveInfo,
         goal_id: UUID,
     ) -> GoalPlanType:
         user = get_current_user_required()

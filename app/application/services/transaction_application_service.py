@@ -228,22 +228,7 @@ class TransactionApplicationService:
                 normalized["status"]
             ).value
 
-        if normalized.get("status", "").lower() == "paid" and not normalized.get(
-            "paid_at"
-        ):
-            raise _validation_error(
-                "É obrigatório informar 'paid_at' ao marcar a transação "
-                "como paga (status=PAID)."
-            )
-        if normalized.get("paid_at") and normalized.get("status", "").lower() != "paid":
-            raise _validation_error(
-                "'paid_at' só pode ser definido se o status for 'PAID'."
-            )
-        if "paid_at" in normalized and normalized["paid_at"] is not None:
-            paid_at = self._coerce_datetime(normalized["paid_at"], field_name="paid_at")
-            if paid_at > utc_now_compatible_with(paid_at):
-                raise _validation_error("'paid_at' não pode ser uma data futura.")
-            normalized["paid_at"] = paid_at
+        self._normalize_paid_at_for_update(normalized)
 
         due_date = self._coerce_date(
             normalized.get("due_date", transaction.due_date),
@@ -551,6 +536,27 @@ class TransactionApplicationService:
         raise _validation_error(
             f"Parâmetro '{field_name}' inválido. Use formato datetime ISO-8601."
         )
+
+    def _normalize_paid_at_for_update(self, normalized: dict[str, Any]) -> None:
+        status = str(normalized.get("status", "")).strip().lower()
+        paid_at_value = normalized.get("paid_at")
+
+        if status == "paid" and not paid_at_value:
+            raise _validation_error(
+                "É obrigatório informar 'paid_at' ao marcar a transação "
+                "como paga (status=PAID)."
+            )
+        if paid_at_value and status != "paid":
+            raise _validation_error(
+                "'paid_at' só pode ser definido se o status for 'PAID'."
+            )
+        if "paid_at" not in normalized or paid_at_value is None:
+            return
+
+        parsed_paid_at = self._coerce_datetime(paid_at_value, field_name="paid_at")
+        if parsed_paid_at > utc_now_compatible_with(parsed_paid_at):
+            raise _validation_error("'paid_at' não pode ser uma data futura.")
+        normalized["paid_at"] = parsed_paid_at
 
 
 def _validation_error(message: str) -> TransactionApplicationError:

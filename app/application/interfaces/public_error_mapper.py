@@ -12,4 +12,5 @@ class PublicErrorMapper(Protocol):
         *,
         fallback_message: str,
     ) -> PublicErrorDTO:
-        pass
+        # Protocol contract only; implementations define concrete mapping behavior.
+        ...
