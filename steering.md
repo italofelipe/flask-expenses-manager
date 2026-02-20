@@ -62,3 +62,9 @@
 - Escolhas de produto/negocio (priorizacao de roadmap, UX sensivel, custo/fornecedor).
 - Credenciais/acessos externos nao disponiveis localmente.
 - Decisoes de arquitetura com impacto transversal sem diretriz pre-aprovada.
+
+## 11. Ritual de feedback entre blocos
+- Ao concluir cada bloco de execucao (conjunto de tarefas/feature set), executar uma rodada formal de feedback.
+- A IA deve sempre propor essa rodada antes de iniciar o proximo bloco.
+- O feedback deve cobrir no minimo: estrategia, execucao, riscos, oportunidades, qualidade tecnica, governanca e proximos ajustes.
+- Registrar os aprendizados e decisoes de melhoria na documentacao (steering/TASKS/ADR quando aplicavel) para evolucao continua do processo.

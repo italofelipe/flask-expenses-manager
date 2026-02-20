@@ -1,6 +1,6 @@
 # TASKS - Central de TODOs e Progresso
 
-Ultima atualizacao: 2026-02-20 (bloco E de metas concluido com paridade REST + GraphQL)
+Ultima atualizacao: 2026-02-20 (bloco E concluido + planejamento de debito tecnico C4)
 
 ## Regras de uso deste arquivo
 
@@ -106,6 +106,7 @@ Observações de escopo B4:
 | C1 | A2, A3, A4 (contrato/docs/nomenclatura/estratégia de validação) |
 | C2 | G16 remanescente + limpeza de warnings/deprecações não críticas |
 | C3 | Refactors pontuais de manutenibilidade com testes de regressão |
+| C4 | X2 (centralizar domínio e tornar adapters REST/GraphQL camadas finas) |
 
 ### Ciclo D (planejado) - Refinamento de processo
 
@@ -255,6 +256,7 @@ Fluxo por entrega:
 | S6-11 | App Security  | Harden Docker de produção (non-root, multi-stage, runtime deps only)                                                                       | Done        | 100%      | Baixo: multi-stage + non-root + contexto sem segredos reduziram superfície e removeram CVEs críticos/altos observados                                                    | traceability-debt                   | 2026-02-11         |
 | S6-12 | App Security  | Definir política de exposição de documentação em produção (`/docs`) por ambiente/autenticação                                              | Done        | 100%      | Baixo: política por ambiente + fail-fast para configuração inválida em runtime seguro                                                                                    | 208e1d1                          | 2026-02-12         |
 | X1    | Tech Debt     | Remover/atualizar TODO desatualizado sobre enums em transacoes                                                                             | Done        | 100%      | Baixo: clareza de manutencao                                                                                                                                             | traceability-debt                | 2026-02-20         |
+| X2    | Tech Debt     | Centralizar regras de domínio em serviços/casos de uso e reduzir controllers/resolvers REST/GraphQL a adapters finos (sem regra duplicada) | Todo        | 0%        | Alto: `Complexidade=Alta` (impacto transversal) e `Urgencia=Media/Alta` (antes dos próximos blocos grandes de features para evitar acoplamento e drift de contrato)   |                                  | 2026-02-20         |
 
 
 ## Registro de progresso recente
@@ -271,6 +273,7 @@ Fluxo por entrega:
 | 2026-02-20 | A3                      | Padronização de nomenclatura concluída em documentação (wallet/investment/ticker) com guia dedicado (`docs/NOMENCLATURE.md`) e limpeza de branding legado nos metadados da API/documentos de apoio.                                                                                    | traceability-debt |
 | 2026-02-20 | A4                      | Estratégia de validação unificada formalizada por ADR (`docs/adr/0001-validation-strategy.md`): manter Marshmallow/Webargs no runtime e bloquear introdução de novo validador sem revisão arquitetural explícita.                                                                        | traceability-debt |
 | 2026-02-20 | X1                      | Limpeza do débito X1 concluída: referências documentais ao TODO desatualizado de enums em transações foram removidas/atualizadas para refletir o estado real do código.                                                                                                                  | traceability-debt |
+| 2026-02-20 | X2 Planning             | Débito técnico registrado: centralizar domínio e manter REST/GraphQL como adapters finos. Classificação aplicada: `Complexidade=Alta`, `Urgência=Media/Alta`. Execução decidida para o próximo bloco técnico (C4) antes de ampliar novos blocos de feature.                                 | n/a            |
 | 2026-02-20 | DB Hardening            | Baseline de migrations Alembic versionado em `migrations/` + bootstrap endurecido (`AUTO_CREATE_DB` default false e fail-fast quando `migrations/` não existe em startup PROD, salvo override explícito controlado).                                                                   | traceability-debt |
 | 2026-02-09 | C2                      | Job de recorrencia + servico idempotente para gerar ocorrencias                                                                                                                                                                                                                             | f3ef3c0          |
 | 2026-02-09 | C5                      | Endpoint `GET /transactions/expenses` com filtros de periodo, paginacao, ordenacao e metricas                                                                                                                                                                                               | f3ef3c0          |
