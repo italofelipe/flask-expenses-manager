@@ -201,6 +201,21 @@ jobs:
       - name: Boot local stack for smoke tests
         run: docker compose up -d --build db redis web
 
+      - name: Apply database migrations for smoke tests
+        run: |
+          for _ in {1..20}; do
+            if docker compose exec -T web flask db upgrade; then
+              echo "Database migrations applied."
+              exit 0
+            fi
+            echo "Waiting for web/db before migration retry..."
+            sleep 3
+          done
+          echo "Failed to apply database migrations for smoke tests." >&2
+          docker compose ps
+          docker compose logs --tail=200 web db
+          exit 1
+
       - name: Wait for API health
         run: |
           for _ in {1..40}; do
