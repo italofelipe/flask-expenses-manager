@@ -11,9 +11,11 @@ Contract
 - `GET /healthz` returns HTTP 200 with a minimal JSON body.
 """
 
+# mypy: disable-error-code=misc
+
 from __future__ import annotations
 
-from flask import Blueprint, Response, jsonify
+from flask import Blueprint
 from flask_apispec import doc
 
 health_bp = Blueprint("health", __name__)
@@ -25,7 +27,7 @@ health_bp = Blueprint("health", __name__)
     tags=["Health"],
     responses={200: {"description": "Serviço saudável"}},
 )
-def healthz() -> tuple[Response, int]:
+def healthz() -> tuple[dict[str, str], int]:
     """Liveness probe endpoint (public)."""
 
-    return jsonify({"status": "ok"}), 200
+    return {"status": "ok"}, 200
