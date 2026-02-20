@@ -1,7 +1,8 @@
 from typing import Any
 
-from flask import request
+from flask import current_app, request
 from flask_jwt_extended import get_jwt, verify_jwt_in_request
+from flask_jwt_extended.exceptions import JWTExtendedException
 
 from app.extensions.jwt_callbacks import _jwt_error_response
 
@@ -36,9 +37,18 @@ def register_auth_guard(app: Any) -> None:
         try:
             verify_jwt_in_request()
             get_jwt()
-        except Exception:
+        except JWTExtendedException:
             return _jwt_error_response(
                 "Token inválido ou ausente",
                 code="UNAUTHORIZED",
                 status_code=401,
+            )
+        except Exception:
+            current_app.logger.exception(
+                "Unexpected failure while validating JWT in auth guard."
+            )
+            return _jwt_error_response(
+                "Internal Server Error",
+                code="INTERNAL_ERROR",
+                status_code=500,
             )
