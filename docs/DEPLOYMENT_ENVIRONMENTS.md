@@ -31,6 +31,7 @@ docker compose -f docker-compose.dev.yml up --build
 - Uses `docker-compose.prod.yml`.
 - Uses `.env.prod` through `env_file`.
 - `AUTO_CREATE_DB=false` and migrations via `flask db upgrade` on startup.
+- Startup fails if `migrations/` is missing (unless `ALLOW_SCHEMA_BOOTSTRAP_WITHOUT_MIGRATIONS=true` is explicitly set for controlled recovery).
 - Runs Gunicorn behind Nginx.
 - Exposes app on `localhost:80`.
 - Supports TLS with Certbot + Nginx (`443`) using shared challenge/certificate volumes.
@@ -55,7 +56,7 @@ Detailed runbook:
 
 ## Compatibility note
 - `app/__init__.py` now gates `db.create_all()` using `AUTO_CREATE_DB`.
-- Default remains `true` for local compatibility.
+- Default is `false` to avoid implicit schema drift.
 - Production compose explicitly sets `AUTO_CREATE_DB=false`.
 
 ## Security note

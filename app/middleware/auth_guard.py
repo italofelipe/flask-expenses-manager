@@ -1,7 +1,7 @@
 from typing import Any
 
 from flask import current_app, request
-from flask_jwt_extended import get_jwt, verify_jwt_in_request
+from flask_jwt_extended import verify_jwt_in_request
 from flask_jwt_extended.exceptions import JWTExtendedException
 
 from app.extensions.jwt_callbacks import _jwt_error_response
@@ -36,7 +36,6 @@ def register_auth_guard(app: Any) -> None:
 
         try:
             verify_jwt_in_request()
-            get_jwt()
         except JWTExtendedException:
             return _jwt_error_response(
                 "Token inválido ou ausente",

@@ -16,6 +16,15 @@ Definir pipelines de CI/CD e gates de qualidade, seguranca e deploy.
 
 ## Secrets relevantes
 - `TOKEN_GITHUB_ADMIN`: token com permissao de administracao do repositório para auditoria/sync de ruleset no `governance.yml`.
+- `SNYK_TOKEN`: token da Snyk (obrigatorio apenas quando `ENABLE_SNYK=true`).
+
+## Variaveis de controle
+- `ENABLE_SNYK`:
+  - `true`: habilita o job `Security Scan (Snyk)` no `ci.yml`.
+  - vazio/`false`: o job `snyk` e ignorado.
+
+## Observabilidade de CI
+- O job `API Smoke (Postman/Newman)` aplica `flask db upgrade` antes da suite Postman para evitar falhas de schema em banco efemero.
 
 ## Padroes obrigatorios
 - Toda mudanca de workflow deve manter reproducibilidade local quando aplicavel.

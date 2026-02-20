@@ -27,6 +27,7 @@ os.environ.setdefault("FLASK_DEBUG", "False")
 os.environ.setdefault("FLASK_TESTING", "true")
 os.environ.setdefault("SECURITY_ENFORCE_STRONG_SECRETS", "false")
 os.environ.setdefault("DOCS_EXPOSURE_POLICY", "public")
+os.environ.setdefault("AUTO_CREATE_DB", "true")
 
 _APP = create_app()
 
