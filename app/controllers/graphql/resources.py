@@ -13,6 +13,7 @@ from app.controllers.graphql.utils import (
     graphql_error_response,
     parse_graphql_payload,
 )
+from app.extensions.integration_metrics import increment_metric
 from app.graphql import schema
 from app.graphql.authorization import (
     GraphQLAuthorizationPolicy,
@@ -21,12 +22,45 @@ from app.graphql.authorization import (
 )
 from app.graphql.errors import PUBLIC_GRAPHQL_ERROR_CODES
 from app.graphql.security import (
+    GraphQLQueryMetrics,
     GraphQLSecurityPolicy,
     GraphQLSecurityViolation,
     analyze_graphql_query,
 )
 
 from .dependencies import get_graphql_authorization_policy, get_graphql_security_policy
+
+_GRAPHQL_ROOT_FIELD_DOMAIN_MAP = {
+    "__typename": "meta",
+    "registerUser": "auth",
+    "login": "auth",
+    "logout": "auth",
+    "me": "user",
+    "updateUserProfile": "user",
+    "transactions": "transaction",
+    "transactionSummary": "transaction",
+    "transactionDashboard": "transaction",
+    "createTransaction": "transaction",
+    "deleteTransaction": "transaction",
+    "walletEntries": "wallet",
+    "walletHistory": "wallet",
+    "addWalletEntry": "wallet",
+    "updateWalletEntry": "wallet",
+    "deleteWalletEntry": "wallet",
+    "investmentValuation": "wallet",
+    "portfolioValuation": "wallet",
+    "portfolioValuationHistory": "wallet",
+    "investmentOperations": "investment",
+    "investmentOperationSummary": "investment",
+    "investmentPosition": "investment",
+    "investmentInvestedAmount": "investment",
+    "addInvestmentOperation": "investment",
+    "updateInvestmentOperation": "investment",
+    "deleteInvestmentOperation": "investment",
+    "tickers": "ticker",
+    "addTicker": "ticker",
+    "deleteTicker": "ticker",
+}
 
 
 def _sanitize_graphql_message(message: Any) -> str:
@@ -110,6 +144,55 @@ def _format_graphql_execution_error(err: GraphQLError) -> dict[str, Any]:
     return payload
 
 
+def _normalize_metric_suffix(raw: str) -> str:
+    normalized = "".join(
+        character.lower() if character.isalnum() else "_"
+        for character in str(raw).strip()
+    ).strip("_")
+    return normalized or "unknown"
+
+
+def _domain_from_root_field(root_field: str) -> str:
+    domain = _GRAPHQL_ROOT_FIELD_DOMAIN_MAP.get(root_field)
+    if domain:
+        return domain
+    return "unknown"
+
+
+def _record_graphql_query_metrics(metrics: GraphQLQueryMetrics) -> None:
+    increment_metric("graphql.request.accepted")
+    increment_metric("graphql.request.query_bytes_total", amount=metrics.query_bytes)
+    increment_metric(
+        "graphql.request.operation_count_total",
+        amount=metrics.operation_count,
+    )
+    increment_metric("graphql.request.depth_total", amount=metrics.depth)
+    increment_metric("graphql.request.complexity_total", amount=metrics.complexity)
+
+    domains: set[str] = set()
+    for root_field in metrics.root_fields:
+        metric_suffix = _normalize_metric_suffix(root_field)
+        increment_metric(f"graphql.field.{metric_suffix}.requests")
+        domains.add(_domain_from_root_field(root_field))
+
+    if not domains:
+        return
+
+    ordered_domains = sorted(domains)
+    for domain in ordered_domains:
+        increment_metric(f"graphql.domain.{domain}.requests")
+
+    complexity = metrics.complexity
+    base_complexity = complexity // len(ordered_domains)
+    remainder = complexity % len(ordered_domains)
+    for index, domain in enumerate(ordered_domains):
+        distributed_complexity = base_complexity + (1 if index < remainder else 0)
+        increment_metric(
+            f"graphql.domain.{domain}.complexity_total",
+            amount=distributed_complexity,
+        )
+
+
 def _enforce_graphql_policies(
     *,
     query: str,
@@ -118,13 +201,18 @@ def _enforce_graphql_policies(
 ) -> tuple[dict[str, Any], int] | None:
     security_policy = _get_security_policy()
     try:
-        analyze_graphql_query(
+        metrics = analyze_graphql_query(
             query=query,
             operation_name=parsed_operation_name,
             variable_values=parsed_variables,
             policy=security_policy,
         )
     except GraphQLSecurityViolation as exc:
+        increment_metric("graphql.request.rejected")
+        increment_metric("graphql.security_violation.total")
+        increment_metric(
+            f"graphql.security_violation.code.{_normalize_metric_suffix(exc.code)}"
+        )
         return graphql_error_response(
             message=exc.message,
             code=exc.code,
@@ -140,6 +228,11 @@ def _enforce_graphql_policies(
             policy=authorization_policy,
         )
     except GraphQLAuthorizationViolation as exc:
+        increment_metric("graphql.request.rejected")
+        increment_metric("graphql.authorization_violation.total")
+        increment_metric(
+            f"graphql.authorization_violation.code.{_normalize_metric_suffix(exc.code)}"
+        )
         return graphql_error_response(
             message=exc.message,
             code=exc.code,
@@ -147,13 +240,17 @@ def _enforce_graphql_policies(
             status_code=401,
         )
 
+    _record_graphql_query_metrics(metrics)
     return None
 
 
 def execute_graphql() -> tuple[dict[str, Any], int]:
+    increment_metric("graphql.request.total")
     try:
         parsed_payload = parse_graphql_payload(request.get_json(silent=True))
     except ValueError as exc:
+        increment_metric("graphql.request.rejected")
+        increment_metric("graphql.payload.invalid")
         mapped_error = map_validation_exception(
             exc,
             fallback_message="Payload GraphQL inválido.",

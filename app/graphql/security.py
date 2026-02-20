@@ -97,6 +97,7 @@ class GraphQLQueryMetrics:
     depth: int
     complexity: int
     query_bytes: int
+    root_fields: tuple[str, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -304,12 +305,25 @@ def _calculate_metrics(
         max_depth = max(max_depth, operation_depth)
         total_complexity += operation_complexity
 
+    root_fields = _collect_root_fields(operations)
     return GraphQLQueryMetrics(
         operation_count=len(operations),
         depth=max_depth,
         complexity=total_complexity,
         query_bytes=len(query.encode("utf-8")),
+        root_fields=tuple(sorted(root_fields)),
     )
+
+
+def _collect_root_fields(
+    operations: list[ast.OperationDefinitionNode],
+) -> set[str]:
+    root_fields: set[str] = set()
+    for operation in operations:
+        for selection in operation.selection_set.selections:
+            if isinstance(selection, ast.FieldNode):
+                root_fields.add(selection.name.value)
+    return root_fields
 
 
 def _enforce_depth_and_complexity_limits(
@@ -411,4 +425,5 @@ def analyze_graphql_query(
         depth=metrics.depth,
         complexity=metrics.complexity,
         query_bytes=query_bytes,
+        root_fields=metrics.root_fields,
     )

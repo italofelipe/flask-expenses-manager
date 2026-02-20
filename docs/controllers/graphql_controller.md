@@ -42,4 +42,7 @@ O que faz:
   - `portfolioValuationHistory`
 - Mutations de carteira também suportam `assetClass` e `annualRate`
   para classes de ativos de renda variável e renda fixa.
-- Hardening de GraphQL (complexity/depth/rate-limit específico) permanece no backlog.
+- Hardening ativo no transporte e autorização:
+  - limites de tamanho/profundidade/complexidade/operações (`app/graphql/security.py`);
+  - autorização por política de operação no transporte + ownership no domínio;
+  - observabilidade por domínio/custo em métricas `graphql.*` (volume, rejeições, custo e distribuição por domínio/campo).
