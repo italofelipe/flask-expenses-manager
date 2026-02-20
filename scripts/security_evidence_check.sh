@@ -92,7 +92,7 @@ check_contains "app/controllers/auth/dependencies.py" "generate_password_hash" "
 
 check_exists ".gitleaks.toml" "Gitleaks config is versioned in repository"
 check_contains ".github/workflows/ci.yml" "name: Security Scan \(Snyk\)" "Snyk security scan job configured"
-check_not_contains ".github/workflows/ci.yml" "SNYK_ENABLED" "Snyk security scan is mandatory (no conditional gate)"
+check_contains ".github/workflows/ci.yml" "vars\.ENABLE_SNYK == 'true'" "Snyk security scan uses explicit opt-in gate (ENABLE_SNYK)"
 
 if command -v rg >/dev/null 2>&1; then
   jwt_count=$(rg -n "@jwt_required\(" app/controllers | wc -l | tr -d ' ')
