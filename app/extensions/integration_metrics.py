@@ -71,3 +71,24 @@ def build_login_guard_metrics_payload() -> dict[str, Any]:
             "successes": metrics.get("login_guard.success", 0),
         },
     }
+
+
+def build_graphql_metrics_payload() -> dict[str, Any]:
+    metrics = snapshot_metrics(prefix="graphql.")
+    return {
+        "component": "graphql",
+        "counters": metrics,
+        "summary": {
+            "requests_total": metrics.get("graphql.request.total", 0),
+            "requests_accepted": metrics.get("graphql.request.accepted", 0),
+            "requests_rejected": metrics.get("graphql.request.rejected", 0),
+            "security_violations": metrics.get("graphql.security_violation.total", 0),
+            "authorization_violations": metrics.get(
+                "graphql.authorization_violation.total", 0
+            ),
+            "payload_invalid": metrics.get("graphql.payload.invalid", 0),
+            "query_bytes_total": metrics.get("graphql.request.query_bytes_total", 0),
+            "depth_total": metrics.get("graphql.request.depth_total", 0),
+            "complexity_total": metrics.get("graphql.request.complexity_total", 0),
+        },
+    }
