@@ -42,8 +42,7 @@ instance/
 # Pytest cache
 .pytest_cache/
 
-# Migrations
-migrations/
+# Migrations must remain versioned (Alembic source of truth).
 
 # DBeaver connections (se usar .dbeaver-data-sources.xml)
 .dbeaver/
