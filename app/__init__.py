@@ -32,6 +32,7 @@ from app.middleware.security_headers import register_security_headers
 from app.models.account import Account  # noqa: F401
 from app.models.audit_event import AuditEvent  # noqa: F401
 from app.models.credit_card import CreditCard  # noqa: F401
+from app.models.goal import Goal  # noqa: F401
 from app.models.investment_operation import InvestmentOperation  # noqa: F401
 from app.models.tag import Tag  # noqa: F401
 
