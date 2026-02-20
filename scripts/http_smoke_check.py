@@ -31,6 +31,21 @@ class SmokeCheckError(RuntimeError):
     """Raised when a smoke check cannot pass safely."""
 
 
+class _MethodPreservingNoRedirect(urllib.request.HTTPRedirectHandler):
+    """Disable urllib auto-redirect to preserve method/body on manual follow."""
+
+    def redirect_request(  # type: ignore[override]
+        self,
+        req: urllib.request.Request,
+        fp: Any,
+        code: int,
+        msg: str,
+        headers: Any,
+        newurl: str,
+    ) -> None:
+        return None
+
+
 def _try_parse_json(body_text: str) -> Any | None:
     if not body_text.strip():
         return None
@@ -54,29 +69,47 @@ def _request_json(
     timeout: int = 15,
     headers: dict[str, str] | None = None,
 ) -> HttpResult:
+    opener = urllib.request.build_opener(_MethodPreservingNoRedirect())
     request_headers = {"Accept": "application/json"}
     if headers:
         request_headers.update(headers)
-    data: bytes | None = None
-    if payload is not None:
-        data = json.dumps(payload).encode("utf-8")
-        request_headers["Content-Type"] = "application/json"
 
-    request = urllib.request.Request(
-        url=url,
-        data=data,
-        headers=request_headers,
-        method=method,
-    )
-    try:
-        with urllib.request.urlopen(request, timeout=timeout) as response:
-            body_text = response.read().decode("utf-8", errors="replace")
-            return _result_from_status(response.status, body_text)
-    except urllib.error.HTTPError as exc:
-        body_text = exc.read().decode("utf-8", errors="replace")
-        return _result_from_status(exc.code, body_text)
-    except urllib.error.URLError as exc:
-        raise SmokeCheckError(f"Network error for {method} {url}: {exc}") from exc
+    redirect_statuses = {301, 302, 303, 307, 308}
+    current_url = url
+
+    for _ in range(5):
+        data: bytes | None = None
+        if payload is not None:
+            data = json.dumps(payload).encode("utf-8")
+            request_headers["Content-Type"] = "application/json"
+
+        request = urllib.request.Request(
+            url=current_url,
+            data=data,
+            headers=request_headers,
+            method=method,
+        )
+
+        try:
+            with opener.open(request, timeout=timeout) as response:
+                body_text = response.read().decode("utf-8", errors="replace")
+                return _result_from_status(response.status, body_text)
+        except urllib.error.HTTPError as exc:
+            body_text = exc.read().decode("utf-8", errors="replace")
+            status = int(exc.code)
+            if status in redirect_statuses:
+                location = exc.headers.get("Location")
+                if not location:
+                    return _result_from_status(status, body_text)
+                current_url = urllib.parse.urljoin(current_url, location)
+                continue
+            return _result_from_status(status, body_text)
+        except urllib.error.URLError as exc:
+            raise SmokeCheckError(
+                f"Network error for {method} {current_url}: {exc}"
+            ) from exc
+
+    raise SmokeCheckError(f"Too many redirects for {method} {url}.")
 
 
 def _build_url(base_url: str, path: str) -> str:
