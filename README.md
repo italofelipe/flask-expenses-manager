@@ -193,10 +193,12 @@ cd flask-expenses-manager
 2. Preparar ambiente local:
 ```bash
 cp .env.dev.example .env.dev
-python3 -m venv .venv
+./scripts/bootstrap_local_env.sh
+```
+
+Ativação manual do ambiente virtual:
+```bash
 source .venv/bin/activate
-pip install -r requirements.txt -r requirements-dev.txt
-pre-commit install
 ```
 
 3. Validar baseline local:
