@@ -61,10 +61,9 @@ Este plano mapeia o estado atual por endpoint e define a migração para contrat
 - Teste automatizado cobrindo formato.
 
 ## 5) Itens incompletos/TODOs do código atual que impactam a adoção
-1. TODO desatualizado em transações sobre enums (já existem no model).
-2. `GET /transactions/list` sem filtros/paginação efetiva no banco.
-3. Ausência de módulo de metas (`goals`) e cadastros auxiliares (Tag/Account/CreditCard) via controller.
-4. Ausência de padrão único de serialização entre controllers.
+1. `GET /transactions/list` sem filtros/paginação efetiva no banco.
+2. Ausência de módulo de metas (`goals`) e cadastros auxiliares (Tag/Account/CreditCard) via controller.
+3. Ausência de padrão único de serialização entre controllers.
 
 ## 6) Observações de engenharia (senior baseline)
 - Controller deve somente orquestrar request/response.
