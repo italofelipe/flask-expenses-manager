@@ -185,3 +185,29 @@ TRANSACTION_EXPENSE_PERIOD_DOC = {
         500: {"description": "Erro interno"},
     },
 }
+
+TRANSACTION_DUE_PERIOD_DOC = {
+    "description": (
+        "Lista vencimentos (receitas + despesas) por período com paginação, "
+        "contadores e ordenação por vencimento."
+    ),
+    "tags": ["Transações"],
+    "security": [{"BearerAuth": []}],
+    "params": {
+        "initialDate": {"description": "Data inicial (YYYY-MM-DD)", "type": "string"},
+        "finalDate": {"description": "Data final (YYYY-MM-DD)", "type": "string"},
+        "page": {"description": "Número da página", "type": "integer"},
+        "per_page": {"description": "Itens por página", "type": "integer"},
+        "order_by": {
+            "description": ("Ordenação (overdue_first|upcoming_first|date|title|card)"),
+            "type": "string",
+        },
+        **CONTRACT_HEADER_PARAM,
+    },
+    "responses": {
+        200: {"description": "Lista de vencimentos"},
+        400: {"description": "Parâmetros inválidos"},
+        401: {"description": "Token inválido"},
+        500: {"description": "Erro interno"},
+    },
+}

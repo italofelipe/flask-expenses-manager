@@ -71,6 +71,11 @@ def test_transaction_endpoints_return_401_when_token_is_revoked(
         ),
         ("DELETE", f"/transactions/{transaction_id}/force", None),
         ("GET", f"/transactions/expenses?finalDate={date.today().isoformat()}", None),
+        (
+            "GET",
+            f"/transactions/due-range?finalDate={date.today().isoformat()}",
+            None,
+        ),
     ]
 
     for method, url, body in scenarios:

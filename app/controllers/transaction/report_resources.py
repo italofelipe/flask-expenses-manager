@@ -22,6 +22,7 @@ from .openapi import (
     TRANSACTION_ACTIVE_LIST_DOC,
     TRANSACTION_DASHBOARD_DOC,
     TRANSACTION_DELETED_LIST_DOC,
+    TRANSACTION_DUE_PERIOD_DOC,
     TRANSACTION_EXPENSE_PERIOD_DOC,
     TRANSACTION_FORCE_DELETE_DOC,
     TRANSACTION_RESTORE_DOC,
@@ -369,6 +370,79 @@ class TransactionDeletedResource(MethodResource):
             )
 
 
+class TransactionDuePeriodResource(MethodResource):
+    @doc(**TRANSACTION_DUE_PERIOD_DOC)  # type: ignore[misc]
+    @jwt_required()  # type: ignore[misc]
+    def get(self) -> Response:
+        token_error = _guard_revoked_token()
+        if token_error is not None:
+            return token_error
+
+        user_uuid = UUID(get_jwt_identity())
+        try:
+            page = _parse_positive_int(
+                request.args.get("page"), default=1, field_name="page"
+            )
+            per_page = _parse_positive_int(
+                request.args.get("per_page"), default=10, field_name="per_page"
+            )
+            order_by = (
+                str(request.args.get("order_by", "overdue_first")).strip().lower()
+            )
+
+            dependencies = get_transaction_dependencies()
+            service = dependencies.transaction_application_service_factory(user_uuid)
+            result = service.get_due_transactions(
+                initial_date=request.args.get("initialDate"),
+                final_date=request.args.get("finalDate"),
+                page=page,
+                per_page=per_page,
+                order_by=order_by,
+            )
+            pagination = result["pagination"]
+            counts = result["counts"]
+
+            return _compat_success(
+                legacy_payload={
+                    "transactions": result["items"],
+                    "total": pagination["total"],
+                    "page": pagination["page"],
+                    "per_page": pagination["per_page"],
+                    "counts": counts,
+                },
+                status_code=200,
+                message="Lista de vencimentos por período",
+                data={"transactions": result["items"], "counts": counts},
+                meta={
+                    "pagination": {
+                        "total": pagination["total"],
+                        "page": pagination["page"],
+                        "per_page": pagination["per_page"],
+                        "pages": pagination["pages"],
+                    }
+                },
+            )
+        except TransactionApplicationError as exc:
+            return _compat_error(
+                legacy_payload={"error": exc.message, "details": exc.details},
+                status_code=exc.status_code,
+                message=exc.message,
+                error_code=exc.code,
+                details=exc.details,
+            )
+        except ValueError as exc:
+            return _validation_error_response(
+                exc=exc,
+                fallback_message="Parâmetros de vencimentos inválidos.",
+            )
+        except Exception:
+            db.session.rollback()
+            return _internal_error_response(
+                message="Erro ao buscar vencimentos por período",
+                log_context="transaction.due_period_failed",
+            )
+
+
 class TransactionRestoreResource(MethodResource):
     @doc(**TRANSACTION_RESTORE_DOC)  # type: ignore[misc]
     @jwt_required()  # type: ignore[misc]
@@ -539,6 +613,7 @@ __all__ = [
     "TransactionForceDeleteResource",
     "TransactionExpensePeriodResource",
     "TransactionDeletedResource",
+    "TransactionDuePeriodResource",
     "TransactionRestoreResource",
     "TransactionListActiveResource",
     "_guard_revoked_token",

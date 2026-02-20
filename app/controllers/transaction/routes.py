@@ -3,6 +3,7 @@ from __future__ import annotations
 from .blueprint import transaction_bp
 from .report_resources import (
     TransactionDeletedResource,
+    TransactionDuePeriodResource,
     TransactionExpensePeriodResource,
     TransactionForceDeleteResource,
     TransactionListActiveResource,
@@ -72,6 +73,11 @@ def register_transaction_routes() -> None:
         view_func=TransactionExpensePeriodResource.as_view(
             "transaction_expense_period"
         ),
+        methods=["GET"],
+    )
+    transaction_bp.add_url_rule(
+        "/due-range",
+        view_func=TransactionDuePeriodResource.as_view("transaction_due_period"),
         methods=["GET"],
     )
 

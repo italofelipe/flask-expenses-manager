@@ -6,6 +6,7 @@ from uuid import UUID
 from flask_jwt_extended import decode_token
 
 from app.extensions.database import db
+from app.models.credit_card import CreditCard
 from app.models.tag import Tag
 
 
@@ -477,5 +478,116 @@ def test_transaction_expenses_legacy_contract(client) -> None:
     body = response.get_json()
     assert "success" not in body
     assert "expenses" in body
+    assert "counts" in body
+    assert "total_transactions" in body["counts"]
+
+
+def test_transaction_due_range_requires_period_parameter_v2_contract(client) -> None:
+    token = _register_and_login(client)
+
+    response = client.get(
+        "/transactions/due-range",
+        headers=_auth_headers(token, "v2"),
+    )
+
+    assert response.status_code == 400
+    body = response.get_json()
+    assert body["success"] is False
+    assert body["error"]["code"] == "VALIDATION_ERROR"
+
+
+def test_transaction_due_range_with_unified_sorting_v2_contract(client) -> None:
+    token = _register_and_login(client)
+    today = date.today()
+    overdue_day = (today - timedelta(days=1)).isoformat()
+    upcoming_day = (today + timedelta(days=1)).isoformat()
+
+    with client.application.app_context():
+        user_id = UUID(decode_token(token)["sub"])
+        card_a = CreditCard(user_id=user_id, name="Cartao A")
+        card_b = CreditCard(user_id=user_id, name="Cartao B")
+        db.session.add_all([card_a, card_b])
+        db.session.commit()
+        card_a_id = str(card_a.id)
+        card_b_id = str(card_b.id)
+
+    payloads = [
+        _transaction_payload(
+            title="Receita vencida",
+            type="income",
+            due_date=overdue_day,
+            amount="200.00",
+            credit_card_id=card_b_id,
+        ),
+        _transaction_payload(
+            title="Conta mensal",
+            type="expense",
+            due_date=upcoming_day,
+            amount="80.00",
+            credit_card_id=card_b_id,
+        ),
+        _transaction_payload(
+            title="Conta mensal",
+            type="expense",
+            due_date=upcoming_day,
+            amount="60.00",
+            credit_card_id=card_a_id,
+        ),
+    ]
+    for payload in payloads:
+        created = client.post(
+            "/transactions",
+            json=payload,
+            headers=_auth_headers(token, "v2"),
+        )
+        assert created.status_code == 201
+
+    upcoming_first_response = client.get(
+        (
+            f"/transactions/due-range?initialDate={overdue_day}"
+            f"&finalDate={upcoming_day}&order_by=upcoming_first&page=1&per_page=10"
+        ),
+        headers=_auth_headers(token, "v2"),
+    )
+    assert upcoming_first_response.status_code == 200
+    upcoming_body = upcoming_first_response.get_json()
+    assert upcoming_body["success"] is True
+    assert upcoming_body["meta"]["pagination"]["total"] == 3
+    assert upcoming_body["data"]["counts"]["total_transactions"] == 3
+    assert upcoming_body["data"]["counts"]["income_transactions"] == 1
+    assert upcoming_body["data"]["counts"]["expense_transactions"] == 2
+    assert upcoming_body["data"]["transactions"][0]["credit_card_id"] == card_a_id
+
+    overdue_first_response = client.get(
+        (
+            f"/transactions/due-range?initialDate={overdue_day}"
+            f"&finalDate={upcoming_day}&order_by=overdue_first&page=1&per_page=10"
+        ),
+        headers=_auth_headers(token, "v2"),
+    )
+    assert overdue_first_response.status_code == 200
+    overdue_body = overdue_first_response.get_json()
+    assert overdue_body["success"] is True
+    assert overdue_body["data"]["transactions"][0]["title"] == "Receita vencida"
+
+
+def test_transaction_due_range_legacy_contract(client) -> None:
+    token = _register_and_login(client)
+    created = client.post(
+        "/transactions",
+        json=_transaction_payload(type="expense", amount="100.00"),
+        headers=_auth_headers(token),
+    )
+    assert created.status_code == 201
+
+    response = client.get(
+        f"/transactions/due-range?finalDate={date.today().isoformat()}",
+        headers=_auth_headers(token),
+    )
+
+    assert response.status_code == 200
+    body = response.get_json()
+    assert "success" not in body
+    assert "transactions" in body
     assert "counts" in body
     assert "total_transactions" in body["counts"]

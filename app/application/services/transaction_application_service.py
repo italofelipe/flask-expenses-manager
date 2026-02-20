@@ -7,8 +7,10 @@ from typing import Any, Callable, cast
 from uuid import UUID, uuid4
 
 from dateutil.relativedelta import relativedelta
+from sqlalchemy import case, func
 
 from app.extensions.database import db
+from app.models.credit_card import CreditCard
 from app.models.transaction import Transaction, TransactionStatus, TransactionType
 from app.services.transaction_analytics_service import TransactionAnalyticsService
 from app.services.transaction_reference_authorization_service import (
@@ -369,6 +371,86 @@ class TransactionApplicationService:
             "top_income_categories": top_income_categories,
         }
 
+    def get_due_transactions(
+        self,
+        *,
+        initial_date: str | date | None,
+        final_date: str | date | None,
+        page: int,
+        per_page: int,
+        order_by: str = "overdue_first",
+    ) -> dict[str, Any]:
+        parsed_initial_date = self._coerce_date(
+            initial_date,
+            field_name="initialDate",
+            required=False,
+        )
+        parsed_final_date = self._coerce_date(
+            final_date,
+            field_name="finalDate",
+            required=False,
+        )
+        if not parsed_initial_date and not parsed_final_date:
+            raise _validation_error(
+                "Informe ao menos um parâmetro: 'initialDate' ou 'finalDate'."
+            )
+        if (
+            parsed_initial_date
+            and parsed_final_date
+            and parsed_initial_date > parsed_final_date
+        ):
+            raise _validation_error(
+                "Parâmetro 'initialDate' não pode ser maior que 'finalDate'."
+            )
+
+        normalized_order = str(order_by or "overdue_first").strip().lower()
+        order_clauses = _resolve_due_ordering(normalized_order)
+
+        base_query = Transaction.query.filter_by(user_id=self._user_id, deleted=False)
+        if parsed_initial_date:
+            base_query = base_query.filter(Transaction.due_date >= parsed_initial_date)
+        if parsed_final_date:
+            base_query = base_query.filter(Transaction.due_date <= parsed_final_date)
+
+        total_transactions = base_query.count()
+        income_transactions = base_query.filter(
+            Transaction.type == TransactionType.INCOME
+        ).count()
+        expense_transactions = base_query.filter(
+            Transaction.type == TransactionType.EXPENSE
+        ).count()
+        pages = (
+            (total_transactions + per_page - 1) // per_page if total_transactions else 0
+        )
+
+        transactions = (
+            base_query.outerjoin(
+                CreditCard, Transaction.credit_card_id == CreditCard.id
+            )
+            .order_by(*order_clauses)
+            .offset((page - 1) * per_page)
+            .limit(per_page)
+            .all()
+        )
+        serialized_transactions = [
+            _serialize_transaction(item) for item in transactions
+        ]
+
+        return {
+            "items": serialized_transactions,
+            "counts": {
+                "total_transactions": total_transactions,
+                "income_transactions": income_transactions,
+                "expense_transactions": expense_transactions,
+            },
+            "pagination": {
+                "total": total_transactions,
+                "page": page,
+                "per_page": per_page,
+                "pages": pages,
+            },
+        }
+
     def _assert_owned_references(
         self,
         *,
@@ -501,6 +583,56 @@ def _parse_month(value: str) -> tuple[int, int, str]:
         raise _validation_error("Formato de mês inválido. Use YYYY-MM.")
 
     return year, month_number, f"{year:04d}-{month_number:02d}"
+
+
+def _resolve_due_ordering(order_by: str) -> list[Any]:
+    today = date.today()
+    title_order = func.lower(func.coalesce(Transaction.title, ""))
+    card_order = func.lower(func.coalesce(CreditCard.name, ""))
+    overdue_bucket = case((Transaction.due_date < today, 0), else_=1)
+    upcoming_bucket = case((Transaction.due_date >= today, 0), else_=1)
+
+    if order_by == "overdue_first":
+        return [
+            overdue_bucket.asc(),
+            Transaction.due_date.asc(),
+            title_order.asc(),
+            card_order.asc(),
+            Transaction.created_at.asc(),
+        ]
+    if order_by == "upcoming_first":
+        return [
+            upcoming_bucket.asc(),
+            Transaction.due_date.asc(),
+            title_order.asc(),
+            card_order.asc(),
+            Transaction.created_at.asc(),
+        ]
+    if order_by == "date":
+        return [
+            Transaction.due_date.asc(),
+            title_order.asc(),
+            card_order.asc(),
+            Transaction.created_at.asc(),
+        ]
+    if order_by == "title":
+        return [
+            title_order.asc(),
+            Transaction.due_date.asc(),
+            card_order.asc(),
+            Transaction.created_at.asc(),
+        ]
+    if order_by == "card":
+        return [
+            card_order.asc(),
+            Transaction.due_date.asc(),
+            title_order.asc(),
+            Transaction.created_at.asc(),
+        ]
+    raise _validation_error(
+        "Parâmetro 'order_by' inválido. "
+        "Use overdue_first, upcoming_first, date, title ou card."
+    )
 
 
 def _validate_recurring_payload(

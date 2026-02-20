@@ -1,4 +1,4 @@
-from datetime import date
+from datetime import date, timedelta
 from decimal import Decimal
 from typing import Any, Dict
 
@@ -135,6 +135,20 @@ def test_graphql_transactions_summary_and_dashboard(client) -> None:
     assert income_response.status_code == 200
     assert "errors" not in income_response.get_json()
 
+    overdue_response = _graphql(
+        client,
+        create_mutation,
+        {
+            "title": "Conta atrasada",
+            "amount": "70.00",
+            "type": "expense",
+            "dueDate": (date.today() - timedelta(days=1)).isoformat(),
+        },
+        token=token,
+    )
+    assert overdue_response.status_code == 200
+    assert "errors" not in overdue_response.get_json()
+
     list_query = """
     query ListTx {
       transactions(page: 1, perPage: 10) {
@@ -184,6 +198,39 @@ def test_graphql_transactions_summary_and_dashboard(client) -> None:
     dashboard_body = dashboard_response.get_json()
     assert "errors" not in dashboard_body
     assert dashboard_body["data"]["transactionDashboard"]["month"] == month_ref
+
+    due_range_query = """
+    query DueRange($initialDate: String!, $finalDate: String!) {
+      transactionDueRange(
+        initialDate: $initialDate,
+        finalDate: $finalDate,
+        page: 1,
+        perPage: 10,
+        orderBy: "overdue_first"
+      ) {
+        items { title type dueDate }
+        counts { totalTransactions incomeTransactions expenseTransactions }
+        pagination { total page perPage }
+      }
+    }
+    """
+    due_range_response = _graphql(
+        client,
+        due_range_query,
+        {
+            "initialDate": (date.today() - timedelta(days=1)).isoformat(),
+            "finalDate": date.today().isoformat(),
+        },
+        token=token,
+    )
+    assert due_range_response.status_code == 200
+    due_range_body = due_range_response.get_json()
+    assert "errors" not in due_range_body
+    due_payload = due_range_body["data"]["transactionDueRange"]
+    assert due_payload["counts"]["totalTransactions"] == 3
+    assert due_payload["counts"]["incomeTransactions"] == 1
+    assert due_payload["counts"]["expenseTransactions"] == 2
+    assert due_payload["items"][0]["title"] == "Conta atrasada"
 
 
 def test_graphql_wallet_and_ticker_queries_mutations(client) -> None:

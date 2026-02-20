@@ -22,6 +22,8 @@ from app.graphql.types import (
     DashboardStatusCountsType,
     DashboardTotalsType,
     TransactionDashboardPayloadType,
+    TransactionDueCountsType,
+    TransactionDueRangePayloadType,
     TransactionListPayloadType,
     TransactionSummaryPayloadType,
     TransactionTypeObject,
@@ -48,6 +50,14 @@ class TransactionQueryMixin:
     transaction_dashboard = graphene.Field(
         TransactionDashboardPayloadType,
         month=graphene.String(required=True),
+    )
+    transaction_due_range = graphene.Field(
+        TransactionDueRangePayloadType,
+        initial_date=graphene.String(),
+        final_date=graphene.String(),
+        page=graphene.Int(default_value=1),
+        per_page=graphene.Int(default_value=10),
+        order_by=graphene.String(default_value="overdue_first"),
     )
 
     def resolve_transactions(
@@ -161,5 +171,51 @@ class TransactionQueryMixin:
                     for item in result["top_income_categories"]
                     if isinstance(item, dict)
                 ],
+            ),
+        )
+
+    def resolve_transaction_due_range(
+        self,
+        info: graphene.ResolveInfo,
+        initial_date: str | None = None,
+        final_date: str | None = None,
+        page: int = 1,
+        per_page: int = 10,
+        order_by: str = "overdue_first",
+    ) -> TransactionDueRangePayloadType:
+        _validate_pagination_values(page, per_page)
+        user = get_current_user_required()
+        service = TransactionApplicationService.with_defaults(user.id)
+        try:
+            result = service.get_due_transactions(
+                initial_date=initial_date,
+                final_date=final_date,
+                page=page,
+                per_page=per_page,
+                order_by=order_by,
+            )
+        except TransactionApplicationError as exc:
+            raise build_public_graphql_error(
+                exc.message,
+                code=to_public_graphql_code(exc.code),
+            ) from exc
+
+        counts = result["counts"]
+        pagination = result["pagination"]
+        return TransactionDueRangePayloadType(
+            items=[
+                TransactionTypeObject(**item)
+                for item in result["items"]
+                if isinstance(item, dict)
+            ],
+            counts=TransactionDueCountsType(
+                total_transactions=int(counts["total_transactions"]),
+                income_transactions=int(counts["income_transactions"]),
+                expense_transactions=int(counts["expense_transactions"]),
+            ),
+            pagination=paginate(
+                total=int(pagination["total"]),
+                page=int(pagination["page"]),
+                per_page=int(pagination["per_page"]),
             ),
         )
