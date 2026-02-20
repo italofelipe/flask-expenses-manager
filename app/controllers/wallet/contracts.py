@@ -4,9 +4,13 @@ from datetime import date, datetime
 from typing import Any
 
 from app.application.errors import PublicValidationError
+from app.application.services.investment_application_service import (
+    InvestmentApplicationError,
+)
 from app.application.services.public_error_mapper_service import (
     map_validation_exception,
 )
+from app.application.services.wallet_application_service import WalletApplicationError
 from app.controllers.response_contract import compat_error_tuple, compat_success_tuple
 from app.services.investment_operation_service import InvestmentOperationError
 
@@ -47,6 +51,18 @@ def compat_error(
 
 def operation_error_response(
     exc: InvestmentOperationError,
+) -> tuple[dict[str, Any], int]:
+    return compat_error(
+        legacy_payload={"error": exc.message, "details": exc.details},
+        status_code=exc.status_code,
+        message=exc.message,
+        error_code=exc.code,
+        details=exc.details,
+    )
+
+
+def application_error_response(
+    exc: InvestmentApplicationError | WalletApplicationError,
 ) -> tuple[dict[str, Any], int]:
     return compat_error(
         legacy_payload={"error": exc.message, "details": exc.details},
