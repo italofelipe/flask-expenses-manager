@@ -1,6 +1,6 @@
-# auth_controller.py
+# auth controller
 
-Arquivo: `/opt/auraxis/app/controllers/auth_controller.py`
+Pacote: `app/controllers/auth/`
 
 ## Responsabilidade
 Gerenciar autenticação e sessão JWT:

@@ -21,6 +21,7 @@ Fluxo atual:
 - Autenticação
 - Usuário/perfil
 - Transações
+- Metas
 - Carteira (investimentos)
 
 ## Nomenclatura oficial de domínio
@@ -134,6 +135,7 @@ Query params atuais:
 - `GET /transactions/dashboard?month=YYYY-MM`
 - `GET /transactions/list`
 - `GET /transactions/expenses`
+- `GET /transactions/due-range`
 
 Contrato de resposta:
 - Padrão legado (default): sem envelope `success/data/meta`.
@@ -231,6 +233,25 @@ Resposta inclui:
   - despesas em `data.expenses`
   - contadores em `data.counts`
   - paginação em `meta.pagination`
+
+### `GET /transactions/due-range`
+Lista transações de receita e despesa por intervalo de vencimento (`due_date`) com visão unificada.
+
+Regras:
+- É obrigatório enviar ao menos um parâmetro: `initialDate` ou `finalDate`.
+- `initialDate` e `finalDate` usam formato `YYYY-MM-DD`.
+- Se ambos forem enviados, `initialDate` não pode ser maior que `finalDate`.
+
+Query params suportados:
+- `initialDate`
+- `finalDate`
+- `page`, `per_page`
+- `order_by` (`overdue_first|due_first|due_date|title|card_name`)
+
+Resposta inclui:
+- lista paginada unificada em `data.items`
+- contagem total, receitas e despesas em `data.counts`
+- paginação em `meta.pagination`
 
 ## 4) Wallet
 - `POST /wallet`
@@ -358,18 +379,40 @@ Retorna evolução diária da carteira por período:
 Atualiza item da carteira e salva histórico quando `quantity` ou `value` mudam.
 - Com `X-API-Contract: v2`, retorna envelope padronizado.
 
-## 5) GraphQL (fase 1)
+### `DELETE /wallet/{investment_id}`
+Remove item da carteira.
+- Com `X-API-Contract: v2`, retorna envelope padronizado.
+
+## 5) Goals
+- `GET /goals`
+- `POST /goals`
+- `GET /goals/{goal_id}`
+- `PUT /goals/{goal_id}`
+- `DELETE /goals/{goal_id}`
+- `GET /goals/{goal_id}/plan`
+- `POST /goals/simulate`
+
+Contrato de resposta:
+- Padrão legado (default): sem envelope `success/data/meta`.
+- Novo contrato: enviar header `X-API-Contract: v2`.
+
+Objetivo do domínio:
+- Gerenciar metas financeiras do usuário.
+- Expor plano de atingimento com recomendação acionável.
+- Permitir simulação sem persistência (what-if).
+
+## 6) GraphQL
 - `POST /graphql`
 
-Objetivo da fase 1:
-- adicionar suporte GraphQL gradual sem quebrar os endpoints REST.
-- cobrir operações essenciais por domínio.
-
-Queries iniciais:
+Queries disponíveis:
 - `me`
 - `transactions`
 - `transactionSummary`
 - `transactionDashboard`
+- `transactionDueRange`
+- `goals`
+- `goal`
+- `goalPlan`
 - `walletEntries`
 - `walletHistory`
 - `investmentOperations`
@@ -381,13 +424,17 @@ Queries iniciais:
 - `portfolioValuationHistory`
 - `tickers`
 
-Mutations iniciais:
+Mutations disponíveis:
 - `registerUser`
 - `login`
 - `logout`
 - `updateUserProfile`
 - `createTransaction`
 - `deleteTransaction`
+- `createGoal`
+- `updateGoal`
+- `deleteGoal`
+- `simulateGoalPlan`
 - `addWalletEntry`
 - `updateWalletEntry`
 - `deleteWalletEntry`
@@ -404,22 +451,18 @@ Autenticação:
 - operações protegidas usam `Authorization: Bearer <JWT>`.
 - `registerUser` e `login` são públicas.
 
-### `DELETE /wallet/{investment_id}`
-Remove item da carteira.
-- Com `X-API-Contract: v2`, retorna envelope padronizado.
-
 ## Contratos e status code
 A API ainda não está 100% padronizada em payload de sucesso/erro entre todos os controllers.
 
 Referência de padronização (Fase 0):
-- `/opt/auraxis/docs/API_RESPONSE_CONTRACT.md`
-- `/opt/auraxis/docs/PHASE0_RESPONSE_ADOPTION_PLAN.md`
+- `docs/API_RESPONSE_CONTRACT.md`
+- `docs/PHASE0_RESPONSE_ADOPTION_PLAN.md`
 
 ## Lacunas e TODOs identificados no código (Fase 0)
 1. Geração de recorrência foi implementada em serviço/script e com job agendado no GitHub Actions (`.github/workflows/recurrence-job.yml`), dependente de secrets para conexão no banco.
-2. Não há módulo de metas financeiras implementado (`goals`).
-3. Não há CRUD exposto para `Tag`, `Account` e `CreditCard` (existem model/schema, mas sem controller).
-4. A documentação histórica citava endpoints `/ticker` e `/transaction`; o código atual usa `/wallet` e `/transactions`, e o antigo `ticker_controller` REST foi removido.
+2. Não há CRUD exposto para `Tag`, `Account` e `CreditCard` (existem model/schema, mas sem controller).
+3. Recuperação de senha por link ainda não foi implementada no domínio de autenticação.
+4. Evolução de perfil V1 (campos mínimos, auto declaração de investidor e questionário auxiliar) ainda está em backlog.
 5. Projeto usa Marshmallow/Webargs em runtime; Pydantic não está implementado no fluxo atual.
 
 ## Diretrizes para próximas implementações (senior baseline)

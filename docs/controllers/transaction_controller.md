@@ -1,6 +1,6 @@
-# transaction_controller.py
+# transaction controller
 
-Arquivo: `/opt/auraxis/app/controllers/transaction_controller.py`
+Pacote: `app/controllers/transaction/`
 
 ## Responsabilidade
 Gerenciar ciclo completo de transações financeiras:
@@ -133,6 +133,29 @@ O que faz:
   - `expense_transactions`
 - Contrato v2:
   - itens em `data.expenses`
+  - métricas em `data.counts`
+  - paginação em `meta.pagination`
+
+## `TransactionDuePeriodResource.get`
+Endpoint: `GET /transactions/due-range`
+
+O que faz:
+- Lista receitas e despesas em uma consulta unificada por intervalo de vencimento.
+- Regras de entrada:
+  - ao menos um parâmetro obrigatório: `initialDate` ou `finalDate`
+  - ambos aceitam formato `YYYY-MM-DD`
+  - se ambos forem enviados, valida `initialDate <= finalDate`
+- Paginação:
+  - `page` (default `1`)
+  - `per_page` (default `10`)
+- Ordenação:
+  - `order_by`: `overdue_first|due_first|due_date|title|card_name`
+- Métricas retornadas para o período filtrado:
+  - `total_transactions`
+  - `income_transactions`
+  - `expense_transactions`
+- Contrato v2:
+  - itens em `data.items`
   - métricas em `data.counts`
   - paginação em `meta.pagination`
 

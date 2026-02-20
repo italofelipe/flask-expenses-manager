@@ -1,6 +1,6 @@
-# user_controller.py
+# user controller
 
-Arquivo: `/opt/auraxis/app/controllers/user_controller.py`
+Pacote: `app/controllers/user/`
 
 ## Responsabilidade
 Gerenciar perfil do usuário autenticado e visão consolidada (`/user/me`) com dados de transações e carteira.

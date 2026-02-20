@@ -1,6 +1,6 @@
 # TASKS - Central de TODOs e Progresso
 
-Ultima atualizacao: 2026-02-20 (bloco E concluido + X2/C4 e C6 concluidos)
+Ultima atualizacao: 2026-02-20 (bloco E concluido + X2/C4 e C6 concluidos + backlog de perfil V1 atualizado)
 
 ## Regras de uso deste arquivo
 
@@ -66,15 +66,18 @@ Critérios de saída do Ciclo A:
 ### Snapshot de retomada (continuidade)
 
 Estado atual consolidado:
-- Ciclo A concluido com deploy DEV/PROD validado, governanca ativa e auditoria de seguranca operacional em execucao.
-- Workflow `AWS Security Audit` executado com sucesso apos merge (validacao operacional do I8).
-- Proximo foco efetivo: iniciar Ciclo B (features) com `E1 -> E2 -> E3` (metas), preservando paridade REST + GraphQL.
+- Ciclo A concluido com deploy DEV/PROD validado, governanca ativa e auditoria de seguranca operacional ativa.
+- Bloco de metas (`E1` a `E6`) concluido com paridade REST + GraphQL.
+- Debito tecnico X2/C4 concluido com adapters REST/GraphQL mais finos.
+- Endpoint unificado de vencimentos (`C6`) concluido com paridade REST + GraphQL.
+- Foco atual de produto: evolucao de perfil V1 (auto declaracao + questionario indicativo + campos minimos).
 
 Pendencias de execucao imediata (ordem sugerida):
-1. `E1` model de metas (`Goal`) + migration + testes de modelo.
-2. `E2` CRUD `/goals` (REST) com validacao e ownership.
-3. `E2` paridade GraphQL para metas reutilizando mesmo dominio.
-4. `E3` servico de planejamento de metas (curto/medio/longo prazo).
+1. `B8` campos minimos de perfil V1 com retrocompatibilidade (`monthly_income` -> `monthly_income_net`).
+2. `B9` fluxo de perfil de investidor auto declarado.
+3. `B10` questionario indicativo (5-10 perguntas) para sugestao de perfil.
+4. `B11` persistencia/exposicao do perfil sugerido e `taxonomy_version`.
+5. `B4 -> B6` recuperacao de senha por link (seguranca de conta).
 
 ### Ciclo B (planejado) - Features bloco 1
 
@@ -84,6 +87,7 @@ Pendencias de execucao imediata (ordem sugerida):
 | B2 | F1, F2, F3, F4 (auxiliares e integração em transações) |
 | B3 | C6 (vencimentos por range com paridade REST + GraphQL) |
 | B4 | B4, B5, B6, B7 (recuperação de senha por link + descoberta de OTP por celular) |
+| B5 | B8, B9, B10, B11 (perfil V1: campos mínimos + auto declaração + questionário indicativo) |
 
 #### Descoberta de produto/engenharia para B4 (não prioritário)
 
@@ -150,6 +154,10 @@ Fluxo por entrega:
 | B5    | Autenticacao  | Implementar envio de link de recuperação por email com token de uso único, expiração curta e armazenamento seguro                         | Todo        | 0%        | Alto: depende de provedor transacional, política anti-abuso e gestão segura de token                                                                                    |                                  | 2026-02-19         |
 | B6    | Autenticacao  | Implementar fluxo de redefinição por link (`token` + nova senha), com invalidação do token e revogação de sessões ativas                 | Todo        | 0%        | Alto: falhas em invalidação/revogação deixam conta vulnerável pós-reset                                                                                                 |                                  | 2026-02-19         |
 | B7    | Autenticacao  | Discovery do fluxo alternativo de recuperação por OTP (SMS): provedor, custos, antifraude, UX e compliance (LGPD)                       | Blocked     | 0%        | Alto: custo operacional e riscos de SIM swap; bloqueado até decisão de arquitetura/provedor                                                                             |                                  | 2026-02-19         |
+| B8    | Usuario       | [P1] Implementar campos mínimos de perfil V1 no domínio e contratos REST/GraphQL (`state_uf`, `occupation`, `investor_profile`, `financial_objectives`, `monthly_income_net`) com retrocompatibilidade de payload | Todo        | 0%        | Alto: envolve migration e compatibilidade de contrato para evitar quebra de clientes já integrados                                                                       |                                  | 2026-02-20         |
+| B9    | Usuario       | [P1] Implementar fluxo de perfil de investidor auto declarado (onboarding + edição de perfil) com validação por enum                      | Todo        | 0%        | Medio: sem validação de enum e regras claras, perfil pode ficar inconsistente entre telas                                                                                |                                  | 2026-02-20         |
+| B10   | Usuario       | [P2] Implementar questionário curto (5-10 perguntas) para sugestão indicativa de perfil de investidor, sem substituir a auto declaração | Todo        | 0%        | Medio: classificação simplificada pode gerar expectativa de precisão acima da proposta                                                                                    |                                  | 2026-02-20         |
+| B11   | Usuario       | [P2] Persistir e expor resultado do questionário (`investor_profile_suggested`, `profile_quiz_score`, `taxonomy_version`) para comparação com perfil auto declarado | Todo        | 0%        | Medio: risco de confusão de UX se não houver explicação clara entre perfil declarado e perfil sugerido                                                                  |                                  | 2026-02-20         |
 | C1    | Transacoes    | Corrigir listagem de transacoes com filtros/paginacao reais no banco                                                                       | Done        | 100%      | Baixo                                                                                                                                                                    | 497f901                          | 2026-02-09         |
 | C2    | Transacoes    | Regras fortes de recorrencia + geracao automatica idempotente                                                                              | Done        | 100%      | Baixo                                                                                                                                                                    | f3ef3c0                          | 2026-02-09         |
 | C3    | Transacoes    | Consolidar regras de parcelamento (soma exata e arredondamento final)                                                                      | Done        | 100%      | Baixo                                                                                                                                                                    | 497f901                          | 2026-02-09         |
