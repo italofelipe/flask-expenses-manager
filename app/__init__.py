@@ -11,6 +11,7 @@ from flask_migrate import Migrate
 from sqlalchemy.pool import NullPool
 
 from app.controllers.auth_controller import auth_bp, register_auth_dependencies
+from app.controllers.goal_controller import goal_bp, register_goal_dependencies
 from app.controllers.graphql_controller import graphql_bp, register_graphql_dependencies
 from app.controllers.health_controller import health_bp
 from app.controllers.transaction_controller import (
@@ -125,6 +126,7 @@ def create_app() -> Flask:
     register_auth_dependencies(app)
     register_user_dependencies(app)
     register_transaction_dependencies(app)
+    register_goal_dependencies(app)
     register_cors(app)
     register_security_headers(app)
     register_docs_access_guard(app)
@@ -135,6 +137,7 @@ def create_app() -> Flask:
 
     # Registra blueprints ANTES dos endpoints no Swagger
     app.register_blueprint(transaction_bp)
+    app.register_blueprint(goal_bp)
     app.register_blueprint(user_bp)
     app.register_blueprint(auth_bp)
     app.register_blueprint(wallet_bp)
@@ -142,7 +145,14 @@ def create_app() -> Flask:
     app.register_blueprint(health_bp)
 
     # Registra os endpoints documentados no Swagger com base no mapa real de rotas.
-    documented_blueprints = {"auth", "user", "transaction", "wallet", "health"}
+    documented_blueprints = {
+        "auth",
+        "user",
+        "transaction",
+        "goal",
+        "wallet",
+        "health",
+    }
     for endpoint, view_func in sorted(app.view_functions.items()):
         if "." not in endpoint:
             continue
