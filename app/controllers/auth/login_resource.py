@@ -16,6 +16,45 @@ from .dependencies import get_auth_dependencies
 from .guard import guard_login_check, guard_register_failure, guard_register_success
 
 
+def _resolve_login_user(
+    *,
+    dependencies: Any,
+    email: str | None,
+    name: str | None,
+) -> Any:
+    if email:
+        return dependencies.find_user_by_email(str(email))
+    return dependencies.find_user_by_name(str(name))
+
+
+def _invalid_credentials_response(*, login_guard: Any, login_context: Any) -> Response:
+    failure_guard_response = guard_register_failure(
+        login_guard=login_guard,
+        login_context=login_context,
+    )
+    if failure_guard_response is not None:
+        return failure_guard_response
+    return compat_error(
+        legacy_payload={"message": "Invalid credentials"},
+        status_code=401,
+        message="Invalid credentials",
+        error_code="UNAUTHORIZED",
+    )
+
+
+def _too_many_attempts_response(*, retry_after: int | None) -> Response:
+    return compat_error(
+        legacy_payload={
+            "message": "Too many login attempts. Try again later.",
+            "retry_after_seconds": retry_after,
+        },
+        status_code=429,
+        message="Too many login attempts. Try again later.",
+        error_code="TOO_MANY_ATTEMPTS",
+        details={"retry_after_seconds": retry_after},
+    )
+
+
 class AuthResource(MethodResource):
     @doc(
         description="Autenticação de usuário (email ou nome devem ser fornecidos)",
@@ -67,10 +106,10 @@ class AuthResource(MethodResource):
         dependencies = get_auth_dependencies()
         auth_policy = dependencies.get_auth_security_policy()
         principal = str(email or name or "")
-        user = (
-            dependencies.find_user_by_email(str(email))
-            if email
-            else dependencies.find_user_by_name(str(name))
+        user = _resolve_login_user(
+            dependencies=dependencies,
+            email=email,
+            name=name,
         )
         login_context = dependencies.build_login_attempt_context(
             principal=principal,
@@ -92,31 +131,14 @@ class AuthResource(MethodResource):
         allowed, retry_after = check_result
 
         if not allowed:
-            return compat_error(
-                legacy_payload={
-                    "message": "Too many login attempts. Try again later.",
-                    "retry_after_seconds": retry_after,
-                },
-                status_code=429,
-                message="Too many login attempts. Try again later.",
-                error_code="TOO_MANY_ATTEMPTS",
-                details={"retry_after_seconds": retry_after},
-            )
+            return _too_many_attempts_response(retry_after=retry_after)
 
         password_hash = user.password if user is not None else None
         is_valid_password = dependencies.verify_password(password_hash, str(password))
         if not user or not is_valid_password:
-            failure_guard_response = guard_register_failure(
+            return _invalid_credentials_response(
                 login_guard=login_guard,
                 login_context=login_context,
-            )
-            if failure_guard_response is not None:
-                return failure_guard_response
-            return compat_error(
-                legacy_payload={"message": "Invalid credentials"},
-                status_code=401,
-                message="Invalid credentials",
-                error_code="UNAUTHORIZED",
             )
 
         try:
