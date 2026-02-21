@@ -1,215 +1,163 @@
 """
-Auraxis Multi-Agent System — Entry Point.
+Auraxis AI Squad — Backend Only Mode.
 
-Orchestrates a CrewAI squad of 5 specialized agents to automate the SDLC.
-Each agent has access to security-hardened tools (see tools/project_tools.py)
-and follows the knowledge base defined in .context/.
+Runs a 3-agent pipeline (PM → Backend Dev → QA) using CrewAI.
+Frontend and DevOps agents are disabled until the project has a frontend.
 
-Agent Flow (sequential):
-    PM (bootstrap + plan) → Backend → Frontend → QA → DevOps (human approval)
-
-Integration with .context/:
-    The PM agent performs the bootstrap sequence from .context/README.md
-    before planning. Backend and QA agents can read architecture and
-    quality gate docs via read_context_file().
+The PM agent executes the .context/ bootstrap sequence before planning,
+as defined in .context/README.md and .context/03_agentic_workflow.md.
 
 References:
-    - .context/README.md — bootstrap reading order
-    - .context/03_agentic_workflow.md — agent operational loop
-    - ai_squad/AGENT_ARCHITECTURE.md — squad architecture manifesto
-    - ai_squad/tools/project_tools.py — all available tools
+- ai_squad/AGENT_ARCHITECTURE.md — agent registry and tools
+- .context/03_agentic_workflow.md — agentic operational loop
+- .context/05_quality_and_gates.md — quality gates and Definition of Done
 """
+
+import os
 
 from crewai import Agent, Crew, Process, Task
 from dotenv import load_dotenv
-from tools.project_tools import ProjectTools
+from tools.project_tools import (
+    GitOpsTool,
+    ReadContextFileTool,
+    ReadGovernanceFileTool,
+    ReadSchemaTool,
+    ReadTasksTool,
+    RunTestsTool,
+    WriteFileTool,
+)
 
 load_dotenv()
 
 
 class AuraxisSquad:
-    """
-    Auraxis development squad with 5 agents.
+    def __init__(self):
+        # Read-only tools
+        self.rt = ReadTasksTool()
+        self.rs = ReadSchemaTool()
+        self.rcf = ReadContextFileTool()
+        self.rgf = ReadGovernanceFileTool()
 
-    The squad reads the .context/ knowledge base during bootstrap,
-    then executes a sequential pipeline from planning to deployment.
-    """
+        # Execution tools
+        self.rtst = RunTestsTool()
 
-    def __init__(self) -> None:
-        self.tools = ProjectTools()
+        # Write tools
+        self.wf = WriteFileTool()
 
-    def run(self):  # type: ignore[no-untyped-def]
+        # Git tools
+        self.git = GitOpsTool()
+
+    def run_backend_workflow(self, briefing: str):
+        """
+        Run backend-only workflow: PM → Backend Dev → QA.
+        Frontend and Deploy are dormant.
+        """
+
         # --- AGENTS ---
-
         manager = Agent(
             role="Gerente de Projeto Auraxis",
             goal=(
-                "Coordenar o ciclo completo de desenvolvimento "
-                "(Back, Front, QA, Deploy) usando a base de "
-                "conhecimento em .context/ como referencia."
+                "Coordinate backend development ensuring code quality, "
+                "alignment with product.md, and compliance with steering.md."
             ),
             backstory=(
-                "Voce e o lider do squad Auraxis. Antes de qualquer "
-                "planejamento, execute o bootstrap lendo os arquivos "
-                "da base de conhecimento .context/ na ordem definida "
-                "em .context/README.md. Use read_context_file() para "
-                "cada arquivo e read_governance_file() para product.md "
-                "e steering.md. Garanta que cada agente tenha o que "
-                "precisa para trabalhar com rastreabilidade e qualidade."
+                "Technical lead focused on Clean Architecture and TASKS.md. "
+                "You always start by reading the .context/ knowledge base "
+                "to understand the project's current state before planning."
             ),
-            tools=[
-                self.tools.read_tasks,
-                self.tools.read_context_file,
-                self.tools.read_governance_file,
-            ],
+            tools=[self.rt, self.rcf, self.rgf],
             verbose=True,
             allow_delegation=True,
         )
 
         backend_dev = Agent(
             role="Senior Backend Engineer",
-            goal="Implementar APIs Flask e migrations SQLAlchemy.",
-            backstory=(
-                "Focado em performance e seguranca de dados financeiros. "
-                "Consulte .context/04_architecture_snapshot.md via "
-                "read_context_file() para entender a estrutura do projeto "
-                "antes de implementar. Siga os padroes de nomenclatura "
-                "e arquitetura definidos na base de conhecimento."
+            goal=(
+                "Implement business logic, models, services, and "
+                "GraphQL resolvers following CODING_STANDARDS.md."
             ),
-            tools=[
-                self.tools.read_tasks,
-                self.tools.read_schema,
-                self.tools.read_context_file,
-                self.tools.write_file_content,
-            ],
-            verbose=True,
-        )
-
-        frontend_dev = Agent(
-            role="Senior Frontend Engineer",
-            goal="Desenvolver interfaces responsivas e intuitivas.",
             backstory=(
-                "Especialista em criar UIs que consomem GraphQL/REST. "
-                "Voce foca na experiencia do usuario e integra com "
-                "os contratos definidos pelo backend."
+                "Expert in Python, Flask, SQLAlchemy, and Ariadne GraphQL. "
+                "You consult .context/04_architecture_snapshot.md for the "
+                "codebase structure before writing any code."
             ),
-            tools=[self.tools.write_file_content],
+            tools=[self.rt, self.rs, self.rcf, self.wf, self.git],
             verbose=True,
         )
 
         qa_engineer = Agent(
             role="QA Engineer",
-            goal="Validar integridade do sistema e ausencia de bugs.",
-            backstory=(
-                "Rigoroso e detalhista. Consulte "
-                ".context/05_quality_and_gates.md via read_context_file() "
-                "para conhecer os gates de qualidade obrigatorios. "
-                "Rode os testes e valide contra os criterios de pronto "
-                "antes de aprovar o incremento."
+            goal=(
+                "Validate backend changes against quality gates "
+                "defined in .context/05_quality_and_gates.md."
             ),
-            tools=[
-                self.tools.run_backend_tests,
-                self.tools.read_context_file,
-            ],
+            backstory=(
+                "Rigorous tester. You run pytest and validate that "
+                "the API contract is maintained. You check the quality "
+                "gates before approving any changes."
+            ),
+            tools=[self.rtst, self.rcf],
             verbose=True,
         )
 
-        devops_agent = Agent(
-            role="Cloud DevOps Engineer",
-            goal="Gerenciar infraestrutura AWS e processos de deploy.",
-            backstory=(
-                "Especialista em AWS EC2, S3 e automacao. "
-                "Seguranca e sua prioridade numero 1. "
-                "Toda acao de deploy requer aprovacao humana."
-            ),
-            tools=[self.tools.check_aws_status],
-            verbose=True,
-        )
-
-        # --- TASKS ---
-
+        # --- TASKS (Backend Only) ---
         task_plan = Task(
             description=(
-                "BOOTSTRAP: Primeiro, leia os seguintes arquivos na ordem:\n"
-                '1. read_context_file("README.md")\n'
-                '2. read_context_file("01_sources_of_truth.md")\n'
-                '3. read_context_file("04_architecture_snapshot.md")\n'
-                '4. read_governance_file("steering.md")\n'
-                '5. read_governance_file("product.md")\n'
+                "BOOTSTRAP SEQUENCE (execute in order before planning):\n"
+                "1. read_context_file('README.md')\n"
+                "2. read_context_file('01_sources_of_truth.md')\n"
+                "3. read_context_file('04_architecture_snapshot.md')\n"
+                "4. read_governance_file('steering.md')\n"
+                "5. read_governance_file('product.md')\n"
                 "6. read_tasks()\n\n"
-                "Depois, defina o proximo incremento funcional baseado "
-                "nas prioridades do TASKS.md e na direcao de product.md. "
-                "Inclua no plano: branch name, commits planejados, "
-                "quality gates a validar, e riscos identificados."
+                f'USER BRIEFING: "{briefing}"\n\n'
+                "Based on the bootstrap context and the user's briefing, "
+                "define the next backend increment: which files to change, "
+                "what models/services/resolvers to create or modify, "
+                "and in what order."
             ),
             expected_output=(
-                "Plano de execucao detalhado para Backend e Frontend, "
-                "incluindo branch name convencional, commits planejados, "
-                "quality gates, e riscos mapeados."
+                "A detailed technical plan listing which backend files "
+                "will be created or modified, with rationale tied to "
+                "TASKS.md priorities and product.md direction."
             ),
             agent=manager,
         )
 
-        task_backend = Task(
+        task_code = Task(
             description=(
-                "Implemente a logica de backend e atualize o schema "
-                "de dados conforme o plano do PM. Consulte "
-                ".context/04_architecture_snapshot.md para a estrutura "
-                "e o schema.graphql para contratos existentes."
+                "Implement the backend changes as defined in the plan. "
+                "Use migrations (Alembic) if the database schema changes. "
+                "Follow the coding standards in CODING_STANDARDS.md. "
+                "Every new Model must have a corresponding Marshmallow Schema."
             ),
-            expected_output="Codigo Python e Migrations criados.",
+            expected_output=(
+                "Python code implemented and saved to the correct files. "
+                "List of all files created or modified."
+            ),
             agent=backend_dev,
             context=[task_plan],
         )
 
-        task_frontend = Task(
-            description=(
-                "Crie os componentes de interface necessarios "
-                "integrando com o backend recem-criado."
-            ),
-            expected_output="Arquivos de frontend (JS/TS/Flutter) gerados.",
-            agent=frontend_dev,
-            context=[task_backend],
-        )
-
         task_test = Task(
             description=(
-                "Execute a suite de testes em todo o incremento. "
-                "Consulte .context/05_quality_and_gates.md para os "
-                "criterios de qualidade. Reporte PASS/FAIL com detalhes."
+                "Run the test suite (pytest) to validate backend changes. "
+                "Check that coverage meets the 85% minimum threshold. "
+                "Consult .context/05_quality_and_gates.md for the full "
+                "Definition of Done checklist."
             ),
-            expected_output="Relatorio de QA com status PASS/FAIL.",
+            expected_output=(
+                "Test results: pass/fail summary, coverage percentage, "
+                "and any error logs that need fixing."
+            ),
             agent=qa_engineer,
-            context=[task_frontend],
+            context=[task_code],
         )
 
-        task_deploy = Task(
-            description=(
-                "Verifique a saude da AWS e prepare o deploy " "do novo incremento."
-            ),
-            expected_output=("Relatorio de pre-deploy e execucao do deploy na AWS."),
-            agent=devops_agent,
-            context=[task_test],
-            human_input=True,  # SECURITY: requires human "OK" for deploy
-        )
-
-        # --- ORCHESTRATION ---
-
+        # --- ORCHESTRATION (Backend Only) ---
         crew = Crew(
-            agents=[
-                manager,
-                backend_dev,
-                frontend_dev,
-                qa_engineer,
-                devops_agent,
-            ],
-            tasks=[
-                task_plan,
-                task_backend,
-                task_frontend,
-                task_test,
-                task_deploy,
-            ],
+            agents=[manager, backend_dev, qa_engineer],
+            tasks=[task_plan, task_code, task_test],
             process=Process.sequential,
             verbose=True,
         )
@@ -218,6 +166,14 @@ class AuraxisSquad:
 
 
 if __name__ == "__main__":
-    print("### Auraxis Multi-Agent System Activated ###")
+    print("### Auraxis AI Squad - Mode: BACKEND ONLY ###")
+    print(f"Project root: {os.path.abspath('.')}")
+    print()
+
+    briefing_usuario = (
+        "Analise o status atual no TASKS.md e identifique "
+        "se há algo pendente nos modelos de Investimento."
+    )
+
     squad = AuraxisSquad()
-    squad.run()
+    squad.run_backend_workflow(briefing_usuario)

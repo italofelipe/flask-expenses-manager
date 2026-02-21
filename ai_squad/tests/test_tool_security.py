@@ -156,7 +156,7 @@ class TestSecurityConstants:
     def test_writable_dirs_inside_project_root(self) -> None:
         """All WRITABLE_DIRS should be inside PROJECT_ROOT."""
         for wd in WRITABLE_DIRS:
-            assert str(wd).startswith(str(PROJECT_ROOT)), f"{wd} escapes PROJECT_ROOT"
+            assert wd.is_relative_to(PROJECT_ROOT), f"{wd} escapes PROJECT_ROOT"
 
     def test_protected_files_are_absolute(self) -> None:
         """All PROTECTED_FILES should be absolute paths."""

@@ -207,11 +207,13 @@ def validate_write_path(raw_path: str) -> Path:
     resolved = (PROJECT_ROOT / raw_path).resolve()
 
     # Rule 1: Must be inside project root (prevents escape)
-    if not str(resolved).startswith(str(PROJECT_ROOT)):
+    # Uses Path.is_relative_to() instead of str.startswith() to avoid
+    # prefix collisions (e.g., /project-evil/ matching /project).
+    if not resolved.is_relative_to(PROJECT_ROOT):
         raise PermissionError(f"Path escapes project root: {raw_path}")
 
     # Rule 2: Must be inside an allowed writable directory
-    in_writable = any(str(resolved).startswith(str(wd)) for wd in WRITABLE_DIRS)
+    in_writable = any(resolved.is_relative_to(wd) for wd in WRITABLE_DIRS)
     if not in_writable:
         allowed = [str(d.relative_to(PROJECT_ROOT)) for d in WRITABLE_DIRS]
         raise PermissionError(
