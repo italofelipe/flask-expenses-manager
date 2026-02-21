@@ -10,7 +10,9 @@ Ela nao substitui os documentos oficiais; ela organiza o que ler, em que ordem, 
 3. `.context/02_sdd_workflow.md`
 4. `.context/03_agentic_workflow.md`
 5. `.context/05_quality_and_gates.md`
-6. `TASKS.md` (status e backlog)
+6. `.context/07_operational_cycle.md`
+7. `TASKS.md` (status e backlog)
+8. `.context/handoffs/` (check for pending handoffs)
 
 ## Invariantes do projeto
 - Backlog, status e progresso: `TASKS.md`.
@@ -31,5 +33,14 @@ Ela nao substitui os documentos oficiais; ela organiza o que ler, em que ordem, 
 - `04_architecture_snapshot.md`: snapshot arquitetural para orientacao rapida.
 - `05_quality_and_gates.md`: gates locais/CI/CD e criterios de pronto.
 - `06_context_backlog.md`: melhorias necessarias na propria base de contexto.
-- `templates/feature_spec_template.md`: template de especificacao.
-- `templates/handoff_template.md`: template de handoff entre agentes/sessoes.
+- `07_operational_cycle.md`: ciclo completo de entrega multi-agente (SPEC → ANALYSIS → REFINEMENT → EXECUTION → DELIVERY → CLOSE).
+
+### Templates
+- `templates/feature_spec_template.md`: especificacao tecnica detalhada (contratos, modelos, erros).
+- `templates/feature_card_template.md`: card operacional para TASKS.md (contrato PO ↔ agentes).
+- `templates/delivery_report_template.md`: relatorio pos-entrega (feedback, divida, riscos).
+- `templates/handoff_template.md`: handoff entre agentes/sessoes.
+
+### Directories
+- `handoffs/`: handoffs ativos entre agentes.
+- `reports/`: delivery reports de features entregues.

@@ -8,6 +8,11 @@
 - CLAUDE.md com diretiva operacional e integracao com .context/.
 - Security hardening das tools do ai_squad/ (tool_security.py).
 - Integracao do ai_squad/ com a base de conhecimento .context/.
+- Ciclo operacional multi-agente documentado (07_operational_cycle.md).
+- Template de feature card para TASKS.md (feature_card_template.md).
+- Template de delivery report pos-entrega (delivery_report_template.md).
+- Diretorio reports/ para armazenar delivery reports.
+- CLAUDE.md atualizado com ciclo de entrega e colaboracao multi-agente (Claude, Gemini, Gepeto).
 
 ## Proximos incrementos recomendados
 

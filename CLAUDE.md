@@ -50,7 +50,7 @@ When documents conflict, follow this priority order:
 - Product/business decisions (scope changes, UX, pricing)
 - Architecture changes with cross-cutting impact
 - Deleting existing code or tests
-- Changes to: `steering.md`, `product.md`, `.context/01-06` files
+- Changes to: `steering.md`, `product.md`, `.context/01-07` files
 - AWS/infrastructure operations
 - Database schema changes that affect existing data
 - Deploy to any environment
@@ -64,22 +64,45 @@ When documents conflict, follow this priority order:
 - Use `git add .` (always use selective file staging)
 - Skip quality gates before committing
 
-## Relationship with ai_squad/ (CrewAI)
+## Feature Delivery Cycle
 
-The `ai_squad/` directory contains a CrewAI multi-agent system that automates
-the full SDLC pipeline. Claude operates independently but shares the same
-operational foundation.
+The full operational cycle is defined in `.context/07_operational_cycle.md`.
+Summary:
 
-| Aspect | Claude | CrewAI (ai_squad/) |
+1. **SPEC** — PO gives natural language briefing → Agent creates feature card.
+2. **ANALYSIS** — Agent reads codebase, identifies risks/gaps/opportunities.
+3. **REFINEMENT** — PO + Agent align on tasks breakdown and validation.
+4. **EXECUTION** — Agent implements autonomously (code, tests, commits).
+5. **DELIVERY** — Agent writes delivery report with feedback and debt.
+6. **CLOSE** — PO reviews, accepts, signals next feature.
+
+Templates:
+- Feature card: `.context/templates/feature_card_template.md`
+- Feature spec (detailed): `.context/templates/feature_spec_template.md`
+- Delivery report: `.context/templates/delivery_report_template.md`
+- Handoff: `.context/templates/handoff_template.md`
+
+## Multi-Agent Collaboration
+
+Three AI agents + one automated pipeline share this project:
+
+| Agent | Strengths | Primary use |
 | :--- | :--- | :--- |
-| **Role** | Direct implementation, review, debug, refactor, docs | Automated SDLC pipeline (PM→Backend→Frontend→QA→DevOps) |
-| **Knowledge Base** | `.context/` (reads directly) | `.context/` (reads via `read_context_file` tool) |
-| **Task Tracking** | `TASKS.md` (reads/updates directly) | `TASKS.md` (reads via `read_tasks` tool) |
-| **Handoff** | `.context/handoffs/` (creates directly) | `.context/handoffs/` (via `write_file_content` tool) |
-| **Security** | Follows this CLAUDE.md directive | Enforced by `tools/tool_security.py` |
+| **Claude** | Direct implementation, review, analysis, docs | Interactive sessions with PO |
+| **Gemini** | Architecture review, orchestration analysis | Alternative perspectives, review |
+| **Gepeto (GPT)** | Implementation, code generation, problem-solving | Feature implementation, debugging |
+| **CrewAI** | Automated multi-agent pipeline (PM→Backend→QA) | Well-defined tasks from TASKS.md |
 
-**Handoff interop:** Claude can read and write handoffs in `.context/handoffs/`
-that CrewAI agents also consume, and vice versa.
+All agents share:
+- Knowledge base: `.context/`
+- Task tracking: `TASKS.md`
+- Handoffs: `.context/handoffs/`
+- Delivery reports: `.context/reports/`
+- Quality gates: `.context/05_quality_and_gates.md`
+- Feature card format: `.context/templates/feature_card_template.md`
+
+**Handoff interop:** Any agent can read and write handoffs in `.context/handoffs/`
+that other agents consume. Use `templates/handoff_template.md` for consistency.
 
 ## Quality Gates (run before every commit)
 
