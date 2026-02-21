@@ -1,41 +1,22 @@
 """
-Auraxis AI Squad — Project Tools (Security-Hardened).
+Auraxis AI Squad — CrewAI Tools (BaseTool).
 
-This module provides all tools available to CrewAI agents for interacting
-with the Auraxis codebase. Every tool enforces security boundaries defined
-in tool_security.py before performing any operation.
-
-Architecture:
-- Read tools: read_tasks, read_schema, read_context_file, read_governance_file
-- Write tools: write_file_content (path-validated)
-- Execution tools: run_backend_tests (timeout-enforced)
-- Infrastructure tools: check_aws_status (timeout-enforced)
-- Git tools: git_operations (selective staging, branch prefix validation)
-
-Security Guarantees:
-- No file write outside WRITABLE_DIRS (app/, tests/, migrations/, scripts/, docs/).
-- No write to PROTECTED_FILES (.env, run.py, Dockerfiles, etc.).
-- No git staging of sensitive patterns (.env, *.pem, *.key, etc.).
-- All subprocess calls have enforced timeouts.
-- Every tool invocation is audit-logged to ai_squad/logs/tool_audit.log.
-
-Integration with .context/:
-- read_context_file() gives agents access to the SDD/agentic knowledge base.
-- read_governance_file() gives agents access to product.md and steering.md.
-- This bridges the gap between ai_squad/ (execution) and .context/ (governance).
+All tools use the security primitives from tool_security.py:
+- validate_write_path() for file writes
+- safe_subprocess() for subprocess calls
+- audit_log() for structured audit logging
 
 References:
-- ai_squad/tools/tool_security.py — security primitives used here
-- .context/03_agentic_workflow.md — agent operational loop
-- .context/05_quality_and_gates.md — quality gates enforced by run_backend_tests
-- steering.md — branching conventions enforced by git_operations
+- ai_squad/tools/tool_security.py — security module
+- ai_squad/AGENT_ARCHITECTURE.md — tools registry
+- .context/05_quality_and_gates.md — quality gates
 """
 
 import fnmatch
-import os
 
-from langchain.tools import tool
-from tools.tool_security import (
+from crewai.tools import BaseTool
+
+from .tool_security import (
     CONVENTIONAL_BRANCH_PREFIXES,
     GIT_STAGE_BLOCKLIST,
     PROJECT_ROOT,
@@ -44,462 +25,338 @@ from tools.tool_security import (
     validate_write_path,
 )
 
+# ---------------------------------------------------------------------------
+# GOVERNANCE_ALLOWLIST — files that read_governance_file can access.
+# ---------------------------------------------------------------------------
+GOVERNANCE_ALLOWLIST: list[str] = ["product.md", "steering.md"]
 
-class ProjectTools:
-    """
-    Centralized tool registry for Auraxis CrewAI agents.
+# ---------------------------------------------------------------------------
+# Read-only tools
+# ---------------------------------------------------------------------------
 
-    All methods are static and decorated with @tool() for LangChain/CrewAI
-    compatibility. Each tool enforces security boundaries via tool_security.py.
 
-    Usage in main.py:
-        tools = ProjectTools()
-        agent = Agent(tools=[tools.read_tasks, tools.write_file_content, ...])
-    """
+class ReadTasksTool(BaseTool):
+    name: str = "read_tasks"
+    description: str = (
+        "Reads TASKS.md to understand current project status, "
+        "backlog, and priorities."
+    )
 
-    # -------------------------------------------------------------------
-    # READ TOOLS — safe, read-only access to project files
-    # -------------------------------------------------------------------
+    def _run(self, query: str = None) -> str:
+        path = PROJECT_ROOT / "TASKS.md"
+        audit_log("read_tasks", {"path": str(path)}, "reading", status="OK")
+        if not path.exists():
+            return f"Error: TASKS.md not found at {path}"
+        return path.read_text(encoding="utf-8")
 
-    @tool("read_tasks")
-    def read_tasks() -> str:
-        """
-        Read TASKS.md to understand the current project status, backlog,
-        priorities, and risk register.
 
-        Returns:
-            Full content of TASKS.md, or error message if file not found.
+class ReadSchemaTool(BaseTool):
+    name: str = "read_schema"
+    description: str = "Reads schema.graphql to understand GraphQL API contracts."
 
-        Note:
-            TASKS.md is the primary source of truth for task status
-            (see .context/01_sources_of_truth.md).
-        """
-        try:
-            with open(PROJECT_ROOT / "TASKS.md", "r") as f:
-                content = f.read()
-            audit_log("read_tasks", {}, f"read {len(content)} chars")
-            return content
-        except FileNotFoundError:
-            audit_log("read_tasks", {}, "TASKS.md not found", status="ERROR")
-            return "ERROR: TASKS.md not found at project root."
+    def _run(self, query: str = None) -> str:
+        path = PROJECT_ROOT / "schema.graphql"
+        audit_log("read_schema", {"path": str(path)}, "reading", status="OK")
+        if not path.exists():
+            return f"Error: schema.graphql not found at {path}"
+        return path.read_text(encoding="utf-8")
 
-    @tool("read_schema")
-    def read_schema() -> str:
-        """
-        Read schema.graphql to understand GraphQL API contracts
-        (types, queries, mutations, inputs).
 
-        Returns:
-            Full content of schema.graphql, or error message if not found.
+class ReadContextFileTool(BaseTool):
+    name: str = "read_context_file"
+    description: str = (
+        "Reads a file from the .context/ knowledge base. "
+        "Provide the filename relative to .context/ "
+        "(e.g., 'README.md', '04_architecture_snapshot.md')."
+    )
 
-        Note:
-            The schema defines the public API contract. Any changes must
-            preserve backward compatibility unless explicitly approved.
-        """
-        try:
-            with open(PROJECT_ROOT / "schema.graphql", "r") as f:
-                content = f.read()
-            audit_log("read_schema", {}, f"read {len(content)} chars")
-            return content
-        except FileNotFoundError:
-            audit_log("read_schema", {}, "schema.graphql not found", status="ERROR")
-            return "ERROR: schema.graphql not found at project root."
-
-    @tool("read_context_file")
-    def read_context_file(filename: str) -> str:
-        """
-        Read a file from the .context/ knowledge base directory.
-
-        This tool gives agents access to the SDD workflow, agentic workflow,
-        architecture snapshot, quality gates, and templates.
-
-        Args:
-            filename: Relative path within .context/. Examples:
-                - "README.md" (bootstrap and reading order)
-                - "01_sources_of_truth.md" (document authority hierarchy)
-                - "02_sdd_workflow.md" (Spec-Driven Development phases)
-                - "03_agentic_workflow.md" (agent operational loop)
-                - "04_architecture_snapshot.md" (codebase structure)
-                - "05_quality_and_gates.md" (quality gates and DoD)
-                - "06_context_backlog.md" (knowledge base improvements)
-                - "templates/feature_spec_template.md"
-                - "templates/handoff_template.md"
-
-        Returns:
-            File content, or error message if not found or path escapes.
-
-        Security:
-            Path is resolved and validated to stay within .context/.
-            Any '../' traversal attempt is blocked.
-        """
+    def _run(self, filename: str) -> str:
         context_dir = PROJECT_ROOT / ".context"
-        target = (context_dir / filename).resolve()
+        resolved = (context_dir / filename).resolve()
 
-        # Security: prevent path escape outside .context/
-        if not str(target).startswith(str(context_dir.resolve())):
+        # Anti-escape: must stay inside .context/
+        if not resolved.is_relative_to(context_dir):
+            msg = f"BLOCKED: '{filename}' escapes .context/ directory."
             audit_log(
                 "read_context_file",
                 {"filename": filename},
-                "PATH ESCAPE BLOCKED",
+                msg,
                 status="BLOCKED",
             )
-            return "BLOCKED: path escapes .context/ directory."
-
-        try:
-            with open(target, "r") as f:
-                content = f.read()
-            audit_log(
-                "read_context_file",
-                {"filename": filename},
-                f"read {len(content)} chars",
-            )
-            return content
-        except FileNotFoundError:
-            audit_log(
-                "read_context_file",
-                {"filename": filename},
-                "file not found",
-                status="ERROR",
-            )
-            return f"ERROR: .context/{filename} not found."
-
-    @tool("read_governance_file")
-    def read_governance_file(filename: str) -> str:
-        """
-        Read a project governance file (product.md or steering.md).
-
-        These files define product direction and execution governance.
-        Agents should read these during the bootstrap phase before
-        planning any work (see .context/03_agentic_workflow.md).
-
-        Args:
-            filename: Must be exactly "product.md" or "steering.md".
-
-        Returns:
-            File content, or error message if filename not allowed or not found.
-
-        Security:
-            Only product.md and steering.md are readable via this tool.
-            This is a strict allowlist to prevent agents from reading
-            arbitrary files at the project root.
-        """
-        allowed = {"product.md", "steering.md"}
-        if filename not in allowed:
-            audit_log(
-                "read_governance_file",
-                {"filename": filename},
-                f"not in allowlist {allowed}",
-                status="BLOCKED",
-            )
-            return f"BLOCKED: only {allowed} are readable via this tool."
-
-        try:
-            with open(PROJECT_ROOT / filename, "r") as f:
-                content = f.read()
-            audit_log(
-                "read_governance_file",
-                {"filename": filename},
-                f"read {len(content)} chars",
-            )
-            return content
-        except FileNotFoundError:
-            audit_log(
-                "read_governance_file",
-                {"filename": filename},
-                "file not found",
-                status="ERROR",
-            )
-            return f"ERROR: {filename} not found at project root."
-
-    # -------------------------------------------------------------------
-    # WRITE TOOLS — path-validated file operations
-    # -------------------------------------------------------------------
-
-    @tool("write_file_content")
-    def write_file_content(path: str, content: str) -> str:
-        """
-        Write content to a file. The path must be inside an allowed directory.
-
-        Allowed directories: app/, tests/, migrations/, scripts/, docs/, ai_squad/logs/.
-        Protected files (.env, run.py, Dockerfiles, etc.) are always blocked.
-
-        Args:
-            path: Relative path from project root (e.g., "app/models/goal.py").
-            content: Full file content to write.
-
-        Returns:
-            Success message, or "BLOCKED: ..." if path validation fails.
-
-        Security:
-            Uses validate_write_path() which enforces:
-            - Allowlist of writable directories
-            - Denylist of protected files
-            - Blocked file extensions (.env, .pem, .key, .secret)
-            - Path traversal prevention (../ and symlinks)
-        """
-        try:
-            resolved = validate_write_path(path)
-        except PermissionError as e:
-            audit_log(
-                "write_file_content",
-                {"path": path, "content_len": len(content)},
-                str(e),
-                status="BLOCKED",
-            )
-            return f"BLOCKED: {e}"
-
-        # Ensure parent directories exist
-        resolved.parent.mkdir(parents=True, exist_ok=True)
-
-        with open(resolved, "w") as f:
-            f.write(content)
+            return msg
 
         audit_log(
-            "write_file_content",
-            {
-                "path": str(resolved.relative_to(PROJECT_ROOT)),
-                "content_len": len(content),
-            },
-            "written successfully",
+            "read_context_file",
+            {"filename": filename},
+            "reading",
+            status="OK",
         )
-        return f"File {path} written successfully."
+        if not resolved.exists():
+            return f"Error: File not found: .context/{filename}"
+        return resolved.read_text(encoding="utf-8")
 
-    # -------------------------------------------------------------------
-    # EXECUTION TOOLS — subprocess calls with timeout enforcement
-    # -------------------------------------------------------------------
 
-    @tool("run_backend_tests")
-    def run_backend_tests() -> str:
-        """
-        Execute the pytest backend test suite and return the result.
+class ReadGovernanceFileTool(BaseTool):
+    name: str = "read_governance_file"
+    description: str = (
+        "Reads a governance file (product.md or steering.md) " "from the project root."
+    )
 
-        Runs with:
-        - --tb=short: Concise traceback for failed tests.
-        - -q: Quiet mode to reduce output noise.
-        - -m "not schemathesis": Excludes property-based tests.
-        - Timeout: 300 seconds (5 minutes max).
+    def _run(self, filename: str) -> str:
+        if filename not in GOVERNANCE_ALLOWLIST:
+            msg = (
+                f"BLOCKED: '{filename}' is not a governance file. "
+                f"Allowed: {GOVERNANCE_ALLOWLIST}"
+            )
+            audit_log(
+                "read_governance_file",
+                {"filename": filename},
+                msg,
+                status="BLOCKED",
+            )
+            return msg
 
-        Returns:
-            Combined STDOUT and STDERR from pytest.
+        path = PROJECT_ROOT / filename
+        audit_log(
+            "read_governance_file",
+            {"filename": filename},
+            "reading",
+            status="OK",
+        )
+        if not path.exists():
+            return f"Error: {filename} not found at project root."
+        return path.read_text(encoding="utf-8")
 
-        Note:
-            Quality gate: tests must pass before any commit.
-            See .context/05_quality_and_gates.md for full gate list.
-        """
+
+# ---------------------------------------------------------------------------
+# Execution tools
+# ---------------------------------------------------------------------------
+
+
+class RunTestsTool(BaseTool):
+    name: str = "run_backend_tests"
+    description: str = (
+        "Runs the pytest test suite with timeout protection. "
+        "Returns stdout and stderr."
+    )
+
+    def _run(self, query: str = None) -> str:
+        pytest_path = str(PROJECT_ROOT / ".venv" / "bin" / "pytest")
+        import os
+
+        if not os.path.exists(pytest_path):
+            pytest_path = "pytest"
+
         result = safe_subprocess(
-            ["pytest", "-m", "not schemathesis", "--tb=short", "-q"],
+            [pytest_path, "--tb=short", "-q"],
             timeout=300,
+            cwd=str(PROJECT_ROOT),
         )
-        output = f"STDOUT:\n{result['stdout']}\nSTDERR:\n{result['stderr']}"
+        output = f"STDOUT: {result['stdout']}\nSTDERR: {result['stderr']}"
         audit_log(
             "run_backend_tests",
-            {},
-            f"returncode={result['returncode']}",
+            {"pytest_path": pytest_path},
+            output[:200],
+            status="OK" if result["returncode"] == 0 else "ERROR",
         )
         return output
 
-    @tool("check_aws_status")
-    def check_aws_status() -> str:
-        """
-        Check basic AWS infrastructure status (EC2 instances).
 
-        Requires AWS CLI configured with appropriate credentials.
-        Timeout: 30 seconds.
+# ---------------------------------------------------------------------------
+# Write tools
+# ---------------------------------------------------------------------------
 
-        Returns:
-            List of EC2 instances with InstanceId, State, and PublicIP.
 
-        Note:
-            This is a read-only operation. Actual deploy actions
-            require human_input=True approval in the CrewAI task.
-        """
+class WriteFileTool(BaseTool):
+    name: str = "write_file_content"
+    description: str = (
+        "Writes content to a file. Path must be relative to project root. "
+        "Enforces security: only writable dirs, no protected files, "
+        "no blocked extensions."
+    )
+
+    def _run(self, path: str, content: str) -> str:
+        try:
+            validated = validate_write_path(path)
+        except PermissionError as e:
+            msg = f"BLOCKED: {e}"
+            audit_log(
+                "write_file_content",
+                {"path": path},
+                msg,
+                status="BLOCKED",
+            )
+            return msg
+
+        validated.parent.mkdir(parents=True, exist_ok=True)
+        validated.write_text(content, encoding="utf-8")
+
+        msg = f"File {path} written successfully."
+        audit_log(
+            "write_file_content",
+            {"path": path, "size": len(content)},
+            msg,
+            status="OK",
+        )
+        return msg
+
+
+# ---------------------------------------------------------------------------
+# Infrastructure tools
+# ---------------------------------------------------------------------------
+
+
+class AWSStatusTool(BaseTool):
+    name: str = "check_aws_status"
+    description: str = "Checks basic AWS EC2 infrastructure status (read-only)."
+
+    def _run(self, query: str = None) -> str:
         result = safe_subprocess(
             [
                 "aws",
                 "ec2",
                 "describe-instances",
                 "--query",
-                "Reservations[*].Instances[*].[InstanceId,State.Name,PublicIpAddress]",
+                "Reservations[*].Instances[*]."
+                "[InstanceId,State.Name,PublicIpAddress]",
             ],
             timeout=30,
         )
-        output = f"AWS Status:\n{result['stdout']}"
-        if result["returncode"] != 0:
-            output += f"\nError: {result['stderr']}"
-        audit_log("check_aws_status", {}, output[:200])
+        output = f"AWS Status: {result['stdout']}"
+        audit_log(
+            "check_aws_status",
+            {},
+            output[:200],
+            status="OK" if result["returncode"] == 0 else "ERROR",
+        )
         return output
 
-    # -------------------------------------------------------------------
-    # GIT TOOLS — safe git operations with selective staging
-    # -------------------------------------------------------------------
 
-    @tool("git_operations")
-    def git_operations(
+# ---------------------------------------------------------------------------
+# Git tools — extracted helpers to keep cyclomatic complexity low.
+# ---------------------------------------------------------------------------
+
+
+def _git_create_branch(branch_name: str) -> str:
+    """Create a branch with conventional prefix validation."""
+    if not branch_name:
+        return "Error: branch_name is required."
+
+    if not branch_name.startswith(CONVENTIONAL_BRANCH_PREFIXES):
+        allowed = ", ".join(CONVENTIONAL_BRANCH_PREFIXES)
+        return (
+            f"BLOCKED: Branch '{branch_name}' does not use a conventional "
+            f"prefix. Allowed prefixes: {allowed}"
+        )
+
+    result = safe_subprocess(["git", "checkout", "-b", branch_name], timeout=15)
+    if result["returncode"] != 0:
+        return f"Error creating branch: {result['stderr']}"
+    return f"Branch '{branch_name}' created."
+
+
+def _git_collect_changed_files() -> list[str]:
+    """Get list of changed files (staged + unstaged + untracked)."""
+    # Staged and modified
+    diff_result = safe_subprocess(["git", "diff", "--name-only", "HEAD"], timeout=15)
+    # Untracked
+    untracked_result = safe_subprocess(
+        ["git", "ls-files", "--others", "--exclude-standard"], timeout=15
+    )
+
+    files: list[str] = []
+    for output in [diff_result["stdout"], untracked_result["stdout"]]:
+        files.extend(line.strip() for line in output.splitlines() if line.strip())
+    return list(set(files))
+
+
+def _git_filter_safe_files(files: list[str]) -> list[str]:
+    """Filter files against GIT_STAGE_BLOCKLIST using fnmatch."""
+    safe_files: list[str] = []
+    for f in files:
+        blocked = any(fnmatch.fnmatch(f, pattern) for pattern in GIT_STAGE_BLOCKLIST)
+        if not blocked:
+            safe_files.append(f)
+    return safe_files
+
+
+def _git_commit(message: str) -> str:
+    """Selective staging + commit. Never uses 'git add .'."""
+    # Detect current branch — block commits to master/main
+    branch_result = safe_subprocess(
+        ["git", "rev-parse", "--abbrev-ref", "HEAD"], timeout=10
+    )
+    current_branch = branch_result["stdout"].strip()
+    if current_branch in ("master", "main"):
+        return (
+            "BLOCKED: Direct commits to 'master'/'main' are not allowed. "
+            "Create a feature branch first."
+        )
+
+    if not message:
+        return "Error: commit message is required."
+
+    changed = _git_collect_changed_files()
+    if not changed:
+        return "Nothing to commit — no changed files detected."
+
+    safe = _git_filter_safe_files(changed)
+    if not safe:
+        blocked_count = len(changed)
+        return (
+            f"Nothing to commit — all {blocked_count} changed file(s) "
+            f"are in GIT_STAGE_BLOCKLIST."
+        )
+
+    # Selective staging (never 'git add .')
+    safe_subprocess(["git", "add"] + safe, timeout=30)
+
+    # Commit
+    result = safe_subprocess(["git", "commit", "-m", message], timeout=30)
+    if result["returncode"] != 0:
+        return f"Commit error: {result['stderr']}"
+
+    return f"Committed {len(safe)} file(s): {message}\n" f"Staged: {safe}"
+
+
+def _git_status() -> str:
+    """Return git status output."""
+    result = safe_subprocess(["git", "status"], timeout=15)
+    return result["stdout"]
+
+
+class GitOpsTool(BaseTool):
+    name: str = "git_operations"
+    description: str = (
+        "Git operations: create_branch (with conventional prefix), "
+        "commit (selective staging, blocks master/main), "
+        "status. Never uses 'git add .'."
+    )
+
+    def _run(
+        self,
         command: str,
         branch_name: str = None,
         message: str = None,
     ) -> str:
-        """
-        Execute safe git operations with security guardrails.
-
-        Supported commands:
-        - 'create_branch': Create and switch to a new branch.
-          Enforces conventional branch prefixes (feat/, fix/, refactor/, etc.).
-        - 'commit': Stage and commit changes with SELECTIVE staging.
-          Never uses 'git add .' — filters files against GIT_STAGE_BLOCKLIST.
-        - 'status': Show current working tree status.
-
-        Args:
-            command: One of 'create_branch', 'commit', 'status'.
-            branch_name: Required for 'create_branch'. Must start with a
-                conventional prefix (feat/, fix/, refactor/, chore/, docs/,
-                test/, perf/, security/).
-            message: Required for 'commit'. The commit message.
-
-        Returns:
-            Operation result or "BLOCKED: ..." if validation fails.
-
-        Security:
-            - Branch names must follow conventional branching (steering.md).
-            - Commit uses selective staging: lists changed files, filters out
-              sensitive patterns (.env, *.pem, *.key, .coverage, etc.),
-              and only stages safe files.
-            - All operations have subprocess timeouts.
-        """
-        dispatch = {
-            "create_branch": lambda: _git_create_branch(branch_name),
-            "commit": lambda: _git_commit(message),
-            "status": _git_status,
-        }
-        handler = dispatch.get(command)
-        if handler is None:
-            return (
-                "ERROR: invalid command. "
-                "Supported: 'create_branch', 'commit', 'status'."
-            )
-        return handler()
-
-
-# -------------------------------------------------------------------
-# Git helper functions (extracted to reduce cyclomatic complexity)
-# -------------------------------------------------------------------
-
-
-def _git_create_branch(branch_name: str | None) -> str:
-    """Create a new branch with conventional prefix validation."""
-    if not branch_name:
-        return "ERROR: branch_name is required for create_branch."
-
-    if not branch_name.startswith(CONVENTIONAL_BRANCH_PREFIXES):
-        audit_log(
-            "git_operations",
-            {"command": "create_branch", "branch_name": branch_name},
-            "invalid branch prefix",
-            status="BLOCKED",
-        )
-        return (
-            f"BLOCKED: branch '{branch_name}' must start with "
-            f"one of {CONVENTIONAL_BRANCH_PREFIXES}"
-        )
-
-    result = safe_subprocess(["git", "checkout", "-b", branch_name], timeout=15)
-    audit_log(
-        "git_operations",
-        {"command": "create_branch", "branch_name": branch_name},
-        result["stdout"],
-    )
-    if result["returncode"] != 0:
-        return f"ERROR: {result['stderr']}"
-    return f"Branch '{branch_name}' created and checked out."
-
-
-def _git_collect_changed_files() -> set[str]:
-    """Collect all changed, staged, and untracked files."""
-    all_files: set[str] = set()
-    for cmd in [
-        ["git", "diff", "--name-only"],
-        ["git", "diff", "--cached", "--name-only"],
-        ["git", "ls-files", "--others", "--exclude-standard"],
-    ]:
-        result = safe_subprocess(cmd, timeout=10)
-        for f in result["stdout"].strip().split("\n"):
-            if f.strip():
-                all_files.add(f.strip())
-    return all_files
-
-
-def _git_filter_safe_files(
-    all_files: set[str],
-) -> tuple[list[str], list[str]]:
-    """Split files into safe and blocked lists based on GIT_STAGE_BLOCKLIST."""
-    safe_files: list[str] = []
-    blocked_files: list[str] = []
-    for filepath in sorted(all_files):
-        is_blocked = any(
-            fnmatch.fnmatch(filepath, pattern)
-            or fnmatch.fnmatch(os.path.basename(filepath), pattern)
-            for pattern in GIT_STAGE_BLOCKLIST
-        )
-        if is_blocked:
-            blocked_files.append(filepath)
+        if command == "create_branch":
+            result = _git_create_branch(branch_name)
+        elif command == "commit":
+            result = _git_commit(message)
+        elif command == "status":
+            result = _git_status()
         else:
-            safe_files.append(filepath)
-    return safe_files, blocked_files
+            result = (
+                f"Invalid command: '{command}'. "
+                f"Valid commands: create_branch, commit, status."
+            )
 
-
-def _git_commit(message: str | None) -> str:
-    """Commit with selective staging (never 'git add .')."""
-    if not message:
-        return "ERROR: message is required for commit."
-
-    all_files = _git_collect_changed_files()
-    if not all_files:
-        return "No changed files to commit."
-
-    safe_files, blocked_files = _git_filter_safe_files(all_files)
-
-    if blocked_files:
         audit_log(
             "git_operations",
-            {"command": "commit", "blocked_files": blocked_files},
-            f"filtered {len(blocked_files)} unsafe files",
-            status="OK",
+            {"command": command, "branch_name": branch_name, "message": message},
+            result[:200],
+            status=(
+                "OK" if "BLOCKED" not in result and "Error" not in result else "ERROR"
+            ),
         )
-
-    if not safe_files:
-        return f"No safe files to commit. Blocked files: {blocked_files}"
-
-    stage_result = safe_subprocess(["git", "add"] + safe_files, timeout=15)
-    if stage_result["returncode"] != 0:
-        return f"ERROR staging files: {stage_result['stderr']}"
-
-    commit_result = safe_subprocess(["git", "commit", "-m", message], timeout=30)
-    audit_log(
-        "git_operations",
-        {
-            "command": "commit",
-            "staged_files": safe_files,
-            "blocked_files": blocked_files,
-            "message": message,
-        },
-        commit_result["stdout"],
-    )
-    if commit_result["returncode"] != 0:
-        return f"ERROR committing: {commit_result['stderr']}"
-
-    return (
-        f"Committed {len(safe_files)} file(s) with message: {message}\n"
-        f"Staged: {safe_files}\n"
-        f"Excluded (blocked): {blocked_files if blocked_files else 'none'}"
-    )
-
-
-def _git_status() -> str:
-    """Show current git working tree status."""
-    result = safe_subprocess(["git", "status"], timeout=10)
-    audit_log(
-        "git_operations",
-        {"command": "status"},
-        result["stdout"][:200],
-    )
-    return result["stdout"]
+        return result
