@@ -1,4 +1,11 @@
-from marshmallow import Schema, ValidationError, fields, pre_load, validates_schema
+from marshmallow import (
+    Schema,
+    ValidationError,
+    fields,
+    pre_load,
+    validate,
+    validates_schema,
+)
 
 from app.schemas.sanitization import sanitize_string_fields
 
@@ -76,3 +83,56 @@ class LogoutSchema(Schema):
             "example": "Logout realizado com sucesso",
         },
     )
+
+
+class ForgotPasswordSchema(Schema):
+    """Schema para solicitação de recuperação de senha"""
+
+    email = fields.Email(
+        required=True,
+        metadata={
+            "description": "Email da conta que deseja recuperar acesso",
+            "example": "joao.silva@email.com",
+        },
+    )
+
+    @pre_load
+    def sanitize_input(self, data: object, **kwargs: object) -> object:
+        sanitized = sanitize_string_fields(data, {"email"})
+        if isinstance(sanitized, dict) and isinstance(sanitized.get("email"), str):
+            sanitized["email"] = str(sanitized["email"]).lower()
+        return sanitized
+
+
+class ResetPasswordSchema(Schema):
+    """Schema para redefinição de senha via token"""
+
+    token = fields.String(
+        required=True,
+        validate=validate.Length(min=24, max=512),
+        metadata={
+            "description": "Token de recuperação recebido por email",
+            "example": "G9Q7zJ6lQ4Vwm6dXj6nQjzH8QqfUuBqbMTe4PmS7p8Q",
+        },
+    )
+    new_password = fields.String(
+        required=True,
+        load_only=True,
+        validate=validate.Regexp(
+            r"^(?=.*[A-Z])(?=.*\d)(?=.*[^A-Za-z0-9]).{10,}$",
+            error=(
+                "A senha deve ter no mínimo 10 caracteres, conter ao menos "
+                "uma letra maiúscula, um número e um símbolo."
+            ),
+        ),
+        metadata={
+            "description": (
+                "Nova senha (mínimo 10 caracteres, com maiúscula, número e símbolo)"
+            ),
+            "example": "NovaSenha@123",
+        },
+    )
+
+    @pre_load
+    def sanitize_input(self, data: object, **kwargs: object) -> object:
+        return sanitize_string_fields(data, {"token"})

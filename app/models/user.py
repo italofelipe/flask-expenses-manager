@@ -20,6 +20,9 @@ class User(db.Model):
     created_at = db.Column(db.DateTime, default=datetime.now)
     updated_at = db.Column(db.DateTime, default=datetime.now)
     current_jti = db.Column(db.String(128), nullable=True)
+    password_reset_token_hash = db.Column(db.String(128), nullable=True)
+    password_reset_token_expires_at = db.Column(db.DateTime, nullable=True)
+    password_reset_requested_at = db.Column(db.DateTime, nullable=True)
 
     # Dados pessoais - informações adicionais coletadas após o cadastro inicial
     gender = db.Column(db.String(20), nullable=True)
