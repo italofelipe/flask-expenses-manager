@@ -126,6 +126,7 @@ Observacoes de escopo:
 | C2 | G16 remanescente + limpeza de warnings/deprecações não críticas |
 | C3 | Refactors pontuais de manutenibilidade com testes de regressão |
 | C4 | X2 (centralizar domínio e tornar adapters REST/GraphQL camadas finas) |
+| C5 | X3, X4 (análise de migração gradual para FastAPI e consolidação do toolchain com Ruff) |
 
 ### Ciclo D (planejado) - Refinamento de processo
 
@@ -285,6 +286,8 @@ Fluxo por entrega:
 | S6-12 | App Security  | Definir política de exposição de documentação em produção (`/docs`) por ambiente/autenticação                                              | Done        | 100%      | Baixo: política por ambiente + fail-fast para configuração inválida em runtime seguro                                                                                    | 208e1d1                          | 2026-02-12         |
 | X1    | Tech Debt     | Remover/atualizar TODO desatualizado sobre enums em transacoes                                                                             | Done        | 100%      | Baixo: clareza de manutencao                                                                                                                                             | traceability-debt                | 2026-02-20         |
 | X2    | Tech Debt     | Centralizar regras de domínio em serviços/casos de uso e reduzir controllers/resolvers REST/GraphQL a adapters finos (sem regra duplicada) | Done        | 100%      | Baixo: metas, transações, wallet entries/queries e investment operations convergidos em camada de aplicação, com adapters REST/GraphQL finos e mapeamento de erro/presenters por domínio | 6192830, 5e4995f                | 2026-02-20         |
+| X3    | Tech Debt     | Analisar plano de migração gradual Flask -> FastAPI (estratégia de convivência, impacto em REST/GraphQL, autenticação, docs OpenAPI e rollout sem downtime) | Todo        | 0%        | Alto: migração de framework pode introduzir regressão transversal e aumentar custo operacional se não houver plano faseado por bounded context                              |                                  | 2026-02-22         |
+| X4    | Tech Debt     | Analisar adoção do Ruff como stack principal de qualidade (`lint`, `format`, `import sort`) e estratégia de substituição de `flake8`, `black`, `isort` e evolução da checagem de tipos hoje no `mypy` | Todo        | 0%        | Médio/Alto: Ruff cobre lint/format/import, mas tipagem estática profunda exige decisão explícita (manter `mypy` ou migrar para `pyright`) para não reduzir rigor técnico |                                  | 2026-02-22         |
 
 
 ## Registro de progresso recente
