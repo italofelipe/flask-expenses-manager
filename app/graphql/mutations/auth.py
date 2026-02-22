@@ -12,6 +12,10 @@ from werkzeug.security import generate_password_hash
 from app.application.services.auth_security_policy_service import (
     get_auth_security_policy,
 )
+from app.application.services.password_reset_service import (
+    request_password_reset,
+    reset_password,
+)
 from app.application.services.password_verification_service import (
     verify_password_with_timing_protection,
 )
@@ -29,6 +33,7 @@ from app.graphql.errors import (
 from app.graphql.schema_utils import _user_basic_auth_payload, _user_to_graphql_payload
 from app.graphql.types import AuthPayloadType, UserType
 from app.models.user import User
+from app.schemas.auth_schema import ForgotPasswordSchema, ResetPasswordSchema
 from app.schemas.user_schemas import UserRegistrationSchema
 from app.services.login_attempt_guard_service import (
     LoginAttemptContext,
@@ -258,6 +263,60 @@ class LogoutMutation(graphene.Mutation):
         user.current_jti = None
         db.session.commit()
         return LogoutMutation(ok=True, message="Logout successful")
+
+
+class ForgotPasswordMutation(graphene.Mutation):
+    class Arguments:
+        email = graphene.String(required=True)
+
+    Output = AuthPayloadType
+
+    def mutate(self, info: graphene.ResolveInfo, email: str) -> AuthPayloadType:
+        schema = ForgotPasswordSchema()
+        try:
+            validated = schema.load({"email": email})
+        except ValidationError as exc:
+            raise _public_graphql_error(
+                "Dados inválidos para recuperação de senha.",
+                code=GRAPHQL_ERROR_CODE_VALIDATION,
+            ) from exc
+
+        result = request_password_reset(str(validated["email"]))
+        return AuthPayloadType(message=result.message)
+
+
+class ResetPasswordMutation(graphene.Mutation):
+    class Arguments:
+        token = graphene.String(required=True)
+        new_password = graphene.String(required=True)
+
+    Output = AuthPayloadType
+
+    def mutate(
+        self,
+        info: graphene.ResolveInfo,
+        token: str,
+        new_password: str,
+    ) -> AuthPayloadType:
+        schema = ResetPasswordSchema()
+        try:
+            validated = schema.load({"token": token, "new_password": new_password})
+        except ValidationError as exc:
+            raise _public_graphql_error(
+                "Dados inválidos para redefinição de senha.",
+                code=GRAPHQL_ERROR_CODE_VALIDATION,
+            ) from exc
+
+        result = reset_password(
+            token=str(validated["token"]),
+            new_password_hash=generate_password_hash(str(validated["new_password"])),
+        )
+        if not result.ok:
+            raise _public_graphql_error(
+                result.message,
+                code=GRAPHQL_ERROR_CODE_VALIDATION,
+            )
+        return AuthPayloadType(message=result.message)
 
 
 class UpdateUserProfileMutation(graphene.Mutation):

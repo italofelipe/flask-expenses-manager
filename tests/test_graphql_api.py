@@ -2,6 +2,12 @@ from datetime import date, timedelta
 from decimal import Decimal
 from typing import Any, Dict
 
+from app.application.services.password_reset_service import (
+    PASSWORD_RESET_INVALID_TOKEN_MESSAGE,
+    PASSWORD_RESET_NEUTRAL_MESSAGE,
+    PASSWORD_RESET_SUCCESS_MESSAGE,
+)
+
 
 def _graphql(
     client,
@@ -84,6 +90,141 @@ def test_graphql_register_login_and_me(client) -> None:
     body = response.get_json()
     assert "errors" not in body
     assert body["data"]["me"]["email"] == "graphql-user@email.com"
+
+
+def test_graphql_forgot_password_is_neutral(client) -> None:
+    mutation = """
+    mutation ForgotPassword($email: String!) {
+      forgotPassword(email: $email) {
+        message
+      }
+    }
+    """
+    response = _graphql(
+        client,
+        mutation,
+        {"email": "unknown-user@email.com"},
+    )
+    assert response.status_code == 200
+    body = response.get_json()
+    assert "errors" not in body
+    assert body["data"]["forgotPassword"]["message"] == PASSWORD_RESET_NEUTRAL_MESSAGE
+
+
+def test_graphql_reset_password_with_invalid_token_returns_public_validation_error(
+    client,
+) -> None:
+    mutation = """
+    mutation ResetPassword($token: String!, $newPassword: String!) {
+      resetPassword(token: $token, newPassword: $newPassword) {
+        message
+      }
+    }
+    """
+    response = _graphql(
+        client,
+        mutation,
+        {
+            "token": "invalid-token-value-with-sufficient-length-123456",
+            "newPassword": "NovaSenha@123",
+        },
+    )
+    assert response.status_code == 200
+    body = response.get_json()
+    assert "data" in body
+    assert body["data"]["resetPassword"] is None
+    assert body["errors"][0]["extensions"]["code"] == "VALIDATION_ERROR"
+    assert body["errors"][0]["message"] == PASSWORD_RESET_INVALID_TOKEN_MESSAGE
+
+
+def test_graphql_reset_password_flow_allows_new_credentials(client) -> None:
+    suffix = "graphql-reset-user"
+    register_mutation = """
+    mutation Register($name: String!, $email: String!, $password: String!) {
+      registerUser(name: $name, email: $email, password: $password) {
+        message
+      }
+    }
+    """
+    email = f"{suffix}@email.com"
+    register_response = _graphql(
+        client,
+        register_mutation,
+        {
+            "name": suffix,
+            "email": email,
+            "password": "StrongPass@123",
+        },
+    )
+    assert register_response.status_code == 200
+    assert "errors" not in register_response.get_json()
+
+    forgot_mutation = """
+    mutation ForgotPassword($email: String!) {
+      forgotPassword(email: $email) {
+        message
+      }
+    }
+    """
+    forgot_response = _graphql(client, forgot_mutation, {"email": email})
+    assert forgot_response.status_code == 200
+    forgot_body = forgot_response.get_json()
+    assert "errors" not in forgot_body
+    assert (
+        forgot_body["data"]["forgotPassword"]["message"]
+        == PASSWORD_RESET_NEUTRAL_MESSAGE
+    )
+
+    outbox = client.application.extensions.get("password_reset_outbox", [])
+    assert isinstance(outbox, list)
+    token = outbox[0]["token"]
+
+    reset_mutation = """
+    mutation ResetPassword($token: String!, $newPassword: String!) {
+      resetPassword(token: $token, newPassword: $newPassword) {
+        message
+      }
+    }
+    """
+    reset_response = _graphql(
+        client,
+        reset_mutation,
+        {"token": token, "newPassword": "NovaSenha@123"},
+    )
+    assert reset_response.status_code == 200
+    reset_body = reset_response.get_json()
+    assert "errors" not in reset_body
+    assert (
+        reset_body["data"]["resetPassword"]["message"] == PASSWORD_RESET_SUCCESS_MESSAGE
+    )
+
+    login_mutation = """
+    mutation Login($email: String!, $password: String!) {
+      login(email: $email, password: $password) {
+        message
+        token
+      }
+    }
+    """
+    old_login_response = _graphql(
+        client,
+        login_mutation,
+        {"email": email, "password": "StrongPass@123"},
+    )
+    assert old_login_response.status_code == 200
+    old_login_body = old_login_response.get_json()
+    assert old_login_body["data"]["login"] is None
+    assert old_login_body["errors"][0]["extensions"]["code"] == "UNAUTHORIZED"
+
+    new_login_response = _graphql(
+        client,
+        login_mutation,
+        {"email": email, "password": "NovaSenha@123"},
+    )
+    assert new_login_response.status_code == 200
+    new_login_body = new_login_response.get_json()
+    assert "errors" not in new_login_body
+    assert new_login_body["data"]["login"]["token"]
 
 
 def test_graphql_transactions_summary_and_dashboard(client) -> None:

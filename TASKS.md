@@ -1,6 +1,6 @@
 # TASKS - Central de TODOs e Progresso
 
-Ultima atualizacao: 2026-02-22 (bloco E concluido + X2/C4 e C6 concluidos + backlog de perfil V1 atualizado + discovery J1..J5 + B1/B2/B3/B9 concluidos)
+Ultima atualizacao: 2026-02-22 (bloco E concluido + X2/C4 e C6 concluidos + backlog de perfil V1 atualizado + discovery J1..J5 + B1/B2/B3/B4/B5/B6/B9 concluidos)
 
 ## Regras de uso deste arquivo
 
@@ -73,11 +73,11 @@ Estado atual consolidado:
 - Foco atual de produto: evolucao de perfil V1 (auto declaracao + questionario indicativo + campos minimos).
 
 Pendencias de execucao imediata (ordem sugerida):
-1. `B8` campos minimos de perfil V1 com retrocompatibilidade (`monthly_income` -> `monthly_income_net`).
-2. `B9` fluxo de perfil de investidor auto declarado.
-3. `B10` questionario indicativo (5-10 perguntas) para sugestao de perfil.
-4. `B11` persistencia/exposicao do perfil sugerido e `taxonomy_version`.
-5. `B4 -> B6` recuperacao de senha por link (seguranca de conta).
+1. `B10` questionario indicativo (5-10 perguntas) para sugestao de perfil.
+2. `B11` persistencia/exposicao do perfil sugerido e `taxonomy_version`.
+3. `F1..F4` auxiliares (Tag/Account/CreditCard) e integração em transações.
+4. `G5` seed de dados para ambiente local.
+5. `B7` discovery de OTP por SMS (mantido como blocked até decisão de provedor/compliance).
 
 ### Ciclo B (planejado) - Features bloco 1
 
@@ -166,9 +166,9 @@ Fluxo por entrega:
 | B1    | Usuario       | Criar endpoint dedicado para leitura de perfil (payload reduzido)                                                                          | Done        | 100%      | Baixo: endpoint dedicado entregue em `/user/profile` (GET) com payload reduzido e contrato v1/v2                                                                        | 19f6448, 829af5d                | 2026-02-22         |
 | B2    | Usuario       | Reforcar validacoes de coerencia financeira no perfil                                                                                      | Done        | 100%      | Baixo: regras de coerência adicionadas (`gastos <= renda`, `aporte <= renda-gastos`, `investimento inicial <= patrimônio`) com paridade REST+GraphQL e testes          | 19f6448, 829af5d                | 2026-02-22         |
 | B3    | Usuario       | Adicionar auditoria de atualizacao de perfil                                                                                               | Done        | 100%      | Baixo: atualização de perfil agora emite evento estruturado `user.profile_update` com `changed_fields` e `request_id`                                                  | 19f6448, 829af5d                | 2026-02-22         |
-| B4    | Autenticacao  | Criar endpoint `POST /auth/password/forgot` (ou equivalente) com resposta idempotente e neutra, rate-limit e trilha de auditoria         | Todo        | 0%        | Medio: risco de enumeração e abuso de endpoint sem rate-limit/captcha                                                                                                   |                                  | 2026-02-19         |
-| B5    | Autenticacao  | Implementar envio de link de recuperação por email com token de uso único, expiração curta e armazenamento seguro                         | Todo        | 0%        | Alto: depende de provedor transacional, política anti-abuso e gestão segura de token                                                                                    |                                  | 2026-02-19         |
-| B6    | Autenticacao  | Implementar fluxo de redefinição por link (`token` + nova senha), com invalidação do token e revogação de sessões ativas                 | Todo        | 0%        | Alto: falhas em invalidação/revogação deixam conta vulnerável pós-reset                                                                                                 |                                  | 2026-02-19         |
+| B4    | Autenticacao  | Criar endpoint `POST /auth/password/forgot` (ou equivalente) com resposta idempotente e neutra, rate-limit e trilha de auditoria         | Done        | 100%      | Baixo: endpoint REST + mutation GraphQL públicas com resposta neutra, proteção anti enumeração e trilha de auditoria estruturada                                         | 5d092c1, 9532375, 54cfae2                   | 2026-02-22         |
+| B5    | Autenticacao  | Implementar envio de link de recuperação por email com token de uso único, expiração curta e armazenamento seguro                         | Done        | 100%      | Médio: token assinado por HMAC/SECRET_KEY, TTL curta e armazenamento por hash; envio real de email segue como integração futura de provedor transacional                 | 5d092c1, 9532375, 54cfae2                   | 2026-02-22         |
+| B6    | Autenticacao  | Implementar fluxo de redefinição por link (`token` + nova senha), com invalidação do token e revogação de sessões ativas                 | Done        | 100%      | Baixo: reset invalida token em uso único e revoga sessão ativa (`current_jti`), com cobertura de regressão em REST + GraphQL                                            | 5d092c1, 9532375, 54cfae2                   | 2026-02-22         |
 | B7    | Autenticacao  | Discovery do fluxo alternativo de recuperação por OTP (SMS): provedor, custos, antifraude, UX e compliance (LGPD)                       | Blocked     | 0%        | Alto: custo operacional e riscos de SIM swap; bloqueado até decisão de arquitetura/provedor                                                                             |                                  | 2026-02-19         |
 | B8 | Usuario | [P1] Implementar campos mínimos de perfil V1 no domínio e contratos REST/GraphQL (`state_uf`, `occupation`, `investor_profile`, `financial_objectives`, `monthly_income_net`) com retrocompatibilidade de payload |  Done  |  100%  | Alto: envolve migration e compatibilidade de contrato para evitar quebra de clientes já integrados |  adb529c  |  2026-02-22  |
 | B9    | Usuario       | [P1] Implementar fluxo de perfil de investidor auto declarado (onboarding + edição de perfil) com validação por enum                      | Done        | 100%      | Baixo: onboarding e edição com enum em REST+GraphQL concluídos, incluindo serialização de campos de perfil V1 e cobertura de regressão                                  | 24025bb, 49d1735                | 2026-02-22         |
@@ -554,8 +554,8 @@ Pendências de substituição controlada:
 ## Debito tecnico de rastreabilidade (estabilizacao 01)
 
 Contexto do bloco:
-- Marcador `pending-commit` foi encerrado e substituido por rastreabilidade explicita.
-- Snapshot do bloco (linhas de backlog/changelog): `216` ocorrencias de `pending-commit` -> `0`.
+- Marcador `5d092c1, 9532375, 54cfae2` foi encerrado e substituido por rastreabilidade explicita.
+- Snapshot do bloco (linhas de backlog/changelog): `216` ocorrencias de `5d092c1, 9532375, 54cfae2` -> `0`.
 - Pendencia atual visivel (linhas de backlog/changelog): `152` ocorrencias de `traceability-debt`.
 
 Interpretacao do marcador `traceability-debt`:

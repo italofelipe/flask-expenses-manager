@@ -32,7 +32,7 @@ class GraphQLAuthorizationPolicy:
             public_queries=_read_csv_set("GRAPHQL_PUBLIC_QUERIES", "__typename"),
             public_mutations=_read_csv_set(
                 "GRAPHQL_PUBLIC_MUTATIONS",
-                "registerUser,login",
+                "registerUser,login,forgotPassword,resetPassword",
             ),
             allow_unnamed_operations=_read_bool_env(
                 "GRAPHQL_ALLOW_UNNAMED_OPERATIONS",

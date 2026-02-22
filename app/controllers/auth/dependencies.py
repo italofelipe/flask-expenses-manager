@@ -13,6 +13,11 @@ from app.application.dto.auth_security_policy_dto import AuthSecurityPolicyDTO
 from app.application.services.auth_security_policy_service import (
     get_auth_security_policy,
 )
+from app.application.services.password_reset_service import (
+    PasswordResetResult,
+    request_password_reset,
+    reset_password,
+)
 from app.application.services.password_verification_service import (
     verify_password_with_timing_protection,
 )
@@ -39,6 +44,8 @@ class AuthDependencies:
     find_user_by_email: Callable[[str], User | None]
     find_user_by_name: Callable[[str], User | None]
     get_user_by_id: Callable[[UUID], User | None]
+    request_password_reset: Callable[[str], PasswordResetResult]
+    reset_password: Callable[[str, str], PasswordResetResult]
 
 
 def _find_user_by_email(email: str) -> User | None:
@@ -86,6 +93,11 @@ def _default_dependencies() -> AuthDependencies:
         find_user_by_email=_find_user_by_email,
         find_user_by_name=_find_user_by_name,
         get_user_by_id=_get_user_by_id,
+        request_password_reset=request_password_reset,
+        reset_password=lambda token, password_hash: reset_password(
+            token=token,
+            new_password_hash=password_hash,
+        ),
     )
 
 

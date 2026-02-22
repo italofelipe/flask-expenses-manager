@@ -3,9 +3,11 @@ from __future__ import annotations
 import graphene
 
 from app.graphql.mutations.auth import (
+    ForgotPasswordMutation,
     LoginMutation,
     LogoutMutation,
     RegisterUserMutation,
+    ResetPasswordMutation,
     UpdateUserProfileMutation,
 )
 from app.graphql.mutations.goal import (
@@ -35,6 +37,8 @@ class Mutation(graphene.ObjectType):
     register_user = RegisterUserMutation.Field()
     login = LoginMutation.Field()
     logout = LogoutMutation.Field()
+    forgot_password = ForgotPasswordMutation.Field()
+    reset_password = ResetPasswordMutation.Field()
     update_user_profile = UpdateUserProfileMutation.Field()
     create_transaction = CreateTransactionMutation.Field()
     delete_transaction = DeleteTransactionMutation.Field()
