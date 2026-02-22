@@ -1,6 +1,6 @@
 # TASKS - Central de TODOs e Progresso
 
-Ultima atualizacao: 2026-02-22 (bloco E concluido + X2/C4 e C6 concluidos + backlog de perfil V1 atualizado + discovery J1..J5 detalhado em docs + B1/B2/B3/B4/B5/B6/B9 concluidos + preparo de migracao para auraxis-platform)
+Ultima atualizacao: 2026-02-22 (bloco E concluido + X2/C4 e C6 concluidos + backlog de perfil V1 atualizado + discovery J1..J5 detalhado em docs + analise X3/X4 formalizada + B1/B2/B3/B4/B5/B6/B9 concluidos + preparo de migracao para auraxis-platform)
 
 ## Regras de uso deste arquivo
 
@@ -74,11 +74,13 @@ Estado atual consolidado:
 
 Pendencias de execucao imediata (ordem sugerida):
 1. `PLT1` configurar repositório `auraxis-platform` (remote, submodules/repos, baseline de CI e governança) antes da migração definitiva dos repositórios.
-2. `B10` questionario indicativo (5-10 perguntas) para sugestao de perfil.
-3. `B11` persistencia/exposicao do perfil sugerido e `taxonomy_version`.
-4. `F1..F4` auxiliares (Tag/Account/CreditCard) e integração em transações.
-5. `G5` seed de dados para ambiente local.
-6. `B7` discovery de OTP por SMS (mantido como blocked até decisão de provedor/compliance).
+2. `X4` adoção faseada de Ruff (`advisory -> substituição de flake8/black/isort`) preservando rigor de tipagem.
+3. `X3` iniciar fase 0 de desacoplamento para coexistência Flask/FastAPI.
+4. `B10` questionario indicativo (5-10 perguntas) para sugestao de perfil.
+5. `B11` persistencia/exposicao do perfil sugerido e `taxonomy_version`.
+6. `F1..F4` auxiliares (Tag/Account/CreditCard) e integração em transações.
+7. `G5` seed de dados para ambiente local.
+8. `B7` discovery de OTP por SMS (mantido como blocked até decisão de provedor/compliance).
 
 ### Ciclo B (planejado) - Features bloco 1
 
@@ -288,8 +290,8 @@ Fluxo por entrega:
 | S6-12 | App Security  | Definir política de exposição de documentação em produção (`/docs`) por ambiente/autenticação                                              | Done        | 100%      | Baixo: política por ambiente + fail-fast para configuração inválida em runtime seguro                                                                                    | 208e1d1                          | 2026-02-12         |
 | X1    | Tech Debt     | Remover/atualizar TODO desatualizado sobre enums em transacoes                                                                             | Done        | 100%      | Baixo: clareza de manutencao                                                                                                                                             | traceability-debt                | 2026-02-20         |
 | X2    | Tech Debt     | Centralizar regras de domínio em serviços/casos de uso e reduzir controllers/resolvers REST/GraphQL a adapters finos (sem regra duplicada) | Done        | 100%      | Baixo: metas, transações, wallet entries/queries e investment operations convergidos em camada de aplicação, com adapters REST/GraphQL finos e mapeamento de erro/presenters por domínio | 6192830, 5e4995f                | 2026-02-20         |
-| X3    | Tech Debt     | Analisar plano de migração gradual Flask -> FastAPI (estratégia de convivência, impacto em REST/GraphQL, autenticação, docs OpenAPI e rollout sem downtime) | Todo        | 0%        | Alto: migração de framework pode introduzir regressão transversal e aumentar custo operacional se não houver plano faseado por bounded context                              |                                  | 2026-02-22         |
-| X4    | Tech Debt     | Analisar adoção do Ruff como stack principal de qualidade (`lint`, `format`, `import sort`) e estratégia de substituição de `flake8`, `black`, `isort` e evolução da checagem de tipos hoje no `mypy` | Todo        | 0%        | Médio/Alto: Ruff cobre lint/format/import, mas tipagem estática profunda exige decisão explícita (manter `mypy` ou migrar para `pyright`) para não reduzir rigor técnico |                                  | 2026-02-22         |
+| X3    | Tech Debt     | Analisar plano de migração gradual Flask -> FastAPI (estratégia de convivência, impacto em REST/GraphQL, autenticação, docs OpenAPI e rollout sem downtime) | In Progress | 40%       | Alto: migração de framework pode introduzir regressão transversal e aumentar custo operacional se não houver plano faseado por bounded context                              | n/a (analise em auraxis-platform/.context/tech_debt/X3_fastapi_migration_coexistence.md) | 2026-02-22         |
+| X4    | Tech Debt     | Analisar adoção do Ruff como stack principal de qualidade (`lint`, `format`, `import sort`) e estratégia de substituição de `flake8`, `black`, `isort` e evolução da checagem de tipos hoje no `mypy` | In Progress | 45%       | Médio/Alto: Ruff cobre lint/format/import, mas tipagem estática profunda exige decisão explícita (manter `mypy` ou migrar para `pyright`) para não reduzir rigor técnico | n/a (analise em auraxis-platform/.context/tech_debt/X4_ruff_adoption_strategy.md) | 2026-02-22         |
 
 
 ## Registro de progresso recente
@@ -301,6 +303,8 @@ Fluxo por entrega:
 | 2026-02-22 | B2                      | Regras de coerência financeira no perfil adicionadas para bloquear cenários inválidos (`gastos > renda`, `aporte > renda-gastos`, `investimento inicial > patrimônio`) com validação em REST + GraphQL.                                                                                | 19f6448, 829af5d |
 | 2026-02-22 | B3                      | Auditoria de atualização de perfil reforçada com evento estruturado `user.profile_update` contendo `changed_fields` e `request_id`, além de cobertura de regressão dedicada.                                                                                                            | 19f6448, 829af5d |
 | 2026-02-22 | B9                      | Fluxo de perfil de investidor auto declarado concluído em onboarding + edição (REST/GraphQL), com enum padronizado e serialização dos campos de perfil V1.                                                                                                                              | 24025bb, 49d1735 |
+| 2026-02-22 | X3 (análise)            | Ideação técnica formalizada para migração gradual Flask -> FastAPI por coexistência faseada (sem big-bang), com pré-requisitos de desacoplamento, estratégia de rollout por contexto e mitigação de risco operacional.                                                                | n/a (auraxis-platform) |
+| 2026-02-22 | X4 (análise)            | Estratégia formalizada para adoção do Ruff em fases (advisory -> substituição de `flake8/black/isort`), mantendo `mypy` como gate de tipagem até decisão dedicada sobre eventual migração de type checker.                                                                           | n/a (auraxis-platform) |
 | 2026-02-20 | C6                      | Endpoint unificado de vencimentos entregue com paridade REST+GraphQL (`/transactions/due-range` e `transactionDueRange`), ordenações `overdue_first/upcoming_first/date/title/card`, filtros `initialDate/finalDate`, contadores agregados e cobertura de contrato/erro/OpenAPI/Schemathesis. | 4f67bc7 |
 | 2026-02-20 | H1/H1-HARDENING         | Observabilidade GraphQL fortalecida com métricas `graphql.*` por domínio/campo/custo (`query_bytes`, `depth`, `complexity`, violações de segurança/autorização) no controller, com cobertura dedicada em `tests/test_graphql_observability.py`.                                      | traceability-debt |
 | 2026-02-20 | G1/G2                   | Suite por domínio expandida com cenários de integração BRAPI em camada de API (REST + GraphQL) simulando timeout real do provider e validando fallback seguro de valuation em `tests/test_brapi_integration_contract.py`.                                                            | traceability-debt |
