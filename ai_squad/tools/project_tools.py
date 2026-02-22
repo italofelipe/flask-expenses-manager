@@ -175,6 +175,108 @@ class ReadTasksSectionTool(BaseTool):
         )
 
 
+class ReadProjectFileTool(BaseTool):
+    name: str = "read_project_file"
+    description: str = (
+        "Reads ANY existing file from the project. "
+        "Path must be relative to project root "
+        "(e.g., 'app/models/user.py', 'app/schemas/user_schemas.py'). "
+        "ALWAYS use this before writing to a file that may already exist. "
+        "This is the primary tool for reading source code."
+    )
+
+    def _run(self, path: str) -> str:
+        resolved = (PROJECT_ROOT / path).resolve()
+
+        if not resolved.is_relative_to(PROJECT_ROOT):
+            msg = f"BLOCKED: '{path}' escapes project root."
+            audit_log("read_project_file", {"path": path}, msg, status="BLOCKED")
+            return msg
+
+        audit_log("read_project_file", {"path": path}, "reading", status="OK")
+        if not resolved.exists():
+            return f"FILE_NOT_FOUND: '{path}' does not exist yet."
+        return resolved.read_text(encoding="utf-8")
+
+
+class ListProjectFilesTool(BaseTool):
+    name: str = "list_project_files"
+    description: str = (
+        "Lists files inside a project directory. "
+        "Path must be relative to project root "
+        "(e.g., 'app/models', 'app/graphql/mutations', 'migrations/versions'). "
+        "Use this to discover what files already exist before creating new ones."
+    )
+
+    def _run(self, directory: str) -> str:
+        resolved = (PROJECT_ROOT / directory).resolve()
+
+        if not resolved.is_relative_to(PROJECT_ROOT):
+            return f"BLOCKED: '{directory}' escapes project root."
+
+        if not resolved.exists():
+            return f"DIRECTORY_NOT_FOUND: '{directory}' does not exist."
+
+        files = sorted(
+            str(f.relative_to(PROJECT_ROOT))
+            for f in resolved.rglob("*")
+            if f.is_file() and "__pycache__" not in str(f)
+        )
+        audit_log(
+            "list_project_files",
+            {"directory": directory},
+            f"listed {len(files)} files",
+            status="OK",
+        )
+        return f"Files in '{directory}':\n" + "\n".join(files)
+
+
+class GetLatestMigrationTool(BaseTool):
+    name: str = "get_latest_migration"
+    description: str = (
+        "Returns the revision ID and filename of the latest Alembic migration. "
+        "ALWAYS call this before creating a new migration to get the correct "
+        "down_revision value. Without this, the migration chain breaks."
+    )
+
+    def _run(self, query: str = None) -> str:
+        versions_dir = PROJECT_ROOT / "migrations" / "versions"
+        if not versions_dir.exists():
+            return "Error: migrations/versions/ directory not found."
+
+        migration_files = sorted(
+            f
+            for f in versions_dir.iterdir()
+            if f.is_file() and f.suffix == ".py" and f.name != "__init__.py"
+        )
+
+        if not migration_files:
+            return "No migrations found. Use down_revision = None for the first one."
+
+        latest = migration_files[-1]
+        content = latest.read_text(encoding="utf-8")
+
+        # Extract revision ID
+        revision_id = "unknown"
+        for line in content.splitlines():
+            if line.strip().startswith("revision"):
+                revision_id = line.split("=")[1].strip().strip('"').strip("'")
+                break
+
+        audit_log(
+            "get_latest_migration",
+            {"file": latest.name},
+            f"revision={revision_id}",
+            status="OK",
+        )
+        return (
+            f"Latest migration:\n"
+            f"  File: migrations/versions/{latest.name}\n"
+            f"  Revision ID: {revision_id}\n\n"
+            f"Use this as down_revision in your new migration."
+        )
+
+
 class ReadSchemaTool(BaseTool):
     name: str = "read_schema"
     description: str = "Reads schema.graphql to understand GraphQL API contracts."

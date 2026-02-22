@@ -1,24 +1,26 @@
 """
 Auraxis AI Squad — Backend Only Mode.
 
-Runs a 3-agent pipeline (PM → Backend Dev → QA) using CrewAI.
-Frontend and DevOps agents are disabled until the project has a frontend.
+Runs a 4-task pipeline using CrewAI:
+  PM (plan) → Backend Dev (read) → Backend Dev (write) → QA (test)
+
+The extra "read" task is the fix for the root cause of the previous failure:
+agents were writing files without reading what already existed, causing
+overwrites and loss of existing code.
 
 HOW TO USE:
   Edit BRIEFING at the bottom of this file, then run:
     cd ai_squad && python main.py
 
 BRIEFING TIPS:
-  - Be specific: name the TASKS.md ID (e.g., "B8"), the fields, the files.
-  - The PM reads TASKS.md automatically via read_pending_tasks — no need
-    to ask it to "find what's pending" generically.
-  - The more precise the briefing, the less the PM hallucinates.
+  - Reference the TASKS.md ID explicitly (e.g., "B8").
+  - Name the exact files to touch — the agent reads them before writing.
+  - Describe what to ADD, not what the full file should look like.
 
 References:
-- ai_squad/AGENT_ARCHITECTURE.md — agent registry and tools
-- .context/03_agentic_workflow.md — agentic operational loop
-- .context/05_quality_and_gates.md — quality gates and Definition of Done
 - .context/07_operational_cycle.md — full delivery cycle
+- .context/04_architecture_snapshot.md — codebase structure
+- ai_squad/AGENT_ARCHITECTURE.md — agent registry and tools
 """
 
 import os
@@ -26,13 +28,15 @@ import os
 from crewai import Agent, Crew, Process, Task
 from dotenv import load_dotenv
 from tools.project_tools import (
+    GetLatestMigrationTool,
     GitOpsTool,
+    ListProjectFilesTool,
     ReadContextFileTool,
     ReadGovernanceFileTool,
     ReadPendingTasksTool,
+    ReadProjectFileTool,
     ReadSchemaTool,
     ReadTasksSectionTool,
-    ReadTasksTool,
     RunTestsTool,
     WriteFileTool,
 )
@@ -42,43 +46,43 @@ load_dotenv()
 
 class AuraxisSquad:
     def __init__(self):
-        # Read-only tools
-        self.rt = ReadTasksTool()
-        self.rpt = ReadPendingTasksTool()  # focused view — avoids lost-in-middle
-        self.rts = ReadTasksSectionTool()  # section-level read for large TASKS.md
-        self.rs = ReadSchemaTool()
+        # Discovery tools (read-only, no security risk)
+        self.rpt = ReadPendingTasksTool()
+        self.rts = ReadTasksSectionTool()
         self.rcf = ReadContextFileTool()
         self.rgf = ReadGovernanceFileTool()
+        self.rpf = ReadProjectFileTool()
+        self.lpf = ListProjectFilesTool()
+        self.glm = GetLatestMigrationTool()
+        self.rs = ReadSchemaTool()
 
         # Execution tools
         self.rtst = RunTestsTool()
 
-        # Write tools
+        # Write + Git tools
         self.wf = WriteFileTool()
-
-        # Git tools
         self.git = GitOpsTool()
 
     def run_backend_workflow(self, briefing: str):
         """
-        Run backend-only workflow: PM → Backend Dev → QA.
-        Frontend and Deploy are dormant.
+        4-task pipeline: Plan → Read → Write → Test.
+        The Read task is the guard that prevents the Write task from
+        overwriting existing files with hallucinated content.
         """
 
         # --- AGENTS ---
         manager = Agent(
             role="Gerente de Projeto Auraxis",
             goal=(
-                "Coordinate backend development ensuring code quality, "
-                "alignment with product.md, and compliance with steering.md. "
-                "Always produce a concrete plan with specific file names — "
-                "never produce a plan that results in zero code changes."
+                "Produce a CONCRETE implementation plan with exact file paths, "
+                "exact code changes, and correct migration chain. "
+                "Never produce a plan that results in zero code changes."
             ),
             backstory=(
-                "Technical lead focused on Clean Architecture and TASKS.md. "
+                "Technical lead who reads before planning. "
                 "You use read_pending_tasks to see what needs to be done, "
-                "and read_tasks_section to zoom into a specific task. "
-                "You never mark something as done without a code plan."
+                "read_tasks_section to zoom into a task, and "
+                "read_governance_file to check product direction."
             ),
             tools=[self.rpt, self.rts, self.rcf, self.rgf],
             verbose=True,
@@ -88,116 +92,149 @@ class AuraxisSquad:
         backend_dev = Agent(
             role="Senior Backend Engineer",
             goal=(
-                "Implement business logic, models, services, and "
-                "GraphQL resolvers following CODING_STANDARDS.md. "
-                "You MUST write real Python code and save it using write_file_content. "
-                "Never finish a task without writing at least one file."
+                "Read every existing file before modifying it. "
+                "Add new fields/methods to existing code — never replace it. "
+                "Write complete, working Python that follows the project patterns."
             ),
             backstory=(
-                "Expert in Python, Flask, SQLAlchemy, and Ariadne GraphQL. "
-                "You consult .context/04_architecture_snapshot.md for the "
-                "codebase structure before writing any code. "
-                "You follow existing patterns: Model → Schema → Service → "
-                "Controller → GraphQL resolver."
+                "Expert in Python, Flask, SQLAlchemy (db.Model style), "
+                "Marshmallow, and Graphene (NOT Ariadne). "
+                "Your rule: read_project_file BEFORE write_file_content. "
+                "You integrate new code into what already exists."
             ),
-            tools=[self.rts, self.rs, self.rcf, self.wf, self.git],
+            tools=[
+                self.rpf,
+                self.lpf,
+                self.glm,
+                self.rs,
+                self.rcf,
+                self.wf,
+                self.git,
+            ],
             verbose=True,
         )
 
         qa_engineer = Agent(
             role="QA Engineer",
             goal=(
-                "Validate backend changes against quality gates "
-                "defined in .context/05_quality_and_gates.md. "
-                "Run pytest and report exact results with coverage percentage."
+                "Run pytest, report exact pass/fail counts and coverage. "
+                "Flag FAIL if coverage < 85% or any test fails."
             ),
-            backstory=(
-                "Rigorous tester. You run pytest and validate that "
-                "the API contract is maintained. You check the quality "
-                "gates before approving any changes."
-            ),
+            backstory=("Rigorous tester who runs the full suite and reports honestly."),
             tools=[self.rtst, self.rcf],
             verbose=True,
         )
 
-        # --- TASKS (Backend Only) ---
+        # --- TASK 1: PLAN ---
         task_plan = Task(
             description=(
-                "BOOTSTRAP SEQUENCE (execute in order before planning):\n"
-                "1. read_pending_tasks() — focused list of what needs doing\n"
-                "2. read_tasks_section('<task_id>') — zoom into the specific task\n"
-                "3. read_context_file('04_architecture_snapshot.md') — codebase\n"
-                "4. read_governance_file('product.md') — product direction\n\n"
+                "BOOTSTRAP (execute in order):\n"
+                "1. read_pending_tasks() — focused list of pending work\n"
+                "2. read_tasks_section('<task_id>') — zoom into the task\n"
+                "3. read_context_file('04_architecture_snapshot.md')\n"
+                "4. read_governance_file('product.md')\n\n"
                 f'USER BRIEFING: "{briefing}"\n\n'
-                "Based on the bootstrap context and the user's briefing, produce a "
-                "CONCRETE technical plan. The plan MUST include:\n"
-                "- Exact file paths to create or modify (e.g., app/models/user.py)\n"
-                "- What changes to make in each file\n"
-                "- Whether a database migration is needed\n"
-                "- The order of implementation\n\n"
-                "IMPORTANT: If the briefing points to a specific task ID (e.g., B8), "
-                "that task MUST be implemented. Do not conclude 'nothing to do'."
+                "Produce a CONCRETE plan. Include:\n"
+                "- Task ID being implemented\n"
+                "- Exact file paths to modify (existing) or create (new)\n"
+                "- For each file: what to ADD (not replace)\n"
+                "- Migration needed? Yes/No. If yes: what columns to add\n"
+                "- Implementation order (dependencies first)\n\n"
+                "CRITICAL: If briefing names a task ID, that task MUST be "
+                "implemented. 'Nothing to do' is never acceptable."
             ),
             expected_output=(
-                "A detailed technical plan with:\n"
-                "1. Task ID being implemented\n"
-                "2. List of files to create/modify with specific changes\n"
-                "3. Migration plan (if schema changes)\n"
-                "4. Implementation order"
+                "Numbered list:\n"
+                "1. Task ID: <id>\n"
+                "2. Files to MODIFY: <path> — <what to add>\n"
+                "3. Files to CREATE: <path> — <purpose>\n"
+                "4. Migration: <yes/no> — <columns if yes>\n"
+                "5. Order: <step by step>"
             ),
             agent=manager,
         )
 
-        task_code = Task(
+        # --- TASK 2: READ (guard against blind overwrites) ---
+        task_read = Task(
             description=(
-                "Implement the backend changes exactly as defined in the plan.\n\n"
-                "MANDATORY STEPS:\n"
-                "1. Read .context/04_architecture_snapshot.md to understand patterns\n"
-                "2. Read schema.graphql to understand current GraphQL contracts\n"
-                "3. For each file in the plan: write the complete implementation\n"
-                "4. Use write_file_content for every file created or modified\n"
-                "5. After writing: use git_operations(command='status') to verify\n\n"
-                "RULES:\n"
-                "- Follow existing patterns (Model → Schema → Service → Resolver)\n"
-                "- Every new Model MUST have a corresponding Marshmallow Schema\n"
-                "- Use Alembic for migrations (write the migration file)\n"
-                "- Never claim a file was written without actually writing it"
+                "READ PHASE — execute before writing anything.\n\n"
+                "For every file listed in the plan:\n"
+                "1. list_project_files('<directory>') to confirm what exists\n"
+                "2. read_project_file('<path>') to read the FULL current content\n"
+                "3. read_schema() to read schema.graphql\n"
+                "4. get_latest_migration() to get the correct down_revision\n\n"
+                "Output a READING REPORT listing:\n"
+                "- Each file read and its key contents (classes, fields, methods)\n"
+                "- The latest migration revision ID\n"
+                "- Any conflicts or risks spotted between plan and reality\n\n"
+                "DO NOT write any code yet. This task is read-only."
             ),
             expected_output=(
-                "List of ALL files created or modified, with a one-line summary "
-                "of what changed in each. Minimum: at least one file written."
+                "Reading report:\n"
+                "- File: <path> | Key contents: <classes/fields/methods found>\n"
+                "- Latest migration revision: <id>\n"
+                "- Conflicts/risks: <any issues spotted>"
             ),
             agent=backend_dev,
             context=[task_plan],
         )
 
+        # --- TASK 3: WRITE ---
+        task_code = Task(
+            description=(
+                "WRITE PHASE — implement based on the plan and reading report.\n\n"
+                "RULES (non-negotiable):\n"
+                "1. Use the reading report from the previous task as your base\n"
+                "2. For existing files: take the FULL content you read, add the "
+                "new fields/methods, write the complete updated file\n"
+                "3. For new files: create from scratch following project patterns\n"
+                "4. Use db.Model style (NOT declarative Base) for SQLAlchemy\n"
+                "5. Use Graphene (NOT Ariadne) for GraphQL\n"
+                "6. Set migration down_revision to revision ID from reading report\n"
+                "7. After writing: git_operations(command='status') to verify\n"
+                "8. After verifying: git_operations(command='create_branch', "
+                "branch_name='feat/<task-id>-<short-description>')\n"
+                "9. Then: git_operations(command='commit', "
+                "message='feat(<scope>): <description>')\n\n"
+                "NEVER claim a file was written without calling write_file_content."
+            ),
+            expected_output=(
+                "List of all files written:\n"
+                "- <path>: <one-line summary of changes>\n"
+                "Git branch created: <branch name>\n"
+                "Commit hash: <hash from git status>"
+            ),
+            agent=backend_dev,
+            context=[task_plan, task_read],
+        )
+
+        # --- TASK 4: TEST ---
         task_test = Task(
             description=(
-                "Run the full test suite to validate backend changes.\n\n"
-                "STEPS:\n"
-                "1. run_backend_tests() — run pytest\n"
-                "2. Report exact results: number of tests passed/failed\n"
+                "TEST PHASE — validate the implementation.\n\n"
+                "1. run_backend_tests()\n"
+                "2. Report exact numbers: X passed, Y failed\n"
                 "3. Report coverage percentage\n"
-                "4. If coverage < 85%: flag as FAIL\n"
-                "5. If any tests fail: report the exact error messages\n\n"
-                "Consult read_context_file('05_quality_and_gates.md') for "
-                "the full Definition of Done checklist."
+                "4. Status: PASS (coverage >= 85%, 0 failures) or FAIL\n"
+                "5. If FAIL: quote the exact error messages\n\n"
+                "Consult read_context_file('05_quality_and_gates.md') "
+                "for the Definition of Done checklist."
             ),
             expected_output=(
                 "Test results:\n"
-                "- Pass/fail: X passed, Y failed\n"
+                "- Passed: X | Failed: Y\n"
                 "- Coverage: XX%\n"
                 "- Status: PASS or FAIL\n"
-                "- Error logs (if any failures)"
+                "- Errors (if any): <exact messages>"
             ),
             agent=qa_engineer,
             context=[task_code],
         )
 
-        # --- ORCHESTRATION (Backend Only) ---
+        # --- CREW ---
         crew = Crew(
             agents=[manager, backend_dev, qa_engineer],
-            tasks=[task_plan, task_code, task_test],
+            tasks=[task_plan, task_read, task_code, task_test],
             process=Process.sequential,
             verbose=True,
         )
@@ -208,29 +245,38 @@ class AuraxisSquad:
 # =============================================================================
 # BRIEFING — Edit this to tell the squad what to implement.
 #
-# Tips:
-#   - Reference the TASKS.md ID explicitly (e.g., "B8")
-#   - Be specific about fields, files, and expected behavior
-#   - The more precise, the less the PM will guess
+# Be specific:
+#   - Task ID from TASKS.md (e.g., "B8")
+#   - Exact fields/behavior expected
+#   - Files to touch (the agent will read them before writing)
 # =============================================================================
 
 if __name__ == "__main__":
-    print("### Auraxis AI Squad - Mode: BACKEND ONLY ###")
+    print("### Auraxis AI Squad — BACKEND ONLY (4-task pipeline) ###")
     print(f"Project root: {os.path.abspath('.')}")
     print()
 
     BRIEFING = (
         "Implement task B8: User Profile V1 minimum fields. "
-        "Add the following fields to the User model: "
-        "state_uf (String, optional), occupation (String, optional), "
-        "investor_profile (String enum: conservador/explorador/entusiasta, optional), "
-        "financial_objectives (Text, optional). "
-        "Rename monthly_income to monthly_income_net keeping backward compatibility "
-        "(old field should still work as an alias or be migrated carefully). "
-        "Files to touch: app/models/user.py, app/schemas/user_schema.py, "
-        "and the GraphQL user type/mutations. "
-        "Create an Alembic migration for the schema changes. "
-        "Follow the existing patterns in the codebase."
+        "Files to modify:\n"
+        "  - app/models/user.py: ADD these columns to the existing User model "
+        "(keep all existing fields): "
+        "state_uf (db.String(2), nullable=True), "
+        "occupation (db.String(128), nullable=True), "
+        "investor_profile (db.String(32), nullable=True, "
+        "values: conservador/explorador/entusiasta), "
+        "financial_objectives (db.Text, nullable=True), "
+        "monthly_income_net (db.Numeric(10,2), nullable=True). "
+        "ADD a hybrid_property monthly_income that reads/writes "
+        "monthly_income_net for backward compatibility.\n"
+        "  - app/schemas/user_schemas.py: ADD the 5 new fields to "
+        "UserProfileSchema and UserCompleteSchema. "
+        "ADD monthly_income_net as alias in UserCompleteSchema.\n"
+        "  - migrations/versions/: CREATE a new Alembic migration that "
+        "adds the 5 columns to the 'users' table. "
+        "down_revision must be the latest migration revision (use "
+        "get_latest_migration to find it).\n"
+        "Do NOT create new files for schema or service — modify existing ones."
     )
 
     squad = AuraxisSquad()

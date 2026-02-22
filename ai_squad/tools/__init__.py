@@ -9,10 +9,13 @@ dependencies) can be imported and tested even when crewai is not installed.
 try:
     from .project_tools import (  # noqa: F401
         AWSStatusTool,
+        GetLatestMigrationTool,
         GitOpsTool,
+        ListProjectFilesTool,
         ReadContextFileTool,
         ReadGovernanceFileTool,
         ReadPendingTasksTool,
+        ReadProjectFileTool,
         ReadSchemaTool,
         ReadTasksSectionTool,
         ReadTasksTool,
