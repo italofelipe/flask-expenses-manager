@@ -61,7 +61,7 @@ def test_openapi_methods_match_main_routes(client) -> None:
         "/auth/logout": {"post"},
         "/healthz": {"get"},
         "/user/me": {"get"},
-        "/user/profile": {"put"},
+        "/user/profile": {"get", "put"},
         "/transactions": {"post", "put", "delete"},
         "/transactions/{transaction_id}": {"put", "delete"},
         "/transactions/{transaction_id}/force": {"delete"},
