@@ -1,6 +1,6 @@
 # TASKS - Central de TODOs e Progresso
 
-Ultima atualizacao: 2026-02-22 (bloco E concluido + X2/C4 e C6 concluidos + backlog de perfil V1 atualizado + discovery J1..J5 + B1/B2/B3/B4/B5/B6/B9 concluidos)
+Ultima atualizacao: 2026-02-22 (bloco E concluido + X2/C4 e C6 concluidos + backlog de perfil V1 atualizado + discovery J1..J5 + B1/B2/B3/B4/B5/B6/B9 concluidos + preparo de migracao para auraxis-platform)
 
 ## Regras de uso deste arquivo
 
@@ -73,11 +73,12 @@ Estado atual consolidado:
 - Foco atual de produto: evolucao de perfil V1 (auto declaracao + questionario indicativo + campos minimos).
 
 Pendencias de execucao imediata (ordem sugerida):
-1. `B10` questionario indicativo (5-10 perguntas) para sugestao de perfil.
-2. `B11` persistencia/exposicao do perfil sugerido e `taxonomy_version`.
-3. `F1..F4` auxiliares (Tag/Account/CreditCard) e integração em transações.
-4. `G5` seed de dados para ambiente local.
-5. `B7` discovery de OTP por SMS (mantido como blocked até decisão de provedor/compliance).
+1. `PLT1` configurar repositório `auraxis-platform` (remote, submodules/repos, baseline de CI e governança) antes da migração definitiva dos repositórios.
+2. `B10` questionario indicativo (5-10 perguntas) para sugestao de perfil.
+3. `B11` persistencia/exposicao do perfil sugerido e `taxonomy_version`.
+4. `F1..F4` auxiliares (Tag/Account/CreditCard) e integração em transações.
+5. `G5` seed de dados para ambiente local.
+6. `B7` discovery de OTP por SMS (mantido como blocked até decisão de provedor/compliance).
 
 ### Ciclo B (planejado) - Features bloco 1
 
@@ -174,6 +175,7 @@ Fluxo por entrega:
 | B9    | Usuario       | [P1] Implementar fluxo de perfil de investidor auto declarado (onboarding + edição de perfil) com validação por enum                      | Done        | 100%      | Baixo: onboarding e edição com enum em REST+GraphQL concluídos, incluindo serialização de campos de perfil V1 e cobertura de regressão                                  | 24025bb, 49d1735                | 2026-02-22         |
 | B10   | Usuario       | [P2] Implementar questionário curto (5-10 perguntas) para sugestão indicativa de perfil de investidor, sem substituir a auto declaração | Todo        | 0%        | Medio: classificação simplificada pode gerar expectativa de precisão acima da proposta                                                                                    |                                  | 2026-02-20         |
 | B11   | Usuario       | [P2] Persistir e expor resultado do questionário (`investor_profile_suggested`, `profile_quiz_score`, `taxonomy_version`) para comparação com perfil auto declarado | Todo        | 0%        | Medio: risco de confusão de UX se não houver explicação clara entre perfil declarado e perfil sugerido                                                                  |                                  | 2026-02-20         |
+| PLT1  | Plataforma    | Configurar repositório `auraxis-platform` como orquestrador oficial (remote, estratégia de submodules/repos, branch protection e baseline de CI/docs) antes da migração definitiva | Todo        | 0%        | Médio: sem configuração formal, há risco de drift de contexto e perda de rastreabilidade multi-repo na transição                                                        |                                  | 2026-02-22         |
 | J1    | Discovery     | Definir e implementar exportacao de extrato financeiro em CSV/XLSX por periodo (presets 15/30/90/180 dias, desde inicio e range customizado) | Todo        | 0%        | Medio: contrato de arquivo e timezone podem gerar divergencias em conciliacao externa                                                                                   |                                  | 2026-02-22         |
 | J2    | Discovery     | Implementar importacao de relatorios bancarios (arquivos) com normalizacao e consolidacao no balanco mensal junto aos lancamentos manuais   | Todo        | 0%        | Alto: variacao de formatos por banco e possivel ruido de dados                                                                                                          |                                  | 2026-02-22         |
 | J3    | Discovery     | Implementar conciliacao inteligente e insights com LLM para detectar possiveis duplicidades e sugerir categorizacao/insights explicaveis    | Todo        | 0%        | Alto: privacidade/LGPD, falso positivo de deduplicacao e custo operacional de inferencia                                                                                |                                  | 2026-02-22         |
