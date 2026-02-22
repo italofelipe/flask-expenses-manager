@@ -1,9 +1,10 @@
-# mypy: disable-error-code=name-defined
+# mypy: disable-error-code="name-defined,no-redef"
 
 import uuid
 from datetime import datetime
 
 from sqlalchemy.dialects.postgresql import UUID
+from sqlalchemy.ext.hybrid import hybrid_property
 
 from app.extensions.database import db
 
@@ -23,12 +24,21 @@ class User(db.Model):
     # Dados pessoais - informações adicionais coletadas após o cadastro inicial
     gender = db.Column(db.String(20), nullable=True)
     birth_date = db.Column(db.Date, nullable=True)
-    monthly_income = db.Column(db.Numeric(10, 2), nullable=True)
+    monthly_income_net = db.Column(db.Numeric(10, 2), nullable=True)
     net_worth = db.Column(db.Numeric(10, 2), nullable=True)
     monthly_expenses = db.Column(db.Numeric(10, 2), nullable=True)
     initial_investment = db.Column(db.Numeric(10, 2), nullable=True)
     monthly_investment = db.Column(db.Numeric(10, 2), nullable=True)
     investment_goal_date = db.Column(db.Date, nullable=True)
+
+    state_uf = db.Column(db.String(2), nullable=True)
+    occupation = db.Column(db.String(128), nullable=True)
+
+    # Allowed values: conservador/explorador/entusiasta
+    investor_profile = db.Column(db.String(32), nullable=True)
+
+    financial_objectives = db.Column(db.Text, nullable=True)
+
     tickers = db.relationship("UserTicker", back_populates="user")
     goals = db.relationship(
         "Goal",
@@ -44,3 +54,11 @@ class User(db.Model):
         from app.services.user_validations import validate_user_profile_data
 
         return validate_user_profile_data(self)
+
+    @hybrid_property
+    def monthly_income(self):
+        return self.monthly_income_net
+
+    @monthly_income.setter
+    def monthly_income(self, value):
+        self.monthly_income_net = value

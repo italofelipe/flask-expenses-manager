@@ -12,6 +12,7 @@ try:
         GetLatestMigrationTool,
         GitOpsTool,
         ListProjectFilesTool,
+        ReadAlembicHistoryTool,
         ReadContextFileTool,
         ReadGovernanceFileTool,
         ReadPendingTasksTool,
@@ -20,6 +21,7 @@ try:
         ReadTasksSectionTool,
         ReadTasksTool,
         RunTestsTool,
+        ValidateMigrationConsistencyTool,
         WriteFileTool,
     )
 except ImportError:

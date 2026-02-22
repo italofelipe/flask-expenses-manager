@@ -13,11 +13,13 @@ References:
 """
 
 import fnmatch
+from pathlib import Path
 
 from crewai.tools import BaseTool
 
 from .tool_security import (
     CONVENTIONAL_BRANCH_PREFIXES,
+    DEFAULT_TIMEOUT_SECONDS,
     GIT_STAGE_BLOCKLIST,
     PROJECT_ROOT,
     audit_log,
@@ -275,6 +277,185 @@ class GetLatestMigrationTool(BaseTool):
             f"  Revision ID: {revision_id}\n\n"
             f"Use this as down_revision in your new migration."
         )
+
+
+class ReadAlembicHistoryTool(BaseTool):
+    name: str = "read_alembic_history"
+    description: str = (
+        "Reads ALL Alembic migrations and returns a summary of every "
+        "column operation (add, drop, rename, alter) ever applied to a table. "
+        "Use this to know which columns ALREADY EXIST in the database "
+        "before writing a migration. This prevents writing add_column "
+        "for a column that should be renamed, or adding a duplicate column."
+    )
+
+    def _run(self, table_name: str = "users") -> str:
+        versions_dir = PROJECT_ROOT / "migrations" / "versions"
+        if not versions_dir.exists():
+            return "Error: migrations/versions/ directory not found."
+
+        migration_files = sorted(
+            f
+            for f in versions_dir.iterdir()
+            if f.is_file() and f.suffix == ".py" and f.name != "__init__.py"
+        )
+
+        if not migration_files:
+            return f"No migrations found for table '{table_name}'."
+
+        ops: list[str] = []
+        for mf in migration_files:
+            content = mf.read_text(encoding="utf-8")
+            if table_name not in content:
+                continue
+            for line in content.splitlines():
+                stripped = line.strip()
+                if stripped.startswith("op.") and table_name in stripped:
+                    ops.append(f"  {mf.name}: {stripped}")
+
+        if not ops:
+            return f"No operations found for table '{table_name}'."
+
+        audit_log(
+            "read_alembic_history",
+            {"table_name": table_name},
+            f"found {len(ops)} operations",
+            status="OK",
+        )
+        return (
+            f"Alembic history for table '{table_name}' "
+            f"({len(ops)} operations):\n" + "\n".join(ops)
+        )
+
+
+# ---------------------------------------------------------------------------
+# Helpers for ValidateMigrationConsistencyTool (extracted for low complexity)
+# ---------------------------------------------------------------------------
+
+
+def _extract_model_columns(content: str) -> list[str]:
+    """Extract db.Column attribute names from a model file."""
+    cols: list[str] = []
+    for line in content.splitlines():
+        stripped = line.strip()
+        if "db.Column(" in stripped and "=" in stripped:
+            cols.append(stripped.split("=")[0].strip())
+    return cols
+
+
+def _extract_sa_column_name(line: str) -> str | None:
+    """Extract the column name from a sa.Column('name', ...) call."""
+    for quote in ['"', "'"]:
+        marker = f"sa.Column({quote}"
+        if marker in line:
+            return line.split(marker)[1].split(quote)[0]
+    return None
+
+
+def _extract_migration_ops(content: str) -> tuple[list[str], list[str]]:
+    """Return (add_columns, alter_lines) from a migration file."""
+    add_cols: list[str] = []
+    alter_lines: list[str] = []
+    for line in content.splitlines():
+        stripped = line.strip()
+        if "op.add_column" in stripped:
+            col = _extract_sa_column_name(stripped)
+            if col:
+                add_cols.append(col)
+        if "op.alter_column" in stripped:
+            alter_lines.append(stripped)
+    return add_cols, alter_lines
+
+
+def _collect_existing_columns(versions_dir: Path, exclude_file: Path) -> set[str]:
+    """Scan previous migrations for column names already in the DB."""
+    existing: set[str] = set()
+    for mf in sorted(versions_dir.iterdir()):
+        if mf == exclude_file or mf.suffix != ".py":
+            continue
+        if mf.name == "__init__.py":
+            continue
+        for line in mf.read_text(encoding="utf-8").splitlines():
+            col = _extract_sa_column_name(line.strip())
+            if col and "sa.Column(" in line:
+                existing.add(col)
+    return existing
+
+
+def _build_consistency_report(
+    mig_add_cols: list[str],
+    model_cols: list[str],
+    existing_cols: set[str],
+) -> tuple[list[str], list[str]]:
+    """Return (issues, warnings) comparing migration ops vs model/DB."""
+    issues: list[str] = []
+    warnings: list[str] = []
+    for col in mig_add_cols:
+        if col in existing_cols:
+            issues.append(
+                f"CONFLICT: add_column('{col}') but column already "
+                f"exists in a previous migration. "
+                f"Use op.alter_column() to rename instead."
+            )
+        if col not in model_cols:
+            warnings.append(
+                f"WARNING: migration adds '{col}' but model has no "
+                f"matching db.Column attribute."
+            )
+    return issues, warnings
+
+
+class ValidateMigrationConsistencyTool(BaseTool):
+    name: str = "validate_migration_consistency"
+    description: str = (
+        "Compares a model file against a migration file to check consistency. "
+        "Detects: (1) columns in migration that do not match model, "
+        "(2) model columns that have no migration, "
+        "(3) add_column for a column that already exists in a previous migration "
+        "(should be alter_column/rename instead). "
+        "Run this AFTER writing model and migration, BEFORE committing."
+    )
+
+    def _run(self, model_path: str, migration_path: str) -> str:
+        model_file = PROJECT_ROOT / model_path
+        migration_file = PROJECT_ROOT / migration_path
+
+        if not model_file.exists():
+            return f"Error: model file not found: {model_path}"
+        if not migration_file.exists():
+            return f"Error: migration file not found: {migration_path}"
+
+        model_cols = _extract_model_columns(model_file.read_text(encoding="utf-8"))
+        mig_add_cols, _ = _extract_migration_ops(
+            migration_file.read_text(encoding="utf-8")
+        )
+
+        versions_dir = PROJECT_ROOT / "migrations" / "versions"
+        existing_cols = _collect_existing_columns(
+            versions_dir, migration_file.resolve()
+        )
+
+        issues, warnings = _build_consistency_report(
+            mig_add_cols, model_cols, existing_cols
+        )
+
+        if not issues and not warnings:
+            result = "CONSISTENT: model and migration are aligned."
+        else:
+            parts = []
+            if issues:
+                parts.append("ISSUES (must fix):\n" + "\n".join(issues))
+            if warnings:
+                parts.append("WARNINGS:\n" + "\n".join(warnings))
+            result = "\n\n".join(parts)
+
+        audit_log(
+            "validate_migration_consistency",
+            {"model": model_path, "migration": migration_path},
+            result[:200],
+            status="OK" if not issues else "ERROR",
+        )
+        return result
 
 
 class ReadSchemaTool(BaseTool):
@@ -536,10 +717,12 @@ def _git_commit(message: str) -> str:
         )
 
     # Selective staging (never 'git add .')
-    safe_subprocess(["git", "add"] + safe, timeout=30)
+    safe_subprocess(["git", "add"] + safe, timeout=DEFAULT_TIMEOUT_SECONDS)
 
-    # Commit
-    result = safe_subprocess(["git", "commit", "-m", message], timeout=30)
+    # Commit (uses DEFAULT_TIMEOUT to accommodate pre-commit hooks)
+    result = safe_subprocess(
+        ["git", "commit", "-m", message], timeout=DEFAULT_TIMEOUT_SECONDS
+    )
     if result["returncode"] != 0:
         return f"Commit error: {result['stderr']}"
 

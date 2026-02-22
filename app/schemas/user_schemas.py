@@ -97,6 +97,31 @@ class UserProfileSchema(Schema):
         },
     )
 
+    state_uf = fields.String(
+        validate=validate.Length(equal=2),
+        metadata={"description": "Estado (UF) do usuário", "example": "SP"},
+    )
+
+    occupation = fields.String(
+        validate=validate.Length(max=128),
+        metadata={
+            "description": "Profissão do usuário",
+            "example": "Engenheiro de Software",
+        },
+    )
+
+    investor_profile = fields.String(
+        validate=validate.OneOf(["conservador", "explorador", "entusiasta"]),
+        metadata={"description": "Perfil do investidor", "example": "conservador"},
+    )
+
+    financial_objectives = fields.String(
+        metadata={
+            "description": "Objetivos financeiros do usuário",
+            "example": "Aposentar cedo",
+        },
+    )
+
     @pre_load
     def sanitize_input(self, data: object, **kwargs: object) -> object:
         return sanitize_string_fields(data, {"gender"})
@@ -123,6 +148,9 @@ class UserCompleteSchema(Schema):
     monthly_income = fields.Decimal(
         as_string=True, metadata={"description": "Renda mensal"}
     )
+    monthly_income_net = fields.Decimal(
+        as_string=True, metadata={"description": "Renda líquida mensal"}
+    )
     net_worth = fields.Decimal(
         as_string=True, metadata={"description": "Patrimônio líquido"}
     )
@@ -139,6 +167,12 @@ class UserCompleteSchema(Schema):
     )
     investment_goal_date = fields.Date(
         metadata={"description": "Data meta de investimento"}
+    )
+    state_uf = fields.String(metadata={"description": "Estado (UF) do usuário"})
+    occupation = fields.String(metadata={"description": "Profissão do usuário"})
+    investor_profile = fields.String(metadata={"description": "Perfil do investidor"})
+    financial_objectives = fields.String(
+        metadata={"description": "Objetivos financeiros do usuário"}
     )
     created_at = fields.DateTime(metadata={"description": "Data de criação"})
     updated_at = fields.DateTime(metadata={"description": "Data de atualização"})
