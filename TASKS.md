@@ -1,6 +1,6 @@
 # TASKS - Central de TODOs e Progresso
 
-Ultima atualizacao: 2026-02-22 (bloco E concluido + X2/C4 e C6 concluidos + backlog de perfil V1 atualizado + discovery J1..J5 detalhado em docs + analise X3/X4 formalizada + B1/B2/B3/B4/B5/B6/B9 concluidos + preparo de migracao para auraxis-platform)
+Ultima atualizacao: 2026-02-22 (sincronizacao final de status/prioridades + handoff pre-migracao para auraxis-platform + bloco E concluido + X2/C4 e C6 concluidos + backlog de perfil V1 atualizado + discovery J1..J5 detalhado em docs + analise X3/X4 formalizada + B1/B2/B3/B4/B5/B6/B9 concluidos)
 
 ## Regras de uso deste arquivo
 
@@ -73,9 +73,9 @@ Estado atual consolidado:
 - Foco atual de produto: evolucao de perfil V1 (auto declaracao + questionario indicativo + campos minimos).
 
 Pendencias de execucao imediata (ordem sugerida):
-1. `PLT1` configurar repositório `auraxis-platform` (remote, submodules/repos, baseline de CI e governança) antes da migração definitiva dos repositórios.
-2. `X4` adoção faseada de Ruff (`advisory -> substituição de flake8/black/isort`) preservando rigor de tipagem.
-3. `X3` iniciar fase 0 de desacoplamento para coexistência Flask/FastAPI.
+1. `PLT1` concluir setup do `auraxis-platform` como orquestrador oficial e validar migração física do backend para `repos/auraxis-api` (paths, scripts e contexto).
+2. `X4` iniciar execução da adoção faseada de Ruff (`advisory -> substituição de flake8/black/isort`) preservando rigor de tipagem com `mypy`.
+3. `X3` iniciar fase 0 de desacoplamento para coexistência Flask/FastAPI (sem migração de endpoints ainda).
 4. `B10` questionario indicativo (5-10 perguntas) para sugestao de perfil.
 5. `B11` persistencia/exposicao do perfil sugerido e `taxonomy_version`.
 6. `F1..F4` auxiliares (Tag/Account/CreditCard) e integração em transações.
@@ -177,7 +177,7 @@ Fluxo por entrega:
 | B9    | Usuario       | [P1] Implementar fluxo de perfil de investidor auto declarado (onboarding + edição de perfil) com validação por enum                      | Done        | 100%      | Baixo: onboarding e edição com enum em REST+GraphQL concluídos, incluindo serialização de campos de perfil V1 e cobertura de regressão                                  | 24025bb, 49d1735                | 2026-02-22         |
 | B10   | Usuario       | [P2] Implementar questionário curto (5-10 perguntas) para sugestão indicativa de perfil de investidor, sem substituir a auto declaração | Todo        | 0%        | Medio: classificação simplificada pode gerar expectativa de precisão acima da proposta                                                                                    |                                  | 2026-02-20         |
 | B11   | Usuario       | [P2] Persistir e expor resultado do questionário (`investor_profile_suggested`, `profile_quiz_score`, `taxonomy_version`) para comparação com perfil auto declarado | Todo        | 0%        | Medio: risco de confusão de UX se não houver explicação clara entre perfil declarado e perfil sugerido                                                                  |                                  | 2026-02-20         |
-| PLT1  | Plataforma    | Configurar repositório `auraxis-platform` como orquestrador oficial (remote, estratégia de submodules/repos, branch protection e baseline de CI/docs) antes da migração definitiva | Todo        | 0%        | Médio: sem configuração formal, há risco de drift de contexto e perda de rastreabilidade multi-repo na transição                                                        |                                  | 2026-02-22         |
+| PLT1  | Plataforma    | Configurar repositório `auraxis-platform` como orquestrador oficial (remote, estratégia de submodules/repos, branch protection e baseline de CI/docs) antes da migração definitiva | In Progress | 65%       | Médio: base de contexto e governança já estruturada; risco remanescente está na migração física dos repositórios e validação de paths/rotinas pós-movimentação           | n/a (progresso em auraxis-platform: 7de966f, 5204ea2, 3b5d68e, 18ef2f5, c678fd6, f9bd018) | 2026-02-22         |
 | J1    | Discovery     | Definir e implementar exportacao de extrato financeiro em CSV/XLSX por periodo (presets 15/30/90/180 dias, desde inicio e range customizado) | In Progress | 35%       | Medio: contrato de arquivo e timezone podem gerar divergencias em conciliacao externa                                                                                   | n/a (discovery documentado em auraxis-platform/.context/discovery) | 2026-02-22 |
 | J2    | Discovery     | Implementar importacao de relatorios bancarios (arquivos) com normalizacao e consolidacao no balanco mensal junto aos lancamentos manuais   | In Progress | 30%       | Alto: variacao de formatos por banco e possivel ruido de dados                                                                                                          | n/a (discovery documentado em auraxis-platform/.context/discovery) | 2026-02-22 |
 | J3    | Discovery     | Implementar conciliacao inteligente e insights com LLM para detectar possiveis duplicidades e sugerir categorizacao/insights explicaveis    | In Progress | 30%       | Alto: privacidade/LGPD, falso positivo de deduplicacao e custo operacional de inferencia                                                                                | n/a (discovery documentado em auraxis-platform/.context/discovery) | 2026-02-22 |
@@ -290,8 +290,8 @@ Fluxo por entrega:
 | S6-12 | App Security  | Definir política de exposição de documentação em produção (`/docs`) por ambiente/autenticação                                              | Done        | 100%      | Baixo: política por ambiente + fail-fast para configuração inválida em runtime seguro                                                                                    | 208e1d1                          | 2026-02-12         |
 | X1    | Tech Debt     | Remover/atualizar TODO desatualizado sobre enums em transacoes                                                                             | Done        | 100%      | Baixo: clareza de manutencao                                                                                                                                             | traceability-debt                | 2026-02-20         |
 | X2    | Tech Debt     | Centralizar regras de domínio em serviços/casos de uso e reduzir controllers/resolvers REST/GraphQL a adapters finos (sem regra duplicada) | Done        | 100%      | Baixo: metas, transações, wallet entries/queries e investment operations convergidos em camada de aplicação, com adapters REST/GraphQL finos e mapeamento de erro/presenters por domínio | 6192830, 5e4995f                | 2026-02-20         |
-| X3    | Tech Debt     | Analisar plano de migração gradual Flask -> FastAPI (estratégia de convivência, impacto em REST/GraphQL, autenticação, docs OpenAPI e rollout sem downtime) | In Progress | 40%       | Alto: migração de framework pode introduzir regressão transversal e aumentar custo operacional se não houver plano faseado por bounded context                              | n/a (analise em auraxis-platform/.context/tech_debt/X3_fastapi_migration_coexistence.md) | 2026-02-22         |
-| X4    | Tech Debt     | Analisar adoção do Ruff como stack principal de qualidade (`lint`, `format`, `import sort`) e estratégia de substituição de `flake8`, `black`, `isort` e evolução da checagem de tipos hoje no `mypy` | In Progress | 45%       | Médio/Alto: Ruff cobre lint/format/import, mas tipagem estática profunda exige decisão explícita (manter `mypy` ou migrar para `pyright`) para não reduzir rigor técnico | n/a (analise em auraxis-platform/.context/tech_debt/X4_ruff_adoption_strategy.md) | 2026-02-22         |
+| X3    | Tech Debt     | Analisar plano de migração gradual Flask -> FastAPI (estratégia de convivência, impacto em REST/GraphQL, autenticação, docs OpenAPI e rollout sem downtime) | In Progress | 55%       | Alto: migração de framework pode introduzir regressão transversal e aumentar custo operacional se não houver plano faseado por bounded context                              | n/a (analise em auraxis-platform/.context/tech_debt/X3_fastapi_migration_coexistence.md) | 2026-02-22         |
+| X4    | Tech Debt     | Analisar adoção do Ruff como stack principal de qualidade (`lint`, `format`, `import sort`) e estratégia de substituição de `flake8`, `black`, `isort` e evolução da checagem de tipos hoje no `mypy` | In Progress | 60%       | Médio/Alto: Ruff cobre lint/format/import, mas tipagem estática profunda exige decisão explícita (manter `mypy` ou migrar para `pyright`) para não reduzir rigor técnico | n/a (analise em auraxis-platform/.context/tech_debt/X4_ruff_adoption_strategy.md) | 2026-02-22         |
 
 
 ## Registro de progresso recente
@@ -305,6 +305,7 @@ Fluxo por entrega:
 | 2026-02-22 | B9                      | Fluxo de perfil de investidor auto declarado concluído em onboarding + edição (REST/GraphQL), com enum padronizado e serialização dos campos de perfil V1.                                                                                                                              | 24025bb, 49d1735 |
 | 2026-02-22 | X3 (análise)            | Ideação técnica formalizada para migração gradual Flask -> FastAPI por coexistência faseada (sem big-bang), com pré-requisitos de desacoplamento, estratégia de rollout por contexto e mitigação de risco operacional.                                                                | n/a (auraxis-platform) |
 | 2026-02-22 | X4 (análise)            | Estratégia formalizada para adoção do Ruff em fases (advisory -> substituição de `flake8/black/isort`), mantendo `mypy` como gate de tipagem até decisão dedicada sobre eventual migração de type checker.                                                                           | n/a (auraxis-platform) |
+| 2026-02-22 | PLT1/Fechamento de ciclo | Rodada de fechamento executada: prioridades/status sincronizados, limpeza de artefatos locais com sufixo numérico e handoff pre-migração publicado para reduzir risco de perda de contexto ao mover o backend para `auraxis-platform`.                                            | n/a |
 | 2026-02-20 | C6                      | Endpoint unificado de vencimentos entregue com paridade REST+GraphQL (`/transactions/due-range` e `transactionDueRange`), ordenações `overdue_first/upcoming_first/date/title/card`, filtros `initialDate/finalDate`, contadores agregados e cobertura de contrato/erro/OpenAPI/Schemathesis. | 4f67bc7 |
 | 2026-02-20 | H1/H1-HARDENING         | Observabilidade GraphQL fortalecida com métricas `graphql.*` por domínio/campo/custo (`query_bytes`, `depth`, `complexity`, violações de segurança/autorização) no controller, com cobertura dedicada em `tests/test_graphql_observability.py`.                                      | traceability-debt |
 | 2026-02-20 | G1/G2                   | Suite por domínio expandida com cenários de integração BRAPI em camada de API (REST + GraphQL) simulando timeout real do provider e validando fallback seguro de valuation em `tests/test_brapi_integration_contract.py`.                                                            | traceability-debt |
@@ -448,8 +449,9 @@ Fluxo por entrega:
 
 ## Proxima prioridade sugerida
 
-- S1/S3 (P1): fechar controles de infraestrutura OWASP em AWS (`S1`) e integrar exportação central de métricas/alertas de segurança (CloudWatch/Prometheus).
-- G17 (P1): eliminar `ResourceWarning` remanescente da suíte (`tests/test_transaction_contract.py`) para manter execução 100% limpa e reproduzível no CI/local.
+- PLT1 (P0): concluir migração do workspace para `auraxis-platform/repos/auraxis-api` com validação de paths/scripts/contexto.
+- X4 (P1): iniciar fase advisory de Ruff no CI mantendo `mypy` como gate obrigatório.
+- X3 (P1): implementar somente pré-requisitos da fase 0 (adapters agnósticos de auth/context/error), sem mover endpoints para FastAPI.
 
 ## Mapeamento Rebranding (nomenclatura legada -> `auraxis`)
 
