@@ -15,7 +15,7 @@ from app.application.services.auth_security_policy_service import (
 from app.application.services.password_verification_service import (
     verify_password_with_timing_protection,
 )
-from app.controllers.user_controller import assign_user_profile_fields
+from app.application.services.user_profile_service import update_user_profile
 from app.extensions.database import db
 from app.graphql.auth import get_current_user_required
 from app.graphql.errors import (
@@ -92,17 +92,28 @@ class RegisterUserMutation(graphene.Mutation):
         name = graphene.String(required=True)
         email = graphene.String(required=True)
         password = graphene.String(required=True)
+        investor_profile = graphene.String()
 
     Output = AuthPayloadType
 
     def mutate(
-        self, info: graphene.ResolveInfo, name: str, email: str, password: str
+        self,
+        info: graphene.ResolveInfo,
+        name: str,
+        email: str,
+        password: str,
+        investor_profile: str | None = None,
     ) -> AuthPayloadType:
         auth_policy = get_auth_security_policy()
         registration_schema = UserRegistrationSchema()
         try:
             validated = registration_schema.load(
-                {"name": name, "email": email, "password": password}
+                {
+                    "name": name,
+                    "email": email,
+                    "password": password,
+                    "investor_profile": investor_profile,
+                }
             )
         except ValidationError as exc:
             messages = exc.messages
@@ -135,6 +146,7 @@ class RegisterUserMutation(graphene.Mutation):
             name=validated["name"],
             email=validated["email"],
             password=generate_password_hash(validated["password"]),
+            investor_profile=validated.get("investor_profile"),
         )
         db.session.add(user)
         db.session.commit()
@@ -144,7 +156,7 @@ class RegisterUserMutation(graphene.Mutation):
             )
         return AuthPayloadType(
             message=auth_policy.registration.created_message,
-            user=UserType(**_user_basic_auth_payload(user)),
+            user=UserType(**_user_to_graphql_payload(user)),
         )
 
 
@@ -253,11 +265,16 @@ class UpdateUserProfileMutation(graphene.Mutation):
         gender = graphene.String()
         birth_date = graphene.String()
         monthly_income = graphene.Float()
+        monthly_income_net = graphene.Float()
         net_worth = graphene.Float()
         monthly_expenses = graphene.Float()
         initial_investment = graphene.Float()
         monthly_investment = graphene.Float()
         investment_goal_date = graphene.String()
+        state_uf = graphene.String()
+        occupation = graphene.String()
+        investor_profile = graphene.String()
+        financial_objectives = graphene.String()
 
     user = graphene.Field(UserType, required=True)
 
@@ -265,10 +282,17 @@ class UpdateUserProfileMutation(graphene.Mutation):
         self, info: graphene.ResolveInfo, **kwargs: Any
     ) -> "UpdateUserProfileMutation":
         user = get_current_user_required()
-        result = assign_user_profile_fields(user, kwargs)
+        payload = dict(kwargs)
+        if (
+            "monthly_income" not in payload
+            and "monthly_income_net" in payload
+            and payload.get("monthly_income_net") is not None
+        ):
+            payload["monthly_income"] = payload["monthly_income_net"]
+        result = update_user_profile(user, payload)
         if result["error"]:
             raise _public_graphql_error(
-                str(result["message"]),
+                str(result["error"]),
                 code=GRAPHQL_ERROR_CODE_VALIDATION,
             )
         errors = user.validate_profile_data()

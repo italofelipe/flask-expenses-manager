@@ -10,11 +10,16 @@ class UserType(graphene.ObjectType):
     gender = graphene.String()
     birth_date = graphene.String()
     monthly_income = graphene.Float()
+    monthly_income_net = graphene.Float()
     net_worth = graphene.Float()
     monthly_expenses = graphene.Float()
     initial_investment = graphene.Float()
     monthly_investment = graphene.Float()
     investment_goal_date = graphene.String()
+    state_uf = graphene.String()
+    occupation = graphene.String()
+    investor_profile = graphene.String()
+    financial_objectives = graphene.String()
 
 
 class AuthPayloadType(graphene.ObjectType):

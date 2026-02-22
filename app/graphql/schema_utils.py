@@ -81,13 +81,15 @@ def _wallet_to_graphql_payload(wallet: Wallet) -> dict[str, Any]:
 
 
 def _user_to_graphql_payload(user: User) -> dict[str, Any]:
+    monthly_income = _to_float_or_none(user.monthly_income)
     return {
         "id": str(user.id),
         "name": user.name,
         "email": user.email,
         "gender": user.gender,
         "birth_date": user.birth_date.isoformat() if user.birth_date else None,
-        "monthly_income": _to_float_or_none(user.monthly_income),
+        "monthly_income": monthly_income,
+        "monthly_income_net": monthly_income,
         "net_worth": _to_float_or_none(user.net_worth),
         "monthly_expenses": _to_float_or_none(user.monthly_expenses),
         "initial_investment": _to_float_or_none(user.initial_investment),
@@ -95,6 +97,10 @@ def _user_to_graphql_payload(user: User) -> dict[str, Any]:
         "investment_goal_date": (
             user.investment_goal_date.isoformat() if user.investment_goal_date else None
         ),
+        "state_uf": user.state_uf,
+        "occupation": user.occupation,
+        "investor_profile": user.investor_profile,
+        "financial_objectives": user.financial_objectives,
     }
 
 

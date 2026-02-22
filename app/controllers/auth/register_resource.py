@@ -66,6 +66,7 @@ class RegisterResource(MethodResource):
                 name=validated_data["name"],
                 email=validated_data["email"],
                 password=hashed_password,
+                investor_profile=validated_data.get("investor_profile"),
             )
             db.session.add(user)
             db.session.flush()
