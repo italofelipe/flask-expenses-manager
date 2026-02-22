@@ -7,8 +7,10 @@ from .dependencies import (
 )
 from .resources import (
     AuthResource,
+    ForgotPasswordResource,
     LogoutResource,
     RegisterResource,
+    ResetPasswordResource,
     handle_webargs_error,
 )
 
@@ -20,5 +22,7 @@ __all__ = [
     "RegisterResource",
     "AuthResource",
     "LogoutResource",
+    "ForgotPasswordResource",
+    "ResetPasswordResource",
     "handle_webargs_error",
 ]

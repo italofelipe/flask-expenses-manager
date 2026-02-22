@@ -16,6 +16,8 @@ def register_auth_guard(app: Any) -> None:
         open_endpoints = {
             "registerresource",
             "authresource",
+            "forgotpasswordresource",
+            "resetpasswordresource",
             "refreshtokenresource",
             "execute_graphql",
             "static",

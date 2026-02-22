@@ -135,6 +135,7 @@ class RateLimiterService:
         self._route_rule_order: tuple[tuple[str, str], ...] = (
             ("/auth/login", "auth"),
             ("/auth/register", "auth"),
+            ("/auth/password", "auth"),
             ("/graphql", "graphql"),
             ("/transactions", "transactions"),
             ("/wallet", "wallet"),
