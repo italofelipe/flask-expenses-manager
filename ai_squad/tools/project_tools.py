@@ -575,12 +575,48 @@ class RunTestsTool(BaseTool):
 # ---------------------------------------------------------------------------
 
 
+def _detect_encoding_corruption(existing_path: Path, new_content: str) -> str | None:
+    """Detect if a write would corrupt non-ASCII characters.
+
+    Compares non-ASCII characters in the existing file vs the new content.
+    If the existing file has accented characters (e.g., Portuguese) but
+    the new content has significantly fewer, the LLM likely corrupted them.
+
+    Returns a warning message if corruption is detected, None if safe.
+    """
+    if not existing_path.exists():
+        return None
+
+    try:
+        old_content = existing_path.read_text(encoding="utf-8")
+    except UnicodeDecodeError:
+        return None
+
+    old_non_ascii = sum(1 for ch in old_content if ord(ch) > 127)
+    new_non_ascii = sum(1 for ch in new_content if ord(ch) > 127)
+
+    # If old file had accented chars and new content lost >50% of them
+    if old_non_ascii > 5 and new_non_ascii < old_non_ascii * 0.5:
+        return (
+            f"BLOCKED: encoding corruption detected. "
+            f"Existing file has {old_non_ascii} non-ASCII chars "
+            f"(accents, special chars) but new content has only "
+            f"{new_non_ascii}. The LLM likely corrupted accented "
+            f"characters. To fix: read the file again and preserve "
+            f"ALL original characters exactly as they are."
+        )
+    return None
+
+
 class WriteFileTool(BaseTool):
     name: str = "write_file_content"
     description: str = (
         "Writes content to a file. Path must be relative to project root. "
         "Enforces security: only writable dirs, no protected files, "
-        "no blocked extensions."
+        "no blocked extensions. "
+        "IMPORTANT: This tool will BLOCK writes that corrupt non-ASCII "
+        "characters (accents like ã, é, ç, ô). If blocked, re-read the "
+        "original file and preserve all characters exactly."
     )
 
     def _run(self, path: str, content: str) -> str:
@@ -595,6 +631,17 @@ class WriteFileTool(BaseTool):
                 status="BLOCKED",
             )
             return msg
+
+        # Guard: detect encoding corruption before writing
+        corruption_msg = _detect_encoding_corruption(validated, content)
+        if corruption_msg:
+            audit_log(
+                "write_file_content",
+                {"path": path},
+                corruption_msg,
+                status="BLOCKED",
+            )
+            return corruption_msg
 
         validated.parent.mkdir(parents=True, exist_ok=True)
         validated.write_text(content, encoding="utf-8")

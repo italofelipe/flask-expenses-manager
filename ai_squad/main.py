@@ -117,7 +117,14 @@ class AuraxisSquad:
                 "read_alembic_history to check existing DB columns.\n\n"
                 + MIGRATION_RULES
             ),
-            tools=[self.rpt, self.rts, self.rcf, self.rgf, self.rah],
+            tools=[
+                self.rpt,
+                self.rts,
+                self.rcf,
+                self.rgf,
+                self.rah,
+                self.rpf,
+            ],
             verbose=True,
             allow_delegation=True,
         )
@@ -174,6 +181,14 @@ class AuraxisSquad:
                 "5. read_alembic_history('<table>') — see existing "
                 "columns in DB\n\n"
                 f'USER BRIEFING: "{briefing}"\n\n'
+                "DUPLICATE WORK GUARD (mandatory):\n"
+                "After reading the task, CHECK if it is already Done "
+                "in TASKS.md or if the code already exists in the "
+                "target files. Read the files mentioned in the briefing "
+                "using read_project_file. If the task's code is already "
+                "present, your plan MUST say: "
+                "'ALREADY IMPLEMENTED — no changes needed.' "
+                "Do NOT re-implement existing code.\n\n"
                 "Produce a CONCRETE plan. Include:\n"
                 "- Task ID being implemented\n"
                 "- Exact file paths to modify or create\n"
@@ -185,15 +200,16 @@ class AuraxisSquad:
                 + MIGRATION_RULES
                 + "\n\n"
                 "CRITICAL: If briefing names a task ID, that task "
-                "MUST be implemented. 'Nothing to do' is never valid."
+                "MUST be implemented UNLESS it is already Done."
             ),
             expected_output=(
                 "Numbered list:\n"
                 "1. Task ID: <id>\n"
-                "2. Files to MODIFY: <path> — <what to add>\n"
-                "3. Files to CREATE: <path> — <purpose>\n"
-                "4. Migration ops: <column>: <ADD|RENAME|ALTER|DROP>\n"
-                "5. Order: <step by step>"
+                "2. Already implemented? YES (stop) or NO (continue)\n"
+                "3. Files to MODIFY: <path> — <what to add>\n"
+                "4. Files to CREATE: <path> — <purpose>\n"
+                "5. Migration ops: <column>: <ADD|RENAME|ALTER|DROP>\n"
+                "6. Order: <step by step>"
             ),
             agent=manager,
         )
@@ -247,6 +263,13 @@ class AuraxisSquad:
                 "git_operations(command='status') to verify\n"
                 "9. DO NOT create branch or commit yet — the REVIEW "
                 "phase will validate first.\n\n"
+                "UTF-8 RULE (critical): This project uses Portuguese. "
+                "Files contain accented characters (ã, é, ç, ô, í, ú, "
+                "ê, à, ñ). You MUST preserve ALL accented characters "
+                "EXACTLY as they appear in the reading report. "
+                "Do NOT replace them with ASCII approximations. "
+                "The write tool will BLOCK your write if accents are "
+                "lost. If blocked, re-read the file and try again.\n\n"
                 "NEVER claim a file was written without calling "
                 "write_file_content."
             ),
@@ -347,29 +370,20 @@ if __name__ == "__main__":
     print(f"Project root: {os.path.abspath('.')}")
     print()
 
+    # NOTE: Update this BRIEFING before each run.
+    # B8 is DONE (merged in commit adb529c). Next: B9.
     BRIEFING = (
-        "Implement task B8: User Profile V1 minimum fields.\n"
-        "Files to modify:\n"
-        "  - app/models/user.py: ADD columns to existing User model "
-        "(keep ALL existing fields and relationships):\n"
-        "    * state_uf (db.String(2), nullable=True)\n"
-        "    * occupation (db.String(128), nullable=True)\n"
-        "    * investor_profile (db.String(32), nullable=True, "
-        "values: conservador/explorador/entusiasta)\n"
-        "    * financial_objectives (db.Text, nullable=True)\n"
-        "    * RENAME monthly_income TO monthly_income_net "
-        "(db.Numeric(10,2), nullable=True)\n"
-        "    * ADD hybrid_property monthly_income that reads/writes "
-        "monthly_income_net for backward compatibility\n"
-        "  - app/schemas/user_schemas.py: ADD the new fields to "
-        "UserProfileSchema and UserCompleteSchema.\n"
-        "  - migrations/versions/: CREATE Alembic migration:\n"
-        "    * RENAME column monthly_income to monthly_income_net "
-        "(use op.alter_column or ALTER TABLE RENAME COLUMN)\n"
-        "    * ADD columns: state_uf, occupation, investor_profile, "
-        "financial_objectives\n"
-        "    * down_revision = latest (use get_latest_migration)\n"
-        "Do NOT create new files for schema or service."
+        "Implement task B9: investor profile self-declaration flow.\n"
+        "Read TASKS.md section B9 for full requirements.\n"
+        "The investor_profile field already exists in User model "
+        "(added in B8). B9 adds the onboarding + edit flow with "
+        "enum validation.\n"
+        "Files likely to modify:\n"
+        "  - app/controllers/user/ (profile endpoint updates)\n"
+        "  - app/application/services/ (profile update logic)\n"
+        "  - app/schemas/user_schemas.py (validation rules)\n"
+        "  - tests/ (new tests for the flow)\n"
+        "Do NOT re-implement B8 fields. They already exist."
     )
 
     squad = AuraxisSquad()
