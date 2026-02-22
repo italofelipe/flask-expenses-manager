@@ -35,6 +35,42 @@ GOVERNANCE_ALLOWLIST: list[str] = ["product.md", "steering.md"]
 # ---------------------------------------------------------------------------
 
 
+# ---------------------------------------------------------------------------
+# Helpers for ReadPendingTasksTool (extracted to keep cyclomatic complexity low)
+# ---------------------------------------------------------------------------
+
+_PENDING_STATUSES = ("| Todo", "| In Progress", "| Blocked")
+_ORDERED_LIST_PREFIXES = ("1.", "2.", "3.", "4.", "5.")
+_PENDING_BLOCK_MARKER = "Pendencias de execucao imediata"
+
+
+def _extract_pending_rows(lines: list[str]) -> list[str]:
+    """Return table rows whose status is Todo, In Progress, or Blocked."""
+    return [
+        line
+        for line in lines
+        if line.startswith("|") and any(s in line for s in _PENDING_STATUSES)
+    ]
+
+
+def _extract_pending_block(lines: list[str]) -> list[str]:
+    """Return the 'Pendencias de execucao imediata' ordered-list block."""
+    block: list[str] = []
+    in_block = False
+    for line in lines:
+        if _PENDING_BLOCK_MARKER in line:
+            in_block = True
+            block.append(line)
+            continue
+        if in_block:
+            if line.strip() == "" and any(
+                item.startswith(_ORDERED_LIST_PREFIXES) for item in block
+            ):
+                break
+            block.append(line)
+    return block
+
+
 class ReadTasksTool(BaseTool):
     name: str = "read_tasks"
     description: str = (
@@ -48,6 +84,95 @@ class ReadTasksTool(BaseTool):
         if not path.exists():
             return f"Error: TASKS.md not found at {path}"
         return path.read_text(encoding="utf-8")
+
+
+class ReadPendingTasksTool(BaseTool):
+    name: str = "read_pending_tasks"
+    description: str = (
+        "Reads TASKS.md and returns ONLY tasks with status Todo or In Progress. "
+        "Use this instead of read_tasks to avoid the 'lost in the middle' problem "
+        "with large files. Returns a focused view of what needs to be done."
+    )
+
+    def _run(self, query: str = None) -> str:
+        path = PROJECT_ROOT / "TASKS.md"
+        if not path.exists():
+            return f"Error: TASKS.md not found at {path}"
+
+        lines = path.read_text(encoding="utf-8").splitlines()
+        pending_lines = _extract_pending_rows(lines)
+        pending_block = _extract_pending_block(lines)
+
+        result_parts: list[str] = [
+            "# TASKS.md — Pending Tasks Only (Todo / In Progress / Blocked)",
+            "",
+        ]
+        if pending_block:
+            result_parts.extend(pending_block)
+            result_parts.append("")
+        if pending_lines:
+            result_parts.append("| ID | Area | Tarefa | Status | Progresso | Risco |")
+            result_parts.append("|---|---|---|---|---|---|")
+            result_parts.extend(pending_lines)
+        else:
+            result_parts.append("No pending tasks found — all tasks are Done.")
+
+        output = "\n".join(result_parts)
+        audit_log(
+            "read_pending_tasks",
+            {"pending_count": len(pending_lines)},
+            f"returned {len(pending_lines)} pending tasks",
+            status="OK",
+        )
+        return output
+
+
+class ReadTasksSectionTool(BaseTool):
+    name: str = "read_tasks_section"
+    description: str = (
+        "Reads a specific section of TASKS.md by heading keyword. "
+        "Use this to read only the relevant part of the file. "
+        "Example: section_keyword='Ciclo B' or 'B8' or 'Autenticacao'. "
+        "Returns the matching section and up to 40 lines of context."
+    )
+
+    def _run(self, section_keyword: str) -> str:
+        path = PROJECT_ROOT / "TASKS.md"
+        if not path.exists():
+            return f"Error: TASKS.md not found at {path}"
+
+        content = path.read_text(encoding="utf-8")
+        lines = content.splitlines()
+
+        # Find lines containing the keyword
+        matches: list[tuple[int, str]] = [
+            (i, line)
+            for i, line in enumerate(lines)
+            if section_keyword.lower() in line.lower()
+        ]
+
+        if not matches:
+            return (
+                f"No section found matching '{section_keyword}' in TASKS.md. "
+                f"Try a broader keyword."
+            )
+
+        # Return context around the first match: up to 40 lines after
+        first_idx = matches[0][0]
+        start = max(0, first_idx - 2)
+        end = min(len(lines), first_idx + 40)
+        excerpt = "\n".join(lines[start:end])
+
+        audit_log(
+            "read_tasks_section",
+            {"section_keyword": section_keyword, "line": first_idx},
+            f"returned lines {start}-{end}",
+            status="OK",
+        )
+        return (
+            f"# TASKS.md — Section: '{section_keyword}' "
+            f"(lines {start + 1}-{end})\n\n{excerpt}"
+        )
 
 
 class ReadSchemaTool(BaseTool):
