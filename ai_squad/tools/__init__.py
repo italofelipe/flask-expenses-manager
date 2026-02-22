@@ -11,6 +11,7 @@ try:
         AWSStatusTool,
         GetLatestMigrationTool,
         GitOpsTool,
+        IntegrationTestTool,
         ListProjectFilesTool,
         ReadAlembicHistoryTool,
         ReadContextFileTool,
@@ -21,6 +22,7 @@ try:
         ReadTasksSectionTool,
         ReadTasksTool,
         RunTestsTool,
+        UpdateTaskStatusTool,
         ValidateMigrationConsistencyTool,
         WriteFileTool,
     )

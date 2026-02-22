@@ -1,10 +1,17 @@
 """
-Auraxis AI Squad — Backend Only Mode (5-task pipeline).
+Auraxis AI Squad — Backend Only Mode (7-task pipeline).
 
 Pipeline:
-  PM (plan) → Dev (read) → Dev (write) → Dev (review) → QA (test)
+  PM (plan) → Dev (read) → Dev (write) → Dev (review) → QA (unit test)
+  → QA (integration test) → Dev (documentation)
 
-The 5-task architecture addresses these root causes of previous failures:
+The 7-task architecture builds on the 5-task pipeline with two new phases:
+  - Task 6 (INTEGRATION TEST): makes REAL HTTP requests against the Flask
+    app to verify the feature works end-to-end (like Cypress for backend).
+  - Task 7 (DOCUMENTATION): auto-updates TASKS.md with status, progress,
+    and commit hash for traceability.
+
+Previous safeguards (still active):
   - Task 2 (READ): prevents blind overwrites by reading files first.
   - Task 4 (REVIEW): catches migration/model inconsistencies before commit.
   - Migration Decision Rules: teaches agents when to rename vs add columns.
@@ -35,6 +42,7 @@ from dotenv import load_dotenv
 from tools.project_tools import (
     GetLatestMigrationTool,
     GitOpsTool,
+    IntegrationTestTool,
     ListProjectFilesTool,
     ReadAlembicHistoryTool,
     ReadContextFileTool,
@@ -44,6 +52,7 @@ from tools.project_tools import (
     ReadSchemaTool,
     ReadTasksSectionTool,
     RunTestsTool,
+    UpdateTaskStatusTool,
     ValidateMigrationConsistencyTool,
     WriteFileTool,
 )
@@ -86,6 +95,10 @@ class AuraxisSquad:
 
         # Execution tools
         self.rtst = RunTestsTool()
+        self.rit = IntegrationTestTool()
+
+        # Documentation tools
+        self.uts = UpdateTaskStatusTool()
 
         # Write + Git tools
         self.wf = WriteFileTool()
@@ -93,11 +106,15 @@ class AuraxisSquad:
 
     def run_backend_workflow(self, briefing: str):
         """
-        5-task pipeline: Plan -> Read -> Write -> Review -> Test.
+        7-task pipeline:
+          Plan -> Read -> Write -> Review -> Unit Test
+          -> Integration Test -> Documentation.
 
         Task 2 (Read) prevents blind overwrites.
         Task 4 (Review) catches model/migration inconsistencies
         BEFORE committing, so agents self-correct.
+        Task 6 (Integration Test) makes real HTTP requests to verify E2E.
+        Task 7 (Documentation) auto-updates TASKS.md for traceability.
         """
 
         # --- AGENTS ---
@@ -153,6 +170,7 @@ class AuraxisSquad:
                 self.vmc,
                 self.wf,
                 self.git,
+                self.uts,
             ],
             verbose=True,
         )
@@ -160,13 +178,18 @@ class AuraxisSquad:
         qa_engineer = Agent(
             role="QA Engineer",
             goal=(
-                "Run pytest, report exact pass/fail counts and coverage. "
-                "Flag FAIL if coverage < 85% or any test fails."
+                "Run pytest AND integration tests, report exact "
+                "pass/fail counts and coverage. "
+                "Flag FAIL if coverage < 85% or any test fails. "
+                "Integration tests must verify the feature works "
+                "end-to-end with real HTTP requests."
             ),
             backstory=(
-                "Rigorous tester who runs the full suite and " "reports honestly."
+                "Rigorous tester who runs the full suite, then "
+                "validates with real HTTP requests against a temporary "
+                "Flask app (like Cypress for backend). Reports honestly."
             ),
-            tools=[self.rtst, self.rcf],
+            tools=[self.rtst, self.rit, self.rcf],
             verbose=True,
         )
 
@@ -321,20 +344,23 @@ class AuraxisSquad:
             context=[task_plan, task_read, task_code],
         )
 
-        # --- TASK 5: TEST ---
+        # --- TASK 5: UNIT TEST ---
         task_test = Task(
             description=(
-                "TEST PHASE — validate the implementation.\n\n"
+                "UNIT TEST PHASE — validate the implementation.\n\n"
                 "1. run_backend_tests()\n"
                 "2. Report exact numbers: X passed, Y failed\n"
                 "3. Report coverage percentage\n"
                 "4. Status: PASS (coverage >= 85%, 0 failures) or FAIL\n"
                 "5. If FAIL: quote the exact error messages\n\n"
                 "Consult read_context_file('05_quality_and_gates.md') "
-                "for the Definition of Done checklist."
+                "for the Definition of Done checklist.\n\n"
+                "IMPORTANT: Even if unit tests pass, the next phase "
+                "will run integration tests with real HTTP requests. "
+                "Report your results and move on."
             ),
             expected_output=(
-                "Test results:\n"
+                "Unit test results:\n"
                 "- Passed: X | Failed: Y\n"
                 "- Coverage: XX%\n"
                 "- Status: PASS or FAIL\n"
@@ -344,10 +370,90 @@ class AuraxisSquad:
             context=[task_review],
         )
 
+        # --- TASK 6: INTEGRATION TEST (E2E with real HTTP requests) ---
+        task_integration = Task(
+            description=(
+                "INTEGRATION TEST PHASE — verify the feature works "
+                "end-to-end with REAL HTTP requests.\n\n"
+                "This is like Cypress for the backend. The tool spins up "
+                "a temporary Flask app with SQLite, makes actual HTTP "
+                "calls, and verifies the full request/response cycle.\n\n"
+                "Execute IN ORDER:\n"
+                "1. run_integration_tests(scenario='register_and_login')\n"
+                "   → Verifies basic auth flow works\n"
+                "2. run_integration_tests(scenario='full_crud')\n"
+                "   → Verifies register + login + update profile + "
+                "read /me + data persistence\n\n"
+                "DECISION:\n"
+                "- If ALL scenarios PASS: report success and move on "
+                "to documentation phase.\n"
+                "- If ANY scenario FAILS: report the exact errors. "
+                "The feature has a bug that needs fixing.\n\n"
+                "IMPORTANT: This tests with real data flowing through "
+                "the full stack (routes → controllers → services → "
+                "models → database). If it passes here, the feature "
+                "is production-ready."
+            ),
+            expected_output=(
+                "Integration test results:\n"
+                "- Scenario 'register_and_login': PASS or FAIL\n"
+                "- Scenario 'full_crud': PASS or FAIL\n"
+                "- Overall: PASS or FAIL\n"
+                "- Errors (if any): <exact messages>\n"
+                "- Steps executed: <list of HTTP calls and responses>"
+            ),
+            agent=qa_engineer,
+            context=[task_review, task_test],
+        )
+
+        # --- TASK 7: DOCUMENTATION (auto-update TASKS.md) ---
+        task_docs = Task(
+            description=(
+                "DOCUMENTATION PHASE — update traceability records.\n\n"
+                "After successful implementation and testing, update "
+                "the project records for traceability.\n\n"
+                "Execute IN ORDER:\n"
+                "1. git_operations(command='status') — get the current "
+                "branch and last commit info\n"
+                "2. Extract the commit hash from the git status/log\n"
+                "3. update_task_status(\n"
+                "     task_id='<task ID from the plan>',\n"
+                "     status='Done',\n"
+                "     progress='100%',\n"
+                "     commit_hash='<commit hash>'\n"
+                "   )\n"
+                "4. Verify the update by reading TASKS.md\n\n"
+                "RULES:\n"
+                "- Only mark as Done if BOTH unit tests and "
+                "integration tests passed.\n"
+                "- If tests failed, mark as 'In Progress' with the "
+                "current progress percentage.\n"
+                "- Always include the commit hash for traceability.\n"
+                "- The task_id comes from Task 1 (PLAN) output."
+            ),
+            expected_output=(
+                "Documentation results:\n"
+                "- Task ID updated: <id>\n"
+                "- New status: Done (or In Progress if tests failed)\n"
+                "- Commit hash recorded: <hash>\n"
+                "- TASKS.md verified: YES"
+            ),
+            agent=backend_dev,
+            context=[task_plan, task_review, task_test, task_integration],
+        )
+
         # --- CREW ---
         crew = Crew(
             agents=[manager, backend_dev, qa_engineer],
-            tasks=[task_plan, task_read, task_code, task_review, task_test],
+            tasks=[
+                task_plan,
+                task_read,
+                task_code,
+                task_review,
+                task_test,
+                task_integration,
+                task_docs,
+            ],
             process=Process.sequential,
             verbose=True,
         )
@@ -366,7 +472,7 @@ class AuraxisSquad:
 # =================================================================
 
 if __name__ == "__main__":
-    print("### Auraxis AI Squad — BACKEND ONLY (5-task pipeline) ###")
+    print("### Auraxis AI Squad — BACKEND ONLY (7-task pipeline) ###")
     print(f"Project root: {os.path.abspath('.')}")
     print()
 

@@ -571,6 +571,227 @@ class RunTestsTool(BaseTool):
 
 
 # ---------------------------------------------------------------------------
+# Integration test tool — E2E testing with real HTTP requests
+#
+# The IntegrationTestTool invokes a standalone Python script
+# (integration_test_runner.py) using the PROJECT venv (which has Flask),
+# not the ai_squad venv (which has CrewAI). This avoids dependency
+# conflicts between the two environments.
+# ---------------------------------------------------------------------------
+
+
+class IntegrationTestTool(BaseTool):
+    name: str = "run_integration_tests"
+    description: str = (
+        "Runs integration tests using REAL HTTP requests against the Flask app. "
+        "Spins up a temporary Flask app with SQLite, makes actual API calls "
+        "(register, login, CRUD), and verifies responses. "
+        "Like Cypress for backend — tests the full stack end-to-end.\n\n"
+        "Available scenarios:\n"
+        "- 'register_and_login': Register user + login + verify token\n"
+        "- 'update_profile': Register + login + update profile fields\n"
+        "- 'full_crud': Register + login + update profile + read /me + verify data\n\n"
+        "Returns PASS/FAIL with step-by-step results."
+    )
+
+    def _run(self, scenario: str = "full_crud") -> str:
+        import json
+        import os
+
+        valid_scenarios = ("register_and_login", "update_profile", "full_crud")
+        if scenario not in valid_scenarios:
+            return (
+                f"Invalid scenario '{scenario}'. "
+                f"Valid: {', '.join(valid_scenarios)}"
+            )
+
+        # Locate the project venv Python (not the ai_squad venv)
+        project_python = str(PROJECT_ROOT / ".venv" / "bin" / "python")
+        if not os.path.exists(project_python):
+            project_python = "python"
+
+        # Locate the runner script
+        runner_script = str(
+            Path(__file__).resolve().parent / "integration_test_runner.py"
+        )
+
+        result = safe_subprocess(
+            [project_python, runner_script, scenario],
+            timeout=120,
+            cwd=str(PROJECT_ROOT),
+        )
+
+        # Parse JSON output from the runner
+        try:
+            data = json.loads(result["stdout"].strip())
+        except (json.JSONDecodeError, ValueError):
+            msg = (
+                f"EXECUTION FAILED: Could not parse runner output.\n"
+                f"STDOUT: {result['stdout'][:500]}\n"
+                f"STDERR: {result['stderr'][:500]}"
+            )
+            audit_log(
+                "run_integration_tests",
+                {"scenario": scenario},
+                msg[:200],
+                status="ERROR",
+            )
+            return msg
+
+        # Format output
+        lines = [
+            f"# Integration Test Results — Scenario: {scenario}",
+            f"Overall: {'PASS' if data['passed'] else 'FAIL'}",
+            "",
+            "Steps:",
+        ]
+        for step in data.get("steps", []):
+            status = "PASS" if step.get("passed") else "FAIL"
+            lines.append(
+                f"  [{status}] {step.get('action', '?')} "
+                f"-> HTTP {step.get('status', '?')}"
+            )
+
+        if data.get("errors"):
+            lines.append("")
+            lines.append("Errors:")
+            for err in data["errors"]:
+                lines.append(f"  - {err}")
+
+        output = "\n".join(lines)
+        audit_log(
+            "run_integration_tests",
+            {"scenario": scenario},
+            output[:200],
+            status="OK" if data["passed"] else "ERROR",
+        )
+        return output
+
+
+# ---------------------------------------------------------------------------
+# Documentation tool — auto-update TASKS.md
+# ---------------------------------------------------------------------------
+
+
+def _parse_task_row(line: str) -> dict | None:
+    """Parse a TASKS.md table row into a dict of columns."""
+    if not line.startswith("|"):
+        return None
+    cells = [c.strip() for c in line.split("|")]
+    # cells[0] is empty (before first |), cells[-1] is empty (after last |)
+    cells = cells[1:-1]
+    if len(cells) < 8:
+        return None
+    return {
+        "id": cells[0].strip(),
+        "area": cells[1].strip(),
+        "tarefa": cells[2].strip(),
+        "status": cells[3].strip(),
+        "progresso": cells[4].strip(),
+        "risco": cells[5].strip(),
+        "commit": cells[6].strip(),
+        "data": cells[7].strip(),
+        "raw_cells": cells,
+    }
+
+
+def _rebuild_task_row(cells: list[str]) -> str:
+    """Rebuild a TASKS.md table row from a list of cell values."""
+    return "| " + " | ".join(cells) + " |"
+
+
+class UpdateTaskStatusTool(BaseTool):
+    name: str = "update_task_status"
+    description: str = (
+        "Updates a task in TASKS.md to mark it as Done with commit hash.\n\n"
+        "Parameters:\n"
+        "- task_id: The task ID (e.g., 'B8', 'B9')\n"
+        "- status: New status ('Done', 'In Progress', 'Todo', 'Blocked')\n"
+        "- progress: Progress percentage (e.g., '100%')\n"
+        "- commit_hash: Git commit hash(es) to record for traceability\n\n"
+        "This tool reads TASKS.md, finds the row matching task_id, "
+        "updates status/progress/commit/date, and writes back.\n"
+        "It also updates the 'Ultima atualizacao' header date."
+    )
+
+    def _run(
+        self,
+        task_id: str,
+        status: str = "Done",
+        progress: str = "100%",
+        commit_hash: str = "",
+    ) -> str:
+        import re
+        from datetime import date
+
+        tasks_path = PROJECT_ROOT / "TASKS.md"
+        if not tasks_path.exists():
+            return "Error: TASKS.md not found."
+
+        content = tasks_path.read_text(encoding="utf-8")
+        lines = content.splitlines()
+
+        # Find the row matching task_id
+        updated = False
+        for i, line in enumerate(lines):
+            if not line.startswith("|"):
+                continue
+            parsed = _parse_task_row(line)
+            if not parsed or parsed["id"] != task_id:
+                continue
+
+            # Update the fields
+            cells = parsed["raw_cells"]
+            cells[3] = f" {status} "  # Status column
+            cells[4] = f" {progress} "  # Progress column
+            if commit_hash:
+                cells[6] = f" {commit_hash} "  # Commit column
+            cells[7] = f" {date.today().isoformat()} "  # Date column
+
+            lines[i] = _rebuild_task_row(cells)
+            updated = True
+            break
+
+        if not updated:
+            msg = f"Task '{task_id}' not found in TASKS.md."
+            audit_log(
+                "update_task_status",
+                {"task_id": task_id},
+                msg,
+                status="ERROR",
+            )
+            return msg
+
+        # Update the header date
+        today_str = date.today().isoformat()
+        for i, line in enumerate(lines):
+            if line.startswith("Ultima atualizacao:"):
+                lines[i] = re.sub(
+                    r"Ultima atualizacao: [\d-]+",
+                    f"Ultima atualizacao: {today_str}",
+                    line,
+                )
+                break
+
+        # Write back — TASKS.md is in project root, use direct write
+        # (not validate_write_path since TASKS.md is not in a writable dir)
+        tasks_path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+
+        msg = (
+            f"TASKS.md updated: {task_id} → "
+            f"Status={status}, Progress={progress}, "
+            f"Commit={commit_hash or 'n/a'}, Date={today_str}"
+        )
+        audit_log(
+            "update_task_status",
+            {"task_id": task_id, "status": status, "commit": commit_hash},
+            msg,
+            status="OK",
+        )
+        return msg
+
+
+# ---------------------------------------------------------------------------
 # Write tools
 # ---------------------------------------------------------------------------
 
