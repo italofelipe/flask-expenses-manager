@@ -13,7 +13,9 @@ def register_user_routes() -> None:
         return
 
     user_bp.add_url_rule(
-        "/profile", view_func=UserProfileResource.as_view("profile"), methods=["PUT"]
+        "/profile",
+        view_func=UserProfileResource.as_view("profile"),
+        methods=["GET", "PUT"],
     )
     user_bp.add_url_rule("/me", view_func=UserMeResource.as_view("me"))
     _ROUTES_REGISTERED = True
