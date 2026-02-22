@@ -146,6 +146,77 @@ def test_rest_update_profile_rejects_invalid_investor_profile(client) -> None:
     assert "investor_profile" in str(body["error"]["details"])
 
 
+def test_rest_get_profile_returns_reduced_payload(client) -> None:
+    token = _register_and_login(client)
+    response = client.get(
+        "/user/profile",
+        headers={"Authorization": f"Bearer {token}", "X-API-Contract": "v2"},
+    )
+    assert response.status_code == 200
+    body = response.get_json()
+    assert body["success"] is True
+    assert "user" in body["data"]
+    assert "transactions" not in body["data"]
+    assert "wallet" not in body["data"]
+
+
+def test_rest_update_profile_rejects_expenses_above_income(client) -> None:
+    token = _register_and_login(client)
+    response = client.put(
+        "/user/profile",
+        headers={"Authorization": f"Bearer {token}", "X-API-Contract": "v2"},
+        json={
+            "monthly_income": "3000.00",
+            "monthly_expenses": "3500.00",
+        },
+    )
+    assert response.status_code == 400
+    body = response.get_json()
+    assert body["error"]["code"] == "VALIDATION_ERROR"
+    assert "Gastos mensais não podem ser maiores que a renda mensal." in str(
+        body["error"]["details"]
+    )
+
+
+def test_rest_update_profile_rejects_investment_above_capacity(client) -> None:
+    token = _register_and_login(client)
+    response = client.put(
+        "/user/profile",
+        headers={"Authorization": f"Bearer {token}", "X-API-Contract": "v2"},
+        json={
+            "monthly_income": "5000.00",
+            "monthly_expenses": "3000.00",
+            "monthly_investment": "2500.00",
+        },
+    )
+    assert response.status_code == 400
+    body = response.get_json()
+    assert body["error"]["code"] == "VALIDATION_ERROR"
+    assert "Investimento mensal não pode ser maior que a capacidade de aporte" in str(
+        body["error"]["details"]
+    )
+
+
+def test_rest_update_profile_emits_audit_event(client, caplog) -> None:
+    token = _register_and_login(client)
+    response = client.put(
+        "/user/profile",
+        headers={"Authorization": f"Bearer {token}", "X-API-Contract": "v2"},
+        json={
+            "state_uf": "sp",
+            "occupation": "QA",
+            "investor_profile": "explorador",
+        },
+    )
+    assert response.status_code == 200
+    messages = [record.message for record in caplog.records]
+    assert any("event=user.profile_update" in message for message in messages)
+    assert any(
+        "changed_fields=investor_profile,occupation,state_uf" in message
+        for message in messages
+    )
+
+
 def test_rest_register_accepts_optional_investor_profile(client, app) -> None:
     suffix = uuid.uuid4().hex[:8]
     email = f"onboarding-{suffix}@email.com"
@@ -218,6 +289,29 @@ def test_graphql_update_profile_rejects_invalid_investor_profile(client) -> None
     assert body["data"]["updateUserProfile"] is None
     assert body["errors"][0]["extensions"]["code"] == "VALIDATION_ERROR"
     assert "Perfil do investidor inválido" in body["errors"][0]["message"]
+
+
+def test_graphql_update_profile_rejects_expenses_above_income(client) -> None:
+    token = _register_and_login_graphql(client)
+    mutation = """
+    mutation InvalidCoherence {
+      updateUserProfile(
+        monthlyIncome: 2000
+        monthlyExpenses: 2500
+      ) {
+        user { id }
+      }
+    }
+    """
+    response = _graphql(client, mutation, token=token)
+    assert response.status_code == 200
+    body = response.get_json()
+    assert body["data"]["updateUserProfile"] is None
+    assert body["errors"][0]["extensions"]["code"] == "VALIDATION_ERROR"
+    assert (
+        "Gastos mensais não podem ser maiores que a renda mensal."
+        in body["errors"][0]["message"]
+    )
 
 
 def test_graphql_register_accepts_optional_investor_profile(client) -> None:

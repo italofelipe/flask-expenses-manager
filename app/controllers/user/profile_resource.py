@@ -5,7 +5,7 @@ from __future__ import annotations
 from typing import Any
 from uuid import UUID
 
-from flask import Response, current_app
+from flask import Response, current_app, g
 from flask_apispec import doc, use_kwargs
 from flask_apispec.views import MethodResource
 from flask_jwt_extended import get_jwt, get_jwt_identity, jwt_required
@@ -20,6 +20,43 @@ from .helpers import _serialize_user_profile
 
 
 class UserProfileResource(MethodResource):
+    @doc(
+        description=(
+            "Retorna o perfil reduzido do usuário autenticado "
+            "(sem transações e sem carteira)."
+        ),
+        tags=["Usuário"],
+        security=[{"BearerAuth": []}],
+        params={
+            "X-API-Contract": {
+                "in": "header",
+                "description": "Opcional. Envie 'v2' para o contrato padronizado.",
+                "type": "string",
+                "required": False,
+            }
+        },
+        responses={
+            200: {"description": "Perfil retornado com sucesso"},
+            401: {"description": "Token revogado"},
+            404: {"description": "Usuário não encontrado"},
+        },
+    )
+    @jwt_required()
+    def get(self) -> Response:
+        user_or_response = self._authenticated_user_or_error()
+        if isinstance(user_or_response, Response):
+            return user_or_response
+        user_data = _serialize_user_profile(user_or_response)
+        return compat_success(
+            legacy_payload={
+                "message": "Perfil retornado com sucesso",
+                "data": user_data,
+            },
+            status_code=200,
+            message="Perfil retornado com sucesso",
+            data={"user": user_data},
+        )
+
     @doc(
         description=(
             "Atualiza o perfil do usuário autenticado.\n\n"
@@ -64,27 +101,13 @@ class UserProfileResource(MethodResource):
     @jwt_required()
     @use_kwargs(UserProfileSchema(), location="json")
     def put(self, **kwargs: Any) -> Response:
-        user_id = UUID(get_jwt_identity())
-        jti = get_jwt()["jti"]
-        dependencies = get_user_dependencies()
-        user = dependencies.get_user_by_id(user_id)
-        if not user:
-            return compat_error(
-                legacy_payload={"message": "Usuário não encontrado"},
-                status_code=404,
-                message="Usuário não encontrado",
-                error_code="NOT_FOUND",
-            )
-
-        if not hasattr(user, "current_jti") or user.current_jti != jti:
-            return compat_error(
-                legacy_payload={"message": "Token revogado"},
-                status_code=401,
-                message="Token revogado",
-                error_code="UNAUTHORIZED",
-            )
+        user_or_response = self._authenticated_user_or_error()
+        if isinstance(user_or_response, Response):
+            return user_or_response
+        user = user_or_response
 
         data = kwargs
+        before_snapshot = _serialize_user_profile(user)
 
         result = update_user_profile(user, data)
         if result["error"]:
@@ -108,6 +131,12 @@ class UserProfileResource(MethodResource):
         try:
             db.session.commit()
             user_data = _serialize_user_profile(user)
+            self._emit_profile_update_audit(
+                user_id=str(user.id),
+                before=before_snapshot,
+                after=user_data,
+                incoming_fields=tuple(data.keys()),
+            )
             return compat_success(
                 legacy_payload={
                     "message": "Perfil atualizado com sucesso",
@@ -125,3 +154,59 @@ class UserProfileResource(MethodResource):
                 message="Erro ao atualizar perfil",
                 error_code="INTERNAL_ERROR",
             )
+
+    @staticmethod
+    def _emit_profile_update_audit(
+        *,
+        user_id: str,
+        before: dict[str, Any],
+        after: dict[str, Any],
+        incoming_fields: tuple[str, ...],
+    ) -> None:
+        changed_fields = sorted(
+            {
+                field
+                for field in incoming_fields
+                if before.get(field) != after.get(field)
+                or (
+                    field == "monthly_income"
+                    and before.get("monthly_income_net")
+                    != after.get("monthly_income_net")
+                )
+                or (
+                    field == "monthly_income_net"
+                    and before.get("monthly_income") != after.get("monthly_income")
+                )
+            }
+        )
+        current_app.logger.info(
+            "event=user.profile_update user_id=%s changed_fields=%s "
+            "request_id=%s status=%s",
+            user_id,
+            ",".join(changed_fields),
+            str(getattr(g, "request_id", "n/a")),
+            200,
+        )
+
+    @staticmethod
+    def _authenticated_user_or_error() -> Any:
+        user_id = UUID(get_jwt_identity())
+        jti = get_jwt()["jti"]
+        dependencies = get_user_dependencies()
+        user = dependencies.get_user_by_id(user_id)
+        if not user:
+            return compat_error(
+                legacy_payload={"message": "Usuário não encontrado"},
+                status_code=404,
+                message="Usuário não encontrado",
+                error_code="NOT_FOUND",
+            )
+
+        if not hasattr(user, "current_jti") or user.current_jti != jti:
+            return compat_error(
+                legacy_payload={"message": "Token revogado"},
+                status_code=401,
+                message="Token revogado",
+                error_code="UNAUTHORIZED",
+            )
+        return user
