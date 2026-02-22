@@ -1,6 +1,6 @@
 # TASKS - Central de TODOs e Progresso
 
-Ultima atualizacao: 2026-02-20 (bloco E concluido + X2/C4 e C6 concluidos + backlog de perfil V1 atualizado)
+Ultima atualizacao: 2026-02-22 (bloco E concluido + X2/C4 e C6 concluidos + backlog de perfil V1 atualizado + discovery J1..J5)
 
 ## Regras de uso deste arquivo
 
@@ -103,6 +103,21 @@ Observações de escopo B4:
 - Resposta do endpoint de solicitação deve ser idempotente e neutra para evitar enumeração.
 - OTP via celular permanece em discovery até decisão de provedor, custo e requisitos de segurança/LGPD.
 
+#### Descoberta de produto/engenharia para dados externos e conveniencia (nao iniciado)
+
+| Item | Viabilidade | Complexidade | Aderência ao produto | Riscos principais | Oportunidades |
+|---|---|---|---|---|---|
+| Exportacao CSV/XLSX por periodo (15/30/90/180, desde inicio, range) | Alta | Media | Alta | consistencia de periodo/timezone e estabilidade de contrato de arquivo | reduz atrito para analise externa e compartilhamento |
+| Importacao de relatorios bancarios + conciliacao com lancamentos manuais | Alta | Alta | Alta | variacao de layout por banco, deduplicacao incorreta, qualidade de dados | acelera onboarding de historico financeiro real |
+| Insights com LLM sobre gastos/importacoes + sugestao de duplicidade | Media | Alta | Alta | LGPD/privacidade, custo de inferencia, explainability | diferencia produto com inteligencia de uso pratico |
+| Aba Ferramentas (rescisao, salario liquido, ferias, 13o, dividir conta etc.) | Alta | Media | Media/Alta | manutencao de regras trabalhistas/tributarias ao longo do tempo | aumenta recorrencia e utilidade do app no dia a dia |
+| Open Finance/Open Banking nativo | Media | Alta | Alta | compliance, seguranca, consentimento e dependencia de parceiros | automacao de ingestao e fidelizacao de longo prazo |
+
+Observacoes de escopo:
+- Open Finance permanece como ultima fase, apos validar importacao por arquivo + conciliacao.
+- Fluxo com LLM deve ser advisory-only, com trilha de auditoria e revisao humana para deduplicacao ambigua.
+- Exportacao/importacao devem preservar paridade REST + GraphQL onde aplicavel e contrato de dados versionado.
+
 ### Ciclo C (planejado) - Debitos tecnicos nao graves
 
 | Sequencia | Itens alvo iniciais |
@@ -154,10 +169,15 @@ Fluxo por entrega:
 | B5    | Autenticacao  | Implementar envio de link de recuperação por email com token de uso único, expiração curta e armazenamento seguro                         | Todo        | 0%        | Alto: depende de provedor transacional, política anti-abuso e gestão segura de token                                                                                    |                                  | 2026-02-19         |
 | B6    | Autenticacao  | Implementar fluxo de redefinição por link (`token` + nova senha), com invalidação do token e revogação de sessões ativas                 | Todo        | 0%        | Alto: falhas em invalidação/revogação deixam conta vulnerável pós-reset                                                                                                 |                                  | 2026-02-19         |
 | B7    | Autenticacao  | Discovery do fluxo alternativo de recuperação por OTP (SMS): provedor, custos, antifraude, UX e compliance (LGPD)                       | Blocked     | 0%        | Alto: custo operacional e riscos de SIM swap; bloqueado até decisão de arquitetura/provedor                                                                             |                                  | 2026-02-19         |
-| B8    | Usuario       | [P1] Implementar campos mínimos de perfil V1 no domínio e contratos REST/GraphQL (`state_uf`, `occupation`, `investor_profile`, `financial_objectives`, `monthly_income_net`) com retrocompatibilidade de payload | Todo        | 0%        | Alto: envolve migration e compatibilidade de contrato para evitar quebra de clientes já integrados                                                                       |                                  | 2026-02-20         |
+| B8 | Usuario | [P1] Implementar campos mínimos de perfil V1 no domínio e contratos REST/GraphQL (`state_uf`, `occupation`, `investor_profile`, `financial_objectives`, `monthly_income_net`) com retrocompatibilidade de payload |  Done  |  100%  | Alto: envolve migration e compatibilidade de contrato para evitar quebra de clientes já integrados |  adb529c  |  2026-02-22  |
 | B9    | Usuario       | [P1] Implementar fluxo de perfil de investidor auto declarado (onboarding + edição de perfil) com validação por enum                      | Todo        | 0%        | Medio: sem validação de enum e regras claras, perfil pode ficar inconsistente entre telas                                                                                |                                  | 2026-02-20         |
 | B10   | Usuario       | [P2] Implementar questionário curto (5-10 perguntas) para sugestão indicativa de perfil de investidor, sem substituir a auto declaração | Todo        | 0%        | Medio: classificação simplificada pode gerar expectativa de precisão acima da proposta                                                                                    |                                  | 2026-02-20         |
 | B11   | Usuario       | [P2] Persistir e expor resultado do questionário (`investor_profile_suggested`, `profile_quiz_score`, `taxonomy_version`) para comparação com perfil auto declarado | Todo        | 0%        | Medio: risco de confusão de UX se não houver explicação clara entre perfil declarado e perfil sugerido                                                                  |                                  | 2026-02-20         |
+| J1    | Discovery     | Definir e implementar exportacao de extrato financeiro em CSV/XLSX por periodo (presets 15/30/90/180 dias, desde inicio e range customizado) | Todo        | 0%        | Medio: contrato de arquivo e timezone podem gerar divergencias em conciliacao externa                                                                                   |                                  | 2026-02-22         |
+| J2    | Discovery     | Implementar importacao de relatorios bancarios (arquivos) com normalizacao e consolidacao no balanco mensal junto aos lancamentos manuais   | Todo        | 0%        | Alto: variacao de formatos por banco e possivel ruido de dados                                                                                                          |                                  | 2026-02-22         |
+| J3    | Discovery     | Implementar conciliacao inteligente e insights com LLM para detectar possiveis duplicidades e sugerir categorizacao/insights explicaveis    | Todo        | 0%        | Alto: privacidade/LGPD, falso positivo de deduplicacao e custo operacional de inferencia                                                                                |                                  | 2026-02-22         |
+| J4    | Discovery     | Criar aba de Ferramentas com calculadoras de conveniencia (rescisao, salario liquido, ferias, 13o, hora extra, FGTS, dividir conta)        | Todo        | 0%        | Medio: manutencao de regras trabalhistas/tributarias e clareza de limites legais                                                                                        |                                  | 2026-02-22         |
+| J5    | Discovery     | Discovery tecnico/regulatorio de integracao Open Finance/Open Banking (seguranca, consentimento, compliance e arquitetura)                  | Blocked     | 0%        | Alto: dependencia de compliance e parceria/provedor; iniciativa planejada para fase posterior                                                                            |                                  | 2026-02-22         |
 | C1    | Transacoes    | Corrigir listagem de transacoes com filtros/paginacao reais no banco                                                                       | Done        | 100%      | Baixo                                                                                                                                                                    | 497f901                          | 2026-02-09         |
 | C2    | Transacoes    | Regras fortes de recorrencia + geracao automatica idempotente                                                                              | Done        | 100%      | Baixo                                                                                                                                                                    | f3ef3c0                          | 2026-02-09         |
 | C3    | Transacoes    | Consolidar regras de parcelamento (soma exata e arredondamento final)                                                                      | Done        | 100%      | Baixo                                                                                                                                                                    | 497f901                          | 2026-02-09         |

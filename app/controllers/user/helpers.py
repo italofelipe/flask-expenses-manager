@@ -20,13 +20,15 @@ from .contracts import compat_error
 
 
 def _serialize_user_profile(user: User) -> dict[str, Any]:
+    monthly_income = float(user.monthly_income) if user.monthly_income else None
     return {
         "id": str(user.id),
         "name": user.name,
         "email": user.email,
         "gender": user.gender,
         "birth_date": str(user.birth_date) if user.birth_date else None,
-        "monthly_income": float(user.monthly_income) if user.monthly_income else None,
+        "monthly_income": monthly_income,
+        "monthly_income_net": monthly_income,
         "net_worth": float(user.net_worth) if user.net_worth else None,
         "monthly_expenses": (
             float(user.monthly_expenses) if user.monthly_expenses else None
@@ -40,6 +42,10 @@ def _serialize_user_profile(user: User) -> dict[str, Any]:
         "investment_goal_date": (
             str(user.investment_goal_date) if user.investment_goal_date else None
         ),
+        "state_uf": user.state_uf,
+        "occupation": user.occupation,
+        "investor_profile": user.investor_profile,
+        "financial_objectives": user.financial_objectives,
     }
 
 

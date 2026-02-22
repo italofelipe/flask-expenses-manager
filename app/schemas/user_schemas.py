@@ -1,6 +1,7 @@
 from flask_marshmallow import Marshmallow
 from marshmallow import Schema, fields, pre_load, validate
 
+from app.application.services.user_profile_service import INVESTOR_PROFILE_CHOICES
 from app.schemas.sanitization import sanitize_string_fields
 
 ma = Marshmallow()
@@ -40,12 +41,25 @@ class UserRegistrationSchema(Schema):
             ),
         ),
     )
+    investor_profile = fields.String(
+        required=False,
+        allow_none=True,
+        validate=validate.OneOf(INVESTOR_PROFILE_CHOICES),
+        metadata={
+            "description": "Perfil do investidor auto declarado",
+            "example": "conservador",
+        },
+    )
 
     @pre_load
     def sanitize_input(self, data: object, **kwargs: object) -> object:
-        sanitized = sanitize_string_fields(data, {"name", "email"})
+        sanitized = sanitize_string_fields(data, {"name", "email", "investor_profile"})
         if isinstance(sanitized, dict) and isinstance(sanitized.get("email"), str):
             sanitized["email"] = str(sanitized["email"]).lower()
+        if isinstance(sanitized, dict) and isinstance(
+            sanitized.get("investor_profile"), str
+        ):
+            sanitized["investor_profile"] = str(sanitized["investor_profile"]).lower()
         return sanitized
 
 
@@ -63,6 +77,14 @@ class UserProfileSchema(Schema):
         as_string=True,
         validate=validate.Range(min=0),
         metadata={"description": "Renda mensal em reais", "example": "5000.00"},
+    )
+    monthly_income_net = fields.Decimal(
+        as_string=True,
+        validate=validate.Range(min=0),
+        metadata={
+            "description": "Renda líquida mensal em reais",
+            "example": "5000.00",
+        },
     )
     net_worth = fields.Decimal(
         as_string=True,
@@ -111,7 +133,7 @@ class UserProfileSchema(Schema):
     )
 
     investor_profile = fields.String(
-        validate=validate.OneOf(["conservador", "explorador", "entusiasta"]),
+        validate=validate.OneOf(INVESTOR_PROFILE_CHOICES),
         metadata={"description": "Perfil do investidor", "example": "conservador"},
     )
 
@@ -124,7 +146,21 @@ class UserProfileSchema(Schema):
 
     @pre_load
     def sanitize_input(self, data: object, **kwargs: object) -> object:
-        return sanitize_string_fields(data, {"gender"})
+        sanitized = sanitize_string_fields(data, {"gender", "investor_profile"})
+        if isinstance(sanitized, dict):
+            if isinstance(sanitized.get("state_uf"), str):
+                sanitized["state_uf"] = str(sanitized["state_uf"]).upper()
+            if (
+                "monthly_income" not in sanitized
+                and "monthly_income_net" in sanitized
+                and sanitized.get("monthly_income_net") is not None
+            ):
+                sanitized["monthly_income"] = sanitized["monthly_income_net"]
+            if isinstance(sanitized.get("investor_profile"), str):
+                sanitized["investor_profile"] = str(
+                    sanitized["investor_profile"]
+                ).lower()
+        return sanitized
 
 
 class UserSchema(Schema):

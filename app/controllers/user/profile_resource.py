@@ -10,12 +10,13 @@ from flask_apispec import doc, use_kwargs
 from flask_apispec.views import MethodResource
 from flask_jwt_extended import get_jwt, get_jwt_identity, jwt_required
 
+from app.application.services.user_profile_service import update_user_profile
 from app.extensions.database import db
 from app.schemas.user_schemas import UserProfileSchema
 
 from .contracts import compat_error, compat_success
 from .dependencies import get_user_dependencies
-from .helpers import _serialize_user_profile, assign_user_profile_fields
+from .helpers import _serialize_user_profile
 
 
 class UserProfileResource(MethodResource):
@@ -27,7 +28,8 @@ class UserProfileResource(MethodResource):
             "- birth_date: 'YYYY-MM-DD'\n"
             """- monthly_income, net_worth, monthly_expenses, initial_investment,
             monthly_investment: decimal\n"""
-            "- investment_goal_date: 'YYYY-MM-DD'\n\n"
+            "- investment_goal_date: 'YYYY-MM-DD'\n"
+            "- investor_profile: 'conservador', 'explorador', 'entusiasta'\n\n"
             "Exemplo de request:\n"
             """{\n  'gender': 'masculino', 'birth_date': '1990-05-15',
             'monthly_income': '5000.00',
@@ -35,7 +37,8 @@ class UserProfileResource(MethodResource):
             'monthly_expenses': '2000.00',
             'initial_investment': '10000.00',
             'monthly_investment': '500.00',
-            'investment_goal_date': '2025-12-31' }\n\n"""
+            'investment_goal_date': '2025-12-31',
+            'investor_profile': 'conservador' }\n\n"""
             "Exemplo de resposta:\n"
             "{ 'message': 'Perfil atualizado com sucesso', "
             "'data': { ...dados do usuário... } }"
@@ -83,12 +86,12 @@ class UserProfileResource(MethodResource):
 
         data = kwargs
 
-        result = assign_user_profile_fields(user, data)
+        result = update_user_profile(user, data)
         if result["error"]:
             return compat_error(
-                legacy_payload={"message": result["message"]},
+                legacy_payload={"message": result["error"]},
                 status_code=400,
-                message=str(result["message"]),
+                message=str(result["error"]),
                 error_code="VALIDATION_ERROR",
             )
 
