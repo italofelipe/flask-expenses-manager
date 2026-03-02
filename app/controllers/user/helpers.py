@@ -46,6 +46,10 @@ def _serialize_user_profile(user: User) -> dict[str, Any]:
         "occupation": user.occupation,
         "investor_profile": user.investor_profile,
         "financial_objectives": user.financial_objectives,
+        # B11: quiz-derived suggestion fields for comparison with declared profile
+        "investor_profile_suggested": user.investor_profile_suggested,
+        "profile_quiz_score": user.profile_quiz_score,
+        "taxonomy_version": user.taxonomy_version,
     }
 
 
