@@ -22,6 +22,9 @@ _PROFILE_MUTABLE_FIELDS = (
     "state_uf",
     "occupation",
     "financial_objectives",
+    # B11: investor profile suggestion fields (persisted from quiz results)
+    "profile_quiz_score",
+    "taxonomy_version",
 )
 
 
@@ -45,19 +48,34 @@ def _normalize_investor_profile(value: Any) -> str | None:
     return normalized
 
 
+def _apply_declared_investor_profile(user: User, data: dict[str, Any]) -> str | None:
+    """Apply investor_profile (declared). Returns an error string or None."""
+    if "investor_profile" not in data:
+        return None
+    normalized = _normalize_investor_profile(data["investor_profile"])
+    if normalized is None:
+        user.investor_profile = None
+        return None
+    if normalized not in VALID_INVESTOR_PROFILES:
+        return f"Perfil do investidor inválido: {data['investor_profile']}"
+    user.investor_profile = normalized
+    return None
+
+
+def _apply_suggested_investor_profile(user: User, data: dict[str, Any]) -> None:
+    """Apply investor_profile_suggested (B11 — quiz-derived, any lowercase string)."""
+    if "investor_profile_suggested" in data:
+        user.investor_profile_suggested = _normalize_investor_profile(
+            data["investor_profile_suggested"]
+        )
+
+
 def update_user_profile(user: User, data: dict[str, Any]) -> dict[str, str | None]:
-    investor_profile = _normalize_investor_profile(data.get("investor_profile"))
-    if "investor_profile" in data:
-        if investor_profile is None:
-            user.investor_profile = None
-        elif investor_profile not in VALID_INVESTOR_PROFILES:
-            return {
-                "error": (
-                    "Perfil do investidor inválido: " f"{data.get('investor_profile')}"
-                )
-            }
-        else:
-            user.investor_profile = investor_profile
+    error = _apply_declared_investor_profile(user, data)
+    if error:
+        return {"error": error}
+
+    _apply_suggested_investor_profile(user, data)
 
     for field in _PROFILE_MUTABLE_FIELDS:
         if field not in data:

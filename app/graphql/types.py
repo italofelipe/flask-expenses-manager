@@ -20,6 +20,10 @@ class UserType(graphene.ObjectType):
     occupation = graphene.String()
     investor_profile = graphene.String()
     financial_objectives = graphene.String()
+    # B11: quiz-derived suggestion fields
+    investor_profile_suggested = graphene.String()
+    profile_quiz_score = graphene.Int()
+    taxonomy_version = graphene.String()
 
 
 class AuthPayloadType(graphene.ObjectType):
