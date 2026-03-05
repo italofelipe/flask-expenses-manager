@@ -6,6 +6,7 @@ cd "$ROOT_DIR"
 
 SONAR_HOST_URL="${SONAR_HOST_URL:-https://sonarcloud.io}"
 SONAR_LOCAL_MODE="${SONAR_LOCAL_MODE:-advisory}"
+AURAXIS_ENABLE_LOCAL_SONAR="${AURAXIS_ENABLE_LOCAL_SONAR:-false}"
 
 if [[ "${CI:-false}" == "true" ]]; then
   SONAR_LOCAL_MODE="enforce"
@@ -13,6 +14,13 @@ fi
 
 if [[ "${AURAXIS_ENFORCE_LOCAL_SONAR:-false}" == "true" ]]; then
   SONAR_LOCAL_MODE="enforce"
+fi
+
+if [[ "$AURAXIS_ENABLE_LOCAL_SONAR" != "true" ]]; then
+  echo "[sonar-local] advisory: local sonar check is disabled by default (AURAXIS_ENABLE_LOCAL_SONAR=false)."
+  echo "[sonar-local] advisory: set AURAXIS_ENABLE_LOCAL_SONAR=true to run local sonar scanner."
+  echo "[sonar-local] advisory: CI Sonar gate remains mandatory."
+  exit 0
 fi
 
 normalize_env_var() {
