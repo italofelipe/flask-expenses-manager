@@ -9,4 +9,4 @@ cosmic-ray==8.4.4
 pip-audit==2.9.0
 schemathesis==3.35.0
 types-requests==2.32.4.20260107
-types-python-dateutil==2.9.0.20260124
+types-python-dateutil==2.9.0.20260305
