@@ -140,6 +140,8 @@ Política:
 - auto-merge apenas para updates `patch` e `minor`;
 - updates `major` exigem revisão manual;
 - merge automático só conclui com checks obrigatórios da branch protection em verde.
+- jobs dependentes de secrets externos devem ficar `skipped` quando o token não estiver
+  disponível em PRs automatizados (ex.: Dependabot), nunca `failed`.
 
 ## Reproducao local (CI-like)
 
