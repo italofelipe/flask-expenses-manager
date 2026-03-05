@@ -17,11 +17,11 @@ fi
 
 echo "Installing dependencies in ${VENV_DIR}"
 "${VENV_DIR}/bin/python" -m pip install --upgrade pip
-"${VENV_DIR}/bin/pip" install -r "${ROOT_DIR}/requirements.txt" -r "${ROOT_DIR}/requirements-dev.txt"
+"${VENV_DIR}/bin/python" -m pip install -r "${ROOT_DIR}/requirements.txt" -r "${ROOT_DIR}/requirements-dev.txt"
 
 echo "Installing pre-commit hooks"
-"${VENV_DIR}/bin/pre-commit" install
-"${VENV_DIR}/bin/pre-commit" install --hook-type pre-push
+"${VENV_DIR}/bin/python" -m pre_commit install
+"${VENV_DIR}/bin/python" -m pre_commit install --hook-type pre-push
 
 echo
 echo "Bootstrap completed."
