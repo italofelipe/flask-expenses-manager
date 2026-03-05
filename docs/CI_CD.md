@@ -142,6 +142,10 @@ Política:
 - merge automático só conclui com checks obrigatórios da branch protection em verde.
 - jobs dependentes de secrets externos devem ficar `skipped` quando o token não estiver
   disponível em PRs automatizados (ex.: Dependabot), nunca `failed`.
+- no ecossistema Python do backend, updates `minor` de dependências de desenvolvimento
+  não são agrupados. Ferramentas como `mypy`, `pre-commit`, `bandit`, `pip-audit`,
+  `schemathesis`, `flake8` e stubs tipados devem abrir PRs individuais para isolar
+  regressões de toolchain e evitar lotes com centenas de erros não atribuíveis.
 
 ## Reproducao local (CI-like)
 

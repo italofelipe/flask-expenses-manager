@@ -12,10 +12,6 @@ updates:
       pip-patch-updates:
         update-types:
           - patch
-      pip-dev-minor-updates:
-        dependency-type: development
-        update-types:
-          - minor
     labels:
       - "dependencies"
       - "security"
