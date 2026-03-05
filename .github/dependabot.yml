@@ -8,9 +8,25 @@ updates:
       time: "09:00"
       timezone: "America/Sao_Paulo"
     open-pull-requests-limit: 5
+    groups:
+      pip-patch-updates:
+        update-types:
+          - patch
+      pip-dev-minor-updates:
+        dependency-type: development
+        update-types:
+          - minor
     labels:
       - "dependencies"
       - "security"
+      - "auto-merge"
+    commit-message:
+      prefix: "chore"
+      include: "scope"
+    ignore:
+      - dependency-name: "*"
+        update-types:
+          - "version-update:semver-major"
 
   - package-ecosystem: "github-actions"
     directory: "/"
@@ -23,3 +39,12 @@ updates:
     labels:
       - "dependencies"
       - "security"
+      - "github-actions"
+      - "auto-merge"
+    commit-message:
+      prefix: "chore"
+      include: "scope"
+    ignore:
+      - dependency-name: "*"
+        update-types:
+          - "version-update:semver-major"

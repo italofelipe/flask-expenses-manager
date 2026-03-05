@@ -130,6 +130,17 @@ Política do `sonar-local-check`:
 - CI: `SONAR_LOCAL_MODE=enforce` automaticamente quando `CI=true`.
 - Override local estrito: `AURAXIS_ENFORCE_LOCAL_SONAR=true`.
 
+## Dependabot + auto-merge (dependências)
+
+Arquivos:
+- `.github/dependabot.yml`
+- `.github/workflows/auto-merge.yml`
+
+Política:
+- auto-merge apenas para updates `patch` e `minor`;
+- updates `major` exigem revisão manual;
+- merge automático só conclui com checks obrigatórios da branch protection em verde.
+
 ## Reproducao local (CI-like)
 
 Script oficial:
