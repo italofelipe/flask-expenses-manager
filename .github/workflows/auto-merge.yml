@@ -12,7 +12,10 @@ jobs:
       contents: write
       pull-requests: write
     if: |
-      github.actor == 'dependabot[bot]' &&
+      (
+        github.event.pull_request.user.login == 'dependabot[bot]' ||
+        github.event.pull_request.user.login == 'app/dependabot'
+      ) &&
       contains(github.event.pull_request.labels.*.name, 'auto-merge')
     steps:
       - name: Fetch Dependabot metadata
