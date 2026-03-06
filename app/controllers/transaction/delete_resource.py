@@ -5,8 +5,9 @@ from __future__ import annotations
 from uuid import UUID
 
 from flask import Response
-from flask_apispec import doc
-from flask_jwt_extended import get_jwt_identity, jwt_required
+from app.utils.typed_decorators import typed_doc as doc
+from flask_jwt_extended import get_jwt_identity
+from app.utils.typed_decorators import typed_jwt_required as jwt_required
 
 from app.application.services.transaction_application_service import (
     TransactionApplicationError,
@@ -25,8 +26,8 @@ from .utils import (
 class TransactionDeleteMixin:
     """DELETE behavior for transaction soft delete."""
 
-    @doc(**TRANSACTION_SOFT_DELETE_DOC)  # type: ignore[misc]
-    @jwt_required()  # type: ignore[misc]
+    @doc(**TRANSACTION_SOFT_DELETE_DOC)
+    @jwt_required()
     def delete(self, transaction_id: UUID) -> Response:
         token_error = _guard_revoked_token()
         if token_error is not None:

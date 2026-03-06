@@ -1,14 +1,13 @@
-# mypy: disable-error-code=misc
-
 from __future__ import annotations
 
-from typing import Any, Callable, cast
+from typing import Any, cast
 from uuid import UUID
 
 from flask import Response, request
-from flask_apispec import doc
+from app.utils.typed_decorators import typed_doc as doc
 from flask_apispec.views import MethodResource
-from flask_jwt_extended import get_jwt, get_jwt_identity, jwt_required
+from flask_jwt_extended import get_jwt, get_jwt_identity
+from app.utils.typed_decorators import typed_jwt_required as jwt_required
 
 from app.models.transaction import Transaction
 from app.utils.pagination import PaginatedResponse
@@ -74,7 +73,7 @@ class UserMeResource(MethodResource):
             401: {"description": "Token inválido ou expirado"},
         },
     )
-    @cast(Callable[..., Response], jwt_required())
+    @jwt_required()
     def get(self) -> Response:
         user_id = UUID(get_jwt_identity())
         jti = get_jwt()["jti"]

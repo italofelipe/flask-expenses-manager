@@ -2,6 +2,7 @@ from typing import Any, Dict
 from uuid import UUID
 
 from flask import jsonify
+from flask.typing import ResponseReturnValue
 from flask_jwt_extended import JWTManager, get_jwt_identity
 
 from app.extensions.database import db
@@ -10,7 +11,9 @@ from app.utils.api_contract import is_v2_contract_request
 from app.utils.response_builder import error_payload
 
 
-def _jwt_error_response(message: str, *, code: str, status_code: int) -> Any:
+def _jwt_error_response(
+    message: str, *, code: str, status_code: int
+) -> ResponseReturnValue:
     if is_v2_contract_request():
         return (
             jsonify(error_payload(message=message, code=code, details={})),

@@ -6,8 +6,9 @@ from typing import Any, cast
 from uuid import UUID
 
 from flask import Response
-from flask_apispec import doc, use_kwargs
-from flask_jwt_extended import get_jwt_identity, jwt_required
+from app.utils.typed_decorators import typed_doc as doc, typed_use_kwargs as use_kwargs
+from flask_jwt_extended import get_jwt_identity
+from app.utils.typed_decorators import typed_jwt_required as jwt_required
 
 from app.application.services.transaction_application_service import (
     TransactionApplicationError,
@@ -46,9 +47,9 @@ def _compat_installment_amounts(total: Any, count: int) -> list[Any]:
 class TransactionCreateMixin:
     """POST behavior for transaction creation (single and installments)."""
 
-    @doc(**TRANSACTION_CREATE_DOC)  # type: ignore[misc]
-    @jwt_required()  # type: ignore[misc]
-    @use_kwargs(TransactionSchema, location="json")  # type: ignore[misc]
+    @doc(**TRANSACTION_CREATE_DOC)
+    @jwt_required()
+    @use_kwargs(TransactionSchema, location="json")
     def post(self, **kwargs: Any) -> Response:
         token_error = _guard_revoked_token()
         if token_error is not None:
