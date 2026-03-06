@@ -1,17 +1,16 @@
-# mypy: disable-error-code=misc
-
 from __future__ import annotations
 
 from typing import Any
 
 from flask import Response, current_app, request
-from flask_apispec import doc, use_kwargs
 from flask_apispec.views import MethodResource
 
 from app.application.services.password_reset_service import (
     PASSWORD_RESET_NEUTRAL_MESSAGE,
 )
 from app.schemas.auth_schema import ForgotPasswordSchema
+from app.utils.typed_decorators import typed_doc as doc
+from app.utils.typed_decorators import typed_use_kwargs as use_kwargs
 
 from .contracts import compat_error, compat_success
 from .dependencies import get_auth_dependencies

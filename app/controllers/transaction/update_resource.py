@@ -6,13 +6,15 @@ from typing import Any
 from uuid import UUID
 
 from flask import Response
-from flask_apispec import doc, use_kwargs
-from flask_jwt_extended import get_jwt_identity, jwt_required
+from flask_jwt_extended import get_jwt_identity
 
 from app.application.services.transaction_application_service import (
     TransactionApplicationError,
 )
 from app.schemas.transaction_schema import TransactionSchema
+from app.utils.typed_decorators import typed_doc as doc
+from app.utils.typed_decorators import typed_jwt_required as jwt_required
+from app.utils.typed_decorators import typed_use_kwargs as use_kwargs
 
 from .dependencies import get_transaction_dependencies
 from .openapi import TRANSACTION_UPDATE_DOC
@@ -27,9 +29,9 @@ from .utils import (
 class TransactionUpdateMixin:
     """PUT behavior for transaction updates with ownership + validation guards."""
 
-    @doc(**TRANSACTION_UPDATE_DOC)  # type: ignore[misc]
-    @jwt_required()  # type: ignore[misc]
-    @use_kwargs(TransactionSchema(partial=True), location="json")  # type: ignore[misc]
+    @doc(**TRANSACTION_UPDATE_DOC)
+    @jwt_required()
+    @use_kwargs(TransactionSchema(partial=True), location="json")
     def put(self, transaction_id: UUID, **kwargs: Any) -> Response:
         token_error = _guard_revoked_token()
         if token_error is not None:

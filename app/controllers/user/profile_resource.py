@@ -1,18 +1,18 @@
-# mypy: disable-error-code=misc
-
 from __future__ import annotations
 
 from typing import Any
 from uuid import UUID
 
 from flask import Response, current_app, g
-from flask_apispec import doc, use_kwargs
 from flask_apispec.views import MethodResource
-from flask_jwt_extended import get_jwt, get_jwt_identity, jwt_required
+from flask_jwt_extended import get_jwt, get_jwt_identity
 
 from app.application.services.user_profile_service import update_user_profile
 from app.extensions.database import db
 from app.schemas.user_schemas import UserProfileSchema
+from app.utils.typed_decorators import typed_doc as doc
+from app.utils.typed_decorators import typed_jwt_required as jwt_required
+from app.utils.typed_decorators import typed_use_kwargs as use_kwargs
 
 from .contracts import compat_error, compat_success
 from .dependencies import get_user_dependencies

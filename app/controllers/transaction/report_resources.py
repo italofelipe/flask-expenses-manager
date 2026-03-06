@@ -4,9 +4,8 @@ from typing import Any
 from uuid import UUID
 
 from flask import Response, request
-from flask_apispec import doc
 from flask_apispec.views import MethodResource
-from flask_jwt_extended import get_jwt_identity, jwt_required
+from flask_jwt_extended import get_jwt_identity
 
 from app.application.services.public_error_mapper_service import (
     map_validation_exception,
@@ -17,6 +16,8 @@ from app.application.services.transaction_application_service import (
 from app.extensions.database import db
 from app.models.transaction import Transaction, TransactionStatus, TransactionType
 from app.services.transaction_analytics_service import TransactionAnalyticsService
+from app.utils.typed_decorators import typed_doc as doc
+from app.utils.typed_decorators import typed_jwt_required as jwt_required
 
 from .dependencies import get_transaction_dependencies
 from .openapi import (
@@ -164,8 +165,8 @@ def _apply_active_list_optional_filters(
 
 
 class TransactionSummaryResource(MethodResource):
-    @doc(**TRANSACTION_SUMMARY_DOC)  # type: ignore[misc]
-    @jwt_required()  # type: ignore[misc]
+    @doc(**TRANSACTION_SUMMARY_DOC)
+    @jwt_required()
     def get(self) -> Response:
         token_error = _guard_revoked_token()
         if token_error is not None:
@@ -228,8 +229,8 @@ class TransactionSummaryResource(MethodResource):
 
 
 class TransactionMonthlyDashboardResource(MethodResource):
-    @doc(**TRANSACTION_DASHBOARD_DOC)  # type: ignore[misc]
-    @jwt_required()  # type: ignore[misc]
+    @doc(**TRANSACTION_DASHBOARD_DOC)
+    @jwt_required()
     def get(self) -> Response:
         token_error = _guard_revoked_token()
         if token_error is not None:
@@ -291,8 +292,8 @@ class TransactionMonthlyDashboardResource(MethodResource):
 
 
 class TransactionForceDeleteResource(MethodResource):
-    @doc(**TRANSACTION_FORCE_DELETE_DOC)  # type: ignore[misc]
-    @jwt_required()  # type: ignore[misc]
+    @doc(**TRANSACTION_FORCE_DELETE_DOC)
+    @jwt_required()
     def delete(self, transaction_id: UUID) -> Response:
         token_error = _guard_revoked_token()
         if token_error is not None:
@@ -331,8 +332,8 @@ class TransactionForceDeleteResource(MethodResource):
 
 
 class TransactionExpensePeriodResource(MethodResource):
-    @doc(**TRANSACTION_EXPENSE_PERIOD_DOC)  # type: ignore[misc]
-    @jwt_required()  # type: ignore[misc]
+    @doc(**TRANSACTION_EXPENSE_PERIOD_DOC)
+    @jwt_required()
     def get(self) -> Response:
         token_error = _guard_revoked_token()
         if token_error is not None:
@@ -446,8 +447,8 @@ class TransactionExpensePeriodResource(MethodResource):
 
 
 class TransactionDeletedResource(MethodResource):
-    @doc(**TRANSACTION_DELETED_LIST_DOC)  # type: ignore[misc]
-    @jwt_required()  # type: ignore[misc]
+    @doc(**TRANSACTION_DELETED_LIST_DOC)
+    @jwt_required()
     def get(self) -> Response:
         token_error = _guard_revoked_token()
         if token_error is not None:
@@ -475,8 +476,8 @@ class TransactionDeletedResource(MethodResource):
 
 
 class TransactionDuePeriodResource(MethodResource):
-    @doc(**TRANSACTION_DUE_PERIOD_DOC)  # type: ignore[misc]
-    @jwt_required()  # type: ignore[misc]
+    @doc(**TRANSACTION_DUE_PERIOD_DOC)
+    @jwt_required()
     def get(self) -> Response:
         token_error = _guard_revoked_token()
         if token_error is not None:
@@ -548,8 +549,8 @@ class TransactionDuePeriodResource(MethodResource):
 
 
 class TransactionRestoreResource(MethodResource):
-    @doc(**TRANSACTION_RESTORE_DOC)  # type: ignore[misc]
-    @jwt_required()  # type: ignore[misc]
+    @doc(**TRANSACTION_RESTORE_DOC)
+    @jwt_required()
     def patch(self, transaction_id: UUID) -> Response:
         token_error = _guard_revoked_token()
         if token_error is not None:
@@ -585,8 +586,8 @@ class TransactionRestoreResource(MethodResource):
 
 
 class TransactionListActiveResource(MethodResource):
-    @doc(**TRANSACTION_ACTIVE_LIST_DOC)  # type: ignore[misc]
-    @jwt_required()  # type: ignore[misc]
+    @doc(**TRANSACTION_ACTIVE_LIST_DOC)
+    @jwt_required()
     def get(self) -> Response:  # noqa: C901
         token_error = _guard_revoked_token()
         if token_error is not None:

@@ -11,12 +11,11 @@ Contract
 - `GET /healthz` returns HTTP 200 with a minimal JSON body.
 """
 
-# mypy: disable-error-code=misc
-
 from __future__ import annotations
 
 from flask import Blueprint
-from flask_apispec import doc
+
+from app.utils.typed_decorators import typed_doc as doc
 
 health_bp = Blueprint("health", __name__)
 

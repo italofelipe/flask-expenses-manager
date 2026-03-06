@@ -1,18 +1,16 @@
-from typing import Any
-
-from flask import current_app, request
+from flask import Flask, current_app, request
+from flask.typing import ResponseReturnValue
 from flask_jwt_extended import verify_jwt_in_request
 from flask_jwt_extended.exceptions import JWTExtendedException
 
 from app.extensions.jwt_callbacks import _jwt_error_response
 
 
-def register_auth_guard(app: Any) -> None:
-    @app.before_request  # type: ignore[misc]
-    def auth_guard() -> Any:
+def register_auth_guard(app: Flask) -> None:
+    def auth_guard() -> ResponseReturnValue | None:
         # Liveness endpoint must remain public for infra health checks.
         if request.path.rstrip("/") == "/healthz":
-            return
+            return None
         open_endpoints = {
             "registerresource",
             "authresource",
@@ -29,12 +27,12 @@ def register_auth_guard(app: Any) -> None:
             "swagger-ui.swagger_json",
         }
         if not request.endpoint:
-            return
+            return None
         if request.path.startswith("/docs"):
-            return
+            return None
         endpoint = request.endpoint.split(".")[-1]
         if endpoint in open_endpoints:
-            return
+            return None
 
         try:
             verify_jwt_in_request()
@@ -53,3 +51,7 @@ def register_auth_guard(app: Any) -> None:
                 code="INTERNAL_ERROR",
                 status_code=500,
             )
+
+        return None
+
+    app.before_request(auth_guard)

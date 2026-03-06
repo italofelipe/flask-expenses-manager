@@ -1,16 +1,16 @@
-# mypy: disable-error-code=misc
-
 from __future__ import annotations
 
 from typing import Any
 from uuid import UUID
 
 from flask import request
-from flask_apispec import doc, use_kwargs
-from flask_jwt_extended import get_jwt_identity, jwt_required
+from flask_jwt_extended import get_jwt_identity
 from marshmallow import fields
 
 from app.application.services.wallet_application_service import WalletApplicationError
+from app.utils.typed_decorators import typed_doc as doc
+from app.utils.typed_decorators import typed_jwt_required as jwt_required
+from app.utils.typed_decorators import typed_use_kwargs as use_kwargs
 
 from .blueprint import wallet_bp
 from .contracts import application_error_response, compat_success
