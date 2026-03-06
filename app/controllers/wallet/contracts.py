@@ -78,10 +78,10 @@ def parse_optional_query_date(value: str | None, field_name: str) -> date | None
         return None
     try:
         return datetime.strptime(value, "%Y-%m-%d").date()
-    except ValueError:
+    except ValueError as err:
         raise PublicValidationError(
             f"Parâmetro '{field_name}' inválido. Use o formato YYYY-MM-DD."
-        )
+        ) from err
 
 
 def validation_error_response(

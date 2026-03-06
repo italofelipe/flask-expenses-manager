@@ -445,8 +445,7 @@ def run_backup(
         "sudo apt-get update -y >/dev/null 2>&1 || true",
         _ensure_awscli_shell(),
         (
-            "DB_CID=$(docker compose --env-file {env_file} -f {compose_file} "
-            "ps -q db)"
+            "DB_CID=$(docker compose --env-file {env_file} -f {compose_file} ps -q db)"
         ).format(env_file=env_file, compose_file=compose_file),
         'test -n "$DB_CID"',
         # Extract creds from env file (avoid leaking to logs). Assumes KEY=VALUE lines.
@@ -455,7 +454,7 @@ def run_backup(
             "| cut -d= -f2-)"
         ).format(env_file=env_file),
         (
-            "export POSTGRES_DB=$(grep -E '^POSTGRES_DB=' {env_file} " "| cut -d= -f2-)"
+            "export POSTGRES_DB=$(grep -E '^POSTGRES_DB=' {env_file} | cut -d= -f2-)"
         ).format(env_file=env_file),
         f"OUT=/tmp/auraxis_backup_{env_name}_{ts}.sql.gz",
         'echo "creating backup: $OUT"',
@@ -491,8 +490,7 @@ def restore_drill_dev(
         _pick_workdir_shell(),
         _ensure_awscli_shell(),
         (
-            "DB_CID=$(docker compose --env-file {env_file} -f {compose_file} "
-            "ps -q db)"
+            "DB_CID=$(docker compose --env-file {env_file} -f {compose_file} ps -q db)"
         ).format(env_file=env_file, compose_file=compose_file),
         'test -n "$DB_CID"',
         (
@@ -743,7 +741,7 @@ def schedule_backups_via_ssm_mw(
             f"export POSTGRES_USER=$(grep -E '^POSTGRES_USER=' {env_file} "
             "| cut -d= -f2-)"
         ),
-        (f"export POSTGRES_DB=$(grep -E '^POSTGRES_DB=' {env_file} " "| cut -d= -f2-)"),
+        (f"export POSTGRES_DB=$(grep -E '^POSTGRES_DB=' {env_file} | cut -d= -f2-)"),
     ]
 
     def mk_backup_cmds(env_name: str) -> list[str]:

@@ -38,7 +38,7 @@ When documents conflict, follow this priority order:
 ### You MUST do autonomously (no human approval needed)
 
 - Read any file in the repository
-- Run quality gates: `black`, `isort`, `flake8`, `mypy`, `pytest`
+- Run quality gates: `ruff format`, `ruff check`, `mypy`, `pytest`
 - Create branches following conventional branching (`feat/`, `fix/`, `refactor/`, etc.)
 - Write code in: `app/`, `tests/`, `migrations/`, `scripts/`, `docs/`
 - Run existing test suites
@@ -107,11 +107,11 @@ that other agents consume. Use `templates/handoff_template.md` for consistency.
 ## Quality Gates (run before every commit)
 
 ```bash
-black .
-isort app tests config run.py run_without_db.py
-flake8 app tests config run.py run_without_db.py
-mypy app
-pytest -m "not schemathesis" --cov=app --cov-fail-under=85
+bash scripts/bootstrap_local_env.sh
+scripts/python_tool.sh ruff format .
+scripts/python_tool.sh ruff check app tests config run.py run_without_db.py
+scripts/python_tool.sh mypy app
+scripts/repo_bin.sh pytest -m "not schemathesis" --cov=app --cov-fail-under=85
 ```
 
 ## Branching and Commits
@@ -144,7 +144,7 @@ pytest -m "not schemathesis" --cov=app --cov-fail-under=85
 | Database | PostgreSQL |
 | Cache | Redis |
 | Deploy | AWS EC2 + Docker Compose + Nginx |
-| Code Quality | black, isort, flake8, mypy, Bandit, Gitleaks |
+| Code Quality | Ruff, mypy, Bandit, Gitleaks |
 
 ## Key Directories
 

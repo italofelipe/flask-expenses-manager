@@ -14,7 +14,7 @@ concurrency:
 
 jobs:
   quality:
-    name: Quality (Lint + Type Check)
+    name: Quality (Ruff + Type Check)
     runs-on: ubuntu-latest
 
     steps:
@@ -26,7 +26,9 @@ jobs:
         with:
           python-version: "3.11"
           cache: pip
-          cache-dependency-path: requirements.txt
+          cache-dependency-path: |
+            requirements.txt
+            requirements-dev.txt
 
       - name: Feature Flags Hygiene
         run: python scripts/check_feature_flags.py
@@ -34,26 +36,22 @@ jobs:
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install -r requirements.txt
-          pip install -r requirements-dev.txt
+          python -m pip install -r requirements.txt -r requirements-dev.txt
 
       - name: Dependency vulnerability scan
-        run: pip-audit -r requirements.txt
+        run: python -m pip_audit -r requirements.txt
 
-      - name: Black (check)
-        run: black --check .
+      - name: Ruff format (check)
+        run: python -m ruff format --check .
 
-      - name: Isort (check)
-        run: isort --check-only app tests config run.py run_without_db.py
-
-      - name: Flake8
-        run: flake8 app tests config run.py run_without_db.py
+      - name: Ruff lint
+        run: python -m ruff check app tests config run.py run_without_db.py
 
       - name: Mypy
-        run: mypy app
+        run: python -m mypy app
 
       - name: Bandit (SAST - high severity gate)
-        run: bandit -r app -lll -iii
+        run: python -m bandit -r app -lll -iii
 
   mypy-matrix:
     name: Type Check (mypy, py${{ matrix.python-version }})
@@ -72,16 +70,17 @@ jobs:
         with:
           python-version: ${{ matrix.python-version }}
           cache: pip
-          cache-dependency-path: requirements.txt
+          cache-dependency-path: |
+            requirements.txt
+            requirements-dev.txt
 
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install -r requirements.txt
-          pip install -r requirements-dev.txt
+          python -m pip install -r requirements.txt -r requirements-dev.txt
 
       - name: Mypy
-        run: mypy app
+        run: python -m mypy app
 
   secret-scan:
     name: Secret Scan (Gitleaks)

@@ -19,7 +19,7 @@ DEV
 
 1) Validacao completa:
 ```bash
-./.venv/bin/python scripts/aws_validate_i16.py --profile auraxis-admin --region us-east-1
+./scripts/python_exec.sh scripts/aws_validate_i16.py --profile auraxis-admin --region us-east-1
 ```
 
 2) Health check manual:
@@ -36,24 +36,24 @@ Comandos:
 
 DEV:
 ```bash
-./.venv/bin/python scripts/aws_deploy_i6.py --profile auraxis-admin --region us-east-1 deploy --env dev --git-ref origin/master
+./scripts/python_exec.sh scripts/aws_deploy_i6.py --profile auraxis-admin --region us-east-1 deploy --env dev --git-ref origin/master
 ```
 
 PROD:
 ```bash
-./.venv/bin/python scripts/aws_deploy_i6.py --profile auraxis-admin --region us-east-1 deploy --env prod --git-ref origin/master
+./scripts/python_exec.sh scripts/aws_deploy_i6.py --profile auraxis-admin --region us-east-1 deploy --env prod --git-ref origin/master
 ```
 
 Status do deploy (ref atual e ultimo ref "previous" para rollback):
 ```bash
-./.venv/bin/python scripts/aws_deploy_i6.py --profile auraxis-admin --region us-east-1 status --env prod
-./.venv/bin/python scripts/aws_deploy_i6.py --profile auraxis-admin --region us-east-1 status --env dev
+./scripts/python_exec.sh scripts/aws_deploy_i6.py --profile auraxis-admin --region us-east-1 status --env prod
+./scripts/python_exec.sh scripts/aws_deploy_i6.py --profile auraxis-admin --region us-east-1 status --env dev
 ```
 
 Rollback (para o ref anterior bem sucedido, por instancia):
 ```bash
-./.venv/bin/python scripts/aws_deploy_i6.py --profile auraxis-admin --region us-east-1 rollback --env prod
-./.venv/bin/python scripts/aws_deploy_i6.py --profile auraxis-admin --region us-east-1 rollback --env dev
+./scripts/python_exec.sh scripts/aws_deploy_i6.py --profile auraxis-admin --region us-east-1 rollback --env prod
+./scripts/python_exec.sh scripts/aws_deploy_i6.py --profile auraxis-admin --region us-east-1 rollback --env dev
 ```
 
 Notas:
@@ -114,12 +114,12 @@ Renovacao automatica:
   - `deploy/systemd/auraxis-certbot-renew.timer`
 - Instalacao via SSM:
 ```bash
-./.venv/bin/python scripts/aws_tls_renew_i15.py --profile auraxis-admin --region us-east-1 install --env prod
+./scripts/python_exec.sh scripts/aws_tls_renew_i15.py --profile auraxis-admin --region us-east-1 install --env prod
 ```
 
 Validacao (dry-run):
 ```bash
-./.venv/bin/python scripts/aws_tls_renew_i15.py --profile auraxis-admin --region us-east-1 run-once --env prod --dry-run
+./scripts/python_exec.sh scripts/aws_tls_renew_i15.py --profile auraxis-admin --region us-east-1 run-once --env prod --dry-run
 ```
 
 ## Backups PostgreSQL (S3) e Restore Drill
@@ -129,18 +129,18 @@ Bucket:
 
 Setup (bucket + lifecycle + policy + IAM access via role de instancia):
 ```bash
-./.venv/bin/python scripts/aws_backups_s3.py --profile auraxis-admin --region us-east-1 setup
+./scripts/python_exec.sh scripts/aws_backups_s3.py --profile auraxis-admin --region us-east-1 setup
 ```
 
 Backup on-demand:
 ```bash
-./.venv/bin/python scripts/aws_backups_s3.py --profile auraxis-admin --region us-east-1 backup --env prod
-./.venv/bin/python scripts/aws_backups_s3.py --profile auraxis-admin --region us-east-1 backup --env dev
+./scripts/python_exec.sh scripts/aws_backups_s3.py --profile auraxis-admin --region us-east-1 backup --env prod
+./scripts/python_exec.sh scripts/aws_backups_s3.py --profile auraxis-admin --region us-east-1 backup --env dev
 ```
 
 Restore drill (nao-destrutivo):
 ```bash
-./.venv/bin/python scripts/aws_backups_s3.py --profile auraxis-admin --region us-east-1 restore-drill
+./scripts/python_exec.sh scripts/aws_backups_s3.py --profile auraxis-admin --region us-east-1 restore-drill
 ```
 
 ## Observabilidade (CloudWatch)
@@ -155,27 +155,27 @@ Canary:
 
 Validacao rapida:
 ```bash
-./.venv/bin/python scripts/aws_validate_i16.py --profile auraxis-admin --region us-east-1 --target route53 --target logs
+./scripts/python_exec.sh scripts/aws_validate_i16.py --profile auraxis-admin --region us-east-1 --target route53 --target logs
 ```
 
 Snapshot local de métricas de integração (JSON):
 ```bash
-FLASK_APP=run.py ./.venv/bin/flask integration-metrics snapshot --prefix brapi.
-FLASK_APP=run.py ./.venv/bin/flask integration-metrics snapshot --prefix rate_limit. --reset
+FLASK_APP=run.py ./scripts/repo_bin.sh flask integration-metrics snapshot --prefix brapi.
+FLASK_APP=run.py ./scripts/repo_bin.sh flask integration-metrics snapshot --prefix rate_limit. --reset
 ```
 
 ## Firewall host (UFW)
 
 Aplicacao via SSM (mantem SSM funcionando, nao abre SSH):
 ```bash
-./.venv/bin/python scripts/aws_ufw_i8.py --profile auraxis-admin --region us-east-1 apply --env prod --execute
-./.venv/bin/python scripts/aws_ufw_i8.py --profile auraxis-admin --region us-east-1 apply --env dev --execute
+./scripts/python_exec.sh scripts/aws_ufw_i8.py --profile auraxis-admin --region us-east-1 apply --env prod --execute
+./scripts/python_exec.sh scripts/aws_ufw_i8.py --profile auraxis-admin --region us-east-1 apply --env dev --execute
 ```
 
 Status:
 ```bash
-./.venv/bin/python scripts/aws_ufw_i8.py --profile auraxis-admin --region us-east-1 status --env prod --print-output
-./.venv/bin/python scripts/aws_ufw_i8.py --profile auraxis-admin --region us-east-1 status --env dev --print-output
+./scripts/python_exec.sh scripts/aws_ufw_i8.py --profile auraxis-admin --region us-east-1 status --env prod --print-output
+./scripts/python_exec.sh scripts/aws_ufw_i8.py --profile auraxis-admin --region us-east-1 status --env dev --print-output
 ```
 
 ## IAM (least-privilege) - auditoria operacional
@@ -183,7 +183,7 @@ Status:
 Auditar role das instancias e roles de deploy (DEV/PROD):
 
 ```bash
-./.venv/bin/python scripts/aws_iam_audit_i8.py --profile auraxis-admin --region us-east-1
+./scripts/python_exec.sh scripts/aws_iam_audit_i8.py --profile auraxis-admin --region us-east-1
 ```
 
 Valide principalmente:
@@ -199,7 +199,7 @@ IMPORTANTE:
 
 Aplicar/atualizar budget + anomaly subscription:
 ```bash
-./.venv/bin/python scripts/aws_cost_guardrails_i5.py --profile auraxis-admin --region us-east-1 --usd-limit 10 --email felipe.italo@hotmail.com --enable-anomaly-detection
+./scripts/python_exec.sh scripts/aws_cost_guardrails_i5.py --profile auraxis-admin --region us-east-1 --usd-limit 10 --email felipe.italo@hotmail.com --enable-anomaly-detection
 ```
 
 ## Incidentes (playbook minimo)

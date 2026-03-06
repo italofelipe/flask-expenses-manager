@@ -17,11 +17,14 @@ set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT_DIR"
+# shellcheck source=./lib_python.sh
+source "${ROOT_DIR}/scripts/lib_python.sh"
 
 MODE="docker"
 RUN_SCHEMATHESIS=1
 RUN_MUTATION=0
 RUN_POSTMAN=0
+PYTHON_BIN=""
 
 require_command() {
   local cmd="$1"
@@ -32,22 +35,23 @@ require_command() {
 }
 
 ensure_local_dependencies() {
+  PYTHON_BIN="$(resolve_repo_python "$ROOT_DIR")"
   local missing=0
-  local required_tools=(pip-audit black isort flake8 mypy bandit pytest)
+  local required_modules=(pip_audit ruff mypy bandit pytest)
+  local module_name
 
-  for tool in "${required_tools[@]}"; do
-    if ! require_command "$tool"; then
+  for module_name in "${required_modules[@]}"; do
+    if ! python_has_module "$PYTHON_BIN" "$module_name"; then
+      echo "[ci-like-local] missing required Python module: $module_name" >&2
       missing=1
     fi
   done
 
   if [[ "$missing" -eq 1 ]]; then
     cat >&2 <<'EOF'
-[ci-like-local] one or more required tools are missing.
+[ci-like-local] one or more required Python modules are missing.
 Install dev dependencies first:
-  python -m pip install --upgrade pip
-  pip install -r requirements.txt
-  pip install -r requirements-dev.txt
+  bash scripts/bootstrap_local_env.sh
 EOF
     exit 3
   fi
@@ -110,25 +114,22 @@ done
 
 run_core_pipeline() {
   echo "[ci-like-local] step=flags:hygiene"
-  python scripts/check_feature_flags.py
+  "${PYTHON_BIN}" scripts/check_feature_flags.py
 
   echo "[ci-like-local] step=quality:pip-audit"
-  pip-audit -r requirements.txt
+  "${PYTHON_BIN}" -m pip_audit -r requirements.txt
 
-  echo "[ci-like-local] step=quality:black"
-  black --check .
+  echo "[ci-like-local] step=quality:ruff-format"
+  "${PYTHON_BIN}" -m ruff format --check .
 
-  echo "[ci-like-local] step=quality:isort"
-  isort --check-only app tests config run.py run_without_db.py
-
-  echo "[ci-like-local] step=quality:flake8"
-  flake8 app tests config run.py run_without_db.py
+  echo "[ci-like-local] step=quality:ruff-check"
+  "${PYTHON_BIN}" -m ruff check app tests config run.py run_without_db.py
 
   echo "[ci-like-local] step=quality:mypy"
-  mypy app
+  "${PYTHON_BIN}" -m mypy app
 
   echo "[ci-like-local] step=quality:bandit"
-  bandit -r app -lll -iii
+  "${PYTHON_BIN}" -m bandit -r app -lll -iii
 
   if command -v gitleaks >/dev/null 2>&1; then
     echo "[ci-like-local] step=security:gitleaks"
@@ -138,7 +139,7 @@ run_core_pipeline() {
   fi
 
   echo "[ci-like-local] step=tests:pytest+coverage"
-  pytest -m "not schemathesis" \
+  "${PYTHON_BIN}" -m pytest -m "not schemathesis" \
     --cov=app \
     --cov-fail-under=85 \
     --cov-report=term-missing \
@@ -205,14 +206,9 @@ run_in_docker() {
 }
 
 run_in_local() {
-  if ! command -v python >/dev/null 2>&1; then
-    echo "Python is required for --local mode." >&2
-    exit 1
-  fi
-
   ensure_local_dependencies
 
-  echo "[ci-like-local] Running in local environment..."
+  echo "[ci-like-local] Running in local environment with ${PYTHON_BIN}..."
   run_core_pipeline
   echo "[ci-like-local] All selected checks passed (local mode)."
 }

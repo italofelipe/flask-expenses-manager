@@ -1,9 +1,9 @@
 from functools import wraps
 from typing import Any, Callable, TypeVar, cast
 
-import jwt
 from flask import Response, current_app, request
 
+import jwt
 from app.utils.api_contract import is_v2_contract_request
 from app.utils.response_builder import error_payload, json_response
 

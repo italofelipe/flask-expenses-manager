@@ -4,11 +4,10 @@ set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "${ROOT_DIR}"
+# shellcheck source=./lib_python.sh
+source "${ROOT_DIR}/scripts/lib_python.sh"
 
-PYTHON_BIN="${PYTHON_BIN:-python3}"
-if [[ -x "${ROOT_DIR}/.venv/bin/python" ]]; then
-  PYTHON_BIN="${ROOT_DIR}/.venv/bin/python"
-fi
+PYTHON_BIN="$(resolve_repo_python "$ROOT_DIR")"
 PYTHON_DIR="$(dirname "${PYTHON_BIN}")"
 export PATH="${PYTHON_DIR}:${PATH}"
 

@@ -56,7 +56,7 @@ Quando documentos conflitam, a ordem acima é a prioridade.
 | Banco | PostgreSQL | — |
 | Cache | Redis | — |
 | Deploy | AWS EC2 + Docker Compose + Nginx | — |
-| Linting | black + isort + flake8 | — |
+| Linting | Ruff (format + lint + import sort) | — |
 | Type check | mypy (strict) | — |
 | SAST | Bandit | -lll -iii (high+) |
 | Secret scan | Gitleaks | — |
@@ -83,21 +83,21 @@ Quando documentos conflitam, a ordem acima é a prioridade.
 ## 6. Quality gates (obrigatório antes de todo commit)
 
 ```bash
-# Formatação
-black .
-isort app tests config run.py run_without_db.py
+# Bootstrap local portável
+bash scripts/bootstrap_local_env.sh
 
-# Linting
-flake8 app tests config run.py run_without_db.py
+# Formatação + lint
+scripts/python_tool.sh ruff format .
+scripts/python_tool.sh ruff check app tests config run.py run_without_db.py
 
 # Type check
-mypy app
+scripts/python_tool.sh mypy app
 
 # Testes + cobertura (mínimo 85%)
-pytest -m "not schemathesis" --cov=app --cov-fail-under=85
+scripts/repo_bin.sh pytest -m "not schemathesis" --cov=app --cov-fail-under=85
 
 # Pre-commit hooks (roda tudo acima + Gitleaks)
-pre-commit run --all-files
+scripts/repo_bin.sh pre-commit run --all-files
 ```
 
 > ⚠️ **Cobertura não pode regredir.** Se a task atual não adiciona testes, é técnico a ser registrado.
@@ -106,9 +106,8 @@ pre-commit run --all-files
 
 | Gate | Threshold | Bloqueia commit? |
 |:-----|:----------|:-----------------|
-| black | zero diffs | ✅ Sim |
-| isort | zero diffs | ✅ Sim |
-| flake8 | zero warnings | ✅ Sim |
+| ruff format | zero diffs | ✅ Sim |
+| ruff check | zero findings | ✅ Sim |
 | mypy | zero errors (strict) | ✅ Sim |
 | pytest coverage | ≥ 85% | ✅ Sim |
 | Bandit | nenhum HIGH/CRITICAL | ✅ Sim |
@@ -121,7 +120,7 @@ pre-commit run --all-files
 ```
 push/PR
  │
- ├── quality (black + isort + flake8 + mypy + bandit + pip-audit)
+ ├── quality (ruff format + ruff check + mypy + bandit + pip-audit)
  ├── mypy-matrix (3.11 + 3.13)
  ├── secret-scan (Gitleaks)
  ├── dependency-review [PR only]
@@ -169,7 +168,7 @@ Todos os jobs de `tests` e superiores dependem de `quality` + `secret-scan` pass
 - [ ] Requisito implementado com testes adequados
 - [ ] Cobertura ≥ 85% (não regrediu)
 - [ ] Sem regressão de contrato REST/GraphQL
-- [ ] black + isort + flake8 + mypy: zero erros
+- [ ] ruff format + ruff check + mypy: zero erros
 - [ ] Bandit: nenhum HIGH/CRITICAL
 - [ ] Documentação atualizada (TASKS.md + docs afetados)
 - [ ] Branch publicada com commits granulares e mensagens claras

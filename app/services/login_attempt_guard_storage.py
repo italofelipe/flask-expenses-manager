@@ -203,7 +203,7 @@ def build_login_attempt_storage_from_env() -> tuple[
         )
 
     try:
-        redis_client_cls = getattr(importlib.import_module("redis"), "Redis")
+        redis_client_cls = importlib.import_module("redis").Redis
     except Exception:
         return (
             InMemoryLoginAttemptStorage(),

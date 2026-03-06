@@ -3,6 +3,8 @@ set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT_DIR"
+# shellcheck source=./lib_python.sh
+source "${ROOT_DIR}/scripts/lib_python.sh"
 
 SONAR_HOST_URL="${SONAR_HOST_URL:-https://sonarcloud.io}"
 SONAR_LOCAL_MODE="${SONAR_LOCAL_MODE:-advisory}"
@@ -70,10 +72,7 @@ if ! command -v curl >/dev/null 2>&1; then
   handle_soft_failure "curl not found in PATH."
 fi
 
-PYTHON_BIN="${PYTHON_BIN:-.venv/bin/python}"
-if [[ ! -x "$PYTHON_BIN" ]]; then
-  PYTHON_BIN="python3"
-fi
+PYTHON_BIN="$(resolve_repo_python "$ROOT_DIR")"
 
 echo "[sonar-local] Running tests with coverage..."
 "$PYTHON_BIN" -m pytest -p no:schemathesis -m "not schemathesis" -q --disable-warnings --cov=app --cov-report=xml:coverage.xml
