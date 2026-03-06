@@ -4,13 +4,13 @@ from typing import Any, cast
 from uuid import UUID
 
 from flask import Response, request
-from app.utils.typed_decorators import typed_doc as doc
 from flask_apispec.views import MethodResource
 from flask_jwt_extended import get_jwt, get_jwt_identity
-from app.utils.typed_decorators import typed_jwt_required as jwt_required
 
 from app.models.transaction import Transaction
 from app.utils.pagination import PaginatedResponse
+from app.utils.typed_decorators import typed_doc as doc
+from app.utils.typed_decorators import typed_jwt_required as jwt_required
 
 from .contracts import compat_success
 from .dependencies import get_user_dependencies

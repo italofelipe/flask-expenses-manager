@@ -5,13 +5,13 @@ from __future__ import annotations
 from uuid import UUID
 
 from flask import Response
-from app.utils.typed_decorators import typed_doc as doc
 from flask_jwt_extended import get_jwt_identity
-from app.utils.typed_decorators import typed_jwt_required as jwt_required
 
 from app.application.services.transaction_application_service import (
     TransactionApplicationError,
 )
+from app.utils.typed_decorators import typed_doc as doc
+from app.utils.typed_decorators import typed_jwt_required as jwt_required
 
 from .dependencies import get_transaction_dependencies
 from .openapi import TRANSACTION_SOFT_DELETE_DOC

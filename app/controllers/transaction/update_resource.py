@@ -6,14 +6,15 @@ from typing import Any
 from uuid import UUID
 
 from flask import Response
-from app.utils.typed_decorators import typed_doc as doc, typed_use_kwargs as use_kwargs
 from flask_jwt_extended import get_jwt_identity
-from app.utils.typed_decorators import typed_jwt_required as jwt_required
 
 from app.application.services.transaction_application_service import (
     TransactionApplicationError,
 )
 from app.schemas.transaction_schema import TransactionSchema
+from app.utils.typed_decorators import typed_doc as doc
+from app.utils.typed_decorators import typed_jwt_required as jwt_required
+from app.utils.typed_decorators import typed_use_kwargs as use_kwargs
 
 from .dependencies import get_transaction_dependencies
 from .openapi import TRANSACTION_UPDATE_DOC

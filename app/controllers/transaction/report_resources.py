@@ -4,10 +4,8 @@ from typing import Any
 from uuid import UUID
 
 from flask import Response, request
-from app.utils.typed_decorators import typed_doc as doc
 from flask_apispec.views import MethodResource
 from flask_jwt_extended import get_jwt_identity
-from app.utils.typed_decorators import typed_jwt_required as jwt_required
 
 from app.application.services.public_error_mapper_service import (
     map_validation_exception,
@@ -18,6 +16,8 @@ from app.application.services.transaction_application_service import (
 from app.extensions.database import db
 from app.models.transaction import Transaction, TransactionStatus, TransactionType
 from app.services.transaction_analytics_service import TransactionAnalyticsService
+from app.utils.typed_decorators import typed_doc as doc
+from app.utils.typed_decorators import typed_jwt_required as jwt_required
 
 from .dependencies import get_transaction_dependencies
 from .openapi import (

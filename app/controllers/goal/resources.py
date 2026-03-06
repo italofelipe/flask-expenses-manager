@@ -4,13 +4,14 @@ from typing import Any
 from uuid import UUID
 
 from flask import request
-from app.utils.typed_decorators import typed_doc as doc, typed_use_kwargs as use_kwargs
 from flask_apispec.views import MethodResource
 from flask_jwt_extended import get_jwt_identity
-from app.utils.typed_decorators import typed_jwt_required as jwt_required
 from marshmallow import fields
 
 from app.application.services.goal_application_service import GoalApplicationError
+from app.utils.typed_decorators import typed_doc as doc
+from app.utils.typed_decorators import typed_jwt_required as jwt_required
+from app.utils.typed_decorators import typed_use_kwargs as use_kwargs
 
 from .contracts import compat_success, goal_application_error_response
 from .dependencies import get_goal_dependencies

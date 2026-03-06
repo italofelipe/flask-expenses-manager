@@ -4,11 +4,11 @@ from typing import Any
 from uuid import UUID
 
 from flask import request
-from app.utils.typed_decorators import typed_doc as doc
 from flask_jwt_extended import get_jwt_identity
-from app.utils.typed_decorators import typed_jwt_required as jwt_required
 
 from app.services.investment_operation_service import InvestmentOperationError
+from app.utils.typed_decorators import typed_doc as doc
+from app.utils.typed_decorators import typed_jwt_required as jwt_required
 
 from .blueprint import wallet_bp
 from .contracts import (
