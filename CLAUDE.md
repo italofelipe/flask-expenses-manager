@@ -135,7 +135,7 @@ scripts/repo_bin.sh pytest -m "not schemathesis" --cov=app --cov-fail-under=85
 
 | Layer | Technology |
 | :--- | :--- |
-| Backend | Python 3.11+, Flask |
+| Backend | Python 3.13, Flask |
 | ORM | SQLAlchemy with Flask-SQLAlchemy |
 | Serialization | Marshmallow Schemas |
 | API | GraphQL (Ariadne) + REST (Flask controllers) |

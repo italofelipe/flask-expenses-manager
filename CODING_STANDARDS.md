@@ -14,7 +14,7 @@
 # pyproject.toml
 [tool.ruff]
 line-length = 88
-target-version = "py311"
+target-version = "py313"
 ```
 
 - Nunca formatar manualmente — deixe o `ruff format` decidir
@@ -55,7 +55,7 @@ from config.settings import Settings
 ```toml
 # pyproject.toml
 [tool.mypy]
-python_version = "3.11"
+python_version = "3.13"
 strict = true
 disallow_untyped_defs = true
 warn_return_any = true

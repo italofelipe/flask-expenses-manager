@@ -46,7 +46,7 @@ Quando documentos conflitam, a ordem acima é a prioridade.
 
 | Camada | Tecnologia | Versão |
 |:-------|:-----------|:-------|
-| Runtime | Python | 3.11 (CI), 3.13 (matrix) |
+| Runtime | Python | 3.13 |
 | Framework | Flask | latest compat. |
 | ORM | SQLAlchemy + Flask-SQLAlchemy | — |
 | Serialização | Marshmallow | — |
@@ -121,7 +121,7 @@ scripts/repo_bin.sh pre-commit run --all-files
 push/PR
  │
  ├── quality (ruff format + ruff check + mypy + bandit + pip-audit)
- ├── mypy-matrix (3.11 + 3.13)
+ ├── mypy-matrix (3.13)
  ├── secret-scan (Gitleaks)
  ├── dependency-review [PR only]
  ├── review-signal [PR only, advisory]

@@ -1,7 +1,7 @@
 # Testes
 
 ## Pré-requisitos
-- Python 3.11 ou 3.13
+- Python 3.13
 
 ## Setup local
 ```bash

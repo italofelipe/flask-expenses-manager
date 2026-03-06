@@ -11,7 +11,6 @@ resolve_bootstrap_python() {
   for candidate in \
     "${BOOTSTRAP_PYTHON:-${AURAXIS_BOOTSTRAP_PYTHON:-python3.13}}" \
     python3.13 \
-    python3.11 \
     python3 \
     python; do
     [[ -z "$candidate" ]] && continue
@@ -24,7 +23,7 @@ resolve_bootstrap_python() {
     fi
   done
 
-  echo "Python interpreter not found. Expected Python 3.11 or 3.13 in PATH." >&2
+  echo "Python interpreter not found. Expected Python 3.13 in PATH." >&2
   exit 1
 }
 

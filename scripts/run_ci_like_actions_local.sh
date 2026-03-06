@@ -3,7 +3,7 @@ set -euo pipefail
 
 # Run a local gate bundle that mirrors CI checks.
 #
-# Default: dockerized python:3.11 parity for quality/tests/security-evidence.
+# Default: dockerized python:3.13 parity for quality/tests/security-evidence.
 # Flags:
 #   --local               run in current environment (no docker wrapper)
 #   --fast                skip schemathesis checks
@@ -192,11 +192,11 @@ run_in_docker() {
     exit 4
   fi
 
-  echo "[ci-like-local] Running in python:3.11-slim container..."
+  echo "[ci-like-local] Running in python:3.13-slim container..."
   docker run --rm \
     -v "$ROOT_DIR:/workspace" \
     -w /workspace \
-    python:3.11-slim \
+    python:3.13-slim \
     bash -lc "python -m pip install --upgrade pip && \
       pip install -r requirements.txt && \
       pip install -r requirements-dev.txt && \

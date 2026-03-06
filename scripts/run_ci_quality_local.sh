@@ -17,11 +17,11 @@ if [[ "$MODE" == "docker" ]]; then
     exit 1
   fi
 
-  echo "[quality-local] Running CI quality pipeline in python:3.11-slim container..."
+  echo "[quality-local] Running CI quality pipeline in python:3.13-slim container..."
   docker run --rm \
     -v "$ROOT_DIR:/workspace" \
     -w /workspace \
-    python:3.11-slim \
+    python:3.13-slim \
     bash -lc "python -m pip install --upgrade pip && \
       python -m pip install -r requirements.txt -r requirements-dev.txt && \
       python -m pip_audit -r requirements.txt && \
@@ -29,7 +29,7 @@ if [[ "$MODE" == "docker" ]]; then
       python -m ruff check app tests config run.py run_without_db.py && \
       python -m mypy app && \
       python -m bandit -r app -lll -iii"
-  echo "[quality-local] All quality checks passed (Docker / Python 3.11)."
+  echo "[quality-local] All quality checks passed (Docker / Python 3.13)."
   exit 0
 fi
 

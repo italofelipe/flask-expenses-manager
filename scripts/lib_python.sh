@@ -15,7 +15,7 @@ is_supported_python() {
   local version
 
   version="$(python_minor_version "$python_bin")"
-  [[ "$version" == "3.11" || "$version" == "3.13" ]]
+  [[ "$version" == "3.13" ]]
 }
 
 resolve_repo_python() {
@@ -30,7 +30,7 @@ resolve_repo_python() {
         printf '%s\n' "$configured"
         return 0
       fi
-      echo "Configured PYTHON_BIN uses unsupported Python: $(python_minor_version "$configured"). Expected 3.11 or 3.13." >&2
+      echo "Configured PYTHON_BIN uses unsupported Python: $(python_minor_version "$configured"). Expected 3.13." >&2
       return 1
     fi
     if command -v "$configured" >/dev/null 2>&1; then
@@ -39,7 +39,7 @@ resolve_repo_python() {
         printf '%s\n' "$candidate"
         return 0
       fi
-      echo "Configured PYTHON_BIN resolves to unsupported Python: $(python_minor_version "$candidate"). Expected 3.11 or 3.13." >&2
+      echo "Configured PYTHON_BIN resolves to unsupported Python: $(python_minor_version "$candidate"). Expected 3.13." >&2
       return 1
     fi
     echo "Configured PYTHON_BIN not found: $configured" >&2
@@ -60,11 +60,11 @@ resolve_repo_python() {
       printf '%s\n' "${VIRTUAL_ENV}/bin/python"
       return 0
     fi
-    echo "Unsupported Python in VIRTUAL_ENV (${VIRTUAL_ENV}): $(python_minor_version "${VIRTUAL_ENV}/bin/python"). Expected 3.11 or 3.13." >&2
+    echo "Unsupported Python in VIRTUAL_ENV (${VIRTUAL_ENV}): $(python_minor_version "${VIRTUAL_ENV}/bin/python"). Expected 3.13." >&2
     return 1
   fi
 
-  for candidate in "${AURAXIS_BOOTSTRAP_PYTHON:-python3.13}" python3.13 python3.11 python3 python; do
+  for candidate in "${AURAXIS_BOOTSTRAP_PYTHON:-python3.13}" python3.13 python3 python; do
     [[ -z "$candidate" ]] && continue
     if command -v "$candidate" >/dev/null 2>&1; then
       candidate="$(command -v "$candidate")"
@@ -75,7 +75,7 @@ resolve_repo_python() {
     fi
   done
 
-  echo "No supported Python interpreter found. Expected Python 3.11 or 3.13 in PATH." >&2
+  echo "No supported Python interpreter found. Expected Python 3.13 in PATH." >&2
   return 1
 }
 
