@@ -3,11 +3,12 @@ from __future__ import annotations
 from typing import Any
 
 from flask import Response, current_app, request
-from app.utils.typed_decorators import typed_doc as doc, typed_use_kwargs as use_kwargs
 from flask_apispec.views import MethodResource
 
 from app.extensions.database import db
 from app.schemas.auth_schema import AuthSchema
+from app.utils.typed_decorators import typed_doc as doc
+from app.utils.typed_decorators import typed_use_kwargs as use_kwargs
 
 from .contracts import compat_error, compat_success
 from .dependencies import get_auth_dependencies

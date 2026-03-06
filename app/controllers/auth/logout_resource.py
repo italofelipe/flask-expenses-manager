@@ -3,12 +3,12 @@ from __future__ import annotations
 from uuid import UUID
 
 from flask import Response
-from app.utils.typed_decorators import typed_doc as doc
 from flask_apispec.views import MethodResource
 from flask_jwt_extended import get_jwt_identity
-from app.utils.typed_decorators import typed_jwt_required as jwt_required
 
 from app.extensions.database import db
+from app.utils.typed_decorators import typed_doc as doc
+from app.utils.typed_decorators import typed_jwt_required as jwt_required
 
 from .contracts import compat_success
 from .dependencies import get_auth_dependencies

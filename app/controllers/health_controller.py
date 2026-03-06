@@ -14,6 +14,7 @@ Contract
 from __future__ import annotations
 
 from flask import Blueprint
+
 from app.utils.typed_decorators import typed_doc as doc
 
 health_bp = Blueprint("health", __name__)
