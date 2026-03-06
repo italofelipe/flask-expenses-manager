@@ -24,7 +24,7 @@ Gatilhos:
 
 Jobs relevantes:
 1. `quality`
-- `pip-audit`, `black`, `isort`, `flake8`, `mypy`, `bandit`
+- `pip-audit`, `ruff format`, `ruff check`, `mypy`, `bandit`
 
 2. `secret-scan`
 - `gitleaks` com config versionada `.gitleaks.toml`
@@ -116,7 +116,7 @@ Notas:
 Arquivo: `.pre-commit-config.yaml`
 
 Hooks:
-- `black`, `flake8`, `isort`
+- `ruff-check`, `ruff-format`
 - `bandit`
 - `gitleaks` com `.gitleaks.toml`
 - `detect-private-key`
@@ -144,7 +144,7 @@ Política:
   disponível em PRs automatizados (ex.: Dependabot), nunca `failed`.
 - no ecossistema Python do backend, updates `minor` de dependências de desenvolvimento
   não são agrupados. Ferramentas como `mypy`, `pre-commit`, `bandit`, `pip-audit`,
-  `schemathesis`, `flake8` e stubs tipados devem abrir PRs individuais para isolar
+  `schemathesis`, `ruff` e stubs tipados devem abrir PRs individuais para isolar
   regressões de toolchain e evitar lotes com centenas de erros não atribuíveis.
 
 ## Reproducao local (CI-like)
@@ -156,6 +156,7 @@ Script oficial:
   - `python scripts/pr_review_signal_check.py --repo <owner/repo> --pr-number <numero> --mode strict`
 
 Exemplos:
+- `bash scripts/bootstrap_local_env.sh`
 - `bash scripts/run_ci_like_actions_local.sh`
 - `bash scripts/run_ci_like_actions_local.sh --local --with-postman`
 - `bash scripts/run_ci_like_actions_local.sh --local --with-mutation`

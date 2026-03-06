@@ -353,10 +353,7 @@ def _classify_sg_permission(permission: dict[str, Any]) -> tuple[str, str]:
         return "FAIL", "All ports open to world"
     return (
         "WARN",
-        (
-            "Public ingress "
-            f"protocol={protocol} from_port={from_port} to_port={to_port}"
-        ),
+        (f"Public ingress protocol={protocol} from_port={from_port} to_port={to_port}"),
     )
 
 
@@ -508,7 +505,7 @@ def _print_results(results: list[CheckResult]) -> int:
                 f"| resource={result.resource} | {result.details}"
             )
         )
-    print("\nSummary: " f"PASS={pass_count} WARN={warn_count} FAIL={fail_count}")
+    print(f"\nSummary: PASS={pass_count} WARN={warn_count} FAIL={fail_count}")
     return 1 if fail_count > 0 else 0
 
 

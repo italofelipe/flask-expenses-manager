@@ -31,8 +31,7 @@ def _validate_non_negative_values(user: User) -> list[str]:
         value = getattr(user, field_name)
         if value is not None and value < 0:
             errors.append(
-                f"{field_name.replace('_', ' ').capitalize()} "
-                f"não pode ser negativo."
+                f"{field_name.replace('_', ' ').capitalize()} não pode ser negativo."
             )
     return errors
 

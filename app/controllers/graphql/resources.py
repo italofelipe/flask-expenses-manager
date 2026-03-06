@@ -3,7 +3,6 @@ from __future__ import annotations
 from typing import Any
 
 from flask import current_app, request
-from graphql import GraphQLError
 
 from app.application.services.public_error_mapper_service import (
     map_validation_exception,
@@ -27,6 +26,7 @@ from app.graphql.security import (
     GraphQLSecurityViolation,
     analyze_graphql_query,
 )
+from graphql import GraphQLError
 
 from .dependencies import get_graphql_authorization_policy, get_graphql_security_policy
 

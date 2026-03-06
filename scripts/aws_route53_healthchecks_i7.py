@@ -206,8 +206,7 @@ def build_parser() -> argparse.ArgumentParser:
     sub.add_parser(
         "enable-actions",
         help=(
-            "Enable alarm actions for auraxis-health-dev/prod "
-            "(restores notifications)."
+            "Enable alarm actions for auraxis-health-dev/prod (restores notifications)."
         ),
     )
     sub.add_parser(
@@ -319,8 +318,7 @@ def main() -> int:
             health_check_id=http_id,
             sns_topic_arn=args.sns_topic_arn,
             description=(
-                "Auraxis DEV health check failing: "
-                f"http://{args.dev_domain}{args.path}"
+                f"Auraxis DEV health check failing: http://{args.dev_domain}{args.path}"
             ),
         )
 

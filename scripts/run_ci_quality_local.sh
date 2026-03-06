@@ -3,15 +3,13 @@ set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT_DIR"
+# shellcheck source=./lib_python.sh
+source "${ROOT_DIR}/scripts/lib_python.sh"
 
 MODE="docker"
 if [[ "${1:-}" == "--local" ]]; then
   MODE="local"
 fi
-
-PYTHON_FILES_LIST="$(mktemp)"
-trap 'rm -f "$PYTHON_FILES_LIST"' EXIT
-git ls-files "*.py" >"$PYTHON_FILES_LIST"
 
 if [[ "$MODE" == "docker" ]]; then
   if ! command -v docker >/dev/null 2>&1; then
@@ -19,36 +17,28 @@ if [[ "$MODE" == "docker" ]]; then
     exit 1
   fi
 
-  echo "[quality-local] Running CI quality pipeline in python:3.11-slim container..."
+  echo "[quality-local] Running CI quality pipeline in python:3.13-slim container..."
   docker run --rm \
     -v "$ROOT_DIR:/workspace" \
-    -v "$PYTHON_FILES_LIST:/tmp/python_files.txt:ro" \
     -w /workspace \
-    python:3.11-slim \
+    python:3.13-slim \
     bash -lc "python -m pip install --upgrade pip && \
-      pip install -r requirements.txt && \
-      pip install -r requirements-dev.txt && \
-      pip install pip-audit bandit && \
-      pip-audit -r requirements.txt && \
-      black --check \$(tr '\n' ' ' </tmp/python_files.txt) && \
-      isort --check-only app tests config run.py run_without_db.py && \
-      flake8 app tests config run.py run_without_db.py && \
-      mypy app && \
-      bandit -r app -lll -iii"
-  echo "[quality-local] All quality checks passed (Docker / Python 3.11)."
+      python -m pip install -r requirements.txt -r requirements-dev.txt && \
+      python -m pip_audit -r requirements.txt && \
+      python -m ruff format --check . && \
+      python -m ruff check app tests config run.py run_without_db.py && \
+      python -m mypy app && \
+      python -m bandit -r app -lll -iii"
+  echo "[quality-local] All quality checks passed (Docker / Python 3.13)."
   exit 0
 fi
 
-if ! command -v python >/dev/null 2>&1; then
-  echo "Python is required for --local mode." >&2
-  exit 1
-fi
+PYTHON_BIN="$(resolve_repo_python "$ROOT_DIR")"
 
-echo "[quality-local] Running CI quality pipeline in local environment..."
-pip-audit -r requirements.txt
-black --check $(tr '\n' ' ' <"$PYTHON_FILES_LIST")
-isort --check-only app tests config run.py run_without_db.py
-flake8 app tests config run.py run_without_db.py
-mypy app
-bandit -r app -lll -iii
+echo "[quality-local] Running CI quality pipeline in local environment with ${PYTHON_BIN}..."
+"${PYTHON_BIN}" -m pip_audit -r requirements.txt
+"${PYTHON_BIN}" -m ruff format --check .
+"${PYTHON_BIN}" -m ruff check app tests config run.py run_without_db.py
+"${PYTHON_BIN}" -m mypy app
+"${PYTHON_BIN}" -m bandit -r app -lll -iii
 echo "[quality-local] All quality checks passed (local environment)."

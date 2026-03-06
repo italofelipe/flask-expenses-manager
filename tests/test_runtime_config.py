@@ -26,7 +26,7 @@ def test_validate_security_configuration_rejects_debug_in_production(
 
     try:
         module.validate_security_configuration()
-        assert False, "Expected RuntimeError for debug mode in production."
+        raise AssertionError("Expected RuntimeError for debug mode in production.")
     except RuntimeError as exc:
         assert "FLASK_DEBUG must be false in production" in str(exc)
 
@@ -56,7 +56,7 @@ def test_validate_security_configuration_rejects_weak_secrets_in_secure_runtime(
 
     try:
         module.validate_security_configuration()
-        assert False, "Expected RuntimeError for weak secrets."
+        raise AssertionError("Expected RuntimeError for weak secrets.")
     except RuntimeError as exc:
         assert "Weak/invalid secrets" in str(exc)
 
@@ -74,9 +74,9 @@ def test_validate_security_configuration_rejects_disabled_enforcement_in_secure_
 
     try:
         module.validate_security_configuration()
-        assert (
-            False
-        ), "Expected RuntimeError for disabled secret enforcement in secure runtime."
+        raise AssertionError(
+            "Expected RuntimeError for disabled secret enforcement in secure runtime."
+        )
     except RuntimeError as exc:
         assert "SECURITY_ENFORCE_STRONG_SECRETS must be true" in str(exc)
 

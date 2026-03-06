@@ -128,8 +128,7 @@ def register_audit_trail(app: Flask) -> None:
         payload = _build_event_payload(response)
         endpoint = request.endpoint or "unknown"
         message = (
-            "audit_trail event=http.audit method=%s endpoint=%s "
-            "status=%s request_id=%s"
+            "audit_trail event=http.audit method=%s endpoint=%s status=%s request_id=%s"
         )
         current_app.logger.info(
             message,

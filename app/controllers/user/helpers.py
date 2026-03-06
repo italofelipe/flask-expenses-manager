@@ -148,10 +148,10 @@ def _parse_positive_int(
         return default
     try:
         parsed = int(raw_value)
-    except ValueError:
+    except ValueError as err:
         raise PublicValidationError(
             f"Parâmetro '{field_name}' inválido. Informe um inteiro positivo."
-        )
+        ) from err
     if parsed < 1 or parsed > max_value:
         raise PublicValidationError(
             f"Parâmetro '{field_name}' inválido. Use um valor entre 1 e {max_value}."

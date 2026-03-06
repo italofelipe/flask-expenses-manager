@@ -2,9 +2,8 @@ from __future__ import annotations
 
 from typing import Any, Callable
 
-from graphql import GraphQLError
-
 from app.application.errors import PublicValidationError
+from graphql import GraphQLError
 
 
 def graphql_error_response(

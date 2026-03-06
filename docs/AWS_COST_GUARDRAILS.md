@@ -18,7 +18,7 @@ Limites:
 ## Aplicar/atualizar guardrails (CLI)
 
 ```bash
-./.venv/bin/python scripts/aws_cost_guardrails_i5.py \
+./scripts/python_exec.sh scripts/aws_cost_guardrails_i5.py \
   --profile auraxis-admin \
   --region us-east-1 \
   --usd-limit 10 \

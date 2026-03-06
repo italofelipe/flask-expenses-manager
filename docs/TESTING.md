@@ -1,24 +1,21 @@
 # Testes
 
 ## Pré-requisitos
-- Python 3.13+
+- Python 3.13
 
 ## Setup local
 ```bash
-python3 -m venv .venv
-source .venv/bin/activate
-pip install -r requirements.txt
-pip install -r requirements-dev.txt
+bash scripts/bootstrap_local_env.sh
 ```
 
 ## Rodar suíte completa
 ```bash
-pytest
+scripts/repo_bin.sh pytest
 ```
 
 ## Rodar arquivo específico
 ```bash
-pytest tests/test_response_contract.py
+scripts/repo_bin.sh pytest tests/test_response_contract.py
 ```
 
 ## Suíte Postman / API Dog (Smoke + Regression)

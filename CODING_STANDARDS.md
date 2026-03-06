@@ -8,28 +8,19 @@
 
 ## 1. Formatação e estilo
 
-### Black (formatador obrigatório)
+### Ruff (formatador, lint e imports)
 
 ```toml
 # pyproject.toml
-[tool.black]
+[tool.ruff]
 line-length = 88
-target-version = ["py311"]
+target-version = "py313"
 ```
 
-- Nunca formatar manualmente — deixe o `black` decidir
-- Rodar `black .` antes de todo commit
-- CI: `black --check .` — zero diffs obrigatório
-
-### isort (ordenação de imports)
-
-```toml
-# pyproject.toml
-[tool.isort]
-profile = "black"
-line_length = 88
-known_first_party = ["app", "config"]
-```
+- Nunca formatar manualmente — deixe o `ruff format` decidir
+- Rodar `scripts/python_tool.sh ruff format .` antes de todo commit
+- Rodar `scripts/python_tool.sh ruff check app tests config run.py run_without_db.py` antes de todo commit
+- CI: `python -m ruff format --check .` e `python -m ruff check ...` — zero diffs/findings obrigatório
 
 Ordem de imports:
 ```python
@@ -48,16 +39,12 @@ from app.models.user import User
 from config.settings import Settings
 ```
 
-### Flake8
-
-```ini
-# .flake8 ou setup.cfg
-max-line-length = 88
-extend-ignore = E203, W503
-```
-
-- Zero warnings obrigatório
-- E203 e W503 ignorados (compatibilidade com black)
+- Regras equivalentes mantidas:
+  - `E/F/W` para erros base
+  - `I` para ordenação de imports
+  - `B` para bugbear
+  - `C90` para complexidade ciclomática
+- `E203` e `W503` continuam ignorados por compatibilidade com formatter
 
 ---
 
@@ -68,7 +55,7 @@ extend-ignore = E203, W503
 ```toml
 # pyproject.toml
 [tool.mypy]
-python_version = "3.11"
+python_version = "3.13"
 strict = true
 disallow_untyped_defs = true
 warn_return_any = true
