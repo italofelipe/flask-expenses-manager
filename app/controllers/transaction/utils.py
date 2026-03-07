@@ -8,7 +8,7 @@ from uuid import UUID
 from flask import Response, current_app
 
 from app.application.errors import PublicValidationError
-from app.auth import AuthContextError, get_active_auth_context
+from app.auth import AuthContextError, current_token_jti, get_active_auth_context
 from app.controllers.response_contract import (
     CONTRACT_HEADER,
     CONTRACT_V2,
@@ -16,6 +16,7 @@ from app.controllers.response_contract import (
     compat_success_response,
     is_v2_contract,
 )
+from app.extensions.jwt_callbacks import is_token_revoked
 from app.models.transaction import Transaction, TransactionStatus, TransactionType
 from app.services.transaction_reference_authorization_service import (
     TransactionReferenceAuthorizationError,
@@ -185,8 +186,11 @@ def _guard_revoked_token() -> Response | None:
     """
 
     try:
-        get_active_auth_context()
+        context = get_active_auth_context()
     except AuthContextError:
+        return _invalid_token_response()
+    jti = context.jti if context is not None else current_token_jti(optional=True)
+    if jti is not None and is_token_revoked(jti):
         return _invalid_token_response()
     return None
 
