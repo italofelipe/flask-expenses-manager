@@ -5,10 +5,10 @@ from uuid import UUID
 
 from flask import request
 from flask_apispec.views import MethodResource
-from flask_jwt_extended import get_jwt_identity
 from marshmallow import fields
 
 from app.application.services.goal_application_service import GoalApplicationError
+from app.auth import current_user_id
 from app.utils.typed_decorators import typed_doc as doc
 from app.utils.typed_decorators import typed_jwt_required as jwt_required
 from app.utils.typed_decorators import typed_use_kwargs as use_kwargs
@@ -30,7 +30,7 @@ class GoalCollectionResource(MethodResource):
     )
     @jwt_required()
     def post(self) -> Any:
-        user_id = UUID(get_jwt_identity())
+        user_id = current_user_id()
         payload = request.get_json() or {}
         dependencies = get_goal_dependencies()
         service = dependencies.goal_application_service_factory(user_id)
@@ -85,7 +85,7 @@ class GoalCollectionResource(MethodResource):
         per_page: int,
         status: str | None,
     ) -> Any:
-        user_id = UUID(get_jwt_identity())
+        user_id = current_user_id()
         dependencies = get_goal_dependencies()
         service = dependencies.goal_application_service_factory(user_id)
         try:
@@ -126,7 +126,7 @@ class GoalResource(MethodResource):
     )
     @jwt_required()
     def get(self, goal_id: UUID) -> Any:
-        user_id = UUID(get_jwt_identity())
+        user_id = current_user_id()
         dependencies = get_goal_dependencies()
         service = dependencies.goal_application_service_factory(user_id)
         try:
@@ -156,7 +156,7 @@ class GoalResource(MethodResource):
     )
     @jwt_required()
     def put(self, goal_id: UUID) -> Any:
-        user_id = UUID(get_jwt_identity())
+        user_id = current_user_id()
         payload = request.get_json() or {}
         dependencies = get_goal_dependencies()
         service = dependencies.goal_application_service_factory(user_id)
@@ -189,7 +189,7 @@ class GoalResource(MethodResource):
     )
     @jwt_required()
     def delete(self, goal_id: UUID) -> Any:
-        user_id = UUID(get_jwt_identity())
+        user_id = current_user_id()
         dependencies = get_goal_dependencies()
         service = dependencies.goal_application_service_factory(user_id)
         try:
@@ -223,7 +223,7 @@ class GoalPlanResource(MethodResource):
     )
     @jwt_required()
     def get(self, goal_id: UUID) -> Any:
-        user_id = UUID(get_jwt_identity())
+        user_id = current_user_id()
         dependencies = get_goal_dependencies()
         service = dependencies.goal_application_service_factory(user_id)
         try:
@@ -262,7 +262,7 @@ class GoalSimulationResource(MethodResource):
     @jwt_required()
     def post(self) -> Any:
         payload = request.get_json() or {}
-        user_id = UUID(get_jwt_identity())
+        user_id = current_user_id()
         dependencies = get_goal_dependencies()
         service = dependencies.goal_application_service_factory(user_id)
         try:

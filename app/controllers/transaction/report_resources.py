@@ -5,7 +5,6 @@ from uuid import UUID
 
 from flask import Response, request
 from flask_apispec.views import MethodResource
-from flask_jwt_extended import get_jwt_identity
 
 from app.application.services.public_error_mapper_service import (
     map_validation_exception,
@@ -13,6 +12,7 @@ from app.application.services.public_error_mapper_service import (
 from app.application.services.transaction_application_service import (
     TransactionApplicationError,
 )
+from app.auth import current_user_id
 from app.extensions.database import db
 from app.models.transaction import Transaction, TransactionStatus, TransactionType
 from app.services.transaction_analytics_service import TransactionAnalyticsService
@@ -172,7 +172,7 @@ class TransactionSummaryResource(MethodResource):
         if token_error is not None:
             return token_error
 
-        user_uuid = UUID(get_jwt_identity())
+        user_uuid = current_user_id()
         try:
             dependencies = get_transaction_dependencies()
             service = dependencies.transaction_application_service_factory(user_uuid)
@@ -236,7 +236,7 @@ class TransactionMonthlyDashboardResource(MethodResource):
         if token_error is not None:
             return token_error
 
-        user_uuid = UUID(get_jwt_identity())
+        user_uuid = current_user_id()
         try:
             dependencies = get_transaction_dependencies()
             service = dependencies.transaction_application_service_factory(user_uuid)
@@ -299,9 +299,9 @@ class TransactionForceDeleteResource(MethodResource):
         if token_error is not None:
             return token_error
 
-        user_id = get_jwt_identity()
+        user_id = current_user_id()
         transaction = Transaction.query.filter_by(
-            id=transaction_id, user_id=UUID(user_id), deleted=True
+            id=transaction_id, user_id=user_id, deleted=True
         ).first()
 
         if not transaction:
@@ -339,7 +339,7 @@ class TransactionExpensePeriodResource(MethodResource):
         if token_error is not None:
             return token_error
 
-        user_uuid = UUID(get_jwt_identity())
+        user_uuid = current_user_id()
 
         try:
             start_date = _parse_optional_date(
@@ -454,7 +454,7 @@ class TransactionDeletedResource(MethodResource):
         if token_error is not None:
             return token_error
 
-        user_uuid = UUID(get_jwt_identity())
+        user_uuid = current_user_id()
         try:
             transactions = Transaction.query.filter_by(
                 user_id=user_uuid, deleted=True
@@ -483,7 +483,7 @@ class TransactionDuePeriodResource(MethodResource):
         if token_error is not None:
             return token_error
 
-        user_uuid = UUID(get_jwt_identity())
+        user_uuid = current_user_id()
         try:
             page = _parse_positive_int(
                 request.args.get("page"), default=1, field_name="page"
@@ -556,7 +556,7 @@ class TransactionRestoreResource(MethodResource):
         if token_error is not None:
             return token_error
 
-        user_uuid = UUID(get_jwt_identity())
+        user_uuid = current_user_id()
         transaction = Transaction.query.filter_by(
             id=transaction_id, user_id=user_uuid, deleted=True
         ).first()
@@ -593,7 +593,7 @@ class TransactionListActiveResource(MethodResource):
         if token_error is not None:
             return token_error
 
-        user_uuid = UUID(get_jwt_identity())
+        user_uuid = current_user_id()
         try:
             params = _parse_active_list_query_params()
             range_error = _active_list_date_range_error(

@@ -4,8 +4,8 @@ from typing import Any
 from uuid import UUID
 
 from flask import request
-from flask_jwt_extended import get_jwt_identity
 
+from app.auth import current_user_id
 from app.services.investment_operation_service import InvestmentOperationError
 from app.utils.typed_decorators import typed_doc as doc
 from app.utils.typed_decorators import typed_jwt_required as jwt_required
@@ -43,7 +43,7 @@ from .dependencies import get_wallet_dependencies
 )
 @jwt_required()
 def get_portfolio_valuation() -> tuple[dict[str, Any], int]:
-    user_id: UUID = UUID(get_jwt_identity())
+    user_id: UUID = current_user_id()
     dependencies = get_wallet_dependencies()
     service = dependencies.portfolio_valuation_service_factory(user_id)
     payload = service.get_portfolio_current_valuation()
@@ -89,7 +89,7 @@ def get_portfolio_valuation() -> tuple[dict[str, Any], int]:
 )
 @jwt_required()
 def get_portfolio_valuation_history() -> tuple[dict[str, Any], int]:
-    user_id: UUID = UUID(get_jwt_identity())
+    user_id: UUID = current_user_id()
     dependencies = get_wallet_dependencies()
 
     raw_start_date = request.args.get("startDate")
@@ -147,7 +147,7 @@ def get_portfolio_valuation_history() -> tuple[dict[str, Any], int]:
 )
 @jwt_required()
 def get_investment_valuation(investment_id: UUID) -> tuple[dict[str, Any], int]:
-    user_id: UUID = UUID(get_jwt_identity())
+    user_id: UUID = current_user_id()
     dependencies = get_wallet_dependencies()
     service = dependencies.portfolio_valuation_service_factory(user_id)
     try:

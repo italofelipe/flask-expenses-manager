@@ -1,11 +1,9 @@
 from __future__ import annotations
 
-from uuid import UUID
-
 from flask import Response
 from flask_apispec.views import MethodResource
-from flask_jwt_extended import get_jwt_identity
 
+from app.auth import current_user_id
 from app.extensions.database import db
 from app.utils.typed_decorators import typed_doc as doc
 from app.utils.typed_decorators import typed_jwt_required as jwt_required
@@ -34,7 +32,7 @@ class LogoutResource(MethodResource):
     @jwt_required()
     def post(self) -> Response:
         dependencies = get_auth_dependencies()
-        identity = UUID(str(get_jwt_identity()))
+        identity = current_user_id()
         user = dependencies.get_user_by_id(identity)
         if user:
             user.current_jti = None

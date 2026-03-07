@@ -5,9 +5,9 @@ from uuid import UUID
 
 from flask import Response, current_app, g
 from flask_apispec.views import MethodResource
-from flask_jwt_extended import get_jwt, get_jwt_identity
 
 from app.application.services.user_profile_service import update_user_profile
+from app.auth import get_active_auth_context
 from app.extensions.database import db
 from app.schemas.user_schemas import UserProfileSchema
 from app.utils.typed_decorators import typed_doc as doc
@@ -193,10 +193,9 @@ class UserProfileResource(MethodResource):
 
     @staticmethod
     def _authenticated_user_or_error() -> Any:
-        user_id = UUID(get_jwt_identity())
-        jti = get_jwt()["jti"]
+        auth_context = get_active_auth_context()
         dependencies = get_user_dependencies()
-        user = dependencies.get_user_by_id(user_id)
+        user = dependencies.get_user_by_id(UUID(auth_context.subject))
         if not user:
             return compat_error(
                 legacy_payload={"message": "Usuário não encontrado"},
@@ -205,7 +204,11 @@ class UserProfileResource(MethodResource):
                 error_code="NOT_FOUND",
             )
 
-        if not hasattr(user, "current_jti") or user.current_jti != jti:
+        if (
+            auth_context.jti is None
+            or not hasattr(user, "current_jti")
+            or user.current_jti != auth_context.jti
+        ):
             return compat_error(
                 legacy_payload={"message": "Token revogado"},
                 status_code=401,

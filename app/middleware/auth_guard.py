@@ -1,13 +1,15 @@
 from flask import Flask, current_app, request
 from flask.typing import ResponseReturnValue
-from flask_jwt_extended import verify_jwt_in_request
 from flask_jwt_extended.exceptions import JWTExtendedException
 
+from app.auth import AuthContextError, get_active_auth_context
 from app.extensions.jwt_callbacks import _jwt_error_response
 
 
 def register_auth_guard(app: Flask) -> None:
     def auth_guard() -> ResponseReturnValue | None:
+        if request.method == "OPTIONS":
+            return None
         # Liveness endpoint must remain public for infra health checks.
         if request.path.rstrip("/") == "/healthz":
             return None
@@ -35,8 +37,8 @@ def register_auth_guard(app: Flask) -> None:
             return None
 
         try:
-            verify_jwt_in_request()
-        except JWTExtendedException:
+            get_active_auth_context()
+        except (JWTExtendedException, AuthContextError):
             return _jwt_error_response(
                 "Token inválido ou ausente",
                 code="UNAUTHORIZED",

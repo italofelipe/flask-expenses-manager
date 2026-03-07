@@ -4,8 +4,8 @@ import os
 from typing import Any
 
 from flask import Flask, Response, current_app, g, request
-from flask_jwt_extended import get_jwt_identity, verify_jwt_in_request
 
+from app.auth import get_current_auth_context
 from app.extensions.database import db
 from app.models.audit_event import AuditEvent
 
@@ -44,11 +44,10 @@ def _is_sensitive_path(path: str, prefixes: tuple[str, ...]) -> bool:
 
 def _extract_user_id_safely() -> str | None:
     try:
-        verify_jwt_in_request(optional=True)
-        identity = get_jwt_identity()
-        if identity is None:
+        context = get_current_auth_context(optional=True)
+        if context is None:
             return None
-        return str(identity)
+        return context.subject
     except Exception:
         return None
 

@@ -5,12 +5,12 @@ from typing import Any
 from uuid import UUID
 
 from flask import request
-from flask_jwt_extended import get_jwt_identity
 from marshmallow import fields
 
 from app.application.services.investment_application_service import (
     InvestmentApplicationError,
 )
+from app.auth import current_user_id
 from app.utils.typed_decorators import typed_doc as doc
 from app.utils.typed_decorators import typed_jwt_required as jwt_required
 from app.utils.typed_decorators import typed_use_kwargs as use_kwargs
@@ -46,7 +46,7 @@ from .dependencies import get_wallet_dependencies
 )
 @jwt_required()
 def add_investment_operation(investment_id: UUID) -> tuple[dict[str, Any], int]:
-    user_id: UUID = UUID(get_jwt_identity())
+    user_id: UUID = current_user_id()
     payload: dict[str, Any] = request.get_json() or {}
     dependencies = get_wallet_dependencies()
 
@@ -103,7 +103,7 @@ def add_investment_operation(investment_id: UUID) -> tuple[dict[str, Any], int]:
 def list_investment_operations(
     investment_id: UUID, page: int, per_page: int
 ) -> tuple[dict[str, Any], int]:
-    user_id: UUID = UUID(get_jwt_identity())
+    user_id: UUID = current_user_id()
     dependencies = get_wallet_dependencies()
 
     try:
@@ -166,7 +166,7 @@ def list_investment_operations(
 def update_investment_operation(
     investment_id: UUID, operation_id: UUID
 ) -> tuple[dict[str, Any], int]:
-    user_id: UUID = UUID(get_jwt_identity())
+    user_id: UUID = current_user_id()
     payload: dict[str, Any] = request.get_json() or {}
     dependencies = get_wallet_dependencies()
 
@@ -215,7 +215,7 @@ def update_investment_operation(
 def delete_investment_operation(
     investment_id: UUID, operation_id: UUID
 ) -> tuple[dict[str, Any], int]:
-    user_id: UUID = UUID(get_jwt_identity())
+    user_id: UUID = current_user_id()
     dependencies = get_wallet_dependencies()
 
     try:
@@ -257,7 +257,7 @@ def delete_investment_operation(
 def get_investment_operations_summary(
     investment_id: UUID,
 ) -> tuple[dict[str, Any], int]:
-    user_id: UUID = UUID(get_jwt_identity())
+    user_id: UUID = current_user_id()
     dependencies = get_wallet_dependencies()
 
     try:
@@ -302,7 +302,7 @@ def get_investment_operations_summary(
 def get_investment_operations_position(
     investment_id: UUID,
 ) -> tuple[dict[str, Any], int]:
-    user_id: UUID = UUID(get_jwt_identity())
+    user_id: UUID = current_user_id()
     dependencies = get_wallet_dependencies()
 
     try:
@@ -356,7 +356,7 @@ def get_investment_operations_position(
 def get_invested_amount_by_date(
     investment_id: UUID, date: date
 ) -> tuple[dict[str, Any], int]:
-    user_id: UUID = UUID(get_jwt_identity())
+    user_id: UUID = current_user_id()
     dependencies = get_wallet_dependencies()
 
     try:

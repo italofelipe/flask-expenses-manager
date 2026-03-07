@@ -5,11 +5,11 @@ from __future__ import annotations
 from uuid import UUID
 
 from flask import Response
-from flask_jwt_extended import get_jwt_identity
 
 from app.application.services.transaction_application_service import (
     TransactionApplicationError,
 )
+from app.auth import current_user_id
 from app.utils.typed_decorators import typed_doc as doc
 from app.utils.typed_decorators import typed_jwt_required as jwt_required
 
@@ -33,7 +33,7 @@ class TransactionDeleteMixin:
         if token_error is not None:
             return token_error
 
-        user_uuid = UUID(get_jwt_identity())
+        user_uuid = current_user_id()
         dependencies = get_transaction_dependencies()
         service = dependencies.transaction_application_service_factory(user_uuid)
 

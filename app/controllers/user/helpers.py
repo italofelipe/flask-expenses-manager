@@ -12,6 +12,7 @@ from app.application.errors import PublicValidationError
 from app.application.services.public_error_mapper_service import (
     map_validation_exception,
 )
+from app.auth import AuthContext
 from app.extensions.database import db
 from app.models.transaction import Transaction
 from app.models.user import User
@@ -83,9 +84,24 @@ def assign_user_profile_fields(
     return {"error": False}
 
 
-def validate_user_token(user_id: UUID, jti: str) -> User | Response:
+def validate_user_token(
+    auth_context_or_user_id: AuthContext | UUID,
+    jti: str | None = None,
+) -> User | Response:
+    if isinstance(auth_context_or_user_id, AuthContext):
+        user_id = UUID(auth_context_or_user_id.subject)
+        token_jti = auth_context_or_user_id.jti
+    else:
+        user_id = auth_context_or_user_id
+        token_jti = jti
+
     user = cast(User | None, db.session.get(User, user_id))
-    if not user or not hasattr(user, "current_jti") or user.current_jti != jti:
+    if (
+        not user
+        or token_jti is None
+        or not hasattr(user, "current_jti")
+        or user.current_jti != token_jti
+    ):
         return compat_error(
             legacy_payload={"message": "Token revogado ou usuário não encontrado"},
             status_code=401,

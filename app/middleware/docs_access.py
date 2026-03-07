@@ -4,8 +4,8 @@ import os
 from typing import Any, Final, cast
 
 from flask import Flask, Response, abort, request
-from flask_jwt_extended import get_jwt, verify_jwt_in_request
 
+from app.auth import AuthContextError, get_active_auth_context
 from app.extensions.jwt_callbacks import _jwt_error_response
 
 _POLICY_PUBLIC: Final[str] = "public"
@@ -65,8 +65,16 @@ def register_docs_access_guard(app: Flask) -> None:
             abort(404)
 
         try:
-            verify_jwt_in_request()
-            get_jwt()
+            get_active_auth_context()
+        except AuthContextError:
+            return cast(
+                Response | tuple[Any, int],
+                _jwt_error_response(
+                    "Token inválido ou ausente",
+                    code="UNAUTHORIZED",
+                    status_code=401,
+                ),
+            )
         except Exception:
             return cast(
                 Response | tuple[Any, int],

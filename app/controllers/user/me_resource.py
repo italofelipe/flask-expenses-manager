@@ -1,12 +1,11 @@
 from __future__ import annotations
 
 from typing import Any, cast
-from uuid import UUID
 
 from flask import Response, request
 from flask_apispec.views import MethodResource
-from flask_jwt_extended import get_jwt, get_jwt_identity
 
+from app.auth import get_active_auth_context
 from app.models.transaction import Transaction
 from app.utils.pagination import PaginatedResponse
 from app.utils.typed_decorators import typed_doc as doc
@@ -75,9 +74,8 @@ class UserMeResource(MethodResource):
     )
     @jwt_required()
     def get(self) -> Response:
-        user_id = UUID(get_jwt_identity())
-        jti = get_jwt()["jti"]
-        user_or_response = validate_user_token(user_id, jti)
+        auth_context = get_active_auth_context()
+        user_or_response = validate_user_token(auth_context)
         if isinstance(user_or_response, Response):
             return user_or_response
         user = user_or_response
