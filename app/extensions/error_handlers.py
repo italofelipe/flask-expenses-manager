@@ -1,7 +1,8 @@
-from flask import Flask, Response, g
+from flask import Flask, Response
 from werkzeug.exceptions import HTTPException, RequestEntityTooLarge
 
 from app.exceptions import APIError
+from app.http.request_context import current_request_id
 from app.utils.response_builder import error_payload, json_response
 
 
@@ -49,7 +50,7 @@ def register_error_handlers(app: Flask) -> None:
 
     @app.errorhandler(Exception)
     def handle_generic_exception(e: Exception) -> Response:
-        request_id = str(getattr(g, "request_id", "n/a"))
+        request_id = current_request_id()
         app.logger.exception("Unhandled exception. request_id=%s", request_id)
         payload = error_payload(
             message="An unexpected error occurred.",

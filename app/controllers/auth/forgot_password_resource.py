@@ -2,12 +2,13 @@ from __future__ import annotations
 
 from typing import Any
 
-from flask import Response, current_app, request
+from flask import Response, current_app
 from flask_apispec.views import MethodResource
 
 from app.application.services.password_reset_service import (
     PASSWORD_RESET_NEUTRAL_MESSAGE,
 )
+from app.http.request_context import get_request_context
 from app.schemas.auth_schema import ForgotPasswordSchema
 from app.utils.typed_decorators import typed_doc as doc
 from app.utils.typed_decorators import typed_use_kwargs as use_kwargs
@@ -18,12 +19,13 @@ from .guard import guard_login_check, guard_register_failure
 
 
 def _build_password_reset_context(*, dependencies: Any, email: str) -> Any:
+    request_context = get_request_context()
     return dependencies.build_login_attempt_context(
         principal=f"password-reset:{email}",
-        remote_addr=request.remote_addr,
-        user_agent=request.headers.get("User-Agent"),
-        forwarded_for=request.headers.get("X-Forwarded-For"),
-        real_ip=request.headers.get("X-Real-IP"),
+        remote_addr=request_context.client_ip,
+        user_agent=request_context.user_agent,
+        forwarded_for=request_context.headers.get("x-forwarded-for"),
+        real_ip=request_context.headers.get("x-real-ip"),
         known_principal=False,
     )
 

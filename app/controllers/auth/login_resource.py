@@ -2,10 +2,11 @@ from __future__ import annotations
 
 from typing import Any
 
-from flask import Response, current_app, request
+from flask import Response, current_app
 from flask_apispec.views import MethodResource
 
 from app.extensions.database import db
+from app.http.request_context import get_request_context
 from app.schemas.auth_schema import AuthSchema
 from app.utils.typed_decorators import typed_doc as doc
 from app.utils.typed_decorators import typed_use_kwargs as use_kwargs
@@ -105,6 +106,7 @@ class AuthResource(MethodResource):
         dependencies = get_auth_dependencies()
         auth_policy = dependencies.get_auth_security_policy()
         principal = str(email or name or "")
+        request_context = get_request_context()
         user = _resolve_login_user(
             dependencies=dependencies,
             email=email,
@@ -112,10 +114,10 @@ class AuthResource(MethodResource):
         )
         login_context = dependencies.build_login_attempt_context(
             principal=principal,
-            remote_addr=request.remote_addr,
-            user_agent=request.headers.get("User-Agent"),
-            forwarded_for=request.headers.get("X-Forwarded-For"),
-            real_ip=request.headers.get("X-Real-IP"),
+            remote_addr=request_context.client_ip,
+            user_agent=request_context.user_agent,
+            forwarded_for=request_context.headers.get("x-forwarded-for"),
+            real_ip=request_context.headers.get("x-real-ip"),
             known_principal=(
                 user is not None and auth_policy.login_guard.expose_known_principal
             ),
