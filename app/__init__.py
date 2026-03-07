@@ -25,6 +25,7 @@ from app.extensions.audit_retention_cli import register_audit_retention_commands
 from app.extensions.audit_trail import register_audit_trail
 from app.extensions.database import db
 from app.extensions.error_handlers import register_error_handlers
+from app.extensions.http_observability import register_http_observability
 from app.extensions.integration_metrics_cli import register_integration_metrics_commands
 from app.http.request_context import register_request_context_adapter
 from app.middleware.cors import register_cors
@@ -119,6 +120,7 @@ def create_app() -> Flask:
     register_transaction_dependencies(app)
     register_goal_dependencies(app)
     register_request_context_adapter(app)
+    register_http_observability(app)
     register_cors(app)
     register_security_headers(app)
     register_docs_access_guard(app)

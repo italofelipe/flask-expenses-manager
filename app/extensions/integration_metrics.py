@@ -92,3 +92,19 @@ def build_graphql_metrics_payload() -> dict[str, Any]:
             "complexity_total": metrics.get("graphql.request.complexity_total", 0),
         },
     }
+
+
+def build_http_observability_metrics_payload() -> dict[str, Any]:
+    metrics = snapshot_metrics(prefix="http.request.")
+    return {
+        "component": "http_observability",
+        "counters": metrics,
+        "summary": {
+            "requests_total": metrics.get("http.request.total", 0),
+            "duration_ms_total": metrics.get("http.request.duration_ms_total", 0),
+            "anonymous": metrics.get("http.request.anonymous", 0),
+            "authenticated": metrics.get("http.request.authenticated", 0),
+            "flask_requests": metrics.get("http.request.framework.flask", 0),
+            "fastapi_requests": metrics.get("http.request.framework.fastapi", 0),
+        },
+    }
