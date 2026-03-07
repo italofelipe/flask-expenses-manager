@@ -2,59 +2,63 @@ from flask import Flask, Response
 from werkzeug.exceptions import HTTPException, RequestEntityTooLarge
 
 from app.exceptions import APIError
-from app.http.request_context import current_request_id
-from app.utils.response_builder import error_payload, json_response
+from app.http import (
+    error_contract_from_api_error,
+    error_contract_from_http_exception,
+    error_contract_from_request_too_large,
+    error_contract_from_unhandled_exception,
+    flask_error_response,
+)
+from app.utils.response_builder import SENSITIVE_DATA_FIELDS, json_response
 
 
-def _http_status_to_error_code(status_code: int) -> str:
-    mapping = {
-        400: "VALIDATION_ERROR",
-        401: "UNAUTHORIZED",
-        403: "FORBIDDEN",
-        404: "NOT_FOUND",
-        409: "CONFLICT",
-        422: "UNPROCESSABLE_ENTITY",
-    }
-    return mapping.get(status_code, "HTTP_ERROR")
+def _debug_or_testing(app: Flask) -> bool:
+    return bool(app.config.get("DEBUG") or app.config.get("TESTING"))
 
 
 def register_error_handlers(app: Flask) -> None:
     @app.errorhandler(RequestEntityTooLarge)
     def handle_request_too_large(e: RequestEntityTooLarge) -> Response:
-        payload = error_payload(
-            message="Request body is too large.",
-            code="PAYLOAD_TOO_LARGE",
-            details={"max_bytes": app.config.get("MAX_CONTENT_LENGTH")},
+        del e
+        contract = error_contract_from_request_too_large(
+            app.config.get("MAX_CONTENT_LENGTH")
         )
-        return json_response(payload, status_code=413)
+        return flask_error_response(
+            contract,
+            debug_or_testing=_debug_or_testing(app),
+            sensitive_fields=SENSITIVE_DATA_FIELDS,
+            response_factory=json_response,
+        )
 
     @app.errorhandler(APIError)
     def handle_api_error(e: APIError) -> Response:
-        payload = error_payload(
-            message=e.message,
-            code=e.code,
-            details=e.details,
+        contract = error_contract_from_api_error(e)
+        return flask_error_response(
+            contract,
+            debug_or_testing=_debug_or_testing(app),
+            sensitive_fields=SENSITIVE_DATA_FIELDS,
+            response_factory=json_response,
         )
-        return json_response(payload, status_code=e.status_code)
 
     @app.errorhandler(HTTPException)
     def handle_http_exception(e: HTTPException) -> Response:
-        status_code = e.code if e.code is not None else 500
-        message = e.description or "HTTP error"
-        payload = error_payload(
-            message=message,
-            code=_http_status_to_error_code(status_code),
-            details={"http_error": e.name},
+        contract = error_contract_from_http_exception(e)
+        return flask_error_response(
+            contract,
+            debug_or_testing=_debug_or_testing(app),
+            sensitive_fields=SENSITIVE_DATA_FIELDS,
+            response_factory=json_response,
         )
-        return json_response(payload, status_code=status_code)
 
     @app.errorhandler(Exception)
     def handle_generic_exception(e: Exception) -> Response:
-        request_id = current_request_id()
-        app.logger.exception("Unhandled exception. request_id=%s", request_id)
-        payload = error_payload(
-            message="An unexpected error occurred.",
-            code="INTERNAL_ERROR",
-            details={"request_id": request_id},
+        contract = error_contract_from_unhandled_exception(e)
+        app.logger.exception(
+            "Unhandled exception. request_id=%s", contract.request_id or "n/a"
         )
-        return json_response(payload, status_code=500)
+        return flask_error_response(
+            contract,
+            debug_or_testing=_debug_or_testing(app),
+            sensitive_fields=SENSITIVE_DATA_FIELDS,
+            response_factory=json_response,
+        )

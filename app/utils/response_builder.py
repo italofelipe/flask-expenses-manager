@@ -3,7 +3,7 @@ from typing import Any, Dict, Optional
 
 from flask import Response, current_app, has_app_context, jsonify
 
-from app.http.request_context import current_request_id
+from app.http.error_contract import ErrorContract, serialize_error_contract
 
 SENSITIVE_DATA_FIELDS = {
     "password",
@@ -56,24 +56,19 @@ def error_payload(
     details: Optional[Dict[str, Any]] = None,
     meta: Optional[Dict[str, Any]] = None,
 ) -> Dict[str, Any]:
-    if code == "INTERNAL_ERROR" and not _is_debug_or_testing():
-        request_id = (
-            (details or {}).get("request_id") if isinstance(details, dict) else None
-        ) or current_request_id(default="")
-        sanitized_details: Dict[str, Any] = (
-            {"request_id": request_id} if request_id else {}
-        )
-    else:
-        sanitized_details = _sanitize_value(details or {})
-
-    payload: Dict[str, Any] = {
-        "success": False,
-        "message": message,
-        "error": {
-            "code": code,
-            "details": sanitized_details,
-        },
-    }
+    payload: Dict[str, Any] = serialize_error_contract(
+        ErrorContract(
+            message=message,
+            code=code,
+            status_code=0,
+            details=details,
+            request_id=(
+                (details or {}).get("request_id") if isinstance(details, dict) else None
+            ),
+        ),
+        debug_or_testing=_is_debug_or_testing(),
+        sensitive_fields=SENSITIVE_DATA_FIELDS,
+    )
     if meta is not None:
         payload["meta"] = _sanitize_value(meta)
     return payload
