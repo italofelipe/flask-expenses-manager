@@ -2,11 +2,22 @@ from __future__ import annotations
 
 from typing import Any
 
-from flask import Response
+from flask import Response, current_app, has_app_context
 
 from app.exceptions import APIError
+from app.http import ErrorContract, flask_error_response, serialize_error_contract
 from app.utils.api_contract import CONTRACT_HEADER, CONTRACT_V2, is_v2_contract_request
-from app.utils.response_builder import error_payload, json_response, success_payload
+from app.utils.response_builder import (
+    SENSITIVE_DATA_FIELDS,
+    json_response,
+    success_payload,
+)
+
+
+def _debug_or_testing() -> bool:
+    if not has_app_context():
+        return False
+    return bool(current_app.config.get("DEBUG") or current_app.config.get("TESTING"))
 
 
 class ResponseContractError(APIError):
@@ -58,7 +69,17 @@ def compat_error_response(
 ) -> Response:
     payload = legacy_payload
     if is_v2_contract():
-        payload = error_payload(message=message, code=error_code, details=details)
+        return flask_error_response(
+            ErrorContract(
+                message=message,
+                code=error_code,
+                status_code=status_code,
+                details=details,
+            ),
+            debug_or_testing=_debug_or_testing(),
+            sensitive_fields=SENSITIVE_DATA_FIELDS,
+            response_factory=json_response,
+        )
     return json_response(payload, status_code=status_code)
 
 
@@ -86,7 +107,16 @@ def compat_error_tuple(
 ) -> tuple[dict[str, Any], int]:
     payload = legacy_payload
     if is_v2_contract():
-        payload = error_payload(message=message, code=error_code, details=details)
+        payload = serialize_error_contract(
+            ErrorContract(
+                message=message,
+                code=error_code,
+                status_code=status_code,
+                details=details,
+            ),
+            debug_or_testing=_debug_or_testing(),
+            sensitive_fields=SENSITIVE_DATA_FIELDS,
+        )
     return payload, status_code
 
 
