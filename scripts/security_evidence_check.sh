@@ -81,7 +81,7 @@ check_contains "deploy/nginx/default.tls.conf" "X-Content-Type-Options" "X-Conte
 check_contains "app/controllers/graphql/utils.py" "Campo 'query' é obrigatório" "GraphQL rejects empty query payload"
 check_contains "app/graphql/security.py" "GRAPHQL_DEPTH_LIMIT_EXCEEDED" "GraphQL depth limit guard implemented"
 check_contains "app/graphql/security.py" "GRAPHQL_COMPLEXITY_LIMIT_EXCEEDED" "GraphQL complexity limit guard implemented"
-check_contains "app/middleware/auth_guard.py" "verify_jwt_in_request\(\)" "Global auth guard verifies JWT for protected routes"
+check_contains "app/middleware/auth_guard.py" "verify_jwt_in_request\(\)|get_active_auth_context\(\)" "Global auth guard verifies JWT for protected routes"
 check_contains "app/controllers/auth/register_resource.py" "dependencies\.hash_password\(" "User registration hashes password via auth dependency"
 check_contains "app/controllers/auth/dependencies.py" "generate_password_hash" "Auth dependency provider uses Werkzeug password hashing"
 

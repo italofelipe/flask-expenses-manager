@@ -9,7 +9,7 @@ def test_auth_guard_returns_401_for_expected_jwt_errors(client, monkeypatch) -> 
     def _raise_jwt_error() -> None:
         raise NoAuthorizationError("missing authorization header")
 
-    monkeypatch.setattr(auth_guard_module, "verify_jwt_in_request", _raise_jwt_error)
+    monkeypatch.setattr(auth_guard_module, "get_active_auth_context", _raise_jwt_error)
 
     response = client.get("/user/me")
 
@@ -22,7 +22,7 @@ def test_auth_guard_returns_500_for_unexpected_errors(client, monkeypatch) -> No
         raise RuntimeError("unexpected failure")
 
     monkeypatch.setattr(
-        auth_guard_module, "verify_jwt_in_request", _raise_runtime_error
+        auth_guard_module, "get_active_auth_context", _raise_runtime_error
     )
 
     response = client.get("/user/me")

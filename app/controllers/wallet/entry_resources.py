@@ -4,10 +4,10 @@ from typing import Any
 from uuid import UUID
 
 from flask import request
-from flask_jwt_extended import get_jwt_identity
 from marshmallow import fields
 
 from app.application.services.wallet_application_service import WalletApplicationError
+from app.auth import current_user_id
 from app.utils.typed_decorators import typed_doc as doc
 from app.utils.typed_decorators import typed_jwt_required as jwt_required
 from app.utils.typed_decorators import typed_use_kwargs as use_kwargs
@@ -47,7 +47,7 @@ from .dependencies import get_wallet_dependencies
 )
 @jwt_required()
 def add_wallet_entry() -> tuple[dict[str, Any], int]:
-    user_id = UUID(get_jwt_identity())
+    user_id = current_user_id()
     payload = request.get_json() or {}
     dependencies = get_wallet_dependencies()
     service = dependencies.wallet_application_service_factory(user_id)
@@ -96,7 +96,7 @@ def add_wallet_entry() -> tuple[dict[str, Any], int]:
 )
 @jwt_required()
 def list_wallet_entries(page: int, per_page: int) -> tuple[dict[str, Any], int]:
-    user_id = UUID(get_jwt_identity())
+    user_id = current_user_id()
     dependencies = get_wallet_dependencies()
     service = dependencies.wallet_application_service_factory(user_id)
     result = service.list_entries(page=page, per_page=per_page)
@@ -154,7 +154,7 @@ def list_wallet_entries(page: int, per_page: int) -> tuple[dict[str, Any], int]:
 )
 @jwt_required()
 def get_wallet_history(investment_id: UUID) -> tuple[dict[str, Any], int]:
-    user_id = UUID(get_jwt_identity())
+    user_id = current_user_id()
     dependencies = get_wallet_dependencies()
     service = dependencies.wallet_application_service_factory(user_id)
     page = request.args.get("page", default=1, type=int)
@@ -216,7 +216,7 @@ def get_wallet_history(investment_id: UUID) -> tuple[dict[str, Any], int]:
 )
 @jwt_required()
 def update_wallet_entry(investment_id: UUID) -> tuple[dict[str, Any], int]:
-    user_id = UUID(get_jwt_identity())
+    user_id = current_user_id()
     payload = request.get_json() or {}
     dependencies = get_wallet_dependencies()
     service = dependencies.wallet_application_service_factory(user_id)
@@ -261,7 +261,7 @@ def update_wallet_entry(investment_id: UUID) -> tuple[dict[str, Any], int]:
 )
 @jwt_required()
 def delete_wallet_entry(investment_id: UUID) -> tuple[dict[str, Any], int]:
-    user_id = UUID(get_jwt_identity())
+    user_id = current_user_id()
     dependencies = get_wallet_dependencies()
     service = dependencies.wallet_application_service_factory(user_id)
 

@@ -3,8 +3,9 @@ from uuid import UUID
 
 from flask import jsonify
 from flask.typing import ResponseReturnValue
-from flask_jwt_extended import JWTManager, get_jwt_identity
+from flask_jwt_extended import JWTManager
 
+from app.auth import InvalidAuthContextError, current_user_id
 from app.extensions.database import db
 from app.models.user import User
 from app.utils.api_contract import is_v2_contract_request
@@ -26,12 +27,12 @@ def is_token_revoked(jti: str) -> bool:
     # Keep compatibility with legacy call sites that still invoke this helper.
     # Runtime revocation source-of-truth is persisted in user.current_jti.
     try:
-        identity = get_jwt_identity()
-        if not identity:
+        identity = current_user_id(optional=True)
+        if identity is None:
             return True
-        user = db.session.get(User, UUID(str(identity)))
+        user = db.session.get(User, identity)
         return not user or user.current_jti != jti
-    except Exception:
+    except InvalidAuthContextError:
         return True
 
 

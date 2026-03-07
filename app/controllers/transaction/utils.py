@@ -6,9 +6,9 @@ from typing import Any
 from uuid import UUID
 
 from flask import Response, current_app
-from flask_jwt_extended import get_jwt, verify_jwt_in_request
 
 from app.application.errors import PublicValidationError
+from app.auth import AuthContextError, get_active_auth_context
 from app.controllers.response_contract import (
     CONTRACT_HEADER,
     CONTRACT_V2,
@@ -16,7 +16,6 @@ from app.controllers.response_contract import (
     compat_success_response,
     is_v2_contract,
 )
-from app.extensions.jwt_callbacks import is_token_revoked
 from app.models.transaction import Transaction, TransactionStatus, TransactionType
 from app.services.transaction_reference_authorization_service import (
     TransactionReferenceAuthorizationError,
@@ -181,13 +180,13 @@ def _guard_revoked_token() -> Response | None:
     Notes
     - We keep this in `transaction.utils` to avoid duplicate implementations
       across multiple transaction resources.
-    - This intentionally performs its own `verify_jwt_in_request()` call
-      because resources may call it before accessing identity claims.
+    - This intentionally validates the active auth context here because
+      resources may call it before reading identity claims.
     """
 
-    verify_jwt_in_request()
-    jwt_data = get_jwt()
-    if is_token_revoked(jwt_data["jti"]):
+    try:
+        get_active_auth_context()
+    except AuthContextError:
         return _invalid_token_response()
     return None
 
