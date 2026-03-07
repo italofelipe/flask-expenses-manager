@@ -113,7 +113,10 @@ def current_user_id(*, optional: Literal[True]) -> UUID | None: ...
 
 
 def current_user_id(*, optional: bool = False) -> UUID | None:
-    context = _get_current_auth_context(optional=optional)
+    if optional:
+        context = get_current_auth_context(optional=True)
+    else:
+        context = get_current_auth_context()
     if context is None:
         return None
     try:
@@ -131,7 +134,10 @@ def current_token_jti(*, optional: Literal[True]) -> str | None: ...
 
 
 def current_token_jti(*, optional: bool = False) -> str | None:
-    context = _get_current_auth_context(optional=optional)
+    if optional:
+        context = get_current_auth_context(optional=True)
+    else:
+        context = get_current_auth_context()
     if context is None:
         return None
     return str(context.jti) if context.jti is not None else None
@@ -164,7 +170,15 @@ def get_active_auth_context(*, optional: Literal[True]) -> AuthContext | None: .
 
 
 def get_active_auth_context(*, optional: bool = False) -> AuthContext | None:
-    return _get_active_auth_context(optional=optional)
+    if optional:
+        context = get_current_auth_context(optional=True)
+    else:
+        context = get_current_auth_context()
+    if context is None:
+        return None
+    if is_auth_context_revoked(context):
+        raise RevokedTokenError("JWT is revoked.")
+    return context
 
 
 def _get_active_auth_context(*, optional: bool) -> AuthContext | None:
@@ -187,7 +201,10 @@ def get_active_user(*, optional: Literal[True]) -> tuple[AuthContext, User] | No
 
 
 def get_active_user(*, optional: bool = False) -> tuple[AuthContext, User] | None:
-    context = _get_active_auth_context(optional=optional)
+    if optional:
+        context = get_active_auth_context(optional=True)
+    else:
+        context = get_active_auth_context()
     if context is None:
         return None
     user = _user_from_auth_context(context)
