@@ -1,9 +1,8 @@
 import os
-from uuid import uuid4
 
 from apispec import APISpec
 from apispec.ext.marshmallow import MarshmallowPlugin
-from flask import Flask, Response, g
+from flask import Flask
 from flask_apispec import FlaskApiSpec
 from flask_jwt_extended import JWTManager
 from flask_marshmallow import Marshmallow
@@ -27,6 +26,7 @@ from app.extensions.audit_trail import register_audit_trail
 from app.extensions.database import db
 from app.extensions.error_handlers import register_error_handlers
 from app.extensions.integration_metrics_cli import register_integration_metrics_commands
+from app.http.request_context import register_request_context_adapter
 from app.middleware.cors import register_cors
 from app.middleware.docs_access import register_docs_access_guard
 from app.middleware.security_headers import register_security_headers
@@ -63,15 +63,6 @@ def create_app() -> Flask:
             app.config.setdefault("SQLALCHEMY_ENGINE_OPTIONS", {})
             app.config["SQLALCHEMY_ENGINE_OPTIONS"].update({"poolclass": NullPool})
     validate_security_configuration()
-
-    @app.before_request
-    def bind_request_id() -> None:
-        g.request_id = uuid4().hex
-
-    @app.after_request
-    def append_request_id_header(response: Response) -> Response:
-        response.headers["X-Request-Id"] = str(getattr(g, "request_id", "n/a"))
-        return response
 
     # Inicializa extensões
     db.init_app(app)
@@ -127,6 +118,7 @@ def create_app() -> Flask:
     register_user_dependencies(app)
     register_transaction_dependencies(app)
     register_goal_dependencies(app)
+    register_request_context_adapter(app)
     register_cors(app)
     register_security_headers(app)
     register_docs_access_guard(app)

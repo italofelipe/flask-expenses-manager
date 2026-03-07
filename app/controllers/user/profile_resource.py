@@ -3,12 +3,13 @@ from __future__ import annotations
 from typing import Any
 from uuid import UUID
 
-from flask import Response, current_app, g
+from flask import Response, current_app
 from flask_apispec.views import MethodResource
 
 from app.application.services.user_profile_service import update_user_profile
 from app.auth import get_active_auth_context
 from app.extensions.database import db
+from app.http.request_context import current_request_id
 from app.schemas.user_schemas import UserProfileSchema
 from app.utils.typed_decorators import typed_doc as doc
 from app.utils.typed_decorators import typed_jwt_required as jwt_required
@@ -187,7 +188,7 @@ class UserProfileResource(MethodResource):
             "request_id=%s status=%s",
             user_id,
             ",".join(changed_fields),
-            str(getattr(g, "request_id", "n/a")),
+            current_request_id(),
             200,
         )
 

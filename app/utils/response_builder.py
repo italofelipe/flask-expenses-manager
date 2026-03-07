@@ -3,6 +3,8 @@ from typing import Any, Dict, Optional
 
 from flask import Response, current_app, has_app_context, jsonify
 
+from app.http.request_context import current_request_id
+
 SENSITIVE_DATA_FIELDS = {
     "password",
     "password_hash",
@@ -57,7 +59,7 @@ def error_payload(
     if code == "INTERNAL_ERROR" and not _is_debug_or_testing():
         request_id = (
             (details or {}).get("request_id") if isinstance(details, dict) else None
-        )
+        ) or current_request_id(default="")
         sanitized_details: Dict[str, Any] = (
             {"request_id": request_id} if request_id else {}
         )
