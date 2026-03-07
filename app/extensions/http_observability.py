@@ -22,11 +22,10 @@ def register_http_observability(app: Flask) -> None:
     def _mark_request_start() -> None:
         mark_request_start()
 
-    @app.after_request
-    def _record_observability(response: Response) -> Response:
+    def _emit_observability(response: Response) -> None:
         envelope = build_observability_envelope(response)
         if envelope is None:
-            return response
+            return
 
         increment_metric("http.request.total")
         increment_metric(f"http.request.framework.{envelope.source_framework}")
@@ -44,6 +43,11 @@ def register_http_observability(app: Flask) -> None:
             increment_metric("http.request.anonymous")
 
         current_app.logger.info(format_observability_log(envelope))
+
+    @app.after_request
+    def _record_observability(response: Response) -> Response:  # NOSONAR
+        # Flask after_request handlers must return the response object they receive.
+        _emit_observability(response)
         return response
 
 
