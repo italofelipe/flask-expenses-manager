@@ -43,7 +43,11 @@ from config.settings import Settings
   - `E/F/W` para erros base
   - `I` para ordenação de imports
   - `B` para bugbear
-  - `C90` para complexidade ciclomática
+  - `C90` para complexidade ciclomática — **`max-complexity = 10`** (configurado em `pyproject.toml`).
+    Funções com mais de 10 caminhos de execução (if/elif/for/while/except/with/case)
+    são **bloqueadas pelo ruff e não podem ser auto-corrigidas**.
+    Solução: extraia helpers privados (`_build_questions`, `_score_responses`, etc.)
+    até que cada função individual fique abaixo do limite.
 - `E203` e `W503` continuam ignorados por compatibilidade com formatter
 
 ---
