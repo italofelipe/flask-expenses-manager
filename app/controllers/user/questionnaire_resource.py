@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from typing import Tuple
+from uuid import UUID
 
 from flask import Response, jsonify, request
 from flask.views import MethodView
@@ -28,7 +29,7 @@ class UserQuestionnaireResource(MethodView):
     @jwt_required()  # type: ignore[untyped-decorator]
     def post(self) -> Response | Tuple[Response, int]:
         user_id = get_jwt_identity()
-        user = User.query.get(user_id)
+        user = db.session.get(User, UUID(str(user_id)))
         if not user:
             return jsonify({"error": "User not found"}), 404
 
