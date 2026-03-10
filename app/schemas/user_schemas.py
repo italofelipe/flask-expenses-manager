@@ -258,3 +258,25 @@ class UserCompleteSchema(Schema):
     )
     created_at = fields.DateTime(metadata={"description": "Data de criação"})
     updated_at = fields.DateTime(metadata={"description": "Data de atualização"})
+
+
+class QuestionnaireAnswerSchema(Schema):
+    """Schema para validar as respostas enviadas no questionário"""
+
+    answers = fields.List(
+        fields.Integer(validate=validate.Range(min=1, max=4)),
+        required=True,
+        validate=validate.Length(min=5, max=10),
+        metadata={"description": "Lista de respostas (pontuações ou IDs das opções)"},
+    )
+
+
+class QuestionnaireResultSchema(Schema):
+    """Schema para o retorno do perfil sugerido"""
+
+    suggested_profile = fields.String(
+        metadata={
+            "description": "Perfil sugerido (conservador, explorador, entusiasta)"
+        }
+    )
+    score = fields.Integer(metadata={"description": "Pontuação total obtida"})

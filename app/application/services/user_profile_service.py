@@ -28,6 +28,78 @@ _PROFILE_MUTABLE_FIELDS = (
 )
 
 
+QUESTIONNAIRE = [
+    {
+        "id": 1,
+        "text": "Qual o seu principal objetivo ao investir?",
+        "options": [
+            {"id": 1, "text": "Preservar meu patrimônio", "points": 1},
+            {"id": 2, "text": "Crescimento moderado", "points": 2},
+            {"id": 3, "text": "Maximizar a rentabilidade", "points": 3},
+        ],
+    },
+    {
+        "id": 2,
+        "text": "Como você reagiria a uma queda de 10% nos seus investimentos?",
+        "options": [
+            {"id": 1, "text": "Venderia tudo", "points": 1},
+            {"id": 2, "text": "Manteria e aguardaria", "points": 2},
+            {"id": 3, "text": "Compraria mais", "points": 3},
+        ],
+    },
+    {
+        "id": 3,
+        "text": "Por quanto tempo pretende deixar seu dinheiro investido?",
+        "options": [
+            {"id": 1, "text": "Menos de 1 ano", "points": 1},
+            {"id": 2, "text": "De 1 a 5 anos", "points": 2},
+            {"id": 3, "text": "Mais de 5 anos", "points": 3},
+        ],
+    },
+    {
+        "id": 4,
+        "text": "Qual a sua experiência com investimentos?",
+        "options": [
+            {"id": 1, "text": "Nenhuma, estou começando", "points": 1},
+            {"id": 2, "text": "Conheço o básico (renda fixa)", "points": 2},
+            {"id": 3, "text": "Tenho experiência (renda variável)", "points": 3},
+        ],
+    },
+    {
+        "id": 5,
+        "text": "Qual proporção da sua renda você consegue investir mensalmente?",
+        "options": [
+            {"id": 1, "text": "Menos de 10%", "points": 1},
+            {"id": 2, "text": "Entre 10% e 20%", "points": 2},
+            {"id": 3, "text": "Mais de 20%", "points": 3},
+        ],
+    },
+]
+
+
+def get_questionnaire() -> list[dict[str, Any]]:
+    return QUESTIONNAIRE
+
+
+def evaluate_questionnaire(user: User, answers: list[int]) -> dict[str, Any]:
+    if len(answers) != len(QUESTIONNAIRE):
+        return {"error": "Número de respostas inválido."}
+
+    score = sum(answers)
+
+    if score <= 7:
+        suggested = "conservador"
+    elif score <= 11:
+        suggested = "explorador"
+    else:
+        suggested = "entusiasta"
+
+    user.investor_profile_suggested = suggested
+    user.profile_quiz_score = score
+
+    return {"suggested_profile": suggested, "score": score}
+
+
 def _parse_date(field_name: str, value: Any) -> tuple[Any, str | None]:
     if value is None or not isinstance(value, str):
         return value, None
