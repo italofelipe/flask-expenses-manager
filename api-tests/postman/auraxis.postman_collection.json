@@ -384,6 +384,180 @@
           ]
         }
       }
+    },
+    {
+      "name": "09 - Questionnaire GET (REST auth required)",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('questionnaire GET returns 200', function () {",
+              "  pm.response.to.have.status(200);",
+              "});",
+              "var body = pm.response.json();",
+              "pm.test('questionnaire response has data.questions array', function () {",
+              "  pm.expect(body.data.questions).to.be.an('array');",
+              "});",
+              "pm.test('questionnaire has exactly 5 questions', function () {",
+              "  pm.expect(body.data.questions).to.have.lengthOf(5);",
+              "});",
+              "pm.test('each question has id, text and options', function () {",
+              "  body.data.questions.forEach(function (q) {",
+              "    pm.expect(q).to.have.property('id');",
+              "    pm.expect(q).to.have.property('text');",
+              "    pm.expect(q.options).to.be.an('array').with.lengthOf(3);",
+              "  });",
+              "});",
+              "pm.test('option points are between 1 and 3', function () {",
+              "  body.data.questions.forEach(function (q) {",
+              "    q.options.forEach(function (o) {",
+              "      pm.expect(o.points).to.be.within(1, 3);",
+              "    });",
+              "  });",
+              "});"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{authToken}}"
+          },
+          {
+            "key": "X-API-Contract",
+            "value": "v2"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/user/profile/questionnaire",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "user",
+            "profile",
+            "questionnaire"
+          ]
+        }
+      }
+    },
+    {
+      "name": "10 - Questionnaire POST valid answers (REST auth required)",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('questionnaire POST returns 200', function () {",
+              "  pm.response.to.have.status(200);",
+              "});",
+              "var body = pm.response.json();",
+              "pm.test('questionnaire result has suggested_profile', function () {",
+              "  pm.expect(body.data.suggested_profile).to.be.oneOf(['conservador', 'explorador', 'entusiasta']);",
+              "});",
+              "pm.test('questionnaire score equals sum of answers', function () {",
+              "  pm.expect(body.data.score).to.eql(10);",
+              "});",
+              "pm.test('suggested_profile is explorador for score 10', function () {",
+              "  pm.expect(body.data.suggested_profile).to.eql('explorador');",
+              "});"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "Authorization",
+            "value": "Bearer {{authToken}}"
+          },
+          {
+            "key": "X-API-Contract",
+            "value": "v2"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"answers\": [2, 2, 2, 2, 2]\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/user/profile/questionnaire",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "user",
+            "profile",
+            "questionnaire"
+          ]
+        }
+      }
+    },
+    {
+      "name": "11 - Questionnaire POST invalid payload (validation error)",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('questionnaire invalid answers returns 422', function () {",
+              "  pm.response.to.have.status(422);",
+              "});",
+              "var body = pm.response.json();",
+              "pm.test('questionnaire validation error has error.code', function () {",
+              "  pm.expect(body.error.code).to.eql('VALIDATION_ERROR');",
+              "});",
+              "pm.test('questionnaire error does not expose INTERNAL_ERROR', function () {",
+              "  pm.expect(body.error.code).to.not.eql('INTERNAL_ERROR');",
+              "});"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "Authorization",
+            "value": "Bearer {{authToken}}"
+          },
+          {
+            "key": "X-API-Contract",
+            "value": "v2"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"answers\": [4, 1, 1]\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/user/profile/questionnaire",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "user",
+            "profile",
+            "questionnaire"
+          ]
+        }
+      }
     }
   ],
   "variable": [
