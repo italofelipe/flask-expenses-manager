@@ -320,7 +320,7 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Trivy FS scan (repo)
-        uses: aquasecurity/trivy-action@0.34.2
+        uses: aquasecurity/trivy-action@0.35.0
         with:
           scan-type: fs
           scan-ref: .
@@ -335,7 +335,7 @@ jobs:
           docker build -f Dockerfile.prod -t auraxis-ci:${{ github.sha }} .
 
       - name: Trivy image scan
-        uses: aquasecurity/trivy-action@0.34.2
+        uses: aquasecurity/trivy-action@0.35.0
         with:
           image-ref: auraxis-ci:${{ github.sha }}
           format: table
