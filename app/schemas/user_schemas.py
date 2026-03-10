@@ -1,7 +1,12 @@
 from flask_marshmallow import Marshmallow
 from marshmallow import Schema, fields, pre_load, validate
 
-from app.application.services.user_profile_service import INVESTOR_PROFILE_CHOICES
+from app.application.services.user_profile_service import (
+    INVESTOR_PROFILE_CHOICES,
+    QUESTIONNAIRE_OPTION_MAX_POINTS,
+    QUESTIONNAIRE_OPTION_MIN_POINTS,
+    QUESTIONNAIRE_SIZE,
+)
 from app.schemas.sanitization import sanitize_string_fields
 
 ma = Marshmallow()
@@ -261,13 +266,40 @@ class UserCompleteSchema(Schema):
 
 
 class QuestionnaireAnswerSchema(Schema):
-    """Schema para validar as respostas enviadas no questionário"""
+    """Schema para validar as respostas enviadas no questionário.
+
+    Constraints derivadas dos dados reais do domínio (``user_profile_service``):
+    - Cada resposta é o nº de pontos da opção escolhida: mínimo
+      ``QUESTIONNAIRE_OPTION_MIN_POINTS`` (1), máximo
+      ``QUESTIONNAIRE_OPTION_MAX_POINTS`` (3).
+    - A lista deve ter exatamente ``QUESTIONNAIRE_SIZE`` (5) elementos —
+      um por pergunta.
+    """
 
     answers = fields.List(
-        fields.Integer(validate=validate.Range(min=1, max=4)),
+        fields.Integer(
+            validate=validate.Range(
+                min=QUESTIONNAIRE_OPTION_MIN_POINTS,
+                max=QUESTIONNAIRE_OPTION_MAX_POINTS,
+                error=(
+                    f"Cada resposta deve ser um inteiro entre "
+                    f"{QUESTIONNAIRE_OPTION_MIN_POINTS} e "
+                    f"{QUESTIONNAIRE_OPTION_MAX_POINTS}."
+                ),
+            )
+        ),
         required=True,
-        validate=validate.Length(min=5, max=10),
-        metadata={"description": "Lista de respostas (pontuações ou IDs das opções)"},
+        validate=validate.Length(
+            equal=QUESTIONNAIRE_SIZE,
+            error=f"O questionário exige exatamente {QUESTIONNAIRE_SIZE} respostas.",
+        ),
+        metadata={
+            "description": (
+                f"Lista de {QUESTIONNAIRE_SIZE} respostas — "
+                f"pontos da opção escolhida em cada pergunta "
+                f"({QUESTIONNAIRE_OPTION_MIN_POINTS}–{QUESTIONNAIRE_OPTION_MAX_POINTS})."
+            )
+        },
     )
 
 

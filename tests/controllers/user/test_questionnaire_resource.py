@@ -6,6 +6,9 @@ and  POST /user/profile/questionnaire (submit answers → investor profile).
 Auth pattern: _register_and_login creates a fresh user per test so
 each test is fully isolated and does NOT rely on shared fixtures or
 session state from other tests.
+
+Schema boundary tests verify that the fixed constraints (max=3, equal=5)
+are correctly enforced — these would have caught the original max=4 bug.
 """
 
 from __future__ import annotations
@@ -67,6 +70,24 @@ class TestGetQuestionnaire:
             assert "text" in question
             assert "options" in question
             assert len(question["options"]) > 0
+
+    def test_questionnaire_option_points_within_valid_range(self, client) -> None:
+        """Todos os pontos das opções devem estar no intervalo [1, 3] (sem max=4)."""
+        from app.application.services.user_profile_service import (
+            QUESTIONNAIRE_OPTION_MAX_POINTS,
+            QUESTIONNAIRE_OPTION_MIN_POINTS,
+        )
+
+        token = _register_and_login(client)
+        response = client.get("/user/profile/questionnaire", headers=_auth(token))
+
+        for question in response.get_json()["questions"]:
+            for option in question["options"]:
+                assert (
+                    QUESTIONNAIRE_OPTION_MIN_POINTS
+                    <= option["points"]
+                    <= QUESTIONNAIRE_OPTION_MAX_POINTS
+                ), f"Opção {option} tem pontos fora do intervalo permitido"
 
     def test_returns_401_without_token(self, client) -> None:
         """GET sem autenticação deve retornar 401."""
@@ -136,8 +157,13 @@ class TestPostQuestionnaire:
         assert data["score"] == 9
         assert data["suggested_profile"] == "explorador"
 
-    def test_wrong_answer_count_returns_400(self, client) -> None:
-        """Número errado de respostas (6 em vez de 5) → 400 do service layer."""
+    def test_wrong_answer_count_returns_422(self, client) -> None:
+        """Número errado de respostas (6 em vez de 5) → 422 (schema: equal=5).
+
+        Com a correção do schema (Length(equal=5)), 6 respostas são rejeitadas
+        na camada de validação (422) antes de chegar ao service layer.
+        Falha rápida na borda, não no domínio.
+        """
         token = _register_and_login(client)
         response = client.post(
             "/user/profile/questionnaire",
@@ -145,8 +171,8 @@ class TestPostQuestionnaire:
             headers=_auth(token),
         )
 
-        assert response.status_code == 400
-        assert "error" in response.get_json()
+        assert response.status_code == 422
+        assert "errors" in response.get_json()
 
     def test_missing_answers_field_returns_422(self, client) -> None:
         """Payload sem o campo 'answers' → 422 da validação do schema."""
@@ -178,6 +204,56 @@ class TestPostQuestionnaire:
         )
 
         assert response.status_code == 401
+
+    def test_answer_value_exceeds_max_returns_422(self, client) -> None:
+        """Resposta com pontos acima do máximo (4 > max=3) → 422.
+
+        Este teste garante que o bug original (max=4 no schema) não regride.
+        O valor 4 deve ser rejeitado pela validação.
+        """
+        token = _register_and_login(client)
+        response = client.post(
+            "/user/profile/questionnaire",
+            json={"answers": [1, 1, 1, 1, 4]},  # 4 > QUESTIONNAIRE_OPTION_MAX_POINTS
+            headers=_auth(token),
+        )
+
+        assert response.status_code == 422
+        body = response.get_json()
+        assert "errors" in body
+
+    def test_answer_value_below_min_returns_422(self, client) -> None:
+        """Resposta com pontos abaixo do mínimo (0 < min=1) → 422."""
+        token = _register_and_login(client)
+        response = client.post(
+            "/user/profile/questionnaire",
+            json={"answers": [0, 1, 1, 1, 1]},  # 0 < QUESTIONNAIRE_OPTION_MIN_POINTS
+            headers=_auth(token),
+        )
+
+        assert response.status_code == 422
+        body = response.get_json()
+        assert "errors" in body
+
+    def test_exactly_five_answers_required(self, client) -> None:
+        """A lista de respostas deve ter exatamente 5 itens (não mais, não menos)."""
+        token = _register_and_login(client)
+
+        # 4 respostas → 422
+        response_short = client.post(
+            "/user/profile/questionnaire",
+            json={"answers": [1, 1, 1, 1]},
+            headers=_auth(token),
+        )
+        assert response_short.status_code == 422
+
+        # 6 respostas — marshmallow rejeita com equal=5 (não chega no service)
+        response_long = client.post(
+            "/user/profile/questionnaire",
+            json={"answers": [1, 1, 1, 1, 1, 1]},
+            headers=_auth(token),
+        )
+        assert response_long.status_code == 422
 
     def test_profile_persisted_after_submission(self, client, app) -> None:
         """O perfil sugerido deve ser persistido no model do usuário após o POST."""
