@@ -95,9 +95,70 @@ pytest -m "not schemathesis" --cov=app --cov-report=term-missing
 pytest -m "not schemathesis" --cov=app --cov-report=xml --cov-fail-under=85
 ```
 
-- Mínimo absoluto: **85%**
+- Mínimo absoluto: **85% global** (medido pelo CI job `tests`)
+- **Cobertura de código novo ≥ 80%** — SonarCloud mede apenas os arquivos do PR; falha se < 80%
 - Cobertura **não pode regredir** — se um PR diminuir cobertura, deve incluir novos testes
-- Módulos críticos (auth, services, models) devem ter cobertura mais alta
+- Módulos críticos (auth, services, controllers) devem ter cobertura mais alta
+
+### Regra obrigatória: todo controller deve ter teste HTTP
+
+> Incidente B10 (2026-03-10): controller entregue com 45% de cobertura porque agente
+> testou apenas a camada de service. SonarCloud bloqueou o PR com 65% de cobertura nova.
+
+Para **todo `MethodView` Flask criado**, o agente DEVE criar um arquivo de teste em
+`tests/controllers/<modulo>/test_<resource>.py` que cubra:
+
+| Cenário | Status esperado |
+|:--------|:----------------|
+| Sucesso autenticado (todos os métodos HTTP da rota) | `200` / `201` |
+| Sem token de autenticação | `401` |
+| Payload inválido / faltando campos | `422` |
+| Violação de regra de negócio (ex: count errado) | `400` |
+
+**Padrão de auth em testes de controller (obrigatório):**
+
+```python
+import uuid
+
+def _register_and_login(client) -> str:
+    suffix = uuid.uuid4().hex[:8]
+    email = f"test-{suffix}@email.com"
+    password = "StrongPass@123"
+    r = client.post("/auth/register", json={"name": f"test-{suffix}", "email": email, "password": password})
+    assert r.status_code == 201
+    r2 = client.post("/auth/login", json={"email": email, "password": password})
+    assert r2.status_code == 200
+    return r2.get_json()["token"]
+
+def _auth(token: str) -> dict[str, str]:
+    return {"Authorization": f"Bearer {token}"}
+```
+
+> **NÃO EXISTE** fixture `auth_headers`, `auth_client` ou `authenticated_client` no conftest.py.
+> Usar sempre `_register_and_login(client)` + `_auth(token)`.
+
+**SQLAlchemy 2.x — padrão obrigatório:**
+
+```python
+# ❌ PROIBIDO — API legada (causa LegacyAPIWarning tratada como erro pelo pytest.ini)
+user = User.query.get(user_id)
+
+# ✅ CORRETO — SQLAlchemy 2.x
+from uuid import UUID
+user = db.session.get(User, UUID(str(user_id)))
+```
+
+**Verificação de cobertura de arquivo novo antes de commitar:**
+
+```bash
+# Checar cobertura somente do(s) arquivo(s) novo(s):
+pytest tests/controllers/<modulo>/test_<resource>.py \
+       tests/application/test_<service>.py \
+       --cov=app/controllers/<modulo>/<resource>.py \
+       --cov=app/application/services/<service>.py \
+       --cov-report=term-missing -v
+# Qualquer arquivo com < 80%: adicionar mais casos de teste antes de commitar.
+```
 
 ---
 
