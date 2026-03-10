@@ -42,6 +42,7 @@ class User(db.Model):
 
     financial_objectives = db.Column(db.Text, nullable=True)
 
+    # Suggested profile derived from questionnaire (indicative only)
     investor_profile_suggested = db.Column(db.String(32), nullable=True)
     profile_quiz_score = db.Column(db.Integer, nullable=True)
     taxonomy_version = db.Column(db.String(16), nullable=True)
