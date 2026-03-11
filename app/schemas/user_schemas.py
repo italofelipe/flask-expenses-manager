@@ -312,3 +312,43 @@ class QuestionnaireResultSchema(Schema):
         }
     )
     score = fields.Integer(metadata={"description": "Pontuação total obtida"})
+
+
+class SalaryIncreaseSimulationRequestSchema(Schema):
+    """Schema para requisição de simulação de aumento salarial"""
+
+    base_salary = fields.Decimal(
+        required=True,
+        validate=validate.Range(min=0),
+        metadata={"description": "Salário base atual", "example": "5000.00"},
+    )
+    base_date = fields.Date(
+        required=True,
+        metadata={"description": "Data base do salário atual", "example": "2022-01-01"},
+    )
+    discounts = fields.Decimal(
+        required=True,
+        validate=validate.Range(min=0),
+        metadata={"description": "Descontos aplicáveis", "example": "500.00"},
+    )
+    target_real_increase = fields.Decimal(
+        required=True,
+        validate=validate.Range(min=0),
+        metadata={"description": "Aumento real desejado (%)", "example": "5.00"},
+    )
+
+
+class SalaryIncreaseSimulationResponseSchema(Schema):
+    """Schema para resposta de simulação de aumento salarial"""
+
+    recomposition = fields.Decimal(
+        as_string=True,
+        metadata={
+            "description": "Valor de recomposição da inflação",
+            "example": "250.00",
+        },
+    )
+    target = fields.Decimal(
+        as_string=True,
+        metadata={"description": "Salário alvo calculado", "example": "5500.00"},
+    )
