@@ -26,7 +26,8 @@ To migrate ``evaluate_questionnaire`` to FastAPI:
 from __future__ import annotations
 
 import copy
-from datetime import datetime
+from datetime import date, datetime
+from decimal import Decimal
 from typing import Any, Protocol, TypedDict, runtime_checkable
 
 # ---------------------------------------------------------------------------
@@ -334,3 +335,38 @@ def update_user_profile(user: Any, data: dict[str, Any]) -> dict[str, str | None
         setattr(user, field, value)
 
     return {"error": None}
+
+
+def simulate_salary_increase(
+    base_salary: Decimal,
+    base_date: date,
+    discounts: Decimal,
+    target_real_increase: Decimal,
+) -> dict[str, Decimal]:
+    """Calculate salary recomposition and target based on inputs.
+
+    Note:
+        Currently uses a placeholder for historical inflation data.
+        In a real scenario, this would query an external API or database
+        for exact inflation rates from `base_date` to today.
+    """
+    _ = base_date  # Placeholder for future inflation data query
+
+    # Placeholder inflation rate (e.g., 5.0%)
+    inflation_rate = Decimal("0.05")
+
+    recomposition = base_salary * inflation_rate
+
+    # Calculate target salary:
+    # (base_salary + recomposition) * (1 + target_real_increase / 100) - discounts
+    multiplier = Decimal("1") + (target_real_increase / Decimal("100"))
+    target = (base_salary + recomposition) * multiplier - discounts
+
+    # Ensure target is not negative
+    if target < Decimal("0"):
+        target = Decimal("0")
+
+    return {
+        "recomposition": round(recomposition, 2),
+        "target": round(target, 2),
+    }
