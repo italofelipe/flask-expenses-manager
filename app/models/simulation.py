@@ -5,7 +5,7 @@ from __future__ import annotations
 
 import uuid
 
-from sqlalchemy.dialects.postgresql import JSONB, UUID
+from sqlalchemy.dialects.postgresql import UUID
 
 from app.extensions.database import db
 from app.utils.datetime_utils import utc_now_naive
@@ -25,8 +25,8 @@ class Simulation(db.Model):
     )
     tool_id = db.Column(db.String(60), nullable=False, index=True)
     rule_version = db.Column(db.String(20), nullable=False)
-    inputs = db.Column(JSONB, nullable=False)
-    result = db.Column(JSONB, nullable=False)
+    inputs = db.Column(db.JSON, nullable=False)
+    result = db.Column(db.JSON, nullable=False)
     saved = db.Column(db.Boolean, nullable=False, default=False)
     goal_id = db.Column(UUID(as_uuid=True), db.ForeignKey("goals.id"), nullable=True)
     created_at = db.Column(db.DateTime, nullable=False, default=utc_now_naive)
