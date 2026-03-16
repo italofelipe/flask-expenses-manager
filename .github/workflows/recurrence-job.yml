@@ -37,3 +37,34 @@ jobs:
             exit 0
           fi
           python scripts/generate_recurring_transactions.py
+
+      - name: Notify failure via GitHub Issue
+        if: failure()
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const runUrl = `https://github.com/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`;
+            const now = new Date().toISOString();
+            await github.rest.issues.create({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              title: `🚨 [recurrence-job] Falha na geração de transações recorrentes — ${now.slice(0,10)}`,
+              body: [
+                '## Recurrence Job falhou',
+                '',
+                `**Data:** ${now}`,
+                `**Run:** ${runUrl}`,
+                '',
+                'O job agendado de geração de transações recorrentes falhou.',
+                'Verifique os logs do workflow e o estado do banco de dados de produção.',
+                '',
+                '### Ações sugeridas',
+                '- Revisar logs da execução no link acima',
+                '- Verificar conectividade com `RECURRENCE_DATABASE_URL`',
+                '- Executar `scripts/generate_recurring_transactions.py` manualmente se necessário',
+                '',
+                '_Issue criada automaticamente pelo GitHub Actions._',
+              ].join('\n'),
+              labels: ['bug', 'ops'],
+            });
