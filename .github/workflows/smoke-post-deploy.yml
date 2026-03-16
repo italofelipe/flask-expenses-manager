@@ -1,0 +1,140 @@
+name: Smoke Test (Post-Deploy)
+
+# Runs Newman smoke suite against a live deployment.
+# Can be triggered manually or called from the deploy workflow after a
+# successful deploy via `workflow_call`.
+#
+# Required inputs:
+#   api_url       — Base URL of the deployed API  (e.g. https://api.auraxis.app)
+#   environment   — "dev" | "prod"  (selects the Postman environment file)
+
+on:
+  workflow_dispatch:
+    inputs:
+      api_url:
+        description: "Base URL of the deployed API"
+        required: true
+        type: string
+        default: "https://api-dev.auraxis.app"
+      environment:
+        description: "Target environment"
+        required: true
+        type: choice
+        options:
+          - dev
+          - prod
+        default: dev
+
+  workflow_call:
+    inputs:
+      api_url:
+        required: true
+        type: string
+      environment:
+        required: true
+        type: string
+
+jobs:
+  smoke:
+    name: Newman Smoke — ${{ inputs.environment }}
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Install Newman
+        run: npm install -g newman newman-reporter-junitfull
+
+      - name: Select Postman environment file
+        id: env_file
+        run: |
+          ENV="${{ inputs.environment }}"
+          if [ "$ENV" = "prod" ]; then
+            echo "path=api-tests/postman/environments/prod.postman_environment.json" >> "$GITHUB_OUTPUT"
+          else
+            echo "path=api-tests/postman/environments/dev.postman_environment.json" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Patch base URL in environment file
+        run: |
+          API_URL="${{ inputs.api_url }}"
+          ENV_FILE="${{ steps.env_file.outputs.path }}"
+          python3 - "$ENV_FILE" "$API_URL" <<'PYEOF'
+          import json, sys
+          path, base_url = sys.argv[1], sys.argv[2]
+          with open(path) as f:
+              env = json.load(f)
+          for val in env.get("values", []):
+              if val.get("key") in ("baseUrl", "base_url", "BASE_URL"):
+                  val["value"] = base_url
+          with open(path, "w") as f:
+              json.dump(env, f, indent=2)
+          print(f"[smoke] baseUrl patched → {base_url}")
+          PYEOF
+
+      - name: Wait for API health
+        run: |
+          API_URL="${{ inputs.api_url }}"
+          for i in $(seq 1 20); do
+            if curl -fsS "${API_URL}/healthz" >/dev/null 2>&1; then
+              echo "API is healthy at ${API_URL}"
+              exit 0
+            fi
+            echo "Attempt $i/20 — waiting for API..."
+            sleep 5
+          done
+          echo "API did not respond at ${API_URL}/healthz after 100s" >&2
+          exit 1
+
+      - name: Run smoke suite
+        run: |
+          mkdir -p reports
+          newman run api-tests/postman/auraxis.postman_collection.json \
+            --environment "${{ steps.env_file.outputs.path }}" \
+            --folder "smoke" \
+            --reporters cli,junitfull \
+            --reporter-junitfull-export reports/newman-smoke-report.xml \
+            --bail
+
+      - name: Upload Newman report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: newman-smoke-report-${{ inputs.environment }}
+          path: reports/newman-smoke-report.xml
+
+      - name: Notify failure via GitHub Issue
+        if: failure()
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const env = '${{ inputs.environment }}';
+            const url = '${{ inputs.api_url }}';
+            const runUrl = `https://github.com/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`;
+            const now = new Date().toISOString();
+            await github.rest.issues.create({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              title: `🚨 [smoke-post-deploy] Falha nos testes de fumaça — ${env} — ${now.slice(0,10)}`,
+              body: [
+                '## Smoke tests falharam após deploy',
+                '',
+                `**Ambiente:** ${env}`,
+                `**URL:** ${url}`,
+                `**Data:** ${now}`,
+                `**Run:** ${runUrl}`,
+                '',
+                'Os testes Newman pós-deploy detectaram falha na API em produção.',
+                'Verifique o relatório Newman no artefato do workflow.',
+                '',
+                '_Issue criada automaticamente pelo GitHub Actions._',
+              ].join('\n'),
+              labels: ['bug', 'ops'],
+            });
