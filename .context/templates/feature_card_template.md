@@ -98,7 +98,7 @@ Order matters — tasks are executed top to bottom.
 | 2 | (e.g., Create CategorySchema) | `pytest tests/test_category_schema.py -v` | ⚪ |
 | 3 | (e.g., Create CategoryService) | `pytest tests/test_category_service.py -v` | ⚪ |
 | 4 | (e.g., Create GraphQL resolver) | `pytest tests/test_category_graphql.py -v` | ⚪ |
-| 5 | (e.g., Run full quality gates) | `black . && isort . && flake8 . && mypy app && pytest` | ⚪ |
+| 5 | (e.g., Run full quality gates) | `ruff format . && ruff check . && mypy app && pytest` | ⚪ |
 
 ### Risks and dependencies
 

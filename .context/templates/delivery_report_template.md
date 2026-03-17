@@ -59,9 +59,8 @@ Written for a human, not for another agent. 2-5 sentences.
 
 | Gate | Result | Notes |
 |:-----|:------:|:------|
-| black | PASS / FAIL | |
-| isort | PASS / FAIL | |
-| flake8 | PASS / FAIL | |
+| ruff format | PASS / FAIL | |
+| ruff check | PASS / FAIL | |
 | mypy | PASS / FAIL | |
 | pytest (coverage) | PASS / FAIL | Coverage: XX% |
 | pre-commit | PASS / FAIL | |

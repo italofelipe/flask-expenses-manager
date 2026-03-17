@@ -9,14 +9,11 @@
 ## Gates locais (antes de todo commit)
 
 ```bash
-# 1. Formatação
-black .
-isort app tests config run.py run_without_db.py
+# 1. Formatação + linting + import-sort (Ruff unificado)
+ruff format .
+ruff check app tests config run.py run_without_db.py
 
-# 2. Linting
-flake8 app tests config run.py run_without_db.py
-
-# 3. Type check
+# 2. Type check
 mypy app
 
 # 4. Testes + cobertura
@@ -30,9 +27,8 @@ pre-commit run --all-files
 
 | Gate | Threshold | Bloqueia commit? |
 |:-----|:----------|:-----------------|
-| `black` | zero diffs | ✅ Sim |
-| `isort` | zero diffs | ✅ Sim |
-| `flake8` | zero warnings | ✅ Sim |
+| `ruff format` | zero diffs | ✅ Sim |
+| `ruff check` | zero warnings | ✅ Sim |
 | `mypy` | zero errors (strict) | ✅ Sim |
 | `pytest --cov-fail-under` | ≥ 85% | ✅ Sim |
 | `bandit -lll -iii` | 0 HIGH/CRITICAL | ✅ Sim |
@@ -44,7 +40,7 @@ pre-commit run --all-files
 
 | Job | Dependências | Bloqueia merge? | Descrição |
 |:----|:-------------|:----------------|:----------|
-| `quality` | — | ✅ Sim | black + isort + flake8 + mypy + bandit + pip-audit |
+| `quality` | — | ✅ Sim | ruff format + ruff check + mypy + bandit + pip-audit |
 | `mypy-matrix` | — | ✅ Sim | mypy em Python 3.11 + 3.13 |
 | `secret-scan` | `quality` | ✅ Sim | Gitleaks — detect --source . |
 | `dependency-review` | — (PR only) | ✅ Sim (PRs) | Dependências com vulnerabilidades HIGH+ |
@@ -179,7 +175,7 @@ Quality Gate requerido:
 
 | Problema | Causa provável | Solução |
 |:---------|:---------------|:--------|
-| `black` diff em CI | Arquivo não formatado localmente | Rodar `black .` antes de commitar |
+| `ruff format` diff em CI | Arquivo não formatado localmente | Rodar `ruff format .` antes de commitar |
 | `mypy` error em CI | Type annotation faltando ou errada | Rodar `mypy app` localmente |
 | Coverage < 85% | Nova lógica sem teste | Escrever testes para o código adicionado |
 | Gitleaks detectou segredo | Credencial em código | Remover + rotar a credencial imediatamente |
