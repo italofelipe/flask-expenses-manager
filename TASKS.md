@@ -75,7 +75,7 @@ Estado atual consolidado:
 
 Pendencias de execucao imediata (ordem sugerida):
 1. `PLT1` concluir setup do `auraxis-platform` como orquestrador oficial e validar migração física do backend para `repos/auraxis-api` (paths, scripts e contexto).
-2. `X4` iniciar execução da adoção faseada de Ruff (`advisory -> substituição de flake8/black/isort`) preservando rigor de tipagem com `mypy`.
+2. `X4` ~~concluído~~ — Ruff é agora o linter único (`ruff format` + `ruff check`); `flake8`, `black`, `isort` removidos; `mypy` mantido.
 3. `X3` iniciar fase 0 de desacoplamento para coexistência Flask/FastAPI (sem migração de endpoints ainda).
 4. `B10` questionario indicativo (5-10 perguntas) para sugestao de perfil.
 5. `B11` persistencia/exposicao do perfil sugerido e `taxonomy_version`.
@@ -298,7 +298,7 @@ Fluxo por entrega:
 | X1    | Tech Debt     | Remover/atualizar TODO desatualizado sobre enums em transacoes                                                                             | Done        | 100%      | Baixo: clareza de manutencao                                                                                                                                             | traceability-debt                | 2026-02-20         |
 | X2    | Tech Debt     | Centralizar regras de domínio em serviços/casos de uso e reduzir controllers/resolvers REST/GraphQL a adapters finos (sem regra duplicada) | Done        | 100%      | Baixo: metas, transações, wallet entries/queries e investment operations convergidos em camada de aplicação, com adapters REST/GraphQL finos e mapeamento de erro/presenters por domínio | 6192830, 5e4995f                | 2026-02-20         |
 | X3    | Tech Debt     | Analisar plano de migração gradual Flask -> FastAPI (estratégia de convivência, impacto em REST/GraphQL, autenticação, docs OpenAPI e rollout sem downtime) | Todo        | 55%       | Alto: migração de framework pode introduzir regressão transversal e aumentar custo operacional se não houver plano faseado por bounded context                              | n/a (analise em auraxis-platform/.context/tech_debt/X3_fastapi_migration_coexistence.md) | 2026-02-22         |
-| X4    | Tech Debt     | Ruff como stack único de qualidade — `flake8`, `black`, `isort` removidos; `mypy` mantido como gate de tipagem estática | Done        | 100%      | — | chore/infra-gaps-api (#615) | 2026-03-17         |
+| X4    | Tech Debt     | Ruff como stack único de qualidade — `flake8`, `black`, `isort` removidos; `mypy` mantido como gate de tipagem estática | Done        | 100% — concluído | — | chore/infra-gaps-api (#615) + chore/ruff-consolidation-docs-api (#622) | 2026-03-17         |
 
 
 ## Registro de progresso recente
@@ -458,7 +458,7 @@ Fluxo por entrega:
 ## Proxima prioridade sugerida
 
 - PLT1 (P0): concluir migração do workspace para `auraxis-platform/repos/auraxis-api` com validação de paths/scripts/contexto.
-- X4 (P1): iniciar fase advisory de Ruff no CI mantendo `mypy` como gate obrigatório.
+- X4 (Done): Ruff é o linter único — `ruff format` + `ruff check`; `flake8`, `black`, `isort` removidos.
 - X3 (P1): implementar somente pré-requisitos da fase 0 (adapters agnósticos de auth/context/error), sem mover endpoints para FastAPI.
 
 ## Mapeamento Rebranding (nomenclatura legada -> `auraxis`)
