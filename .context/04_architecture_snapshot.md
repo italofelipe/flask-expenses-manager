@@ -18,7 +18,7 @@ Auraxis API e um backend Flask com suporte a REST e GraphQL, focado em gestao fi
 - Reverse proxy/TLS: Nginx + certificados.
 
 ## Qualidade e seguranca
-- Pre-commit: black, isort, flake8, mypy, checks de seguranca.
+- Pre-commit: ruff (format + lint + isort), mypy, checks de seguranca.
 - CI: suites de testes, gates de seguranca e policy Sonar.
 - Observabilidade: metricas e logs estruturados, com runbooks em `docs/`.
 
