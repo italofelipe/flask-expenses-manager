@@ -10,6 +10,10 @@
 
 ### Ruff (formatador, lint e imports)
 
+> **Ruff é o único linter/formatador deste projeto.**
+> `flake8`, `black` e `isort` foram substituídos por ruff — **não instale nem invoque essas ferramentas.**
+> A configuração de isort vive em `[tool.ruff.lint.isort]` dentro do pyproject.toml.
+
 ```toml
 # pyproject.toml
 [tool.ruff]

@@ -47,6 +47,12 @@ class User(db.Model):
     profile_quiz_score = db.Column(db.Integer, nullable=True)
     taxonomy_version = db.Column(db.String(16), nullable=True)
 
+    # J12 — subscription entitlement version bump.
+    # Clients compare their cached value with this field to detect that
+    # entitlements changed and must be revalidated (avoids polling).
+    # Incremented atomically on subscription_status_changed events.
+    entitlements_version = db.Column(db.Integer, nullable=False, default=0)
+
     tickers = db.relationship("UserTicker", back_populates="user")
     goals = db.relationship(
         "Goal",

@@ -27,15 +27,26 @@ from app.extensions.database import db
 from app.extensions.error_handlers import register_error_handlers
 from app.extensions.http_observability import register_http_observability
 from app.extensions.integration_metrics_cli import register_integration_metrics_commands
+from app.extensions.sentry import init_sentry
 from app.http.request_context import register_request_context_adapter
 from app.middleware.cors import register_cors
 from app.middleware.docs_access import register_docs_access_guard
 from app.middleware.security_headers import register_security_headers
 from app.models.account import Account  # noqa: F401
+from app.models.alert import Alert, AlertPreference  # noqa: F401
 from app.models.audit_event import AuditEvent  # noqa: F401
 from app.models.credit_card import CreditCard  # noqa: F401
+from app.models.fiscal import (  # noqa: F401
+    FiscalAdjustment,
+    FiscalDocument,
+    FiscalImport,
+    ReceivableEntry,
+)
 from app.models.goal import Goal  # noqa: F401
 from app.models.investment_operation import InvestmentOperation  # noqa: F401
+from app.models.shared_entry import Invitation, SharedEntry  # noqa: F401
+from app.models.simulation import Simulation  # noqa: F401
+from app.models.subscription import Subscription  # noqa: F401
 from app.models.tag import Tag  # noqa: F401
 
 jwt = JWTManager()
@@ -43,6 +54,10 @@ ma = Marshmallow()
 
 
 def create_app() -> Flask:
+    # Sentry must be initialised before anything else so it can capture
+    # startup errors. Safe no-op when SENTRY_DSN is not set.
+    init_sentry()
+
     app = Flask(__name__, instance_relative_config=True)
     from config import Config, validate_security_configuration
 
