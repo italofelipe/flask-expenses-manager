@@ -96,7 +96,7 @@ before autonomous execution begins.
    e. If validation fails → fix and re-validate before committing.
    f. Update task status in the card (⚪ → 🟢).
 3. After all tasks:
-   a. Run full quality gates (black, isort, flake8, mypy, pytest).
+   a. Run full quality gates (ruff format, ruff check, mypy, pytest).
    b. Verify coverage >= 85%.
 4. PO supervises in parallel (reads commits, asks questions if needed).
 
