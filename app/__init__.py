@@ -36,6 +36,7 @@ from app.models.account import Account  # noqa: F401
 from app.models.alert import Alert, AlertPreference  # noqa: F401
 from app.models.audit_event import AuditEvent  # noqa: F401
 from app.models.credit_card import CreditCard  # noqa: F401
+from app.models.entitlement import Entitlement  # noqa: F401
 from app.models.fiscal import (  # noqa: F401
     FiscalAdjustment,
     FiscalDocument,
