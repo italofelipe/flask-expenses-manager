@@ -29,7 +29,7 @@ def register_goal_routes() -> None:
     goal_bp.add_url_rule(
         "/<uuid:goal_id>",
         view_func=GoalResource.as_view("goal_resource"),
-        methods=["GET", "PUT", "DELETE"],
+        methods=["GET", "PUT", "PATCH", "DELETE"],
     )
     goal_bp.add_url_rule(
         "/<uuid:goal_id>/plan",

@@ -176,6 +176,40 @@ class GoalResource(MethodResource):
         )
 
     @doc(
+        description="Atualiza parcialmente uma meta específica do usuário autenticado.",
+        tags=["Metas"],
+        security=[{"BearerAuth": []}],
+        params={"goal_id": {"in": "path", "type": "string", "required": True}},
+        responses={
+            200: {"description": "Meta atualizada"},
+            400: {"description": "Dados inválidos"},
+            401: {"description": "Token inválido"},
+            403: {"description": "Sem permissão"},
+            404: {"description": "Meta não encontrada"},
+        },
+    )
+    @jwt_required()
+    def patch(self, goal_id: UUID) -> Any:
+        user_id = current_user_id()
+        payload = request.get_json() or {}
+        dependencies = get_goal_dependencies()
+        service = dependencies.goal_application_service_factory(user_id)
+        try:
+            goal_data = service.update_goal(goal_id, payload)
+        except GoalApplicationError as exc:
+            return goal_application_error_response(exc)
+
+        return compat_success(
+            legacy_payload={
+                "message": "Meta atualizada com sucesso",
+                "goal": goal_data,
+            },
+            status_code=200,
+            message="Meta atualizada com sucesso",
+            data={"goal": goal_data},
+        )
+
+    @doc(
         description="Remove uma meta específica do usuário autenticado.",
         tags=["Metas"],
         security=[{"BearerAuth": []}],
