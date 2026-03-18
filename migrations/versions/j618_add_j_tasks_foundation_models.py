@@ -411,6 +411,35 @@ def upgrade() -> None:
     )
 
     # ------------------------------------------------------------------
+    # entitlements
+    # ------------------------------------------------------------------
+    op.create_table(
+        "entitlements",
+        sa.Column("id", postgresql.UUID(as_uuid=True), nullable=False),
+        sa.Column("user_id", postgresql.UUID(as_uuid=True), nullable=False),
+        sa.Column("feature_key", sa.String(80), nullable=False),
+        sa.Column("granted_at", sa.DateTime(), nullable=False),
+        sa.Column("expires_at", sa.DateTime(), nullable=True),
+        sa.Column(
+            "source",
+            sa.Enum("subscription", "manual", "trial", name="entitlementsource"),
+            nullable=False,
+        ),
+        sa.Column("created_at", sa.DateTime(), nullable=False),
+        sa.ForeignKeyConstraint(["user_id"], ["users.id"], ondelete="CASCADE"),
+        sa.PrimaryKeyConstraint("id"),
+    )
+    op.create_index(
+        "ix_entitlements_user_id", "entitlements", ["user_id"]
+    )
+    op.create_index(
+        "ix_entitlements_user_feature", "entitlements", ["user_id", "feature_key"]
+    )
+    op.create_index(
+        "ix_entitlements_user_expires", "entitlements", ["user_id", "expires_at"]
+    )
+
+    # ------------------------------------------------------------------
     # users.entitlements_version (new column)
     # ------------------------------------------------------------------
     op.add_column(
@@ -426,6 +455,11 @@ def upgrade() -> None:
 
 def downgrade() -> None:
     op.drop_column("users", "entitlements_version")
+
+    op.drop_index("ix_entitlements_user_expires", "entitlements")
+    op.drop_index("ix_entitlements_user_feature", "entitlements")
+    op.drop_index("ix_entitlements_user_id", "entitlements")
+    op.drop_table("entitlements")
 
     op.drop_index("ix_fiscal_adjustments_fiscal_document_id", "fiscal_adjustments")
     op.drop_table("fiscal_adjustments")
@@ -477,5 +511,6 @@ def downgrade() -> None:
         "fiscaldocumentstatus",
         "reconciliationstatus",
         "fiscaladjustmenttype",
+        "entitlementsource",
     ):
         sa.Enum(name=enum_name).drop(op.get_bind(), checkfirst=True)
