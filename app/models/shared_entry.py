@@ -98,6 +98,8 @@ class Invitation(db.Model):
         nullable=False,
         default=InvitationStatus.PENDING,
     )
+    token = db.Column(db.String(64), nullable=True, unique=True)
+    expires_at = db.Column(db.DateTime, nullable=True)
     created_at = db.Column(db.DateTime, nullable=False, default=utc_now_naive)
     responded_at = db.Column(db.DateTime, nullable=True)
 
