@@ -11,21 +11,10 @@ from sqlalchemy.pool import NullPool
 
 from app.controllers.alert_controller import alert_bp
 from app.controllers.auth_controller import auth_bp, register_auth_dependencies
-from app.controllers.entitlement import (
-    entitlement_bp,
-    register_entitlement_dependencies,
-)
 from app.controllers.goal_controller import goal_bp, register_goal_dependencies
 from app.controllers.graphql_controller import graphql_bp, register_graphql_dependencies
 from app.controllers.health_controller import health_bp
-<<<<<<< HEAD
 from app.controllers.subscription_controller import subscription_bp
-=======
-from app.controllers.simulation import (
-    register_simulation_dependencies,
-    simulation_bp,
-)
->>>>>>> 6591bdc (feat(alerts): add alert dispatch matrix and preference management service)
 from app.controllers.transaction_controller import (
     register_transaction_dependencies,
     transaction_bp,
@@ -156,8 +145,6 @@ def create_app() -> Flask:
     register_audit_retention_commands(app)
     register_integration_metrics_commands(app)
     register_wallet_dependencies(app)
-    register_simulation_dependencies(app)
-    register_entitlement_dependencies(app)
 
     # Registra blueprints ANTES dos endpoints no Swagger
     app.register_blueprint(transaction_bp)
@@ -167,16 +154,8 @@ def create_app() -> Flask:
     app.register_blueprint(wallet_bp)
     app.register_blueprint(graphql_bp)
     app.register_blueprint(health_bp)
-<<<<<<< HEAD
-    app.register_blueprint(subscription_bp)
-=======
     app.register_blueprint(alert_bp)
-<<<<<<< HEAD
->>>>>>> 7b430a2 (feat(subscriptions): add subscription state endpoints)
-=======
-    app.register_blueprint(simulation_bp)
-    app.register_blueprint(entitlement_bp)
->>>>>>> 6591bdc (feat(alerts): add alert dispatch matrix and preference management service)
+    app.register_blueprint(subscription_bp)
 
     # Registra os endpoints documentados no Swagger com base no mapa real de rotas.
     documented_blueprints = {
@@ -186,8 +165,6 @@ def create_app() -> Flask:
         "goal",
         "wallet",
         "health",
-        "simulation",
-        "entitlement",
     }
     for endpoint, view_func in sorted(app.view_functions.items()):
         if "." not in endpoint:
