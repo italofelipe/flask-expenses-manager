@@ -1,0 +1,12 @@
+{
+  "name": "auraxis-api-smoke",
+  "version": "1.0.0",
+  "description": "Newman smoke test runner for Auraxis API post-deploy validation",
+  "private": true,
+  "scripts": {
+    "smoke": "bash smoke_tests/run_smoke.sh"
+  },
+  "devDependencies": {
+    "newman": "^6.0.0"
+  }
+}
