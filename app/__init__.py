@@ -9,11 +9,11 @@ from flask_marshmallow import Marshmallow
 from flask_migrate import Migrate
 from sqlalchemy.pool import NullPool
 
-from app.controllers.alert_controller import alert_bp
 from app.controllers.auth_controller import auth_bp, register_auth_dependencies
 from app.controllers.goal_controller import goal_bp, register_goal_dependencies
 from app.controllers.graphql_controller import graphql_bp, register_graphql_dependencies
 from app.controllers.health_controller import health_bp
+from app.controllers.subscription_controller import subscription_bp
 from app.controllers.transaction_controller import (
     register_transaction_dependencies,
     transaction_bp,
@@ -34,7 +34,6 @@ from app.middleware.cors import register_cors
 from app.middleware.docs_access import register_docs_access_guard
 from app.middleware.security_headers import register_security_headers
 from app.models.account import Account  # noqa: F401
-from app.models.alert import Alert, AlertPreference  # noqa: F401
 from app.models.audit_event import AuditEvent  # noqa: F401
 from app.models.credit_card import CreditCard  # noqa: F401
 from app.models.entitlement import Entitlement  # noqa: F401
@@ -154,7 +153,7 @@ def create_app() -> Flask:
     app.register_blueprint(wallet_bp)
     app.register_blueprint(graphql_bp)
     app.register_blueprint(health_bp)
-    app.register_blueprint(alert_bp)
+    app.register_blueprint(subscription_bp)
 
     # Registra os endpoints documentados no Swagger com base no mapa real de rotas.
     documented_blueprints = {
