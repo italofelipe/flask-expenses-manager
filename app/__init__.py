@@ -15,7 +15,6 @@ from app.controllers.entitlement import (
     entitlement_bp,
     register_entitlement_dependencies,
 )
-from app.controllers.fiscal import fiscal_bp
 from app.controllers.goal_controller import goal_bp, register_goal_dependencies
 from app.controllers.graphql_controller import graphql_bp, register_graphql_dependencies
 from app.controllers.health_controller import health_bp
@@ -172,7 +171,6 @@ def create_app() -> Flask:
     app.register_blueprint(entitlement_bp)
     app.register_blueprint(simulation_bp)
     app.register_blueprint(shared_entries_bp)
-    app.register_blueprint(fiscal_bp)
 
     # Registra os endpoints documentados no Swagger com base no mapa real de rotas.
     documented_blueprints = {
