@@ -90,7 +90,23 @@ Arquitetura canonica de smoke:
 - pós-deploy: smoke deterministico em Python dentro do `deploy.yml`
 - fluxos legados paralelos de smoke foram removidos para evitar drift
 
-### 3) Governance
+### 3) Release automation
+Arquivo: `.github/workflows/release-please.yml`
+
+Fluxo:
+- `push` em `master/main` dispara o `Release Please`
+- a action abre ou atualiza o PR de release com changelog e versao semantica
+- o PR de release precisa disparar o `CI` normal do repositório
+
+Secret requerido:
+- `RELEASE_PLEASE_TOKEN`
+
+Notas:
+- o workflow usa um token dedicado em vez de `GITHUB_TOKEN` para evitar o bloqueio anti-recursao do GitHub Actions;
+- sem `RELEASE_PLEASE_TOKEN`, o workflow falha cedo com mensagem explicita em vez de criar PR de release sem checks;
+- se um PR legado de release ficar preso sem statuses, um push manual na branch do release PR volta a disparar o `CI`, mas isso deve ser tratado apenas como remediation, nao como fluxo nominal.
+
+### 4) Governance
 Arquivo: `.github/workflows/governance.yml`
 
 Fluxo:
@@ -104,7 +120,7 @@ Arquivos de suporte:
 Secret requerido:
 - `TOKEN_GITHUB_ADMIN`
 
-### 4) AWS Security Audit (I8)
+### 5) AWS Security Audit (I8)
 Arquivo: `.github/workflows/aws-security-audit.yml`
 
 Fluxo:

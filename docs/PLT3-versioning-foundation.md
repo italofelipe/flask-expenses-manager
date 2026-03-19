@@ -18,6 +18,12 @@ Eliminar versionamento manual e padronizar releases da API com base em Conventio
    - tag semântica é criada;
    - release GitHub é publicada automaticamente.
 
+## Requisitos operacionais
+
+- Secret obrigatório no repositório: `RELEASE_PLEASE_TOKEN`
+- O token de release deve ser um PAT ou credencial equivalente capaz de criar/atualizar o PR de release sem suprimir o disparo do CI
+- `GITHUB_TOKEN` não deve ser usado como token principal do Release Please neste repositório, porque pode criar PRs de release que ficam sem checks por proteção anti-recursão do GitHub Actions
+
 ## Observações
 
 - Estratégia da API está em `release-type: simple`:
