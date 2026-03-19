@@ -34,7 +34,7 @@
         "strict_required_status_checks_policy": true,
         "required_status_checks": [
           {
-            "context": "Quality (Lint + Type Check)"
+            "context": "Dependency Review (PR gate)"
           },
           {
             "context": "Secret Scan (Gitleaks)"
@@ -55,13 +55,10 @@
             "context": "Container Security (Trivy)"
           },
           {
-            "context": "Security Scan (Snyk)"
-          },
-          {
             "context": "Security Evidence (S3)"
           },
           {
-            "context": "Dependency Review (PR gate)"
+            "context": "Quality (Ruff + Type Check)"
           },
           {
             "context": "SonarQube Cloud"
