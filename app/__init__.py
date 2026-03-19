@@ -18,6 +18,7 @@ from app.controllers.entitlement import (
 from app.controllers.goal_controller import goal_bp, register_goal_dependencies
 from app.controllers.graphql_controller import graphql_bp, register_graphql_dependencies
 from app.controllers.health_controller import health_bp
+from app.controllers.shared_entries import shared_entries_bp
 from app.controllers.simulation import (
     register_simulation_dependencies,
     simulation_bp,
@@ -55,6 +56,7 @@ from app.models.fiscal import (  # noqa: F401
 from app.models.goal import Goal  # noqa: F401
 from app.models.investment_operation import InvestmentOperation  # noqa: F401
 from app.models.shared_entry import Invitation, SharedEntry  # noqa: F401
+from app.models.sharing_audit import SharingAuditEvent  # noqa: F401
 from app.models.simulation import Simulation  # noqa: F401
 from app.models.subscription import Subscription  # noqa: F401
 from app.models.tag import Tag  # noqa: F401
@@ -168,6 +170,7 @@ def create_app() -> Flask:
     app.register_blueprint(subscription_bp)
     app.register_blueprint(entitlement_bp)
     app.register_blueprint(simulation_bp)
+    app.register_blueprint(shared_entries_bp)
 
     # Registra os endpoints documentados no Swagger com base no mapa real de rotas.
     documented_blueprints = {
