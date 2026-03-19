@@ -56,9 +56,15 @@ EOF
     exit 3
   fi
 
-  if [[ "$RUN_POSTMAN" -eq 1 ]] && ! require_command newman; then
-    echo "[ci-like-local] missing required command: newman" >&2
-    echo "[ci-like-local] install with: npm install -g newman" >&2
+  if [[ "$RUN_POSTMAN" -eq 1 ]] && ! require_command npx; then
+    echo "[ci-like-local] missing required command: npx" >&2
+    echo "[ci-like-local] install Node.js/npm first." >&2
+    exit 3
+  fi
+
+  if [[ "$RUN_POSTMAN" -eq 1 ]] && ! npx --no-install newman --version >/dev/null 2>&1; then
+    echo "[ci-like-local] local Newman dependency not installed." >&2
+    echo "[ci-like-local] run: npm ci" >&2
     exit 3
   fi
 }

@@ -1,10 +1,11 @@
 {
   "name": "auraxis-api-smoke",
   "version": "1.0.0",
-  "description": "Newman smoke test runner for Auraxis API post-deploy validation",
+  "description": "Newman smoke test runner for Auraxis API CI validation",
   "private": true,
   "scripts": {
-    "smoke": "bash smoke_tests/run_smoke.sh"
+    "smoke:local": "bash scripts/run_postman_suite.sh",
+    "smoke:ci": "bash scripts/run_postman_suite.sh api-tests/postman/environments/local.postman_environment.json"
   },
   "devDependencies": {
     "newman": "^6.0.0"

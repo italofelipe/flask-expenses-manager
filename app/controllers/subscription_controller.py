@@ -16,7 +16,8 @@ import os
 from typing import Any
 from uuid import UUID
 
-from flask import Blueprint, Response, current_app, jsonify, request
+from flask import Blueprint, current_app, jsonify, request
+from flask.typing import ResponseReturnValue
 
 from app.auth import get_active_auth_context
 from app.extensions.database import db
@@ -61,14 +62,14 @@ def _serialize_subscription(sub: Subscription) -> dict[str, Any]:
     }
 
 
-def _ok(data: dict[str, Any], status: int = 200) -> Response:
-    return jsonify({"success": True, "data": data}), status  # type: ignore[return-value]
+def _ok(data: dict[str, Any], status: int = 200) -> ResponseReturnValue:
+    return jsonify({"success": True, "data": data}), status
 
 
-def _err(message: str, code: str, status: int) -> Response:
+def _err(message: str, code: str, status: int) -> ResponseReturnValue:
     return jsonify(
         {"success": False, "error": {"code": code, "message": message}}
-    ), status  # type: ignore[return-value]
+    ), status
 
 
 def _get_provider() -> BillingProvider:
@@ -81,7 +82,7 @@ def _get_provider() -> BillingProvider:
 
 
 @subscription_bp.get("/me")
-def get_my_subscription() -> Response:
+def get_my_subscription() -> ResponseReturnValue:
     """Return the authenticated user's current subscription state."""
     auth = get_active_auth_context()
     sub = get_or_create_subscription(UUID(auth.subject))
@@ -96,7 +97,7 @@ def get_my_subscription() -> Response:
 
 
 @subscription_bp.post("/checkout")
-def create_checkout_session() -> Response:
+def create_checkout_session() -> ResponseReturnValue:
     """Create a billing checkout session for the requested plan."""
     auth = get_active_auth_context()
 
@@ -129,7 +130,7 @@ def create_checkout_session() -> Response:
 
 
 @subscription_bp.post("/cancel")
-def cancel_my_subscription() -> Response:
+def cancel_my_subscription() -> ResponseReturnValue:
     """Cancel the authenticated user's subscription."""
     auth = get_active_auth_context()
 
@@ -166,7 +167,7 @@ def _verify_webhook_signature(payload: bytes, signature: str) -> bool:
 
 
 @subscription_bp.post("/webhook")
-def handle_webhook() -> Response:
+def handle_webhook() -> ResponseReturnValue:
     """Receive provider webhook events.
 
     This endpoint intentionally has no JWT authentication — providers call it

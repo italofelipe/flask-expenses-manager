@@ -1,6 +1,6 @@
 # Steering Guide — auraxis-api
 
-Última atualização: 2026-02-23
+Última atualização: 2026-03-19
 
 ## 1. Fonte de verdade
 
@@ -115,19 +115,18 @@ scripts/repo_bin.sh pre-commit run --all-files
 
 ---
 
-## 7. Pipeline CI (11 jobs)
+## 7. Pipeline CI
 
 ```
 push/PR
  │
  ├── quality (ruff format + ruff check + mypy + bandit + pip-audit)
- ├── mypy-matrix (3.13)
  ├── secret-scan (Gitleaks)
  ├── dependency-review [PR only]
  ├── review-signal [PR only, advisory]
  │
  ├── tests (pytest ≥85% coverage)
- │    ├── api-smoke (Newman — local docker stack)
+ │    ├── api-smoke (Newman — smoke black-box oficial pré-merge)
  │    ├── mutation (Cosmic Ray — 0% survival)
  │    └── trivy (FS + image scan)
  │         └── snyk [se ENABLE_SNYK=true]
@@ -138,6 +137,8 @@ push/PR
 ```
 
 Todos os jobs de `tests` e superiores dependem de `quality` + `secret-scan` passarem primeiro.
+
+O smoke pós-deploy oficial roda apenas no `deploy.yml` via `scripts/http_smoke_check.py`.
 
 ---
 

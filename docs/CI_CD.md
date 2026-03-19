@@ -1,6 +1,6 @@
 # CI/CD (GitHub Actions)
 
-Ultima atualizacao: 2026-02-19
+Ultima atualizacao: 2026-03-19
 
 ## Objetivo
 
@@ -42,7 +42,8 @@ Jobs relevantes:
 
 6. `api-smoke`
 - sobe stack local docker
-- executa suite Postman/Newman (`scripts/run_postman_suite.sh`)
+- instala dependencias Node versionadas com `npm ci`
+- executa a unica suite oficial Newman pré-merge (`scripts/run_postman_suite.sh`)
 - publica `reports/newman-report.xml`
 
 7. `schemathesis`
@@ -83,6 +84,11 @@ Controles:
 - bloqueio de deploy PROD fora da branch `master`
 - rollback automatico em falha
 - smoke checks REST + GraphQL pos-deploy via `scripts/http_smoke_check.py`
+
+Arquitetura canonica de smoke:
+- pré-merge: Newman no job `api-smoke` do `ci.yml`
+- pós-deploy: smoke deterministico em Python dentro do `deploy.yml`
+- fluxos legados paralelos de smoke foram removidos para evitar drift
 
 ### 3) Governance
 Arquivo: `.github/workflows/governance.yml`
@@ -160,6 +166,7 @@ Exemplos:
 - `bash scripts/run_ci_like_actions_local.sh`
 - `bash scripts/run_ci_like_actions_local.sh --local --with-postman`
 - `bash scripts/run_ci_like_actions_local.sh --local --with-mutation`
+- `npm ci && npm run smoke:local`
 
 ## Secrets e Vars esperados
 

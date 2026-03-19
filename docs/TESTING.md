@@ -28,20 +28,20 @@ Environments:
 - `api-tests/postman/environments/dev.postman_environment.json`
 - `api-tests/postman/environments/prod.postman_environment.json`
 
+Bootstrap do runner:
+```bash
+npm ci
+```
+
 Runner local (Newman):
 ```bash
-./scripts/run_postman_suite.sh
+npm run smoke:local
 ```
 
 Runner com environment específico:
 ```bash
 ./scripts/run_postman_suite.sh ./api-tests/postman/environments/dev.postman_environment.json
 ./scripts/run_postman_suite.sh ./api-tests/postman/environments/prod.postman_environment.json
-```
-
-Pré-requisito:
-```bash
-npm install -g newman
 ```
 
 Cobertura inicial da coleção:
@@ -63,3 +63,4 @@ Cobertura inicial da coleção:
 - A suíte não depende de `.env.test`.
 - Cada teste roda com schema limpo (`create_all`/`drop_all`).
 - Ao final de cada teste, a sessão SQLAlchemy é removida, o engine é `dispose()` e o arquivo SQLite temporário é limpo.
+- Newman é a trilha oficial de smoke black-box pré-merge no CI; o smoke pós-deploy oficial fica em `scripts/http_smoke_check.py`.

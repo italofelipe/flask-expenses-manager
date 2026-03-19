@@ -28,6 +28,9 @@ instance/
 # MacOS
 .DS_Store
 
+# Node.js local smoke runner
+node_modules/
+
 # Docker
 *.pid
 *.seed
