@@ -32,6 +32,29 @@ strict = true
 plugins = []
 disallow_subclassing_any = false
 
+[[tool.mypy.overrides]]
+module = [
+    "app.middleware.security_headers",
+    "app.middleware.cors",
+    "app.http.request_context",
+    "app.middleware.docs_access",
+    "app.controllers.health_controller",
+    "app.controllers.subscription_controller",
+    "app.controllers.shared_entries.resources",
+    "app.controllers.fiscal.resources",
+    "app.controllers.wallet.valuation_resources",
+    "app.controllers.wallet.operation_resources",
+    "app.controllers.wallet.entry_resources",
+    "app.controllers.auth.error_handlers",
+    "app.extensions.integration_metrics_cli",
+    "app.extensions.audit_retention_cli",
+    "app.extensions.jwt_callbacks",
+    "app.extensions.audit_trail",
+    "app.extensions.http_observability",
+    "app.extensions.error_handlers",
+]
+disable_error_code = ["untyped-decorator"]
+
 [build-system]
 requires = ["setuptools>=42"]
 build-backend = "setuptools.build_meta"

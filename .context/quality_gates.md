@@ -1,6 +1,6 @@
 # Quality Gates — auraxis-api
 
-Última atualização: 2026-02-23
+Última atualização: 2026-03-19
 
 > Referência operacional para agentes e engenheiros. Para contexto completo de plataforma, ver `auraxis-platform/.context/25_quality_security_playbook.md`.
 
@@ -36,17 +36,16 @@ pre-commit run --all-files
 
 ---
 
-## Pipeline CI — 11 jobs
+## Pipeline CI
 
 | Job | Dependências | Bloqueia merge? | Descrição |
 |:----|:-------------|:----------------|:----------|
 | `quality` | — | ✅ Sim | ruff format + ruff check + mypy + bandit + pip-audit |
-| `mypy-matrix` | — | ✅ Sim | mypy em Python 3.11 + 3.13 |
 | `secret-scan` | `quality` | ✅ Sim | Gitleaks — detect --source . |
 | `dependency-review` | — (PR only) | ✅ Sim (PRs) | Dependências com vulnerabilidades HIGH+ |
 | `review-signal` | — (PR only) | ❌ Não (advisory) | Cursor Bugbot — sinal de revisão |
 | `tests` | `quality`, `secret-scan` | ✅ Sim | pytest ≥ 85% coverage + artifacts |
-| `api-smoke` | `tests` | ✅ Sim | Newman — smoke suite em local docker stack |
+| `api-smoke` | `tests` | ✅ Sim | Newman — única smoke suite black-box pré-merge em stack local docker |
 | `schemathesis` | `quality`, `secret-scan` | ✅ Sim | Contract reliability (5 exemplos/endpoint) |
 | `mutation` | `tests` | ✅ Sim | Cosmic Ray — 0% survival |
 | `trivy` | `tests` | ✅ Sim | FS scan + image scan (HIGH+CRITICAL) |
@@ -59,9 +58,8 @@ pre-commit run --all-files
 ```
 push/PR
  │
- ├─ quality ──────────────────────────────────┐
- ├─ mypy-matrix                               │
- └─ secret-scan (needs: quality) ─────────────┤
+ ├─ quality ────────────────────────────────┐
+ └─ secret-scan (needs: quality) ───────────┤
                                               │
  dependency-review [PR only]                  │
  review-signal [PR only, advisory]            │

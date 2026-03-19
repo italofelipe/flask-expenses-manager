@@ -8,9 +8,15 @@ ENV_FILE="${1:-$ENV_FILE_DEFAULT}"
 REPORT_DIR="${ROOT_DIR}/reports"
 REPORT_FILE="${REPORT_DIR}/newman-report.xml"
 
-if ! command -v newman >/dev/null 2>&1; then
-  echo "newman not found in PATH." >&2
-  echo "Install with: npm install -g newman" >&2
+if ! command -v npx >/dev/null 2>&1; then
+  echo "npx not found in PATH." >&2
+  echo "Install Node.js/npm first." >&2
+  exit 127
+fi
+
+if ! npx --no-install newman --version >/dev/null 2>&1; then
+  echo "newman not available from local dependencies." >&2
+  echo "Run: npm ci" >&2
   exit 127
 fi
 
@@ -29,7 +35,7 @@ mkdir -p "$REPORT_DIR"
 echo "[postman-suite] collection=$COLLECTION"
 echo "[postman-suite] environment=$ENV_FILE"
 
-newman run "$COLLECTION" \
+npx --no-install newman run "$COLLECTION" \
   -e "$ENV_FILE" \
   --timeout-request 15000 \
   --delay-request 150 \
