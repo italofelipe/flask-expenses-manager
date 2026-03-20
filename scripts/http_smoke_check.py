@@ -17,14 +17,17 @@ import urllib.error
 import urllib.parse
 import urllib.request
 from dataclasses import dataclass
-from typing import Any
+from typing import cast
+
+JSONScalar = str | int | float | bool | None
+JSONValue = JSONScalar | list["JSONValue"] | dict[str, "JSONValue"]
 
 
 @dataclass(frozen=True)
 class HttpResult:
     status: int
     body_text: str
-    body_json: Any | None
+    body_json: JSONValue | None
 
 
 class SmokeCheckError(RuntimeError):
@@ -37,20 +40,20 @@ class _MethodPreservingNoRedirect(urllib.request.HTTPRedirectHandler):
     def redirect_request(  # type: ignore[override]
         self,
         req: urllib.request.Request,
-        fp: Any,
+        fp: object,
         code: int,
         msg: str,
-        headers: Any,
+        headers: object,
         newurl: str,
     ) -> None:
         return None
 
 
-def _try_parse_json(body_text: str) -> Any | None:
+def _try_parse_json(body_text: str) -> JSONValue | None:
     if not body_text.strip():
         return None
     try:
-        return json.loads(body_text)
+        return cast(JSONValue, json.loads(body_text))
     except json.JSONDecodeError:
         return None
 
@@ -72,7 +75,7 @@ def _request_json(
     *,
     method: str,
     url: str,
-    payload: dict[str, Any] | None = None,
+    payload: dict[str, JSONValue] | None = None,
     timeout: int = 15,
     headers: dict[str, str] | None = None,
 ) -> HttpResult:
@@ -224,6 +227,113 @@ def _check_graphql_invalid_login(base_url: str, timeout: int) -> None:
     print(f"[smoke] PASS graphql-invalid-login status={result.status} code={code}")
 
 
+def _check_installment_vs_cash_rest_calculate(base_url: str, timeout: int) -> None:
+    url = _build_url(base_url, "/simulations/installment-vs-cash/calculate")
+    result = _request_json(
+        method="POST",
+        url=url,
+        payload={
+            "cash_price": "900.00",
+            "installment_count": 3,
+            "installment_total": "990.00",
+            "first_payment_delay_days": 30,
+            "opportunity_rate_type": "manual",
+            "opportunity_rate_annual": "12.00",
+            "inflation_rate_annual": "4.50",
+            "fees_enabled": False,
+            "fees_upfront": "0.00",
+        },
+        timeout=timeout,
+        headers={"X-API-Contract": "v2"},
+    )
+    if result.status != 200:
+        raise SmokeCheckError(
+            "REST installment-vs-cash calculate expected HTTP 200, "
+            f"got {result.status}."
+        )
+    if not isinstance(result.body_json, dict):
+        raise SmokeCheckError(
+            "REST installment-vs-cash calculate expected JSON object body."
+        )
+    data = result.body_json.get("data")
+    if not isinstance(data, dict):
+        raise SmokeCheckError(
+            "REST installment-vs-cash calculate expected wrapped data payload."
+        )
+    if data.get("tool_id") != "installment_vs_cash":
+        raise SmokeCheckError(
+            "REST installment-vs-cash calculate returned unexpected tool_id."
+        )
+    print(
+        "[smoke] PASS rest-installment-vs-cash-calculate "
+        f"status={result.status}"
+    )
+
+
+def _check_installment_vs_cash_graphql_calculate(
+    base_url: str,
+    timeout: int,
+) -> None:
+    url = _build_url(base_url, "/graphql")
+    query = """
+    query InstallmentVsCashCalculate {
+      installmentVsCashCalculate(
+        cashPrice: "900.00"
+        installmentCount: 3
+        installmentTotal: "990.00"
+        firstPaymentDelayDays: 30
+        opportunityRateType: "manual"
+        opportunityRateAnnual: "12.00"
+        inflationRateAnnual: "4.50"
+        feesEnabled: false
+        feesUpfront: "0.00"
+      ) {
+        toolId
+        result {
+          recommendedOption
+        }
+      }
+    }
+    """
+    result = _request_json(
+        method="POST",
+        url=url,
+        payload={"query": query},
+        timeout=timeout,
+    )
+    if result.status != 200:
+        raise SmokeCheckError(
+            "GraphQL installment-vs-cash calculate expected HTTP 200, "
+            f"got {result.status}."
+        )
+    if not isinstance(result.body_json, dict):
+        raise SmokeCheckError(
+            "GraphQL installment-vs-cash calculate expected JSON object body."
+        )
+    if result.body_json.get("errors"):
+        raise SmokeCheckError(
+            "GraphQL installment-vs-cash calculate returned execution errors."
+        )
+    data = result.body_json.get("data")
+    if not isinstance(data, dict):
+        raise SmokeCheckError(
+            "GraphQL installment-vs-cash calculate expected data payload."
+        )
+    calculation = data.get("installmentVsCashCalculate")
+    if not isinstance(calculation, dict):
+        raise SmokeCheckError(
+            "GraphQL installment-vs-cash calculate expected result object."
+        )
+    if calculation.get("toolId") != "installment_vs_cash":
+        raise SmokeCheckError(
+            "GraphQL installment-vs-cash calculate returned unexpected toolId."
+        )
+    print(
+        "[smoke] PASS graphql-installment-vs-cash-calculate "
+        f"status={result.status}"
+    )
+
+
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description="Run REST + GraphQL HTTP smoke checks."
@@ -247,6 +357,8 @@ def main() -> int:
     _check_graphql_empty_query(args.base_url, args.timeout)
     _check_rest_invalid_login(args.base_url, args.timeout)
     _check_graphql_invalid_login(args.base_url, args.timeout)
+    _check_installment_vs_cash_rest_calculate(args.base_url, args.timeout)
+    _check_installment_vs_cash_graphql_calculate(args.base_url, args.timeout)
     print("[smoke] PASS all checks")
     return 0
 
@@ -256,4 +368,4 @@ if __name__ == "__main__":
         raise SystemExit(main())
     except SmokeCheckError as exc:
         print(f"[smoke] FAIL {exc}", file=sys.stderr)
-        raise SystemExit(2)
+        raise SystemExit(2) from exc
