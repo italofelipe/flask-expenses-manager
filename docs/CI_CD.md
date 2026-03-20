@@ -90,6 +90,13 @@ Arquitetura canonica de smoke:
 - pós-deploy: smoke deterministico em Python dentro do `deploy.yml`
 - fluxos legados paralelos de smoke foram removidos para evitar drift
 
+Politica de docs runtime:
+- a documentacao publica oficial da API vive no portal `docs.auraxis.com.br/api/`
+- o runtime `/docs/` e `/docs/swagger/` existe para debugging/operacao
+- em `production`, a politica padrao agora e `disabled`
+- a politica `public` e rejeitada em runtime seguro de producao
+- se houver necessidade operacional excepcional, a exposicao deve ser explicitamente configurada como `authenticated`
+
 ### 3) Release automation
 Arquivo: `.github/workflows/release-please.yml`
 

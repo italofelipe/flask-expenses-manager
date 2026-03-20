@@ -16,7 +16,8 @@ def _create_docs_policy_app(
     docs_policy: str | None,
     flask_testing: bool = True,
     security_enforce_strong_secrets: bool = False,
-):
+    runtime_environment: str | None = None,
+) -> tuple[Any, Path]:
     db_path = tmp_path / f"docs-policy-{uuid.uuid4().hex}.sqlite3"
     monkeypatch.setenv("DATABASE_URL", f"sqlite:///{db_path}")
     monkeypatch.setenv("SECRET_KEY", "x" * 64)
@@ -28,6 +29,13 @@ def _create_docs_policy_app(
         "true" if security_enforce_strong_secrets else "false",
     )
     monkeypatch.setenv("AUDIT_PERSISTENCE_ENABLED", "false")
+    if runtime_environment is None:
+        monkeypatch.delenv("AURAXIS_ENV", raising=False)
+        monkeypatch.delenv("APP_ENV", raising=False)
+        monkeypatch.delenv("FLASK_ENV", raising=False)
+    else:
+        monkeypatch.setenv("AURAXIS_ENV", runtime_environment)
+        monkeypatch.setenv("FLASK_ENV", runtime_environment)
 
     if docs_policy is None:
         monkeypatch.delenv("DOCS_EXPOSURE_POLICY", raising=False)
@@ -63,12 +71,14 @@ def _docs_policy_app_context(
     *,
     flask_debug: bool,
     docs_policy: str | None,
+    runtime_environment: str | None = None,
 ) -> Generator[Any, None, None]:
     app, db_path = _create_docs_policy_app(
         monkeypatch,
         tmp_path,
         flask_debug=flask_debug,
         docs_policy=docs_policy,
+        runtime_environment=runtime_environment,
     )
     try:
         yield app
@@ -108,6 +118,21 @@ def test_docs_policy_defaults_to_authenticated_when_not_debug(
         assert response.get_json()["message"] == "Token inválido ou ausente"
 
 
+def test_docs_policy_defaults_to_disabled_in_production_runtime(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    with _docs_policy_app_context(
+        monkeypatch,
+        tmp_path,
+        flask_debug=False,
+        docs_policy=None,
+        runtime_environment="production",
+    ) as app:
+        response = app.test_client().get("/docs/")
+        assert response.status_code == 404
+
+
 def test_docs_policy_defaults_to_public_in_debug(
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,
@@ -135,6 +160,42 @@ def test_docs_policy_invalid_value_raises_in_secure_runtime(
             flask_testing=False,
             security_enforce_strong_secrets=True,
         )
+
+
+def test_docs_policy_public_raises_in_production_runtime(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    with pytest.raises(
+        RuntimeError,
+        match="Policy 'public' is not allowed in production runtime",
+    ):
+        _create_docs_policy_app(
+            monkeypatch,
+            tmp_path,
+            flask_debug=False,
+            docs_policy="public",
+            flask_testing=False,
+            security_enforce_strong_secrets=True,
+            runtime_environment="production",
+        )
+
+
+def test_docs_policy_authenticated_can_be_explicitly_enabled_in_production(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    with _docs_policy_app_context(
+        monkeypatch,
+        tmp_path,
+        flask_debug=False,
+        docs_policy="authenticated",
+        runtime_environment="production",
+    ) as app:
+        client = app.test_client()
+        token = _register_and_login(client, prefix="docs-prod-auth")
+        response = client.get("/docs/", headers={"Authorization": f"Bearer {token}"})
+        assert response.status_code == 200
 
 
 def test_docs_policy_invalid_value_falls_back_in_debug(
