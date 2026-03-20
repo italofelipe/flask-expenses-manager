@@ -1,6 +1,7 @@
 from __future__ import annotations
 
-from typing import Any
+from collections.abc import Mapping
+from typing import Any, cast
 
 from flask import Response
 
@@ -18,18 +19,18 @@ from app.controllers.response_contract import (
 
 def compat_success(
     *,
-    legacy_payload: dict[str, Any],
+    legacy_payload: Mapping[str, object],
     status_code: int,
     message: str,
-    data: dict[str, Any],
-    meta: dict[str, Any] | None = None,
+    data: Mapping[str, object],
+    meta: Mapping[str, object] | None = None,
 ) -> Response:
     return compat_success_response(
-        legacy_payload=legacy_payload,
+        legacy_payload=cast(dict[str, Any], dict(legacy_payload)),
         status_code=status_code,
         message=message,
-        data=data,
-        meta=meta,
+        data=cast(dict[str, Any], dict(data)),
+        meta=None if meta is None else cast(dict[str, Any], dict(meta)),
     )
 
 

@@ -25,7 +25,6 @@ from app.services.installment_vs_cash_types import (
     InstallmentVsCashIndicatorSnapshot,
     InstallmentVsCashNormalizedInput,
     InstallmentVsCashResult,
-    InstallmentVsCashScheduleItem,
     SerializedSimulation,
 )
 
@@ -98,8 +97,7 @@ def to_installment_vs_cash_result_type(
             payload["indicator_snapshot"]
         ),
         schedule=[
-            InstallmentVsCashScheduleItemType(**item)
-            for item in cast(list[InstallmentVsCashScheduleItem], payload["schedule"])
+            InstallmentVsCashScheduleItemType(**item) for item in payload["schedule"]
         ],
     )
 

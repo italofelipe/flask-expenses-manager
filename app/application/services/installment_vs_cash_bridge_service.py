@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from decimal import ROUND_DOWN, Decimal
-from typing import Callable
+from typing import Callable, cast
 from uuid import UUID
 
 from app.application.services.transaction_application_service import (
@@ -64,7 +64,7 @@ class InstallmentVsCashBridgeService:
                 }
             )
         )
-        return self._goal_service.serialize(goal)
+        return cast(SerializedGoal, self._goal_service.serialize(goal))
 
     def create_planned_expense(
         self,
@@ -106,7 +106,7 @@ class InstallmentVsCashBridgeService:
             ),
             installment_amount_builder=_build_installment_amounts,
         )
-        return transaction_result["items"]
+        return cast(list[SerializedTransaction], transaction_result["items"])
 
     def _create_installment_expense(
         self,
@@ -136,7 +136,9 @@ class InstallmentVsCashBridgeService:
             ),
             installment_amount_builder=_build_installment_amounts,
         )
-        created_items.extend(installment_result["items"])
+        created_items.extend(
+            cast(list[SerializedTransaction], installment_result["items"])
+        )
 
         upfront_fees = Decimal(str(installment["upfront_fees"]))
         if upfront_fees > Decimal("0.00"):
@@ -160,7 +162,7 @@ class InstallmentVsCashBridgeService:
                 ),
                 installment_amount_builder=_build_installment_amounts,
             )
-            created_items.extend(fee_result["items"])
+            created_items.extend(cast(list[SerializedTransaction], fee_result["items"]))
 
         return created_items
 

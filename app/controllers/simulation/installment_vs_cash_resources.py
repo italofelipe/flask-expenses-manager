@@ -15,10 +15,18 @@ from app.schemas.installment_vs_cash_schema import (
     InstallmentVsCashPlannedExpenseBridgeSchema,
     InstallmentVsCashSaveSchema,
 )
-from app.services.entitlement_service import require_entitlement
-from app.utils.typed_decorators import typed_doc as doc
-from app.utils.typed_decorators import typed_jwt_required as jwt_required
-from app.utils.typed_decorators import typed_use_kwargs as use_kwargs
+from app.utils.typed_decorators import (
+    typed_doc as doc,
+)
+from app.utils.typed_decorators import (
+    typed_jwt_required as jwt_required,
+)
+from app.utils.typed_decorators import (
+    typed_require_entitlement as require_entitlement,
+)
+from app.utils.typed_decorators import (
+    typed_use_kwargs as use_kwargs,
+)
 
 from .contracts import compat_success, installment_vs_cash_application_error_response
 from .dependencies import get_simulation_dependencies

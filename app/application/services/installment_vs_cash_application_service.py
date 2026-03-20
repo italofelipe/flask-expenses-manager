@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from decimal import Decimal
-from typing import Callable, Protocol, TypeAlias, cast
+from typing import Callable, TypeAlias, cast
 from uuid import UUID
 
 from flask import current_app
@@ -45,13 +45,6 @@ class InstallmentVsCashApplicationError(Exception):
     code: str
     status_code: int
     details: dict[str, object] | None = None
-
-
-class _ApplicationErrorSource(Protocol):
-    message: str
-    code: str
-    status_code: int
-    details: dict[str, object] | None
 
 
 class InstallmentVsCashApplicationService:
@@ -299,6 +292,9 @@ class InstallmentVsCashApplicationService:
 _CalculatorFactory: TypeAlias = Callable[[], InstallmentVsCashService]
 _SimulationServiceFactory: TypeAlias = Callable[[UUID], SimulationService]
 _BridgeServiceFactory: TypeAlias = Callable[[UUID], InstallmentVsCashBridgeService]
+_ApplicationErrorSource: TypeAlias = (
+    SimulationServiceError | GoalServiceError | TransactionApplicationError
+)
 
 
 def _to_application_error(

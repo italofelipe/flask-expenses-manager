@@ -3,11 +3,13 @@ from __future__ import annotations
 from datetime import date
 from decimal import ROUND_DOWN, Decimal
 from math import isclose, pow
+from typing import cast
 
 from app.services.installment_vs_cash_types import (
     InstallmentVsCashCalculation,
     InstallmentVsCashCalculationInput,
     InstallmentVsCashIndicatorSnapshot,
+    InstallmentVsCashNormalizedInput,
     InstallmentVsCashResult,
     InstallmentVsCashScheduleItem,
     NumericInput,
@@ -41,7 +43,9 @@ class InstallmentVsCashService:
         installment_nominal_total = _sum_money(installment_amounts)
         fees_upfront = _to_money(payload.get("fees_upfront", "0.00"))
         first_payment_delay_days = int(payload.get("first_payment_delay_days", 30))
-        opportunity_rate_type = str(payload.get("opportunity_rate_type", "manual"))
+        opportunity_rate_type = _normalize_opportunity_rate_type(
+            payload.get("opportunity_rate_type", "manual")
+        )
         inflation_rate_annual_percent = Decimal(str(payload["inflation_rate_annual"]))
         opportunity_rate_annual_percent, indicator_snapshot = (
             self._resolve_opportunity_rate(
@@ -157,7 +161,7 @@ class InstallmentVsCashService:
             "indicator_snapshot": indicator_snapshot,
             "schedule": schedule,
         }
-        inputs = {
+        inputs: InstallmentVsCashNormalizedInput = {
             "cash_price": _money_str(cash_price),
             "installment_count": installment_count,
             "installment_amount": _money_str(installment_amounts[0]),
@@ -267,7 +271,7 @@ class InstallmentVsCashService:
     def _build_recommendation_reason(
         self,
         *,
-        recommended_option: str,
+        recommended_option: RecommendedOption,
         delta_vs_cash: Decimal,
     ) -> str:
         if recommended_option == "equivalent":
@@ -289,7 +293,7 @@ class InstallmentVsCashService:
     def _build_formula_explainer(
         self,
         *,
-        opportunity_rate_type: str,
+        opportunity_rate_type: OpportunityRateType,
         opportunity_rate_annual_percent: Decimal,
         inflation_rate_annual_percent: Decimal,
         first_payment_delay_days: int,
@@ -359,6 +363,10 @@ def _resolve_installment_amounts(
                     "installment_amount."
                 )
         return amounts
+    if installment_total is None:
+        raise ValueError(
+            "Informe installment_total quando installment_amount não for enviado."
+        )
     total = _to_money(installment_total)
     base_amount = (total / installment_count).quantize(
         Decimal("0.01"), rounding=ROUND_DOWN
@@ -376,6 +384,12 @@ def _effective_monthly_rate(annual_percent: Decimal) -> float:
 
 def _to_money(value: NumericInput) -> Decimal:
     return Decimal(str(value)).quantize(Decimal("0.01"))
+
+
+def _normalize_opportunity_rate_type(value: object) -> OpportunityRateType:
+    if value in {"manual", "product_default", "inflation_only"}:
+        return cast(OpportunityRateType, value)
+    raise ValueError("opportunity_rate_type inválido.")
 
 
 def _to_percent(value: Decimal) -> Decimal:
