@@ -4,6 +4,9 @@ from typing import Any
 
 from flask import Response
 
+from app.application.services.installment_vs_cash_application_service import (
+    InstallmentVsCashApplicationError,
+)
 from app.application.services.simulation_application_service import (
     SimulationApplicationError,
 )
@@ -32,6 +35,18 @@ def compat_success(
 
 def simulation_application_error_response(
     exc: SimulationApplicationError,
+) -> Response:
+    return compat_error_response(
+        legacy_payload={"error": exc.message, "details": exc.details},
+        status_code=exc.status_code,
+        message=exc.message,
+        error_code=exc.code,
+        details=exc.details,
+    )
+
+
+def installment_vs_cash_application_error_response(
+    exc: InstallmentVsCashApplicationError,
 ) -> Response:
     return compat_error_response(
         legacy_payload={"error": exc.message, "details": exc.details},

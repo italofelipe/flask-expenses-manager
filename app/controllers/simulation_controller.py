@@ -1,8 +1,12 @@
 """Simulation controller compatibility facade."""
 
 from app.controllers.simulation import (
+    InstallmentVsCashCalculationResource,
+    InstallmentVsCashSaveResource,
     SimulationCollectionResource,
     SimulationDependencies,
+    SimulationGoalBridgeResource,
+    SimulationPlannedExpenseBridgeResource,
     SimulationResource,
     get_simulation_dependencies,
     register_simulation_dependencies,
@@ -16,4 +20,8 @@ __all__ = [
     "get_simulation_dependencies",
     "SimulationCollectionResource",
     "SimulationResource",
+    "InstallmentVsCashCalculationResource",
+    "InstallmentVsCashSaveResource",
+    "SimulationGoalBridgeResource",
+    "SimulationPlannedExpenseBridgeResource",
 ]
