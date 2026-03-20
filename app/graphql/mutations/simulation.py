@@ -19,6 +19,10 @@ from app.graphql.installment_vs_cash_presenters import (
 from app.graphql.types import TransactionTypeObject
 from app.services.entitlement_service import has_entitlement
 
+INSTALLMENT_VS_CASH_SIMULATION_TYPE = (
+    "app.graphql.types.InstallmentVsCashSimulationType"
+)
+
 
 def _require_advanced_simulations(user_id: UUID) -> None:
     if has_entitlement(user_id, "advanced_simulations"):
@@ -45,7 +49,7 @@ class SaveInstallmentVsCashSimulationMutation(graphene.Mutation):
 
     message = graphene.String(required=True)
     simulation = graphene.Field(
-        "app.graphql.types.InstallmentVsCashSimulationType",
+        INSTALLMENT_VS_CASH_SIMULATION_TYPE,
         required=True,
     )
     calculation = graphene.Field(
@@ -85,7 +89,7 @@ class CreateGoalFromInstallmentVsCashSimulationMutation(graphene.Mutation):
     message = graphene.String(required=True)
     goal = graphene.Field("app.graphql.types.GoalTypeObject", required=True)
     simulation = graphene.Field(
-        "app.graphql.types.InstallmentVsCashSimulationType",
+        INSTALLMENT_VS_CASH_SIMULATION_TYPE,
         required=True,
     )
 
@@ -129,7 +133,7 @@ class CreatePlannedExpenseFromInstallmentVsCashSimulationMutation(graphene.Mutat
     message = graphene.String(required=True)
     transactions = graphene.List(TransactionTypeObject, required=True)
     simulation = graphene.Field(
-        "app.graphql.types.InstallmentVsCashSimulationType",
+        INSTALLMENT_VS_CASH_SIMULATION_TYPE,
         required=True,
     )
 
