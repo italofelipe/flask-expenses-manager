@@ -1,9 +1,13 @@
 from __future__ import annotations
 
-from typing import Any
+from collections.abc import Mapping
+from typing import Any, cast
 
 from flask import Response
 
+from app.application.services.installment_vs_cash_application_service import (
+    InstallmentVsCashApplicationError,
+)
 from app.application.services.simulation_application_service import (
     SimulationApplicationError,
 )
@@ -15,23 +19,35 @@ from app.controllers.response_contract import (
 
 def compat_success(
     *,
-    legacy_payload: dict[str, Any],
+    legacy_payload: Mapping[str, object],
     status_code: int,
     message: str,
-    data: dict[str, Any],
-    meta: dict[str, Any] | None = None,
+    data: Mapping[str, object],
+    meta: Mapping[str, object] | None = None,
 ) -> Response:
     return compat_success_response(
-        legacy_payload=legacy_payload,
+        legacy_payload=cast(dict[str, Any], dict(legacy_payload)),
         status_code=status_code,
         message=message,
-        data=data,
-        meta=meta,
+        data=cast(dict[str, Any], dict(data)),
+        meta=None if meta is None else cast(dict[str, Any], dict(meta)),
     )
 
 
 def simulation_application_error_response(
     exc: SimulationApplicationError,
+) -> Response:
+    return compat_error_response(
+        legacy_payload={"error": exc.message, "details": exc.details},
+        status_code=exc.status_code,
+        message=exc.message,
+        error_code=exc.code,
+        details=exc.details,
+    )
+
+
+def installment_vs_cash_application_error_response(
+    exc: InstallmentVsCashApplicationError,
 ) -> Response:
     return compat_error_response(
         legacy_payload={"error": exc.message, "details": exc.details},

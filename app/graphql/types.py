@@ -166,6 +166,143 @@ class GoalPlanType(graphene.ObjectType):
     recommendations = graphene.List(GoalRecommendationType, required=True)
 
 
+class InstallmentVsCashIndicatorSnapshotType(graphene.ObjectType):
+    preset_type = graphene.String(required=True)
+    source = graphene.String(required=True)
+    annual_rate_percent = graphene.String(required=True)
+    as_of = graphene.String(required=True)
+
+
+class InstallmentVsCashComparisonType(graphene.ObjectType):
+    cash_option_total = graphene.String(required=True)
+    installment_option_total = graphene.String(required=True)
+    installment_present_value = graphene.String(required=True)
+    installment_real_value_today = graphene.String(required=True)
+    present_value_delta_vs_cash = graphene.String(required=True)
+    absolute_delta_vs_cash = graphene.String(required=True)
+    relative_delta_vs_cash_percent = graphene.String(required=True)
+    break_even_discount_percent = graphene.String(required=True)
+    break_even_opportunity_rate_annual = graphene.String(required=True)
+
+
+class InstallmentVsCashCashOptionType(graphene.ObjectType):
+    total = graphene.String(required=True)
+
+
+class InstallmentVsCashInstallmentOptionType(graphene.ObjectType):
+    count = graphene.Int(required=True)
+    amounts = graphene.List(graphene.String, required=True)
+    installment_amount = graphene.String(required=True)
+    nominal_total = graphene.String(required=True)
+    upfront_fees = graphene.String(required=True)
+    first_payment_delay_days = graphene.Int(required=True)
+
+
+class InstallmentVsCashOptionsType(graphene.ObjectType):
+    cash = graphene.Field(InstallmentVsCashCashOptionType, required=True)
+    installment = graphene.Field(
+        InstallmentVsCashInstallmentOptionType,
+        required=True,
+    )
+
+
+class InstallmentVsCashNeutralityBandType(graphene.ObjectType):
+    absolute_brl = graphene.String(required=True)
+    relative_percent = graphene.String(required=True)
+
+
+class InstallmentVsCashAssumptionsType(graphene.ObjectType):
+    opportunity_rate_type = graphene.String(required=True)
+    opportunity_rate_annual_percent = graphene.String(required=True)
+    inflation_rate_annual_percent = graphene.String(required=True)
+    periodicity = graphene.String(required=True)
+    first_payment_delay_days = graphene.Int(required=True)
+    upfront_fees_apply_to = graphene.String(required=True)
+    neutrality_rule = graphene.String(required=True)
+
+
+class InstallmentVsCashScheduleItemType(graphene.ObjectType):
+    installment_number = graphene.Int(required=True)
+    due_in_days = graphene.Int(required=True)
+    amount = graphene.String(required=True)
+    present_value = graphene.String(required=True)
+    real_value_today = graphene.String(required=True)
+    cumulative_nominal = graphene.String(required=True)
+    cumulative_present_value = graphene.String(required=True)
+    cumulative_real_value_today = graphene.String(required=True)
+    cash_cumulative = graphene.String(required=True)
+
+
+class InstallmentVsCashResultType(graphene.ObjectType):
+    recommended_option = graphene.String(required=True)
+    recommendation_reason = graphene.String(required=True)
+    formula_explainer = graphene.String(required=True)
+    comparison = graphene.Field(InstallmentVsCashComparisonType, required=True)
+    options = graphene.Field(InstallmentVsCashOptionsType, required=True)
+    neutrality_band = graphene.Field(
+        InstallmentVsCashNeutralityBandType,
+        required=True,
+    )
+    assumptions = graphene.Field(InstallmentVsCashAssumptionsType, required=True)
+    indicator_snapshot = graphene.Field(InstallmentVsCashIndicatorSnapshotType)
+    schedule = graphene.List(InstallmentVsCashScheduleItemType, required=True)
+
+
+class InstallmentVsCashInputType(graphene.ObjectType):
+    cash_price = graphene.String(required=True)
+    installment_count = graphene.Int(required=True)
+    installment_amount = graphene.String(required=True)
+    installment_total = graphene.String(required=True)
+    first_payment_delay_days = graphene.Int(required=True)
+    opportunity_rate_type = graphene.String(required=True)
+    opportunity_rate_annual = graphene.String(required=True)
+    inflation_rate_annual = graphene.String(required=True)
+    fees_upfront = graphene.String(required=True)
+    scenario_label = graphene.String()
+
+
+class InstallmentVsCashCalculationPayloadType(graphene.ObjectType):
+    tool_id = graphene.String(required=True)
+    rule_version = graphene.String(required=True)
+    input = graphene.Field(InstallmentVsCashInputType, required=True)
+    result = graphene.Field(InstallmentVsCashResultType, required=True)
+
+
+class InstallmentVsCashSimulationType(graphene.ObjectType):
+    id = graphene.ID(required=True)
+    user_id = graphene.String()
+    tool_id = graphene.String(required=True)
+    rule_version = graphene.String(required=True)
+    input = graphene.Field(InstallmentVsCashInputType, required=True)
+    result = graphene.Field(InstallmentVsCashResultType, required=True)
+    saved = graphene.Boolean(required=True)
+    goal_id = graphene.String()
+    created_at = graphene.String(required=True)
+
+
+class SaveInstallmentVsCashSimulationPayloadType(graphene.ObjectType):
+    message = graphene.String(required=True)
+    simulation = graphene.Field(InstallmentVsCashSimulationType, required=True)
+    calculation = graphene.Field(
+        InstallmentVsCashCalculationPayloadType,
+        required=True,
+    )
+
+
+class CreateGoalFromInstallmentVsCashSimulationPayloadType(graphene.ObjectType):
+    message = graphene.String(required=True)
+    goal = graphene.Field(GoalTypeObject, required=True)
+    simulation = graphene.Field(InstallmentVsCashSimulationType, required=True)
+
+
+class CreatePlannedExpenseFromInstallmentVsCashSimulationPayloadType(
+    graphene.ObjectType
+):
+    message = graphene.String(required=True)
+    transactions = graphene.List(TransactionTypeObject, required=True)
+    simulation = graphene.Field(InstallmentVsCashSimulationType, required=True)
+
+
 class WalletType(graphene.ObjectType):
     id = graphene.ID(required=True)
     name = graphene.String(required=True)

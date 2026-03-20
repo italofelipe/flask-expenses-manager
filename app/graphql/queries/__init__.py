@@ -4,6 +4,7 @@ import graphene
 
 from .goal import GoalQueryMixin
 from .investment import InvestmentQueryMixin
+from .simulation import SimulationQueryMixin
 from .transaction import TransactionQueryMixin
 from .user import UserQueryMixin
 from .wallet import WalletQueryMixin
@@ -13,6 +14,7 @@ class Query(
     UserQueryMixin,
     TransactionQueryMixin,
     GoalQueryMixin,
+    SimulationQueryMixin,
     WalletQueryMixin,
     InvestmentQueryMixin,
     graphene.ObjectType,
@@ -25,6 +27,7 @@ __all__ = [
     "UserQueryMixin",
     "TransactionQueryMixin",
     "GoalQueryMixin",
+    "SimulationQueryMixin",
     "WalletQueryMixin",
     "InvestmentQueryMixin",
 ]

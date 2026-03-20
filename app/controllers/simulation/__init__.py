@@ -6,6 +6,12 @@ from .dependencies import (
     get_simulation_dependencies,
     register_simulation_dependencies,
 )
+from .installment_vs_cash_resources import (
+    InstallmentVsCashCalculationResource,
+    InstallmentVsCashSaveResource,
+    SimulationGoalBridgeResource,
+    SimulationPlannedExpenseBridgeResource,
+)
 from .resources import SimulationCollectionResource, SimulationResource
 
 __all__ = [
@@ -15,4 +21,8 @@ __all__ = [
     "get_simulation_dependencies",
     "SimulationCollectionResource",
     "SimulationResource",
+    "InstallmentVsCashCalculationResource",
+    "InstallmentVsCashSaveResource",
+    "SimulationGoalBridgeResource",
+    "SimulationPlannedExpenseBridgeResource",
 ]

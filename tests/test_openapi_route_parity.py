@@ -48,6 +48,10 @@ def test_openapi_includes_critical_routes(client) -> None:
         "/wallet/{investment_id}/valuation",
         "/wallet/valuation",
         "/wallet/valuation/history",
+        "/simulations/installment-vs-cash/calculate",
+        "/simulations/installment-vs-cash/save",
+        "/simulations/{simulation_id}/goal",
+        "/simulations/{simulation_id}/planned-expense",
     }
 
     missing_paths = sorted(expected_paths - set(paths))
@@ -71,6 +75,10 @@ def test_openapi_methods_match_main_routes(client) -> None:
         "/transactions/{transaction_id}/force": {"delete"},
         "/transactions/restore/{transaction_id}": {"patch"},
         "/transactions/due-range": {"get"},
+        "/simulations/installment-vs-cash/calculate": {"post"},
+        "/simulations/installment-vs-cash/save": {"post"},
+        "/simulations/{simulation_id}/goal": {"post"},
+        "/simulations/{simulation_id}/planned-expense": {"post"},
         "/goals": {"get", "post"},
         "/goals/{goal_id}": {"get", "put", "delete"},
         "/goals/{goal_id}/plan": {"get"},

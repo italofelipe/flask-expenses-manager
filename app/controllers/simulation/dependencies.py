@@ -6,6 +6,9 @@ from uuid import UUID
 
 from flask import Flask, current_app
 
+from app.application.services.installment_vs_cash_application_service import (
+    InstallmentVsCashApplicationService,
+)
 from app.application.services.simulation_application_service import (
     SimulationApplicationService,
 )
@@ -18,11 +21,17 @@ class SimulationDependencies:
     simulation_application_service_factory: Callable[
         [UUID], SimulationApplicationService
     ]
+    installment_vs_cash_application_service_factory: Callable[
+        [UUID | None], InstallmentVsCashApplicationService
+    ]
 
 
 def _default_dependencies() -> SimulationDependencies:
     return SimulationDependencies(
         simulation_application_service_factory=SimulationApplicationService.with_defaults,
+        installment_vs_cash_application_service_factory=(
+            InstallmentVsCashApplicationService.with_defaults
+        ),
     )
 
 
