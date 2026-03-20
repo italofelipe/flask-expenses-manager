@@ -28,8 +28,8 @@ class InstallmentVsCashBridgeService:
         ],
     ) -> None:
         self._goal_service = goal_service_factory(user_id)
-        self._transaction_application_service = (
-            transaction_application_service_factory(user_id)
+        self._transaction_application_service = transaction_application_service_factory(
+            user_id
         )
 
     @classmethod

@@ -37,8 +37,7 @@ def test_installment_vs_cash_service_recommends_cash_when_present_value_is_highe
     )
 
 
-def test_installment_vs_cash_service_recommends_installment_with_high_opportunity_rate(
-) -> None:
+def test_service_recommends_installment_with_high_opportunity_rate() -> None:
     result = _service().calculate(
         _payload(
             cash_price="1000.00",

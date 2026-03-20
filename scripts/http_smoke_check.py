@@ -264,10 +264,7 @@ def _check_installment_vs_cash_rest_calculate(base_url: str, timeout: int) -> No
         raise SmokeCheckError(
             "REST installment-vs-cash calculate returned unexpected tool_id."
         )
-    print(
-        "[smoke] PASS rest-installment-vs-cash-calculate "
-        f"status={result.status}"
-    )
+    print(f"[smoke] PASS rest-installment-vs-cash-calculate status={result.status}")
 
 
 def _check_installment_vs_cash_graphql_calculate(
@@ -328,10 +325,7 @@ def _check_installment_vs_cash_graphql_calculate(
         raise SmokeCheckError(
             "GraphQL installment-vs-cash calculate returned unexpected toolId."
         )
-    print(
-        "[smoke] PASS graphql-installment-vs-cash-calculate "
-        f"status={result.status}"
-    )
+    print(f"[smoke] PASS graphql-installment-vs-cash-calculate status={result.status}")
 
 
 def parse_args() -> argparse.Namespace:

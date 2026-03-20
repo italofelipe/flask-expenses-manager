@@ -79,9 +79,7 @@ def _simulation(*, upfront_fees: str = "0.00") -> SimpleNamespace:
     )
 
 
-def test_installment_vs_cash_bridge_service_creates_goal_from_selected_option() -> (
-    None
-):
+def test_installment_vs_cash_bridge_service_creates_goal_from_selected_option() -> None:
     fake_goal_service = _FakeGoalService()
     service = InstallmentVsCashBridgeService(
         user_id=uuid4(),

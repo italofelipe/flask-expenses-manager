@@ -67,9 +67,7 @@ class SaveInstallmentVsCashSimulationMutation(graphene.Mutation):
         return SaveInstallmentVsCashSimulationMutation(
             message="Simulação salva com sucesso",
             simulation=to_installment_vs_cash_simulation_type(result["simulation"]),
-            calculation=to_installment_vs_cash_calculation_type(
-                result["calculation"]
-            ),
+            calculation=to_installment_vs_cash_calculation_type(result["calculation"]),
         )
 
 
