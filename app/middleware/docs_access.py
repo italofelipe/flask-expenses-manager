@@ -26,6 +26,8 @@ def _default_docs_policy() -> str:
     flask_debug = os.getenv("FLASK_DEBUG", "false").strip().lower() == "true"
     if flask_debug:
         return _POLICY_PUBLIC
+    if _is_production_runtime():
+        return _POLICY_DISABLED
     return _POLICY_AUTHENTICATED
 
 
@@ -35,10 +37,27 @@ def _is_secure_runtime() -> bool:
     return not is_debug and not is_testing
 
 
+def _is_production_runtime() -> bool:
+    for env_name in ("AURAXIS_ENV", "APP_ENV", "FLASK_ENV"):
+        raw_value = os.getenv(env_name, "").strip().lower()
+        if raw_value in {"prod", "production"}:
+            return True
+    return False
+
+
 def _read_docs_exposure_policy() -> str:
     raw_policy = os.getenv("DOCS_EXPOSURE_POLICY", "")
     normalized_policy = raw_policy.strip().lower()
     if normalized_policy in _ALLOWED_POLICIES:
+        if (
+            normalized_policy == _POLICY_PUBLIC
+            and _is_secure_runtime()
+            and _is_production_runtime()
+        ):
+            raise RuntimeError(
+                "Invalid DOCS_EXPOSURE_POLICY. "
+                "Policy 'public' is not allowed in production runtime."
+            )
         return normalized_policy
     if normalized_policy and _is_secure_runtime():
         raise RuntimeError(

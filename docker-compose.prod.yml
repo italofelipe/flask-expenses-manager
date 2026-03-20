@@ -36,6 +36,7 @@ services:
     environment:
       FLASK_ENV: production
       FLASK_DEBUG: "false"
+      DOCS_EXPOSURE_POLICY: "${DOCS_EXPOSURE_POLICY:-disabled}"
       AUTO_CREATE_DB: "${AUTO_CREATE_DB:-false}"
       MIGRATE_ON_START: "${MIGRATE_ON_START:-true}"
       DB_HOST: db
