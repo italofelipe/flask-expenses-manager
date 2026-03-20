@@ -21,6 +21,11 @@ from app.graphql.mutations.investment_operation import (
     DeleteInvestmentOperationMutation,
     UpdateInvestmentOperationMutation,
 )
+from app.graphql.mutations.simulation import (
+    CreateGoalFromInstallmentVsCashSimulationMutation,
+    CreatePlannedExpenseFromInstallmentVsCashSimulationMutation,
+    SaveInstallmentVsCashSimulationMutation,
+)
 from app.graphql.mutations.ticker import AddTickerMutation, DeleteTickerMutation
 from app.graphql.mutations.transaction import (
     CreateTransactionMutation,
@@ -46,6 +51,15 @@ class Mutation(graphene.ObjectType):
     update_goal = UpdateGoalMutation.Field()
     delete_goal = DeleteGoalMutation.Field()
     simulate_goal_plan = SimulateGoalPlanMutation.Field()
+    save_installment_vs_cash_simulation = (
+        SaveInstallmentVsCashSimulationMutation.Field()
+    )
+    create_goal_from_installment_vs_cash_simulation = (
+        CreateGoalFromInstallmentVsCashSimulationMutation.Field()
+    )
+    create_planned_expense_from_installment_vs_cash_simulation = (
+        CreatePlannedExpenseFromInstallmentVsCashSimulationMutation.Field()
+    )
     add_wallet_entry = AddWalletEntryMutation.Field()
     update_wallet_entry = UpdateWalletEntryMutation.Field()
     delete_wallet_entry = DeleteWalletEntryMutation.Field()

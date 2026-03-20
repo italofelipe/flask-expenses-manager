@@ -27,6 +27,7 @@ def register_auth_guard(app: Flask) -> None:
             "swagger-ui",
             "swagger-ui.static",
             "swagger-ui.swagger_json",
+            "installment_vs_cash_calculation",
             # Billing webhook — provider calls this directly without JWT
             "handle_webhook",
         }

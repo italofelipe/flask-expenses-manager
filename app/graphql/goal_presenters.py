@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Any
+from collections.abc import Mapping
 
 from app.application.services.goal_application_service import GoalApplicationError
 from app.graphql.errors import (
@@ -36,19 +36,22 @@ def raise_goal_graphql_error(exc: GoalApplicationError) -> None:
     raise build_public_graphql_error(exc.message, code=graphql_code) from exc
 
 
-def to_goal_type_object(goal_data: dict[str, Any]) -> GoalTypeObject:
+def to_goal_type_object(goal_data: Mapping[str, object]) -> GoalTypeObject:
     filtered = {
         key: value for key, value in goal_data.items() if key in _GOAL_GRAPHQL_FIELDS
     }
     return GoalTypeObject(**filtered)
 
 
-def to_goal_plan_type(plan_data: dict[str, Any]) -> GoalPlanType:
-    recommendations = [
-        GoalRecommendationType(**item)
-        for item in plan_data.get("recommendations", [])
-        if isinstance(item, dict)
-    ]
+def to_goal_plan_type(plan_data: Mapping[str, object]) -> GoalPlanType:
+    raw_recommendations = plan_data.get("recommendations", [])
+    recommendations: list[GoalRecommendationType] = []
+    if isinstance(raw_recommendations, list):
+        recommendations = [
+            GoalRecommendationType(**item)
+            for item in raw_recommendations
+            if isinstance(item, dict)
+        ]
     payload = dict(plan_data)
     payload["recommendations"] = recommendations
     return GoalPlanType(**payload)

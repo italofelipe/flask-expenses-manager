@@ -7,6 +7,8 @@ from flask_apispec import doc as apispec_doc
 from flask_apispec import use_kwargs as apispec_use_kwargs
 from flask_jwt_extended import jwt_required as flask_jwt_required
 
+from app.services.entitlement_service import require_entitlement
+
 F = TypeVar("F", bound=Callable[..., object])
 
 
@@ -37,3 +39,7 @@ def typed_jwt_required(
             skip_revocation_check=skip_revocation_check,
         ),
     )
+
+
+def typed_require_entitlement(feature_key: str) -> Callable[[F], F]:
+    return cast(Callable[[F], F], require_entitlement(feature_key))

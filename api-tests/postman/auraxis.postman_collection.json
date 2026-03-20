@@ -558,6 +558,202 @@
           ]
         }
       }
+    },
+    {
+      "name": "12 - Installment vs Cash calculate (REST public)",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('installment vs cash calculate returns 200', function () {",
+              "  pm.response.to.have.status(200);",
+              "});",
+              "var body = pm.response.json();",
+              "pm.test('installment vs cash uses v2 success envelope', function () {",
+              "  pm.expect(body.success).to.eql(true);",
+              "  pm.expect(body.data.tool_id).to.eql('installment_vs_cash');",
+              "});",
+              "pm.test('installment vs cash returns recommendation', function () {",
+              "  pm.expect(body.data.result.recommended_option).to.be.oneOf(['cash', 'installment', 'equivalent']);",
+              "});"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "X-API-Contract",
+            "value": "v2"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"cash_price\": \"900.00\",\n  \"installment_count\": 3,\n  \"installment_total\": \"990.00\",\n  \"first_payment_delay_days\": 30,\n  \"opportunity_rate_type\": \"manual\",\n  \"opportunity_rate_annual\": \"12.00\",\n  \"inflation_rate_annual\": \"4.50\",\n  \"fees_enabled\": false,\n  \"fees_upfront\": \"0.00\"\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/simulations/installment-vs-cash/calculate",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "simulations",
+            "installment-vs-cash",
+            "calculate"
+          ]
+        }
+      }
+    },
+    {
+      "name": "13 - Installment vs Cash save (REST auth required)",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('installment vs cash save returns 201', function () {",
+              "  pm.response.to.have.status(201);",
+              "});",
+              "var body = pm.response.json();",
+              "pm.test('installment vs cash save persists simulation', function () {",
+              "  pm.expect(body.success).to.eql(true);",
+              "  pm.expect(body.data.simulation.tool_id).to.eql('installment_vs_cash');",
+              "  pm.expect(body.data.simulation.saved).to.eql(true);",
+              "});"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "Authorization",
+            "value": "Bearer {{authToken}}"
+          },
+          {
+            "key": "X-API-Contract",
+            "value": "v2"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"cash_price\": \"900.00\",\n  \"installment_count\": 3,\n  \"installment_total\": \"990.00\",\n  \"first_payment_delay_days\": 30,\n  \"opportunity_rate_type\": \"manual\",\n  \"opportunity_rate_annual\": \"12.00\",\n  \"inflation_rate_annual\": \"4.50\",\n  \"fees_enabled\": true,\n  \"fees_upfront\": \"60.00\",\n  \"scenario_label\": \"Notebook\"\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/simulations/installment-vs-cash/save",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "simulations",
+            "installment-vs-cash",
+            "save"
+          ]
+        }
+      }
+    },
+    {
+      "name": "14 - GraphQL installment vs cash calculate (public)",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('graphql installment vs cash calculate returns 200', function () {",
+              "  pm.response.to.have.status(200);",
+              "});",
+              "var body = pm.response.json();",
+              "pm.test('graphql installment vs cash calculate has data and no errors', function () {",
+              "  pm.expect(body.errors).to.eql(undefined);",
+              "  pm.expect(body.data.installmentVsCashCalculate.toolId).to.eql('installment_vs_cash');",
+              "});"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"query\": \"query InstallmentVsCashCalculate { installmentVsCashCalculate(cashPrice: \\\"900.00\\\", installmentCount: 3, installmentTotal: \\\"990.00\\\", firstPaymentDelayDays: 30, opportunityRateType: \\\"manual\\\", opportunityRateAnnual: \\\"12.00\\\", inflationRateAnnual: \\\"4.50\\\", feesEnabled: false, feesUpfront: \\\"0.00\\\") { toolId result { recommendedOption } } }\"\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/graphql",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "graphql"
+          ]
+        }
+      }
+    },
+    {
+      "name": "15 - GraphQL installment vs cash save (auth required)",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('graphql installment vs cash save returns 200', function () {",
+              "  pm.response.to.have.status(200);",
+              "});",
+              "var body = pm.response.json();",
+              "pm.test('graphql installment vs cash save has data and no errors', function () {",
+              "  pm.expect(body.errors).to.eql(undefined);",
+              "  pm.expect(body.data.saveInstallmentVsCashSimulation.simulation.toolId).to.eql('installment_vs_cash');",
+              "});"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "Authorization",
+            "value": "Bearer {{authToken}}"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"query\": \"mutation SaveInstallmentVsCashSimulation { saveInstallmentVsCashSimulation(cashPrice: \\\"900.00\\\", installmentCount: 3, installmentTotal: \\\"990.00\\\", firstPaymentDelayDays: 30, opportunityRateType: \\\"manual\\\", opportunityRateAnnual: \\\"12.00\\\", inflationRateAnnual: \\\"4.50\\\", feesEnabled: true, feesUpfront: \\\"60.00\\\", scenarioLabel: \\\"Notebook\\\") { message simulation { id toolId saved } calculation { toolId } } }\"\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/graphql",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "graphql"
+          ]
+        }
+      }
     }
   ],
   "variable": [

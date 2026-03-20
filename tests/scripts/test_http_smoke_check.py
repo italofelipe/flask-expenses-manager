@@ -95,3 +95,105 @@ def test_request_json_preserves_post_on_redirect() -> None:
 
     assert result.status == 400
     assert received_methods == ["POST"]
+
+
+def test_check_installment_vs_cash_rest_calculate_uses_public_endpoint() -> None:
+    smoke = _load_smoke_module()
+    received_paths: list[str] = []
+
+    class Handler(BaseHTTPRequestHandler):
+        def do_POST(self) -> None:  # noqa: N802
+            received_paths.append(self.path)
+            if self.path == "/simulations/installment-vs-cash/calculate":
+                length = int(self.headers.get("Content-Length", "0"))
+                payload = json.loads(self.rfile.read(length).decode("utf-8"))
+                assert payload["cash_price"] == "900.00"
+                self.send_response(200)
+                self.send_header("Content-Type", "application/json")
+                self.end_headers()
+                self.wfile.write(
+                    json.dumps(
+                        {
+                            "success": True,
+                            "data": {
+                                "tool_id": "installment_vs_cash",
+                                "result": {"recommended_option": "cash"},
+                            },
+                        }
+                    ).encode("utf-8")
+                )
+                return
+
+            self.send_response(404)
+            self.end_headers()
+
+        def log_message(self, format: str, *args: object) -> None:
+            return
+
+    port = _free_port()
+    server = HTTPServer(("127.0.0.1", port), Handler)
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    try:
+        smoke._check_installment_vs_cash_rest_calculate(  # type: ignore[attr-defined]
+            f"http://127.0.0.1:{port}",
+            5,
+        )
+    finally:
+        server.shutdown()
+        server.server_close()
+        thread.join(timeout=5)
+
+    assert received_paths == ["/simulations/installment-vs-cash/calculate"]
+
+
+def test_check_installment_vs_cash_graphql_calculate_uses_public_query() -> None:
+    smoke = _load_smoke_module()
+    received_queries: list[str] = []
+
+    class Handler(BaseHTTPRequestHandler):
+        def do_POST(self) -> None:  # noqa: N802
+            if self.path == "/graphql":
+                length = int(self.headers.get("Content-Length", "0"))
+                payload = json.loads(self.rfile.read(length).decode("utf-8"))
+                query = payload["query"]
+                received_queries.append(query)
+                self.send_response(200)
+                self.send_header("Content-Type", "application/json")
+                self.end_headers()
+                self.wfile.write(
+                    json.dumps(
+                        {
+                            "data": {
+                                "installmentVsCashCalculate": {
+                                    "toolId": "installment_vs_cash",
+                                    "result": {"recommendedOption": "cash"},
+                                }
+                            }
+                        }
+                    ).encode("utf-8")
+                )
+                return
+
+            self.send_response(404)
+            self.end_headers()
+
+        def log_message(self, format: str, *args: object) -> None:
+            return
+
+    port = _free_port()
+    server = HTTPServer(("127.0.0.1", port), Handler)
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    try:
+        smoke._check_installment_vs_cash_graphql_calculate(  # type: ignore[attr-defined]
+            f"http://127.0.0.1:{port}",
+            5,
+        )
+    finally:
+        server.shutdown()
+        server.server_close()
+        thread.join(timeout=5)
+
+    assert received_queries
+    assert "installmentVsCashCalculate" in received_queries[0]

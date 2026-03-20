@@ -1,0 +1,39 @@
+{
+  "task_id": "J15-2",
+  "tool_id": "installment_vs_cash",
+  "rule_version": "2026.1",
+  "endpoints": [
+    {
+      "method": "POST",
+      "path": "/simulations/installment-vs-cash/calculate",
+      "auth": false
+    },
+    {
+      "method": "POST",
+      "path": "/simulations/installment-vs-cash/save",
+      "auth": true
+    },
+    {
+      "method": "POST",
+      "path": "/simulations/{simulation_id}/goal",
+      "auth": true,
+      "entitlement": "advanced_simulations"
+    },
+    {
+      "method": "POST",
+      "path": "/simulations/{simulation_id}/planned-expense",
+      "auth": true,
+      "entitlement": "advanced_simulations"
+    }
+  ],
+  "bridge_defaults": {
+    "goal": {
+      "target_amount_source": "selected_option_total"
+    },
+    "planned_expense": {
+      "cash_requires": ["due_date"],
+      "installment_requires": ["first_due_date"],
+      "upfront_fees_behavior": "creates_separate_pending_expense"
+    }
+  }
+}
