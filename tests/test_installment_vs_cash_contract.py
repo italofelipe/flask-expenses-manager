@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import uuid
-from typing import Any
 
 from app.models.user import User
 from app.services.entitlement_service import grant_entitlement
@@ -30,8 +29,8 @@ def _auth(token: str, *, v2: bool = False) -> dict[str, str]:
     return headers
 
 
-def _payload(**overrides: Any) -> dict[str, Any]:
-    payload: dict[str, Any] = {
+def _payload(**overrides: object) -> dict[str, object]:
+    payload: dict[str, object] = {
         "cash_price": "900.00",
         "installment_count": 3,
         "installment_total": "990.00",

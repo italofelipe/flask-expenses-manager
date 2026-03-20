@@ -1,8 +1,8 @@
 from __future__ import annotations
 
-from typing import Any
 from uuid import UUID
 
+from flask.typing import ResponseReturnValue
 from flask_apispec.views import MethodResource
 
 from app.application.services.installment_vs_cash_application_service import (
@@ -38,11 +38,11 @@ class InstallmentVsCashCalculationResource(MethodResource):
         },
     )
     @use_kwargs(InstallmentVsCashCalculationSchema, location="json")
-    def post(self, **kwargs: Any) -> Any:
+    def post(self, **kwargs: object) -> ResponseReturnValue:
         dependencies = get_simulation_dependencies()
         service = dependencies.installment_vs_cash_application_service_factory(None)
         try:
-            result = service.calculate(kwargs)
+            result = service.calculate(dict(kwargs))
         except InstallmentVsCashApplicationError as exc:
             return installment_vs_cash_application_error_response(exc)
 
@@ -67,13 +67,13 @@ class InstallmentVsCashSaveResource(MethodResource):
     )
     @jwt_required()
     @use_kwargs(InstallmentVsCashSaveSchema, location="json")
-    def post(self, **kwargs: Any) -> Any:
+    def post(self, **kwargs: object) -> ResponseReturnValue:
         dependencies = get_simulation_dependencies()
         service = dependencies.installment_vs_cash_application_service_factory(
             current_user_id()
         )
         try:
-            result = service.save_simulation(kwargs)
+            result = service.save_simulation(dict(kwargs))
         except InstallmentVsCashApplicationError as exc:
             return installment_vs_cash_application_error_response(exc)
 
@@ -104,13 +104,13 @@ class SimulationGoalBridgeResource(MethodResource):
     @jwt_required()
     @require_entitlement("advanced_simulations")
     @use_kwargs(InstallmentVsCashGoalBridgeSchema, location="json")
-    def post(self, simulation_id: UUID, **kwargs: Any) -> Any:
+    def post(self, simulation_id: UUID, **kwargs: object) -> ResponseReturnValue:
         dependencies = get_simulation_dependencies()
         service = dependencies.installment_vs_cash_application_service_factory(
             current_user_id()
         )
         try:
-            result = service.create_goal_from_simulation(simulation_id, kwargs)
+            result = service.create_goal_from_simulation(simulation_id, dict(kwargs))
         except InstallmentVsCashApplicationError as exc:
             return installment_vs_cash_application_error_response(exc)
 
@@ -142,7 +142,7 @@ class SimulationPlannedExpenseBridgeResource(MethodResource):
     @jwt_required()
     @require_entitlement("advanced_simulations")
     @use_kwargs(InstallmentVsCashPlannedExpenseBridgeSchema, location="json")
-    def post(self, simulation_id: UUID, **kwargs: Any) -> Any:
+    def post(self, simulation_id: UUID, **kwargs: object) -> ResponseReturnValue:
         dependencies = get_simulation_dependencies()
         service = dependencies.installment_vs_cash_application_service_factory(
             current_user_id()
@@ -150,7 +150,7 @@ class SimulationPlannedExpenseBridgeResource(MethodResource):
         try:
             result = service.create_planned_expense_from_simulation(
                 simulation_id,
-                kwargs,
+                dict(kwargs),
             )
         except InstallmentVsCashApplicationError as exc:
             return installment_vs_cash_application_error_response(exc)

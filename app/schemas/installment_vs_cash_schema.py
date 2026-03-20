@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 from datetime import date
-from typing import Any
 
 from marshmallow import (
     Schema,
@@ -91,7 +90,7 @@ class InstallmentVsCashCalculationSchema(Schema):
         return sanitized
 
     @validates_schema
-    def validate_payload(self, data: dict[str, Any], **kwargs: object) -> None:
+    def validate_payload(self, data: dict[str, object], **kwargs: object) -> None:
         installment_amount = data.get("installment_amount")
         installment_total = data.get("installment_total")
         if installment_amount is None and installment_total is None:
@@ -219,7 +218,7 @@ class InstallmentVsCashPlannedExpenseBridgeSchema(Schema):
         return sanitized
 
     @validates_schema
-    def validate_dates(self, data: dict[str, Any], **kwargs: object) -> None:
+    def validate_dates(self, data: dict[str, object], **kwargs: object) -> None:
         selected_option = data.get("selected_option")
         if selected_option == "cash" and data.get("due_date") is None:
             raise ValidationError(
@@ -239,7 +238,7 @@ class InstallmentVsCashPlannedExpenseBridgeSchema(Schema):
             )
 
 
-def _normalize_date_like_field(payload: dict[str, Any], field_name: str) -> None:
+def _normalize_date_like_field(payload: dict[str, object], field_name: str) -> None:
     value = payload.get(field_name)
     if isinstance(value, date):
         payload[field_name] = value.isoformat()

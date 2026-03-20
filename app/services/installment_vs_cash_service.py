@@ -1,18 +1,19 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
 from datetime import date
 from decimal import ROUND_DOWN, Decimal
 from math import isclose, pow
-from typing import Any
 
-
-@dataclass(frozen=True)
-class InstallmentVsCashCalculation:
-    tool_id: str
-    rule_version: str
-    inputs: dict[str, Any]
-    result: dict[str, Any]
+from app.services.installment_vs_cash_types import (
+    InstallmentVsCashCalculation,
+    InstallmentVsCashCalculationInput,
+    InstallmentVsCashIndicatorSnapshot,
+    InstallmentVsCashResult,
+    InstallmentVsCashScheduleItem,
+    NumericInput,
+    OpportunityRateType,
+    RecommendedOption,
+)
 
 
 class InstallmentVsCashService:
@@ -26,7 +27,10 @@ class InstallmentVsCashService:
             default_opportunity_rate_annual_percent
         )
 
-    def calculate(self, payload: dict[str, Any]) -> InstallmentVsCashCalculation:
+    def calculate(
+        self,
+        payload: InstallmentVsCashCalculationInput,
+    ) -> InstallmentVsCashCalculation:
         cash_price = _to_money(payload["cash_price"])
         installment_count = int(payload["installment_count"])
         installment_amounts = _resolve_installment_amounts(
@@ -80,7 +84,7 @@ class InstallmentVsCashService:
             relative_delta=relative_delta,
         )
 
-        result = {
+        result: InstallmentVsCashResult = {
             "recommended_option": recommended_option,
             "recommendation_reason": self._build_recommendation_reason(
                 recommended_option=recommended_option,
@@ -181,8 +185,8 @@ class InstallmentVsCashService:
         opportunity_rate_monthly: float,
         inflation_rate_monthly: float,
         cash_total: Decimal,
-    ) -> list[dict[str, Any]]:
-        schedule: list[dict[str, Any]] = []
+    ) -> list[InstallmentVsCashScheduleItem]:
+        schedule: list[InstallmentVsCashScheduleItem] = []
         cumulative_nominal = Decimal("0.00")
         cumulative_present = Decimal("0.00")
         cumulative_real = Decimal("0.00")
@@ -222,10 +226,10 @@ class InstallmentVsCashService:
     def _resolve_opportunity_rate(
         self,
         *,
-        opportunity_rate_type: str,
-        opportunity_rate_annual_percent: Any,
+        opportunity_rate_type: OpportunityRateType,
+        opportunity_rate_annual_percent: NumericInput | None,
         inflation_rate_annual_percent: Decimal,
-    ) -> tuple[Decimal, dict[str, Any] | None]:
+    ) -> tuple[Decimal, InstallmentVsCashIndicatorSnapshot | None]:
         if opportunity_rate_type == "manual":
             return Decimal(str(opportunity_rate_annual_percent)), None
         if opportunity_rate_type == "inflation_only":
@@ -250,7 +254,7 @@ class InstallmentVsCashService:
         delta_vs_cash: Decimal,
         absolute_delta: Decimal,
         relative_delta: Decimal,
-    ) -> str:
+    ) -> RecommendedOption:
         if (
             absolute_delta < self.NEUTRALITY_ABSOLUTE_BRL
             and relative_delta < self.NEUTRALITY_PERCENT
@@ -339,8 +343,8 @@ class InstallmentVsCashService:
 
 def _resolve_installment_amounts(
     *,
-    installment_amount: Any,
-    installment_total: Any,
+    installment_amount: NumericInput | None,
+    installment_total: NumericInput | None,
     installment_count: int,
 ) -> list[Decimal]:
     if installment_amount is not None:
@@ -370,7 +374,7 @@ def _effective_monthly_rate(annual_percent: Decimal) -> float:
     return pow(1 + annual_decimal, 1 / 12) - 1
 
 
-def _to_money(value: Any) -> Decimal:
+def _to_money(value: NumericInput) -> Decimal:
     return Decimal(str(value)).quantize(Decimal("0.01"))
 
 

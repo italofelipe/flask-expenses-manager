@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from decimal import ROUND_DOWN, Decimal
-from typing import Any, Callable
+from typing import Callable
 from uuid import UUID
 
 from app.application.services.transaction_application_service import (
@@ -9,6 +9,12 @@ from app.application.services.transaction_application_service import (
 )
 from app.models.simulation import Simulation
 from app.services.goal_service import GoalService
+from app.services.installment_vs_cash_types import (
+    InstallmentVsCashGoalBridgeInput,
+    InstallmentVsCashPlannedExpenseBridgeInput,
+    SerializedGoal,
+    SerializedTransaction,
+)
 
 
 class InstallmentVsCashBridgeService:
@@ -38,8 +44,8 @@ class InstallmentVsCashBridgeService:
         self,
         *,
         simulation: Simulation,
-        payload: dict[str, Any],
-    ) -> dict[str, Any]:
+        payload: InstallmentVsCashGoalBridgeInput,
+    ) -> SerializedGoal:
         selected_option = str(payload["selected_option"])
         option_total = _read_result_money(simulation, selected_option)
         goal = self._goal_service.create_goal(
@@ -64,8 +70,8 @@ class InstallmentVsCashBridgeService:
         self,
         *,
         simulation: Simulation,
-        payload: dict[str, Any],
-    ) -> list[dict[str, Any]]:
+        payload: InstallmentVsCashPlannedExpenseBridgeInput,
+    ) -> list[SerializedTransaction]:
         selected_option = str(payload["selected_option"])
         if selected_option == "cash":
             return self._create_cash_expense(simulation=simulation, payload=payload)
@@ -79,8 +85,8 @@ class InstallmentVsCashBridgeService:
         self,
         *,
         simulation: Simulation,
-        payload: dict[str, Any],
-    ) -> list[dict[str, Any]]:
+        payload: InstallmentVsCashPlannedExpenseBridgeInput,
+    ) -> list[SerializedTransaction]:
         transaction_result = self._transaction_application_service.create_transaction(
             _compact_optional_fields(
                 {
@@ -106,10 +112,10 @@ class InstallmentVsCashBridgeService:
         self,
         *,
         simulation: Simulation,
-        payload: dict[str, Any],
-    ) -> list[dict[str, Any]]:
+        payload: InstallmentVsCashPlannedExpenseBridgeInput,
+    ) -> list[SerializedTransaction]:
         installment = simulation.result["options"]["installment"]
-        created_items: list[dict[str, Any]] = []
+        created_items: list[SerializedTransaction] = []
         installment_result = self._transaction_application_service.create_transaction(
             _compact_optional_fields(
                 {
@@ -181,5 +187,7 @@ def _money_str(value: Decimal) -> str:
     return format(Decimal(str(value)).quantize(Decimal("0.01")), ".2f")
 
 
-def _compact_optional_fields(payload: dict[str, Any]) -> dict[str, Any]:
+def _compact_optional_fields(
+    payload: dict[str, object | None],
+) -> dict[str, object]:
     return {key: value for key, value in payload.items() if value is not None}

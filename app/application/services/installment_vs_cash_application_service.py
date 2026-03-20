@@ -2,11 +2,11 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from decimal import Decimal
-from typing import Any, Callable
+from typing import Callable, Protocol, TypeAlias, cast
 from uuid import UUID
 
 from flask import current_app
-from marshmallow import ValidationError
+from marshmallow import Schema, ValidationError
 
 from app.application.services.installment_vs_cash_bridge_service import (
     InstallmentVsCashBridgeService,
@@ -24,6 +24,18 @@ from app.schemas.installment_vs_cash_schema import (
 )
 from app.services.goal_service import GoalServiceError
 from app.services.installment_vs_cash_service import InstallmentVsCashService
+from app.services.installment_vs_cash_types import (
+    InstallmentVsCashCalculation,
+    InstallmentVsCashCalculationInput,
+    InstallmentVsCashCalculationResponse,
+    InstallmentVsCashGoalBridgeInput,
+    InstallmentVsCashGoalBridgeResponse,
+    InstallmentVsCashPlannedExpenseBridgeInput,
+    InstallmentVsCashPlannedExpenseBridgeResponse,
+    InstallmentVsCashSaveInput,
+    InstallmentVsCashSaveResponse,
+    SerializedSimulation,
+)
 from app.services.simulation_service import SimulationService, SimulationServiceError
 
 
@@ -32,7 +44,14 @@ class InstallmentVsCashApplicationError(Exception):
     message: str
     code: str
     status_code: int
-    details: dict[str, Any] | None = None
+    details: dict[str, object] | None = None
+
+
+class _ApplicationErrorSource(Protocol):
+    message: str
+    code: str
+    status_code: int
+    details: dict[str, object] | None
 
 
 class InstallmentVsCashApplicationService:
@@ -40,11 +59,9 @@ class InstallmentVsCashApplicationService:
         self,
         *,
         user_id: UUID | None,
-        calculator_factory: Callable[[], InstallmentVsCashService],
-        simulation_service_factory: Callable[[UUID], SimulationService],
-        bridge_service_factory: Callable[
-            [UUID], InstallmentVsCashBridgeService
-        ],
+        calculator_factory: _CalculatorFactory,
+        simulation_service_factory: _SimulationServiceFactory,
+        bridge_service_factory: _BridgeServiceFactory,
     ) -> None:
         self._user_id = user_id
         self._calculator = calculator_factory()
@@ -77,14 +94,20 @@ class InstallmentVsCashApplicationService:
             bridge_service_factory=InstallmentVsCashBridgeService.with_defaults,
         )
 
-    def calculate(self, payload: dict[str, Any]) -> dict[str, Any]:
-        validated = self._load_schema(self._calculation_schema, payload)
+    def calculate(
+        self,
+        payload: dict[str, object],
+    ) -> InstallmentVsCashCalculationResponse:
+        validated = self._load_calculation_payload(payload)
         calculation = self._calculate_or_error(validated)
         return self._serialize_calculation(calculation)
 
-    def save_simulation(self, payload: dict[str, Any]) -> dict[str, Any]:
+    def save_simulation(
+        self,
+        payload: dict[str, object],
+    ) -> InstallmentVsCashSaveResponse:
         user_id = self._require_authenticated_user()
-        validated = self._load_schema(self._save_schema, payload)
+        validated = self._load_save_payload(payload)
         calculation = self._calculate_or_error(validated)
         simulation_service = self._simulation_service_factory(user_id)
         try:
@@ -99,17 +122,20 @@ class InstallmentVsCashApplicationService:
         except SimulationServiceError as exc:
             raise _to_application_error(exc) from exc
         return {
-            "simulation": simulation_service.serialize(simulation),
+            "simulation": cast(
+                SerializedSimulation,
+                simulation_service.serialize(simulation),
+            ),
             "calculation": self._serialize_calculation(calculation),
         }
 
     def create_goal_from_simulation(
         self,
         simulation_id: UUID,
-        payload: dict[str, Any],
-    ) -> dict[str, Any]:
+        payload: dict[str, object],
+    ) -> InstallmentVsCashGoalBridgeResponse:
         user_id = self._require_authenticated_user()
-        validated = self._load_schema(self._goal_bridge_schema, payload)
+        validated = self._load_goal_bridge_payload(payload)
         simulation_service = self._simulation_service_factory(user_id)
         bridge_service = self._bridge_service_factory(user_id)
         simulation = self._load_installment_vs_cash_simulation(
@@ -128,16 +154,19 @@ class InstallmentVsCashApplicationService:
         db.session.commit()
         return {
             "goal": goal,
-            "simulation": simulation_service.serialize(simulation),
+            "simulation": cast(
+                SerializedSimulation,
+                simulation_service.serialize(simulation),
+            ),
         }
 
     def create_planned_expense_from_simulation(
         self,
         simulation_id: UUID,
-        payload: dict[str, Any],
-    ) -> dict[str, Any]:
+        payload: dict[str, object],
+    ) -> InstallmentVsCashPlannedExpenseBridgeResponse:
         user_id = self._require_authenticated_user()
-        validated = self._load_schema(self._expense_bridge_schema, payload)
+        validated = self._load_expense_bridge_payload(payload)
         simulation_service = self._simulation_service_factory(user_id)
         bridge_service = self._bridge_service_factory(user_id)
         simulation = self._load_installment_vs_cash_simulation(
@@ -155,12 +184,55 @@ class InstallmentVsCashApplicationService:
 
         return {
             "transactions": created_items,
-            "simulation": simulation_service.serialize(simulation),
+            "simulation": cast(
+                SerializedSimulation,
+                simulation_service.serialize(simulation),
+            ),
         }
 
-    def _load_schema(self, schema: Any, payload: dict[str, Any]) -> dict[str, Any]:
+    def _load_calculation_payload(
+        self,
+        payload: dict[str, object],
+    ) -> InstallmentVsCashCalculationInput:
+        return cast(
+            InstallmentVsCashCalculationInput,
+            self._load_schema(self._calculation_schema, payload),
+        )
+
+    def _load_save_payload(
+        self,
+        payload: dict[str, object],
+    ) -> InstallmentVsCashSaveInput:
+        return cast(
+            InstallmentVsCashSaveInput,
+            self._load_schema(self._save_schema, payload),
+        )
+
+    def _load_goal_bridge_payload(
+        self,
+        payload: dict[str, object],
+    ) -> InstallmentVsCashGoalBridgeInput:
+        return cast(
+            InstallmentVsCashGoalBridgeInput,
+            self._load_schema(self._goal_bridge_schema, payload),
+        )
+
+    def _load_expense_bridge_payload(
+        self,
+        payload: dict[str, object],
+    ) -> InstallmentVsCashPlannedExpenseBridgeInput:
+        return cast(
+            InstallmentVsCashPlannedExpenseBridgeInput,
+            self._load_schema(self._expense_bridge_schema, payload),
+        )
+
+    def _load_schema(
+        self,
+        schema: Schema,
+        payload: dict[str, object],
+    ) -> dict[str, object]:
         try:
-            return schema.load(payload)
+            return cast(dict[str, object], schema.load(payload))
         except ValidationError as exc:
             raise InstallmentVsCashApplicationError(
                 message="Dados inválidos para a simulação parcelado vs à vista.",
@@ -169,7 +241,10 @@ class InstallmentVsCashApplicationService:
                 details={"messages": exc.messages},
             ) from exc
 
-    def _calculate_or_error(self, payload: dict[str, Any]) -> Any:
+    def _calculate_or_error(
+        self,
+        payload: InstallmentVsCashCalculationInput,
+    ) -> InstallmentVsCashCalculation:
         try:
             return self._calculator.calculate(payload)
         except ValueError as exc:
@@ -209,7 +284,10 @@ class InstallmentVsCashApplicationService:
             )
         return simulation
 
-    def _serialize_calculation(self, calculation: Any) -> dict[str, Any]:
+    def _serialize_calculation(
+        self,
+        calculation: InstallmentVsCashCalculation,
+    ) -> InstallmentVsCashCalculationResponse:
         return {
             "tool_id": calculation.tool_id,
             "rule_version": calculation.rule_version,
@@ -218,7 +296,14 @@ class InstallmentVsCashApplicationService:
         }
 
 
-def _to_application_error(exc: Any) -> InstallmentVsCashApplicationError:
+_CalculatorFactory: TypeAlias = Callable[[], InstallmentVsCashService]
+_SimulationServiceFactory: TypeAlias = Callable[[UUID], SimulationService]
+_BridgeServiceFactory: TypeAlias = Callable[[UUID], InstallmentVsCashBridgeService]
+
+
+def _to_application_error(
+    exc: _ApplicationErrorSource,
+) -> InstallmentVsCashApplicationError:
     return InstallmentVsCashApplicationError(
         message=exc.message,
         code=exc.code,

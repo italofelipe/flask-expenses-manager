@@ -29,7 +29,10 @@ class GraphQLAuthorizationPolicy:
     @classmethod
     def from_env(cls) -> "GraphQLAuthorizationPolicy":
         return cls(
-            public_queries=_read_csv_set("GRAPHQL_PUBLIC_QUERIES", "__typename"),
+            public_queries=_read_csv_set(
+                "GRAPHQL_PUBLIC_QUERIES",
+                "__typename,installmentVsCashCalculate",
+            ),
             public_mutations=_read_csv_set(
                 "GRAPHQL_PUBLIC_MUTATIONS",
                 "registerUser,login,forgotPassword,resetPassword",
