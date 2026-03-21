@@ -11,6 +11,20 @@ from app.graphql.auth import get_current_user_optional
 
 GRAPHQL_AUTH_REQUIRED = "GRAPHQL_AUTH_REQUIRED"
 GRAPHQL_AUTH_PARSE_ERROR = "GRAPHQL_AUTH_PARSE_ERROR"
+DEFAULT_GRAPHQL_PUBLIC_QUERIES = frozenset(
+    {
+        "__typename",
+        "installmentVsCashCalculate",
+    }
+)
+DEFAULT_GRAPHQL_PUBLIC_MUTATIONS = frozenset(
+    {
+        "registerUser",
+        "login",
+        "forgotPassword",
+        "resetPassword",
+    }
+)
 
 
 @dataclass(frozen=True)
@@ -31,11 +45,11 @@ class GraphQLAuthorizationPolicy:
         return cls(
             public_queries=_read_csv_set(
                 "GRAPHQL_PUBLIC_QUERIES",
-                "__typename,installmentVsCashCalculate",
+                ",".join(sorted(DEFAULT_GRAPHQL_PUBLIC_QUERIES)),
             ),
             public_mutations=_read_csv_set(
                 "GRAPHQL_PUBLIC_MUTATIONS",
-                "registerUser,login,forgotPassword,resetPassword",
+                ",".join(sorted(DEFAULT_GRAPHQL_PUBLIC_MUTATIONS)),
             ),
             allow_unnamed_operations=_read_bool_env(
                 "GRAPHQL_ALLOW_UNNAMED_OPERATIONS",

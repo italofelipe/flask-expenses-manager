@@ -9,6 +9,7 @@ type Query {
   walletEntries(page: Int = 1, perPage: Int = 10): WalletListPayloadType
   walletHistory(investmentId: UUID!, page: Int = 1, perPage: Int = 5): WalletHistoryPayloadType
   tickers: [TickerType]
+  installmentVsCashCalculate(cashPrice: String!, installmentCount: Int!, installmentAmount: String, installmentTotal: String, firstPaymentDelayDays: Int = 30, opportunityRateType: String = "manual", opportunityRateAnnual: String, inflationRateAnnual: String!, feesEnabled: Boolean = false, feesUpfront: String = "0.00", scenarioLabel: String): InstallmentVsCashCalculationPayloadType
   goals(page: Int = 1, perPage: Int = 10, status: String): GoalListPayloadType
   goal(goalId: UUID!): GoalTypeObject
   goalPlan(goalId: UUID!): GoalPlanType
@@ -186,6 +187,102 @@ type TickerType {
   type: String
 }
 
+type InstallmentVsCashCalculationPayloadType {
+  toolId: String!
+  ruleVersion: String!
+  input: InstallmentVsCashInputType!
+  result: InstallmentVsCashResultType!
+}
+
+type InstallmentVsCashInputType {
+  cashPrice: String!
+  installmentCount: Int!
+  installmentAmount: String!
+  installmentTotal: String!
+  firstPaymentDelayDays: Int!
+  opportunityRateType: String!
+  opportunityRateAnnual: String!
+  inflationRateAnnual: String!
+  feesUpfront: String!
+  scenarioLabel: String
+}
+
+type InstallmentVsCashResultType {
+  recommendedOption: String!
+  recommendationReason: String!
+  formulaExplainer: String!
+  comparison: InstallmentVsCashComparisonType!
+  options: InstallmentVsCashOptionsType!
+  neutralityBand: InstallmentVsCashNeutralityBandType!
+  assumptions: InstallmentVsCashAssumptionsType!
+  indicatorSnapshot: InstallmentVsCashIndicatorSnapshotType
+  schedule: [InstallmentVsCashScheduleItemType]!
+}
+
+type InstallmentVsCashComparisonType {
+  cashOptionTotal: String!
+  installmentOptionTotal: String!
+  installmentPresentValue: String!
+  installmentRealValueToday: String!
+  presentValueDeltaVsCash: String!
+  absoluteDeltaVsCash: String!
+  relativeDeltaVsCashPercent: String!
+  breakEvenDiscountPercent: String!
+  breakEvenOpportunityRateAnnual: String!
+}
+
+type InstallmentVsCashOptionsType {
+  cash: InstallmentVsCashCashOptionType!
+  installment: InstallmentVsCashInstallmentOptionType!
+}
+
+type InstallmentVsCashCashOptionType {
+  total: String!
+}
+
+type InstallmentVsCashInstallmentOptionType {
+  count: Int!
+  amounts: [String]!
+  installmentAmount: String!
+  nominalTotal: String!
+  upfrontFees: String!
+  firstPaymentDelayDays: Int!
+}
+
+type InstallmentVsCashNeutralityBandType {
+  absoluteBrl: String!
+  relativePercent: String!
+}
+
+type InstallmentVsCashAssumptionsType {
+  opportunityRateType: String!
+  opportunityRateAnnualPercent: String!
+  inflationRateAnnualPercent: String!
+  periodicity: String!
+  firstPaymentDelayDays: Int!
+  upfrontFeesApplyTo: String!
+  neutralityRule: String!
+}
+
+type InstallmentVsCashIndicatorSnapshotType {
+  presetType: String!
+  source: String!
+  annualRatePercent: String!
+  asOf: String!
+}
+
+type InstallmentVsCashScheduleItemType {
+  installmentNumber: Int!
+  dueInDays: Int!
+  amount: String!
+  presentValue: String!
+  realValueToday: String!
+  cumulativeNominal: String!
+  cumulativePresentValue: String!
+  cumulativeRealValueToday: String!
+  cashCumulative: String!
+}
+
 type GoalListPayloadType {
   items: [GoalTypeObject]!
   pagination: PaginationType!
@@ -320,24 +417,37 @@ type UserType {
   gender: String
   birthDate: String
   monthlyIncome: Float
+  monthlyIncomeNet: Float
   netWorth: Float
   monthlyExpenses: Float
   initialInvestment: Float
   monthlyInvestment: Float
   investmentGoalDate: String
+  stateUf: String
+  occupation: String
+  investorProfile: String
+  financialObjectives: String
+  investorProfileSuggested: String
+  profileQuizScore: Int
+  taxonomyVersion: String
 }
 
 type Mutation {
-  registerUser(email: String!, name: String!, password: String!): AuthPayloadType
+  registerUser(email: String!, investorProfile: String, name: String!, password: String!): AuthPayloadType
   login(email: String, name: String, password: String!): AuthPayloadType
   logout: LogoutMutation
-  updateUserProfile(birthDate: String, gender: String, initialInvestment: Float, investmentGoalDate: String, monthlyExpenses: Float, monthlyIncome: Float, monthlyInvestment: Float, netWorth: Float): UpdateUserProfileMutation
+  forgotPassword(email: String!): AuthPayloadType
+  resetPassword(newPassword: String!, token: String!): AuthPayloadType
+  updateUserProfile(birthDate: String, financialObjectives: String, gender: String, initialInvestment: Float, investmentGoalDate: String, investorProfile: String, investorProfileSuggested: String, monthlyExpenses: Float, monthlyIncome: Float, monthlyIncomeNet: Float, monthlyInvestment: Float, netWorth: Float, occupation: String, profileQuizScore: Int, stateUf: String, taxonomyVersion: String): UpdateUserProfileMutation
   createTransaction(accountId: UUID, amount: String!, creditCardId: UUID, currency: String = "BRL", description: String, dueDate: String!, endDate: String, installmentCount: Int, isInstallment: Boolean = false, isRecurring: Boolean = false, observation: String, startDate: String, status: String = "pending", tagId: UUID, title: String!, type: String!): CreateTransactionMutation
   deleteTransaction(transactionId: UUID!): DeleteTransactionMutation
   createGoal(category: String, currentAmount: String, description: String, priority: Int, status: String, targetAmount: String!, targetDate: String, title: String!): CreateGoalMutation
   updateGoal(category: String, currentAmount: String, description: String, goalId: UUID!, priority: Int, status: String, targetAmount: String, targetDate: String, title: String): UpdateGoalMutation
   deleteGoal(goalId: UUID!): DeleteGoalMutation
   simulateGoalPlan(currentAmount: String, monthlyContribution: String, monthlyExpenses: String, monthlyIncome: String, targetAmount: String!, targetDate: String): SimulateGoalPlanMutation
+  saveInstallmentVsCashSimulation(cashPrice: String!, feesEnabled: Boolean = false, feesUpfront: String = "0.00", firstPaymentDelayDays: Int = 30, inflationRateAnnual: String!, installmentAmount: String, installmentCount: Int!, installmentTotal: String, opportunityRateAnnual: String, opportunityRateType: String = "manual", scenarioLabel: String): SaveInstallmentVsCashSimulationMutation
+  createGoalFromInstallmentVsCashSimulation(category: String = "planned_purchase", currentAmount: String = "0.00", description: String, priority: Int = 3, selectedOption: String!, simulationId: UUID!, targetDate: String, title: String!): CreateGoalFromInstallmentVsCashSimulationMutation
+  createPlannedExpenseFromInstallmentVsCashSimulation(accountId: UUID, creditCardId: UUID, currency: String = "BRL", description: String, dueDate: String, firstDueDate: String, observation: String, selectedOption: String!, simulationId: UUID!, status: String = "pending", tagId: UUID, title: String!, upfrontDueDate: String): CreatePlannedExpenseFromInstallmentVsCashSimulationMutation
   addWalletEntry(annualRate: Float, assetClass: String, name: String!, quantity: Int, registerDate: String, shouldBeOnWallet: Boolean!, targetWithdrawDate: String, ticker: String, value: Float): AddWalletEntryMutation
   updateWalletEntry(annualRate: Float, assetClass: String, investmentId: UUID!, name: String, quantity: Int, registerDate: String, shouldBeOnWallet: Boolean, targetWithdrawDate: String, ticker: String, value: Float): UpdateWalletEntryMutation
   deleteWalletEntry(investmentId: UUID!): DeleteWalletEntryMutation
@@ -391,6 +501,36 @@ type DeleteGoalMutation {
 type SimulateGoalPlanMutation {
   message: String!
   goalPlan: GoalPlanType!
+}
+
+type SaveInstallmentVsCashSimulationMutation {
+  message: String!
+  simulation: InstallmentVsCashSimulationType!
+  calculation: InstallmentVsCashCalculationPayloadType!
+}
+
+type InstallmentVsCashSimulationType {
+  id: ID!
+  userId: String
+  toolId: String!
+  ruleVersion: String!
+  input: InstallmentVsCashInputType!
+  result: InstallmentVsCashResultType!
+  saved: Boolean!
+  goalId: String
+  createdAt: String!
+}
+
+type CreateGoalFromInstallmentVsCashSimulationMutation {
+  message: String!
+  goal: GoalTypeObject!
+  simulation: InstallmentVsCashSimulationType!
+}
+
+type CreatePlannedExpenseFromInstallmentVsCashSimulationMutation {
+  message: String!
+  transactions: [TransactionTypeObject]!
+  simulation: InstallmentVsCashSimulationType!
 }
 
 type AddWalletEntryMutation {
