@@ -15,6 +15,21 @@ GraphQLDomain = Literal[
     "wallet",
 ]
 
+QUERY_USER_MODULE = "app.graphql.queries.user"
+QUERY_TRANSACTION_MODULE = "app.graphql.queries.transaction"
+QUERY_GOAL_MODULE = "app.graphql.queries.goal"
+QUERY_SIMULATION_MODULE = "app.graphql.queries.simulation"
+QUERY_WALLET_MODULE = "app.graphql.queries.wallet"
+QUERY_INVESTMENT_MODULE = "app.graphql.queries.investment"
+MUTATION_AUTH_MODULE = "app.graphql.mutations.auth"
+MUTATION_TRANSACTION_MODULE = "app.graphql.mutations.transaction"
+MUTATION_GOAL_MODULE = "app.graphql.mutations.goal"
+MUTATION_SIMULATION_MODULE = "app.graphql.mutations.simulation"
+MUTATION_WALLET_MODULE = "app.graphql.mutations.wallet"
+MUTATION_INVESTMENT_MODULE = "app.graphql.mutations.investment_operation"
+MUTATION_TICKER_MODULE = "app.graphql.mutations.ticker"
+ADVANCED_SIMULATIONS = "advanced_simulations"
+
 
 @dataclass(frozen=True)
 class GraphQLOperationDoc:
@@ -47,7 +62,7 @@ GRAPHQL_OPERATION_CATALOG: tuple[GraphQLOperationDoc, ...] = (
         domain="user",
         access="auth_required",
         summary="Retorna o perfil do usuário autenticado.",
-        source_module="app.graphql.queries.user",
+        source_module=QUERY_USER_MODULE,
     ),
     GraphQLOperationDoc(
         name="transactions",
@@ -55,7 +70,7 @@ GRAPHQL_OPERATION_CATALOG: tuple[GraphQLOperationDoc, ...] = (
         domain="transactions",
         access="auth_required",
         summary="Lista transações ativas do usuário com paginação e filtros.",
-        source_module="app.graphql.queries.transaction",
+        source_module=QUERY_TRANSACTION_MODULE,
     ),
     GraphQLOperationDoc(
         name="transactionSummary",
@@ -63,7 +78,7 @@ GRAPHQL_OPERATION_CATALOG: tuple[GraphQLOperationDoc, ...] = (
         domain="transactions",
         access="auth_required",
         summary="Retorna resumo mensal de transações com itens paginados.",
-        source_module="app.graphql.queries.transaction",
+        source_module=QUERY_TRANSACTION_MODULE,
     ),
     GraphQLOperationDoc(
         name="transactionDashboard",
@@ -71,7 +86,7 @@ GRAPHQL_OPERATION_CATALOG: tuple[GraphQLOperationDoc, ...] = (
         domain="transactions",
         access="auth_required",
         summary="Entrega visão consolidada mensal de receitas, despesas e categorias.",
-        source_module="app.graphql.queries.transaction",
+        source_module=QUERY_TRANSACTION_MODULE,
     ),
     GraphQLOperationDoc(
         name="transactionDueRange",
@@ -79,7 +94,7 @@ GRAPHQL_OPERATION_CATALOG: tuple[GraphQLOperationDoc, ...] = (
         domain="transactions",
         access="auth_required",
         summary="Lista transações por faixa de vencimento com métricas agregadas.",
-        source_module="app.graphql.queries.transaction",
+        source_module=QUERY_TRANSACTION_MODULE,
     ),
     GraphQLOperationDoc(
         name="goals",
@@ -87,7 +102,7 @@ GRAPHQL_OPERATION_CATALOG: tuple[GraphQLOperationDoc, ...] = (
         domain="goals",
         access="auth_required",
         summary="Lista metas do usuário com paginação e filtro de status.",
-        source_module="app.graphql.queries.goal",
+        source_module=QUERY_GOAL_MODULE,
     ),
     GraphQLOperationDoc(
         name="goal",
@@ -95,7 +110,7 @@ GRAPHQL_OPERATION_CATALOG: tuple[GraphQLOperationDoc, ...] = (
         domain="goals",
         access="auth_required",
         summary="Retorna uma meta específica do usuário.",
-        source_module="app.graphql.queries.goal",
+        source_module=QUERY_GOAL_MODULE,
     ),
     GraphQLOperationDoc(
         name="goalPlan",
@@ -103,7 +118,7 @@ GRAPHQL_OPERATION_CATALOG: tuple[GraphQLOperationDoc, ...] = (
         domain="goals",
         access="auth_required",
         summary="Retorna o plano projetado de uma meta existente.",
-        source_module="app.graphql.queries.goal",
+        source_module=QUERY_GOAL_MODULE,
     ),
     GraphQLOperationDoc(
         name="installmentVsCashCalculate",
@@ -111,7 +126,7 @@ GRAPHQL_OPERATION_CATALOG: tuple[GraphQLOperationDoc, ...] = (
         domain="simulations",
         access="public",
         summary="Calcula a comparação entre pagamento parcelado e à vista.",
-        source_module="app.graphql.queries.simulation",
+        source_module=QUERY_SIMULATION_MODULE,
     ),
     GraphQLOperationDoc(
         name="walletEntries",
@@ -119,7 +134,7 @@ GRAPHQL_OPERATION_CATALOG: tuple[GraphQLOperationDoc, ...] = (
         domain="wallet",
         access="auth_required",
         summary="Lista entradas da carteira do usuário.",
-        source_module="app.graphql.queries.wallet",
+        source_module=QUERY_WALLET_MODULE,
     ),
     GraphQLOperationDoc(
         name="walletHistory",
@@ -127,7 +142,7 @@ GRAPHQL_OPERATION_CATALOG: tuple[GraphQLOperationDoc, ...] = (
         domain="wallet",
         access="auth_required",
         summary="Retorna histórico paginado de um investimento da carteira.",
-        source_module="app.graphql.queries.wallet",
+        source_module=QUERY_WALLET_MODULE,
     ),
     GraphQLOperationDoc(
         name="tickers",
@@ -135,7 +150,7 @@ GRAPHQL_OPERATION_CATALOG: tuple[GraphQLOperationDoc, ...] = (
         domain="wallet",
         access="auth_required",
         summary="Lista os tickers cadastrados pelo usuário.",
-        source_module="app.graphql.queries.wallet",
+        source_module=QUERY_WALLET_MODULE,
     ),
     GraphQLOperationDoc(
         name="investmentOperations",
@@ -143,7 +158,7 @@ GRAPHQL_OPERATION_CATALOG: tuple[GraphQLOperationDoc, ...] = (
         domain="investments",
         access="auth_required",
         summary="Lista operações de um investimento com paginação.",
-        source_module="app.graphql.queries.investment",
+        source_module=QUERY_INVESTMENT_MODULE,
     ),
     GraphQLOperationDoc(
         name="investmentOperationSummary",
@@ -151,7 +166,7 @@ GRAPHQL_OPERATION_CATALOG: tuple[GraphQLOperationDoc, ...] = (
         domain="investments",
         access="auth_required",
         summary="Retorna o resumo agregado das operações de um investimento.",
-        source_module="app.graphql.queries.investment",
+        source_module=QUERY_INVESTMENT_MODULE,
     ),
     GraphQLOperationDoc(
         name="investmentPosition",
@@ -159,7 +174,7 @@ GRAPHQL_OPERATION_CATALOG: tuple[GraphQLOperationDoc, ...] = (
         domain="investments",
         access="auth_required",
         summary="Retorna a posição consolidada de um investimento.",
-        source_module="app.graphql.queries.investment",
+        source_module=QUERY_INVESTMENT_MODULE,
     ),
     GraphQLOperationDoc(
         name="investmentInvestedAmount",
@@ -167,7 +182,7 @@ GRAPHQL_OPERATION_CATALOG: tuple[GraphQLOperationDoc, ...] = (
         domain="investments",
         access="auth_required",
         summary="Calcula o valor investido acumulado em uma data específica.",
-        source_module="app.graphql.queries.investment",
+        source_module=QUERY_INVESTMENT_MODULE,
     ),
     GraphQLOperationDoc(
         name="investmentValuation",
@@ -175,7 +190,7 @@ GRAPHQL_OPERATION_CATALOG: tuple[GraphQLOperationDoc, ...] = (
         domain="investments",
         access="auth_required",
         summary="Retorna a valorização atual de um investimento específico.",
-        source_module="app.graphql.queries.investment",
+        source_module=QUERY_INVESTMENT_MODULE,
     ),
     GraphQLOperationDoc(
         name="portfolioValuation",
@@ -183,7 +198,7 @@ GRAPHQL_OPERATION_CATALOG: tuple[GraphQLOperationDoc, ...] = (
         domain="investments",
         access="auth_required",
         summary="Retorna a valorização consolidada do portfólio do usuário.",
-        source_module="app.graphql.queries.investment",
+        source_module=QUERY_INVESTMENT_MODULE,
     ),
     GraphQLOperationDoc(
         name="portfolioValuationHistory",
@@ -191,7 +206,7 @@ GRAPHQL_OPERATION_CATALOG: tuple[GraphQLOperationDoc, ...] = (
         domain="investments",
         access="auth_required",
         summary="Retorna o histórico de valorização do portfólio em um período.",
-        source_module="app.graphql.queries.investment",
+        source_module=QUERY_INVESTMENT_MODULE,
     ),
     GraphQLOperationDoc(
         name="registerUser",
@@ -199,7 +214,7 @@ GRAPHQL_OPERATION_CATALOG: tuple[GraphQLOperationDoc, ...] = (
         domain="auth",
         access="public",
         summary="Registra um novo usuário na plataforma.",
-        source_module="app.graphql.mutations.auth",
+        source_module=MUTATION_AUTH_MODULE,
     ),
     GraphQLOperationDoc(
         name="login",
@@ -207,7 +222,7 @@ GRAPHQL_OPERATION_CATALOG: tuple[GraphQLOperationDoc, ...] = (
         domain="auth",
         access="public",
         summary="Autentica um usuário e retorna token JWT.",
-        source_module="app.graphql.mutations.auth",
+        source_module=MUTATION_AUTH_MODULE,
     ),
     GraphQLOperationDoc(
         name="logout",
@@ -215,7 +230,7 @@ GRAPHQL_OPERATION_CATALOG: tuple[GraphQLOperationDoc, ...] = (
         domain="auth",
         access="auth_required",
         summary="Revoga a sessão atual do usuário autenticado.",
-        source_module="app.graphql.mutations.auth",
+        source_module=MUTATION_AUTH_MODULE,
     ),
     GraphQLOperationDoc(
         name="forgotPassword",
@@ -223,7 +238,7 @@ GRAPHQL_OPERATION_CATALOG: tuple[GraphQLOperationDoc, ...] = (
         domain="auth",
         access="public",
         summary="Solicita o fluxo de redefinição de senha.",
-        source_module="app.graphql.mutations.auth",
+        source_module=MUTATION_AUTH_MODULE,
     ),
     GraphQLOperationDoc(
         name="resetPassword",
@@ -231,7 +246,7 @@ GRAPHQL_OPERATION_CATALOG: tuple[GraphQLOperationDoc, ...] = (
         domain="auth",
         access="public",
         summary="Conclui a redefinição de senha com token válido.",
-        source_module="app.graphql.mutations.auth",
+        source_module=MUTATION_AUTH_MODULE,
     ),
     GraphQLOperationDoc(
         name="updateUserProfile",
@@ -239,7 +254,7 @@ GRAPHQL_OPERATION_CATALOG: tuple[GraphQLOperationDoc, ...] = (
         domain="user",
         access="auth_required",
         summary="Atualiza o perfil financeiro e pessoal do usuário.",
-        source_module="app.graphql.mutations.auth",
+        source_module=MUTATION_AUTH_MODULE,
     ),
     GraphQLOperationDoc(
         name="createTransaction",
@@ -247,7 +262,7 @@ GRAPHQL_OPERATION_CATALOG: tuple[GraphQLOperationDoc, ...] = (
         domain="transactions",
         access="auth_required",
         summary="Cria uma transação única, recorrente ou parcelada.",
-        source_module="app.graphql.mutations.transaction",
+        source_module=MUTATION_TRANSACTION_MODULE,
     ),
     GraphQLOperationDoc(
         name="deleteTransaction",
@@ -255,7 +270,7 @@ GRAPHQL_OPERATION_CATALOG: tuple[GraphQLOperationDoc, ...] = (
         domain="transactions",
         access="auth_required",
         summary="Realiza soft delete de uma transação do usuário.",
-        source_module="app.graphql.mutations.transaction",
+        source_module=MUTATION_TRANSACTION_MODULE,
     ),
     GraphQLOperationDoc(
         name="createGoal",
@@ -263,7 +278,7 @@ GRAPHQL_OPERATION_CATALOG: tuple[GraphQLOperationDoc, ...] = (
         domain="goals",
         access="auth_required",
         summary="Cria uma meta financeira.",
-        source_module="app.graphql.mutations.goal",
+        source_module=MUTATION_GOAL_MODULE,
     ),
     GraphQLOperationDoc(
         name="updateGoal",
@@ -271,7 +286,7 @@ GRAPHQL_OPERATION_CATALOG: tuple[GraphQLOperationDoc, ...] = (
         domain="goals",
         access="auth_required",
         summary="Atualiza uma meta existente.",
-        source_module="app.graphql.mutations.goal",
+        source_module=MUTATION_GOAL_MODULE,
     ),
     GraphQLOperationDoc(
         name="deleteGoal",
@@ -279,7 +294,7 @@ GRAPHQL_OPERATION_CATALOG: tuple[GraphQLOperationDoc, ...] = (
         domain="goals",
         access="auth_required",
         summary="Remove uma meta existente.",
-        source_module="app.graphql.mutations.goal",
+        source_module=MUTATION_GOAL_MODULE,
     ),
     GraphQLOperationDoc(
         name="simulateGoalPlan",
@@ -287,7 +302,7 @@ GRAPHQL_OPERATION_CATALOG: tuple[GraphQLOperationDoc, ...] = (
         domain="goals",
         access="auth_required",
         summary="Simula o plano de aporte de uma meta sem persistir dados.",
-        source_module="app.graphql.mutations.goal",
+        source_module=MUTATION_GOAL_MODULE,
     ),
     GraphQLOperationDoc(
         name="saveInstallmentVsCashSimulation",
@@ -295,7 +310,7 @@ GRAPHQL_OPERATION_CATALOG: tuple[GraphQLOperationDoc, ...] = (
         domain="simulations",
         access="auth_required",
         summary="Salva uma simulação de parcelado vs à vista no histórico do usuário.",
-        source_module="app.graphql.mutations.simulation",
+        source_module=MUTATION_SIMULATION_MODULE,
     ),
     GraphQLOperationDoc(
         name="createGoalFromInstallmentVsCashSimulation",
@@ -303,8 +318,8 @@ GRAPHQL_OPERATION_CATALOG: tuple[GraphQLOperationDoc, ...] = (
         domain="simulations",
         access="auth_required",
         summary="Converte uma simulação em meta financeira.",
-        source_module="app.graphql.mutations.simulation",
-        entitlements=("advanced_simulations",),
+        source_module=MUTATION_SIMULATION_MODULE,
+        entitlements=(ADVANCED_SIMULATIONS,),
     ),
     GraphQLOperationDoc(
         name="createPlannedExpenseFromInstallmentVsCashSimulation",
@@ -312,8 +327,8 @@ GRAPHQL_OPERATION_CATALOG: tuple[GraphQLOperationDoc, ...] = (
         domain="simulations",
         access="auth_required",
         summary="Converte uma simulação em despesa planejada.",
-        source_module="app.graphql.mutations.simulation",
-        entitlements=("advanced_simulations",),
+        source_module=MUTATION_SIMULATION_MODULE,
+        entitlements=(ADVANCED_SIMULATIONS,),
     ),
     GraphQLOperationDoc(
         name="addWalletEntry",
@@ -321,7 +336,7 @@ GRAPHQL_OPERATION_CATALOG: tuple[GraphQLOperationDoc, ...] = (
         domain="wallet",
         access="auth_required",
         summary="Adiciona um item à carteira do usuário.",
-        source_module="app.graphql.mutations.wallet",
+        source_module=MUTATION_WALLET_MODULE,
     ),
     GraphQLOperationDoc(
         name="updateWalletEntry",
@@ -329,7 +344,7 @@ GRAPHQL_OPERATION_CATALOG: tuple[GraphQLOperationDoc, ...] = (
         domain="wallet",
         access="auth_required",
         summary="Atualiza um item da carteira do usuário.",
-        source_module="app.graphql.mutations.wallet",
+        source_module=MUTATION_WALLET_MODULE,
     ),
     GraphQLOperationDoc(
         name="deleteWalletEntry",
@@ -337,7 +352,7 @@ GRAPHQL_OPERATION_CATALOG: tuple[GraphQLOperationDoc, ...] = (
         domain="wallet",
         access="auth_required",
         summary="Remove um item da carteira do usuário.",
-        source_module="app.graphql.mutations.wallet",
+        source_module=MUTATION_WALLET_MODULE,
     ),
     GraphQLOperationDoc(
         name="addInvestmentOperation",
@@ -345,7 +360,7 @@ GRAPHQL_OPERATION_CATALOG: tuple[GraphQLOperationDoc, ...] = (
         domain="investments",
         access="auth_required",
         summary="Registra uma operação em um investimento existente.",
-        source_module="app.graphql.mutations.investment_operation",
+        source_module=MUTATION_INVESTMENT_MODULE,
     ),
     GraphQLOperationDoc(
         name="updateInvestmentOperation",
@@ -353,7 +368,7 @@ GRAPHQL_OPERATION_CATALOG: tuple[GraphQLOperationDoc, ...] = (
         domain="investments",
         access="auth_required",
         summary="Atualiza uma operação de investimento existente.",
-        source_module="app.graphql.mutations.investment_operation",
+        source_module=MUTATION_INVESTMENT_MODULE,
     ),
     GraphQLOperationDoc(
         name="deleteInvestmentOperation",
@@ -361,7 +376,7 @@ GRAPHQL_OPERATION_CATALOG: tuple[GraphQLOperationDoc, ...] = (
         domain="investments",
         access="auth_required",
         summary="Remove uma operação de investimento existente.",
-        source_module="app.graphql.mutations.investment_operation",
+        source_module=MUTATION_INVESTMENT_MODULE,
     ),
     GraphQLOperationDoc(
         name="addTicker",
@@ -369,7 +384,7 @@ GRAPHQL_OPERATION_CATALOG: tuple[GraphQLOperationDoc, ...] = (
         domain="wallet",
         access="auth_required",
         summary="Adiciona um ticker ao acompanhamento do usuário.",
-        source_module="app.graphql.mutations.ticker",
+        source_module=MUTATION_TICKER_MODULE,
     ),
     GraphQLOperationDoc(
         name="deleteTicker",
@@ -377,7 +392,7 @@ GRAPHQL_OPERATION_CATALOG: tuple[GraphQLOperationDoc, ...] = (
         domain="wallet",
         access="auth_required",
         summary="Remove um ticker do acompanhamento do usuário.",
-        source_module="app.graphql.mutations.ticker",
+        source_module=MUTATION_TICKER_MODULE,
     ),
 )
 
