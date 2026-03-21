@@ -35,7 +35,7 @@ def _normalize_json_object(value: object) -> JsonObject:
 def _load_runtime_schema() -> GraphQLSchema:
     from app.graphql.schema import schema
 
-    return schema.graphql_schema
+    return cast(GraphQLSchema, schema.graphql_schema)
 
 
 def _load_sdl_schema() -> GraphQLSchema:
