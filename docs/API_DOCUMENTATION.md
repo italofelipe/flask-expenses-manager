@@ -5,6 +5,23 @@ Este documento descreve o comportamento real da API com base no código atual da
 ## Base URL
 - Local (Docker): `http://localhost:3333`
 
+## Artefatos de referência GraphQL
+- `schema.graphql`: SDL canônico versionado do schema GraphQL.
+- `graphql.introspection.json`: introspection estática para docs públicas.
+- `graphql.operations.manifest.json`: catálogo curado de queries/mutations, domínio e política de acesso.
+
+Comandos úteis:
+
+```bash
+scripts/export_graphql_docs.py --source runtime
+scripts/export_graphql_docs.py --source runtime --check
+```
+
+Notas:
+- `--source runtime` exporta a partir do schema Graphene real.
+- `--check` falha quando os artefatos versionados estão desatualizados.
+- A documentação pública em `docs.auraxis.com.br/graphql/` deve consumir apenas esses artefatos offline, nunca o endpoint real de produção.
+
 ## Autenticação
 A API usa JWT via header:
 
