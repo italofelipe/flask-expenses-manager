@@ -1,3 +1,10 @@
+"""Canonical auth boundary for HTTP runtimes.
+
+New framework integrations must consume these helpers instead of importing
+framework-specific JWT middleware directly. This keeps Flask and FastAPI
+coexistence constrained to the adapter layer during the X3 migration.
+"""
+
 from .identity import (
     AuthContext,
     AuthContextError,

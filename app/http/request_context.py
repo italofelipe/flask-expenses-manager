@@ -1,3 +1,9 @@
+"""Framework-agnostic request metadata boundary.
+
+During the Flask -> FastAPI coexistence window this module is the canonical
+entrypoint for request metadata consumed outside HTTP adapters.
+"""
+
 from __future__ import annotations
 
 import os

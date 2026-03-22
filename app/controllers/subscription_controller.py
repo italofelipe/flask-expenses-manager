@@ -154,14 +154,33 @@ def cancel_my_subscription() -> ResponseReturnValue:
 
 _WEBHOOK_SIGNATURE_HEADER = "X-Billing-Signature"
 _WEBHOOK_SECRET_ENV = "BILLING_WEBHOOK_SECRET"
+_WEBHOOK_ALLOW_UNSIGNED_ENV = "BILLING_WEBHOOK_ALLOW_UNSIGNED"
+
+
+def _read_bool_env(name: str, default: bool = False) -> bool:
+    raw = os.getenv(name)
+    if raw is None:
+        return default
+    return raw.strip().lower() in {"1", "true", "yes", "on"}
+
+
+def _allow_unsigned_webhooks() -> bool:
+    """Unsigned webhook traffic must be explicitly enabled per environment."""
+    return _read_bool_env(_WEBHOOK_ALLOW_UNSIGNED_ENV, default=False)
 
 
 def _verify_webhook_signature(payload: bytes, signature: str) -> bool:
-    """Verify HMAC-SHA256 webhook signature.  Returns True when valid or when
-    no secret is configured (development / stub mode)."""
+    """Verify HMAC-SHA256 webhook signature.
+
+    Default policy is fail-closed: missing ``BILLING_WEBHOOK_SECRET`` rejects
+    requests unless the environment explicitly opts into unsigned webhooks.
+    That keeps production strict while allowing deterministic local/test flows.
+    """
     secret = os.getenv(_WEBHOOK_SECRET_ENV, "")
     if not secret:
-        return True
+        return _allow_unsigned_webhooks()
+    if not signature:
+        return False
     expected = hmac.new(secret.encode(), payload, hashlib.sha256).hexdigest()
     return hmac.compare_digest(expected, signature)
 
@@ -171,8 +190,8 @@ def handle_webhook() -> ResponseReturnValue:
     """Receive provider webhook events.
 
     This endpoint intentionally has no JWT authentication — providers call it
-    directly.  Payload authenticity is validated via HMAC signature when
-    BILLING_WEBHOOK_SECRET is configured.
+    directly. Payload authenticity is validated via HMAC signature. Unsigned
+    requests are only accepted when the environment explicitly enables them.
 
     Supported events
     ----------------
