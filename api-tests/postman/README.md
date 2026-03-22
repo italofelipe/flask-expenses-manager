@@ -32,6 +32,9 @@ Os environments devem conter apenas valores seguros para versionamento:
 - IDs e tokens devem ser encadeados por collection variables.
 - Fluxos privilegiados devem ser opcionais e gateados por `enablePrivilegedFlows=true` e `adminToken`.
 - O subset padrao que roda no CI deve continuar deterministico e seguro sem token administrativo.
+- `suiteProfile` governa o recorte oficial da execução:
+  - `full`: roda a colecao completa;
+  - `smoke`: roda o subconjunto canônico mínimo por dominio.
 
 ## Execucao
 Gerar/regravar a collection oficial:
@@ -45,10 +48,22 @@ npm ci
 npm run postman:local
 ```
 
+Perfis oficiais:
+```bash
+npm run postman:smoke:local
+npm run postman:full:local
+```
+
 Rodar com outro environment:
 ```bash
 ./scripts/run_postman_suite.sh ./api-tests/postman/environments/dev.postman_environment.json
 ./scripts/run_postman_suite.sh ./api-tests/postman/environments/prod.postman_environment.json
+```
+
+Rodar com perfil explícito:
+```bash
+./scripts/run_postman_suite.sh ./api-tests/postman/environments/dev.postman_environment.json --profile smoke
+./scripts/run_postman_suite.sh ./api-tests/postman/environments/dev.postman_environment.json --profile full
 ```
 
 Rodar fluxos privilegiados:
