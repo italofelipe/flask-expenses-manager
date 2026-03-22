@@ -39,7 +39,7 @@ def test_rate_limit_metrics_increment_when_redis_backend_unavailable(
 ) -> None:
     monkeypatch.setenv("RATE_LIMIT_ENABLED", "true")
     monkeypatch.setenv("RATE_LIMIT_BACKEND", "redis")
-    monkeypatch.setenv("RATE_LIMIT_FAIL_CLOSED", "true")
+    monkeypatch.setenv("RATE_LIMIT_DEGRADED_MODE", "fail_closed")
     monkeypatch.delenv("RATE_LIMIT_REDIS_URL", raising=False)
     monkeypatch.delenv("REDIS_URL", raising=False)
 

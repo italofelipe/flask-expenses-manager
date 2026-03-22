@@ -12,6 +12,10 @@ from flask import Flask, Response, current_app, g, jsonify, request
 from flask_jwt_extended import decode_token
 
 from app.extensions.integration_metrics import increment_metric
+from app.middleware.rate_limit_settings import (
+    RateLimitSettings,
+    build_rate_limit_settings,
+)
 from app.utils.api_contract import is_v2_contract_request
 from app.utils.response_builder import error_payload
 
@@ -119,18 +123,20 @@ class RateLimiterService:
         *,
         rules: dict[str, RateLimitRule],
         storage: "RateLimitStorage",
+        settings: RateLimitSettings,
         backend_name: str,
         configured_backend: str,
         backend_ready: bool,
-        fail_closed: bool,
         backend_failure_reason: str | None = None,
     ) -> None:
         self._rules = rules
         self._storage = storage
+        self._enabled = settings.enabled
         self.backend_name = backend_name
         self.configured_backend = configured_backend
         self.backend_ready = backend_ready
-        self.fail_closed = fail_closed
+        self.degraded_mode = settings.degraded_mode
+        self.fail_closed = settings.fail_closed
         self.backend_failure_reason = backend_failure_reason
         self._route_rule_order: tuple[tuple[str, str], ...] = (
             ("/auth/login", "auth"),
@@ -191,21 +197,22 @@ class RateLimiterService:
             configured_backend,
             backend_failure_reason,
         ) = _build_storage_from_env()
-        default_fail_closed = (
-            configured_backend == "redis"
-            and not _read_bool_env("FLASK_DEBUG", False)
-            and not _read_bool_env("FLASK_TESTING", False)
+        settings = build_rate_limit_settings(
+            configured_backend=configured_backend,
         )
-        fail_closed = _read_bool_env("RATE_LIMIT_FAIL_CLOSED", default_fail_closed)
         return cls(
             rules=rules,
             storage=storage,
+            settings=settings,
             backend_name=backend_name,
             configured_backend=configured_backend,
             backend_ready=backend_ready,
-            fail_closed=fail_closed,
             backend_failure_reason=backend_failure_reason,
         )
+
+    @property
+    def enabled(self) -> bool:
+        return self._enabled
 
     def set_rule(
         self,
@@ -513,11 +520,12 @@ def _log_rate_limit_backend_configuration(
     app.logger.info(
         (
             "rate_limit_backend_config configured_backend=%s "
-            "backend_name=%s ready=%s fail_closed=%s reason=%s"
+            "backend_name=%s ready=%s degraded_mode=%s fail_closed=%s reason=%s"
         ),
         limiter.configured_backend,
         limiter.backend_name,
         limiter.backend_ready,
+        limiter.degraded_mode,
         limiter.fail_closed,
         limiter.backend_failure_reason or "none",
     )
@@ -536,10 +544,9 @@ def _record_allowed_decision_metrics(decision: RateLimitDecision) -> None:
 
 
 def register_rate_limit_guard(app: Flask) -> None:
-    if not _read_bool_env("RATE_LIMIT_ENABLED", True):
-        return
-
     limiter = RateLimiterService.from_env()
+    if not limiter.enabled:
+        return
     app.extensions["rate_limiter"] = limiter
     _log_rate_limit_backend_configuration(app, limiter)
 
