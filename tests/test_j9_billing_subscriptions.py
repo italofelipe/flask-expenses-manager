@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import hashlib
 import hmac
+import logging
 import uuid
 from typing import Dict
 from unittest.mock import MagicMock
@@ -435,3 +436,28 @@ class TestWebhook:
         body = resp.get_json()
         assert body["success"] is False
         assert body["error"]["code"] == "UNAUTHORIZED"
+
+    def test_webhook_logs_warning_for_invalid_signature(
+        self,
+        client,
+        monkeypatch,
+        caplog,
+    ) -> None:
+        monkeypatch.setenv("BILLING_WEBHOOK_SECRET", "billing-webhook-secret")
+        monkeypatch.setenv("BILLING_WEBHOOK_ALLOW_UNSIGNED", "false")
+
+        with caplog.at_level(logging.WARNING):
+            resp = client.post(
+                "/subscriptions/webhook",
+                json={"event": "unknown.event", "subscription_id": "sub_xyz"},
+                headers={"X-Billing-Signature": "invalid-signature"},
+            )
+
+        assert resp.status_code == 401
+        logs = [
+            record.message
+            for record in caplog.records
+            if "Billing webhook invalid signature" in record.message
+        ]
+        assert len(logs) == 1
+        assert "request_id=" in logs[0]
