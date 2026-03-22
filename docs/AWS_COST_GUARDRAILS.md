@@ -37,5 +37,5 @@ Limites:
 3) Se o custo estiver subindo:
    - revisar instancias/volumes/snapshots;
    - reduzir retention de logs/backups;
+   - evitar dashboards CloudWatch com Logs Insights abertos 24x7;
    - considerar desligar DEV fora do horario de uso.
-

@@ -262,6 +262,42 @@ FLASK_APP=run.py ./scripts/repo_bin.sh flask integration-metrics snapshot --pref
 FLASK_APP=run.py ./scripts/repo_bin.sh flask integration-metrics snapshot --prefix rate_limit. --reset
 ```
 
+Baseline operacional minima da API (`OBS-02`):
+```bash
+./scripts/python_exec.sh scripts/aws_api_observability_obs2.py --profile auraxis-admin --region us-east-1 apply
+```
+
+O baseline foi desenhado para custo baixo:
+- reutiliza logs/metrics ja existentes (`AWS/EC2`, `Auraxis/EC2`, Route53 health checks)
+- cria apenas um alarme novo por log-derived metric: webhook de billing com assinatura invalida em PROD
+- os widgets de Logs Insights do dashboard sao para uso sob demanda, nao para dashboard aberto 24x7
+
+Matriz operacional minima:
+- disponibilidade externa: Route53 health checks + alarmes `auraxis-health-prod` / `auraxis-health-dev`
+- saude de host: CPU + `mem_used_percent` + `disk_used_percent`
+- erro 5xx por rota: widget CloudWatch Logs Insights `http_observability`
+- latencia p95 por rota: widget CloudWatch Logs Insights `http_observability`
+- billing webhook invalido: metric filter + alarme `auraxis-billing-webhook-invalid-signature-prod`
+- recurrence job: issue automatica no GitHub Actions + triagem do workflow `Recurrence Job`
+
+Runbooks curtos de incidente:
+1) Burst de 5xx ou latencia alta por rota
+- abrir o dashboard `Auraxis-API-Operations`
+- localizar as rotas no widget `5xx by route` ou `p95 latency by route`
+- correlacionar `request_id` no log group `/auraxis/prod/containers`
+- validar `healthz`, deploy recente e Sonar/Newman mais recentes antes de rollback
+
+2) Billing webhook invalid signature
+- confirmar se houve rotacao recente de `BILLING_WEBHOOK_SECRET`
+- validar o provider e os headers recebidos
+- procurar `request_id` no log group `/auraxis/prod/containers`
+- se o volume subir repentinamente, tratar como tentativa de spoofing ou drift de configuracao
+
+3) Recurrence job falhando
+- abrir o workflow `Recurrence Job`
+- seguir o link da issue automatica reaberta/comentada pelo workflow
+- validar `RECURRENCE_DATABASE_URL` e executar `scripts/generate_recurring_transactions.py` manualmente se necessario
+
 ## Firewall host (UFW)
 
 Aplicacao via SSM (mantem SSM funcionando, nao abre SSH):

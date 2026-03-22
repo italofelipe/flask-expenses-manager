@@ -22,6 +22,7 @@ from flask.typing import ResponseReturnValue
 
 from app.auth import get_active_auth_context
 from app.extensions.database import db
+from app.http.request_context import current_request_id
 from app.models.subscription import Subscription, SubscriptionStatus
 from app.services.billing_adapter import BillingProvider, get_default_billing_provider
 from app.services.subscription_service import (
@@ -225,6 +226,10 @@ def handle_webhook() -> ResponseReturnValue:
     signature = request.headers.get(_WEBHOOK_SIGNATURE_HEADER, "")
 
     if not _verify_webhook_signature(raw_body, signature):
+        logger.warning(
+            "Billing webhook invalid signature request_id=%s",
+            current_request_id(),
+        )
         return _err("Invalid signature", "UNAUTHORIZED", 401)
 
     payload: dict[str, Any] = request.get_json(silent=True) or {}
