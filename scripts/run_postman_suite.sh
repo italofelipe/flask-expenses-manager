@@ -16,7 +16,7 @@ SUITE_PROFILE="${POSTMAN_SUITE_PROFILE:-full}"
 usage() {
   cat <<'EOF'
 Usage:
-  bash scripts/run_postman_suite.sh [environment.json] [--profile smoke|full]
+  bash scripts/run_postman_suite.sh [environment.json] [--profile smoke|full|privileged]
 
 Examples:
   bash scripts/run_postman_suite.sh
@@ -29,7 +29,7 @@ while [[ $# -gt 0 ]]; do
   case "$1" in
     --profile)
       if [[ $# -lt 2 ]]; then
-        echo "--profile requires a value (smoke|full)." >&2
+        echo "--profile requires a value (smoke|full|privileged)." >&2
         usage
         exit 4
       fi
@@ -48,10 +48,10 @@ while [[ $# -gt 0 ]]; do
 done
 
 case "${SUITE_PROFILE}" in
-  smoke|full)
+  smoke|full|privileged)
     ;;
   *)
-    echo "Unsupported profile: ${SUITE_PROFILE}. Use smoke or full." >&2
+    echo "Unsupported profile: ${SUITE_PROFILE}. Use smoke, full or privileged." >&2
     usage
     exit 5
     ;;
@@ -85,6 +85,13 @@ echo "[postman-suite] collection=$COLLECTION"
 echo "[postman-suite] environment=$ENV_FILE"
 echo "[postman-suite] profile=$SUITE_PROFILE"
 echo "[postman-suite] report=$REPORT_FILE"
+
+if [[ "$SUITE_PROFILE" == "privileged" ]]; then
+  if [[ "$ENABLE_PRIVILEGED_FLOWS" != "true" || -z "$ADMIN_TOKEN" ]]; then
+    echo "Privileged profile requires POSTMAN_ENABLE_PRIVILEGED_FLOWS=true and POSTMAN_ADMIN_TOKEN." >&2
+    exit 6
+  fi
+fi
 
 NEWMAN_ARGS=(
   run "$COLLECTION"

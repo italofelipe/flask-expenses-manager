@@ -32,6 +32,21 @@ SMOKE_REQUESTS = {
     "01 - List shared entries by me (REST v2)",
     "01 - CSV upload preview (REST v2)",
 }
+PRIVILEGED_REQUESTS = {
+    "01 - Healthz",
+    "02 - Register user (REST v2)",
+    "03 - Login user (REST v2)",
+    "05 - Me (REST v2)",
+    "01 - Installment vs cash calculate (REST public)",
+    "02 - Installment vs cash save (REST auth required)",
+    "03 - Simulation goal bridge without entitlement returns 403",
+    "04 - Grant advanced simulations entitlement (optional admin)",
+    "05 - Save advanced simulation for success bridges (optional admin)",
+    "06 - Simulation goal bridge success (optional admin)",
+    "07 - Save fee simulation for planned expense bridge (optional admin)",
+    "08 - Simulation planned expense bridge success (optional admin)",
+    "09 - Revoke advanced simulations entitlement (optional admin)",
+}
 
 
 def _load_postman_items() -> list[dict[str, object]]:
@@ -207,3 +222,23 @@ def test_postman_collection_smoke_profile_covers_known_requests() -> None:
     names = {str(item.get("name")) for item in items}
     missing = sorted(SMOKE_REQUESTS - names)
     assert not missing, f"Smoke profile references unknown requests: {missing}"
+
+
+def test_postman_collection_privileged_profile_covers_known_requests() -> None:
+    items = _flatten_request_items(_load_postman_items())
+    names = {str(item.get("name")) for item in items}
+    missing = sorted(PRIVILEGED_REQUESTS - names)
+    assert not missing, f"Privileged profile references unknown requests: {missing}"
+
+
+def test_postman_collection_smoke_profile_excludes_privileged_only_requests() -> None:
+    privileged_only = {
+        "04 - Grant advanced simulations entitlement (optional admin)",
+        "05 - Save advanced simulation for success bridges (optional admin)",
+        "06 - Simulation goal bridge success (optional admin)",
+        "07 - Save fee simulation for planned expense bridge (optional admin)",
+        "08 - Simulation planned expense bridge success (optional admin)",
+        "09 - Revoke advanced simulations entitlement (optional admin)",
+    }
+    overlap = sorted(SMOKE_REQUESTS & privileged_only)
+    assert not overlap, f"Smoke profile must not include privileged requests: {overlap}"

@@ -48,6 +48,7 @@ Perfis oficiais:
 ```bash
 npm run postman:smoke:local
 npm run postman:full:local
+npm run postman:privileged:dev
 ```
 
 Perfis oficiais no CI:
@@ -66,13 +67,14 @@ Runner com perfil explícito:
 ```bash
 ./scripts/run_postman_suite.sh ./api-tests/postman/environments/dev.postman_environment.json --profile smoke
 ./scripts/run_postman_suite.sh ./api-tests/postman/environments/dev.postman_environment.json --profile full
+./scripts/run_postman_suite.sh ./api-tests/postman/environments/dev.postman_environment.json --profile privileged
 ```
 
 Fluxos privilegiados opcionais:
 ```bash
 POSTMAN_ENABLE_PRIVILEGED_FLOWS=true \
 POSTMAN_ADMIN_TOKEN=<token-admin> \
-./scripts/run_postman_suite.sh ./api-tests/postman/environments/dev.postman_environment.json
+./scripts/run_postman_suite.sh ./api-tests/postman/environments/dev.postman_environment.json --profile privileged
 ```
 
 Cobertura canonica atual:
@@ -82,12 +84,18 @@ Cobertura canonica atual:
 - Goals: create, list, get, plan, simulate, update, delete
 - Wallet: create, list, update, history, valuation, operations CRUD, position, invested amount
 - Simulations: installment-vs-cash calculate/save e bridges com subset privilegiado opcional
+- Alerts: preferences, list, read/delete negative paths
+- Subscriptions/Entitlements: subscription me, checkout/cancel, webhook invalid signature, entitlements list/check, admin routes no perfil privilegiado
+- Shared entries: by-me, with-me, invitations list/create/accept/revoke negative paths
+- Fiscal: csv upload/confirm, receivables list/create/receive/delete negative path, summary, fiscal documents list/create
 - GraphQL: validation, auth-safe errors, me, installment-vs-cash calculate/save
 
 Perfis da suíte:
 - `smoke`: subconjunto mínimo canônico de saúde funcional cross-domain
-- `full`: coleção completa REST + GraphQL
+- `full`: coleção completa REST + GraphQL não-privilegiada
+- `privileged`: bootstrap mínimo + fluxos admin/privilegiados que exigem `POSTMAN_ENABLE_PRIVILEGED_FLOWS=true` e `POSTMAN_ADMIN_TOKEN`
 - O CI roda `smoke` como gate rápido e `full` em job dedicado de integração com artifact separado
+- O perfil `privileged` roda em workflow manual separado, para evitar acoplamento do CI comum a token administrativo
 
 ## Como a suíte está configurada
 - `pytest.ini` define padrão de descoberta dos testes.

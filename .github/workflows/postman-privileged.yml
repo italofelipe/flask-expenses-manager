@@ -1,0 +1,58 @@
+name: API Privileged Integration (Postman/Newman)
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: "Target Postman environment"
+        required: true
+        default: "dev"
+        type: choice
+        options:
+          - dev
+          - prod
+
+jobs:
+  postman-privileged:
+    name: Postman Privileged (${{ inputs.environment }})
+    runs-on: ubuntu-latest
+    env:
+      POSTMAN_ENABLE_PRIVILEGED_FLOWS: "true"
+      POSTMAN_ADMIN_TOKEN: ${{ secrets.POSTMAN_ADMIN_TOKEN }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+          cache-dependency-path: package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Ensure privileged token is configured
+        run: |
+          if [[ -z "${POSTMAN_ADMIN_TOKEN}" ]]; then
+            echo "POSTMAN_ADMIN_TOKEN secret is required for the privileged Postman workflow." >&2
+            exit 1
+          fi
+
+      - name: Build canonical Postman collection
+        run: npm run postman:build
+
+      - name: Run privileged Newman suite
+        run: |
+          ENV_FILE="api-tests/postman/environments/${{ inputs.environment }}.postman_environment.json"
+          POSTMAN_REPORT_FILE="reports/newman-privileged-${{ inputs.environment }}-report.xml" \
+          bash scripts/run_postman_suite.sh "$ENV_FILE" --profile privileged
+
+      - name: Upload Newman privileged report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: newman-privileged-${{ inputs.environment }}-report
+          path: reports/newman-privileged-${{ inputs.environment }}-report.xml

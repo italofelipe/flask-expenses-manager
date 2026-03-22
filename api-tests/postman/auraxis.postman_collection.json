@@ -3,7 +3,7 @@
     "_postman_id": "3fd49b04-3416-4cf2-9048-b58abf132a20",
     "name": "Auraxis API - Canonical E2E and Smoke",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
-    "description": "Canonical black-box suite for Auraxis API. Organized by domain, validated by Newman in CI, and designed for direct Postman import. Privileged flows are optional and gated by adminToken + enablePrivilegedFlows."
+    "description": "Canonical black-box suite for Auraxis API. Organized by domain, validated by Newman in CI, and designed for direct Postman import. Privileged flows are optional and gated by adminToken + enablePrivilegedFlows. Use the dedicated privileged profile when executing admin-only coverage."
   },
   "event": [
     {
@@ -11,13 +11,23 @@
       "script": {
         "exec": [
           "var smokeRequests = [\"01 - Healthz\", \"02 - Register user (REST v2)\", \"03 - Login user (REST v2)\", \"04 - Login invalid credentials returns safe error\", \"05 - Me (REST v2)\", \"01 - Create transaction (REST v2)\", \"04 - List active transactions (REST v2)\", \"05 - Transaction summary by month (REST v2)\", \"01 - Create goal (REST v2)\", \"02 - List goals (REST v2)\", \"05 - Goal simulate (REST v2)\", \"01 - Create wallet investment (REST v2)\", \"02 - List wallet investments (REST v2)\", \"08 - Create wallet operation (REST v2)\", \"10 - Wallet operation summary (REST v2)\", \"01 - Installment vs cash calculate (REST public)\", \"02 - Installment vs cash save (REST auth required)\", \"03 - Simulation goal bridge without entitlement returns 403\", \"02 - GraphQL login invalid credentials (safe error)\", \"03 - GraphQL me query (auth required)\", \"04 - GraphQL installment vs cash calculate (public)\", \"01 - List alert preferences (REST v2)\", \"01 - Get my subscription (REST v2)\", \"01 - List entitlements (REST v2)\", \"01 - List shared entries by me (REST v2)\", \"01 - CSV upload preview (REST v2)\"];",
+          "var privilegedOnlyRequests = [\"04 - Grant advanced simulations entitlement (optional admin)\", \"05 - Save advanced simulation for success bridges (optional admin)\", \"06 - Simulation goal bridge success (optional admin)\", \"07 - Save fee simulation for planned expense bridge (optional admin)\", \"08 - Simulation planned expense bridge success (optional admin)\", \"09 - Revoke advanced simulations entitlement (optional admin)\"];",
+          "var privilegedProfileRequests = [\"01 - Healthz\", \"02 - Register user (REST v2)\", \"03 - Login user (REST v2)\", \"05 - Me (REST v2)\", \"01 - Installment vs cash calculate (REST public)\", \"02 - Installment vs cash save (REST auth required)\", \"03 - Simulation goal bridge without entitlement returns 403\", \"04 - Grant advanced simulations entitlement (optional admin)\", \"05 - Save advanced simulation for success bridges (optional admin)\", \"06 - Simulation goal bridge success (optional admin)\", \"07 - Save fee simulation for planned expense bridge (optional admin)\", \"08 - Simulation planned expense bridge success (optional admin)\", \"09 - Revoke advanced simulations entitlement (optional admin)\"];",
           "var activeProfile = String(pm.environment.get('suiteProfile') || pm.collectionVariables.get('suiteProfile') || 'full').toLowerCase();",
-          "if (!['smoke', 'full'].includes(activeProfile)) {",
-          "  throw new Error('Unsupported suiteProfile: ' + activeProfile + '. Use smoke or full.');",
+          "if (!['smoke', 'full', 'privileged'].includes(activeProfile)) {",
+          "  throw new Error('Unsupported suiteProfile: ' + activeProfile + '. Use smoke, full or privileged.');",
           "}",
           "pm.collectionVariables.set('suiteProfile', activeProfile);",
           "if (activeProfile === 'smoke' && !smokeRequests.includes(pm.info.requestName)) {",
           "  console.log('Skipping request outside smoke profile:', pm.info.requestName);",
+          "  pm.execution.skipRequest();",
+          "}",
+          "if (activeProfile === 'full' && privilegedOnlyRequests.includes(pm.info.requestName)) {",
+          "  console.log('Skipping privileged-only request outside privileged profile:', pm.info.requestName);",
+          "  pm.execution.skipRequest();",
+          "}",
+          "if (activeProfile === 'privileged' && !privilegedProfileRequests.includes(pm.info.requestName)) {",
+          "  console.log('Skipping request outside privileged profile:', pm.info.requestName);",
           "  pm.execution.skipRequest();",
           "}"
         ],
@@ -2568,11 +2578,14 @@
               "listen": "prerequest",
               "script": {
                 "exec": [
+                  "var activeProfile = String(pm.environment.get('suiteProfile') || pm.collectionVariables.get('suiteProfile') || 'full').toLowerCase();",
                   "var enabled = String(pm.environment.get('enablePrivilegedFlows') || pm.collectionVariables.get('enablePrivilegedFlows') || 'false').toLowerCase();",
                   "var adminToken = pm.environment.get('adminToken') || pm.collectionVariables.get('adminToken') || '';",
-                  "if (enabled !== 'true' || !adminToken) {",
-                  "  console.log('Skipping privileged request because enablePrivilegedFlows/adminToken is not configured.');",
+                  "if (activeProfile !== 'privileged') {",
                   "  pm.execution.skipRequest();",
+                  "}",
+                  "if (enabled !== 'true' || !adminToken) {",
+                  "  throw new Error('Privileged profile requires enablePrivilegedFlows=true and adminToken configured.');",
                   "}"
                 ],
                 "type": "text/javascript"
@@ -2630,11 +2643,14 @@
               "listen": "prerequest",
               "script": {
                 "exec": [
+                  "var activeProfile = String(pm.environment.get('suiteProfile') || pm.collectionVariables.get('suiteProfile') || 'full').toLowerCase();",
                   "var enabled = String(pm.environment.get('enablePrivilegedFlows') || pm.collectionVariables.get('enablePrivilegedFlows') || 'false').toLowerCase();",
                   "var adminToken = pm.environment.get('adminToken') || pm.collectionVariables.get('adminToken') || '';",
-                  "if (enabled !== 'true' || !adminToken) {",
-                  "  console.log('Skipping privileged request because enablePrivilegedFlows/adminToken is not configured.');",
+                  "if (activeProfile !== 'privileged') {",
                   "  pm.execution.skipRequest();",
+                  "}",
+                  "if (enabled !== 'true' || !adminToken) {",
+                  "  throw new Error('Privileged profile requires enablePrivilegedFlows=true and adminToken configured.');",
                   "}"
                 ],
                 "type": "text/javascript"
@@ -2687,11 +2703,14 @@
               "listen": "prerequest",
               "script": {
                 "exec": [
+                  "var activeProfile = String(pm.environment.get('suiteProfile') || pm.collectionVariables.get('suiteProfile') || 'full').toLowerCase();",
                   "var enabled = String(pm.environment.get('enablePrivilegedFlows') || pm.collectionVariables.get('enablePrivilegedFlows') || 'false').toLowerCase();",
                   "var adminToken = pm.environment.get('adminToken') || pm.collectionVariables.get('adminToken') || '';",
-                  "if (enabled !== 'true' || !adminToken) {",
-                  "  console.log('Skipping privileged request because enablePrivilegedFlows/adminToken is not configured.');",
+                  "if (activeProfile !== 'privileged') {",
                   "  pm.execution.skipRequest();",
+                  "}",
+                  "if (enabled !== 'true' || !adminToken) {",
+                  "  throw new Error('Privileged profile requires enablePrivilegedFlows=true and adminToken configured.');",
                   "}"
                 ],
                 "type": "text/javascript"
@@ -2747,11 +2766,14 @@
               "listen": "prerequest",
               "script": {
                 "exec": [
+                  "var activeProfile = String(pm.environment.get('suiteProfile') || pm.collectionVariables.get('suiteProfile') || 'full').toLowerCase();",
                   "var enabled = String(pm.environment.get('enablePrivilegedFlows') || pm.collectionVariables.get('enablePrivilegedFlows') || 'false').toLowerCase();",
                   "var adminToken = pm.environment.get('adminToken') || pm.collectionVariables.get('adminToken') || '';",
-                  "if (enabled !== 'true' || !adminToken) {",
-                  "  console.log('Skipping privileged request because enablePrivilegedFlows/adminToken is not configured.');",
+                  "if (activeProfile !== 'privileged') {",
                   "  pm.execution.skipRequest();",
+                  "}",
+                  "if (enabled !== 'true' || !adminToken) {",
+                  "  throw new Error('Privileged profile requires enablePrivilegedFlows=true and adminToken configured.');",
                   "}"
                 ],
                 "type": "text/javascript"
@@ -2804,11 +2826,14 @@
               "listen": "prerequest",
               "script": {
                 "exec": [
+                  "var activeProfile = String(pm.environment.get('suiteProfile') || pm.collectionVariables.get('suiteProfile') || 'full').toLowerCase();",
                   "var enabled = String(pm.environment.get('enablePrivilegedFlows') || pm.collectionVariables.get('enablePrivilegedFlows') || 'false').toLowerCase();",
                   "var adminToken = pm.environment.get('adminToken') || pm.collectionVariables.get('adminToken') || '';",
-                  "if (enabled !== 'true' || !adminToken) {",
-                  "  console.log('Skipping privileged request because enablePrivilegedFlows/adminToken is not configured.');",
+                  "if (activeProfile !== 'privileged') {",
                   "  pm.execution.skipRequest();",
+                  "}",
+                  "if (enabled !== 'true' || !adminToken) {",
+                  "  throw new Error('Privileged profile requires enablePrivilegedFlows=true and adminToken configured.');",
                   "}"
                 ],
                 "type": "text/javascript"
@@ -2860,11 +2885,14 @@
               "listen": "prerequest",
               "script": {
                 "exec": [
+                  "var activeProfile = String(pm.environment.get('suiteProfile') || pm.collectionVariables.get('suiteProfile') || 'full').toLowerCase();",
                   "var enabled = String(pm.environment.get('enablePrivilegedFlows') || pm.collectionVariables.get('enablePrivilegedFlows') || 'false').toLowerCase();",
                   "var adminToken = pm.environment.get('adminToken') || pm.collectionVariables.get('adminToken') || '';",
-                  "if (enabled !== 'true' || !adminToken) {",
-                  "  console.log('Skipping privileged request because enablePrivilegedFlows/adminToken is not configured.');",
+                  "if (activeProfile !== 'privileged') {",
                   "  pm.execution.skipRequest();",
+                  "}",
+                  "if (enabled !== 'true' || !adminToken) {",
+                  "  throw new Error('Privileged profile requires enablePrivilegedFlows=true and adminToken configured.');",
                   "}"
                 ],
                 "type": "text/javascript"
@@ -4378,6 +4406,14 @@
     {
       "key": "suiteProfile",
       "value": "full"
+    },
+    {
+      "key": "enablePrivilegedFlows",
+      "value": "false"
+    },
+    {
+      "key": "adminToken",
+      "value": ""
     }
   ]
 }

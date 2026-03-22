@@ -36,6 +36,24 @@ SMOKE_REQUESTS = [
     "01 - List shared entries by me (REST v2)",
     "01 - CSV upload preview (REST v2)",
 ]
+PRIVILEGED_ONLY_REQUESTS = [
+    "04 - Grant advanced simulations entitlement (optional admin)",
+    "05 - Save advanced simulation for success bridges (optional admin)",
+    "06 - Simulation goal bridge success (optional admin)",
+    "07 - Save fee simulation for planned expense bridge (optional admin)",
+    "08 - Simulation planned expense bridge success (optional admin)",
+    "09 - Revoke advanced simulations entitlement (optional admin)",
+]
+PRIVILEGED_PROFILE_REQUESTS = [
+    "01 - Healthz",
+    "02 - Register user (REST v2)",
+    "03 - Login user (REST v2)",
+    "05 - Me (REST v2)",
+    "01 - Installment vs cash calculate (REST public)",
+    "02 - Installment vs cash save (REST auth required)",
+    "03 - Simulation goal bridge without entitlement returns 403",
+    *PRIVILEGED_ONLY_REQUESTS,
+]
 
 
 def _js(lines: list[str]) -> dict[str, Any]:
@@ -112,15 +130,30 @@ def _folder(name: str, items: list[dict[str, Any]]) -> dict[str, Any]:
 
 def _suite_profile_prerequest() -> list[str]:
     smoke_json = json.dumps(SMOKE_REQUESTS, ensure_ascii=True)
+    privileged_only_json = json.dumps(PRIVILEGED_ONLY_REQUESTS, ensure_ascii=True)
+    privileged_profile_json = json.dumps(
+        PRIVILEGED_PROFILE_REQUESTS,
+        ensure_ascii=True,
+    )
     return [
         f"var smokeRequests = {smoke_json};",
+        f"var privilegedOnlyRequests = {privileged_only_json};",
+        f"var privilegedProfileRequests = {privileged_profile_json};",
         "var activeProfile = String(pm.environment.get('suiteProfile') || pm.collectionVariables.get('suiteProfile') || 'full').toLowerCase();",
-        "if (!['smoke', 'full'].includes(activeProfile)) {",
-        "  throw new Error('Unsupported suiteProfile: ' + activeProfile + '. Use smoke or full.');",
+        "if (!['smoke', 'full', 'privileged'].includes(activeProfile)) {",
+        "  throw new Error('Unsupported suiteProfile: ' + activeProfile + '. Use smoke, full or privileged.');",
         "}",
         "pm.collectionVariables.set('suiteProfile', activeProfile);",
         "if (activeProfile === 'smoke' && !smokeRequests.includes(pm.info.requestName)) {",
         "  console.log('Skipping request outside smoke profile:', pm.info.requestName);",
+        "  pm.execution.skipRequest();",
+        "}",
+        "if (activeProfile === 'full' && privilegedOnlyRequests.includes(pm.info.requestName)) {",
+        "  console.log('Skipping privileged-only request outside privileged profile:', pm.info.requestName);",
+        "  pm.execution.skipRequest();",
+        "}",
+        "if (activeProfile === 'privileged' && !privilegedProfileRequests.includes(pm.info.requestName)) {",
+        "  console.log('Skipping request outside privileged profile:', pm.info.requestName);",
         "  pm.execution.skipRequest();",
         "}",
     ]
@@ -128,11 +161,14 @@ def _suite_profile_prerequest() -> list[str]:
 
 def _skip_if_privileged_flows_disabled() -> list[str]:
     return [
+        "var activeProfile = String(pm.environment.get('suiteProfile') || pm.collectionVariables.get('suiteProfile') || 'full').toLowerCase();",
         "var enabled = String(pm.environment.get('enablePrivilegedFlows') || pm.collectionVariables.get('enablePrivilegedFlows') || 'false').toLowerCase();",
         "var adminToken = pm.environment.get('adminToken') || pm.collectionVariables.get('adminToken') || '';",
-        "if (enabled !== 'true' || !adminToken) {",
-        "  console.log('Skipping privileged request because enablePrivilegedFlows/adminToken is not configured.');",
+        "if (activeProfile !== 'privileged') {",
         "  pm.execution.skipRequest();",
+        "}",
+        "if (enabled !== 'true' || !adminToken) {",
+        "  throw new Error('Privileged profile requires enablePrivilegedFlows=true and adminToken configured.');",
         "}",
     ]
 
@@ -1971,6 +2007,7 @@ def build_collection() -> dict[str, Any]:
                 "Canonical black-box suite for Auraxis API. Organized by domain, "
                 "validated by Newman in CI, and designed for direct Postman import. "
                 "Privileged flows are optional and gated by adminToken + enablePrivilegedFlows."
+                " Use the dedicated privileged profile when executing admin-only coverage."
             ),
         },
         "event": [
@@ -2013,6 +2050,8 @@ def build_collection() -> dict[str, Any]:
             {"key": "fakeUuid", "value": "00000000-0000-4000-8000-000000000001"},
             {"key": "nonexistentInvitationToken", "value": ""},
             {"key": "suiteProfile", "value": "full"},
+            {"key": "enablePrivilegedFlows", "value": "false"},
+            {"key": "adminToken", "value": ""},
         ],
     }
     return collection
