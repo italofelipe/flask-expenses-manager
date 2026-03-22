@@ -68,6 +68,7 @@ jobs:
           AWS_REGION: ${{ vars.AWS_REGION }}
           DEV_INSTANCE_ID: ${{ vars.AURAXIS_DEV_INSTANCE_ID }}
           PROD_INSTANCE_ID: ${{ vars.AURAXIS_PROD_INSTANCE_ID }}
+          DEPLOY_DIAGNOSTICS_PATH: ${{ runner.temp }}/deploy-dev-ssm-diagnostics.json
         run: |
           INPUT_REF="${{ inputs.git_ref }}"
           REF="${INPUT_REF}"
@@ -91,7 +92,16 @@ jobs:
             --region "${AWS_REGION}" \
             --dev-instance-id "${DEV_INSTANCE_ID}" \
             --prod-instance-id "${PROD_INSTANCE_ID}" \
+            --diagnostics-json-path "${DEPLOY_DIAGNOSTICS_PATH}" \
             deploy --env dev --git-ref "${REF}"
+
+      - name: Upload deploy diagnostics artifact (DEV)
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: deploy-dev-ssm-diagnostics
+          path: ${{ runner.temp }}/deploy-dev-ssm-diagnostics.json
+          if-no-files-found: ignore
 
       - name: REST + GraphQL smoke checks (DEV)
         env:
@@ -130,6 +140,19 @@ jobs:
             echo "- deploy step outcome: \`${{ steps.deploy_dev.outcome }}\`"
             echo "- smoke checks: \`enabled (REST + GraphQL)\`"
             echo "- rollback on failure: \`enabled\`"
+            if [ -f "${{ runner.temp }}/deploy-dev-ssm-diagnostics.json" ]; then
+              echo "- diagnostics artifact: \`deploy-dev-ssm-diagnostics\`"
+              python - <<'PY' "${{ runner.temp }}/deploy-dev-ssm-diagnostics.json"
+import json
+import sys
+
+payload = json.load(open(sys.argv[1], encoding="utf-8"))
+print(f"- SSM command id: `{payload.get('command_id', '')}`")
+print(f"- SSM status: `{payload.get('status', '')}`")
+print(f"- SSM status details: `{payload.get('status_details') or '<none>'}`")
+print(f"- SSM response code: `{payload.get('response_code')}`")
+PY
+            fi
             echo "- ref resolution:"
             echo "  - event: \`${{ github.event_name }}\`"
             echo "  - github ref: \`${{ github.ref }}\`"
@@ -183,6 +206,7 @@ jobs:
           AWS_REGION: ${{ vars.AWS_REGION }}
           DEV_INSTANCE_ID: ${{ vars.AURAXIS_DEV_INSTANCE_ID }}
           PROD_INSTANCE_ID: ${{ vars.AURAXIS_PROD_INSTANCE_ID }}
+          DEPLOY_DIAGNOSTICS_PATH: ${{ runner.temp }}/deploy-prod-ssm-diagnostics.json
         run: |
           INPUT_REF="${{ inputs.git_ref }}"
           REF="${INPUT_REF}"
@@ -204,7 +228,16 @@ jobs:
             --region "${AWS_REGION}" \
             --dev-instance-id "${DEV_INSTANCE_ID}" \
             --prod-instance-id "${PROD_INSTANCE_ID}" \
+            --diagnostics-json-path "${DEPLOY_DIAGNOSTICS_PATH}" \
             deploy --env prod --git-ref "${REF}"
+
+      - name: Upload deploy diagnostics artifact (PROD)
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: deploy-prod-ssm-diagnostics
+          path: ${{ runner.temp }}/deploy-prod-ssm-diagnostics.json
+          if-no-files-found: ignore
 
       - name: REST + GraphQL smoke checks (PROD)
         env:
@@ -244,6 +277,19 @@ jobs:
             echo "- deploy step outcome: \`${{ steps.deploy_prod.outcome }}\`"
             echo "- smoke checks: \`enabled (REST + GraphQL)\`"
             echo "- rollback on failure: \`enabled\`"
+            if [ -f "${{ runner.temp }}/deploy-prod-ssm-diagnostics.json" ]; then
+              echo "- diagnostics artifact: \`deploy-prod-ssm-diagnostics\`"
+              python - <<'PY' "${{ runner.temp }}/deploy-prod-ssm-diagnostics.json"
+import json
+import sys
+
+payload = json.load(open(sys.argv[1], encoding="utf-8"))
+print(f"- SSM command id: `{payload.get('command_id', '')}`")
+print(f"- SSM status: `{payload.get('status', '')}`")
+print(f"- SSM status details: `{payload.get('status_details') or '<none>'}`")
+print(f"- SSM response code: `{payload.get('response_code')}`")
+PY
+            fi
             echo "- ref resolution:"
             echo "  - event: \`${{ github.event_name }}\`"
             echo "  - github ref: \`${{ github.ref }}\`"

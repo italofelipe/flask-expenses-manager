@@ -35,9 +35,12 @@ from __future__ import annotations
 import argparse
 import base64
 import json
+import os
 import subprocess
+import sys
 import time
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Any
 
 DEFAULT_PROFILE = "auraxis-admin"
@@ -57,6 +60,12 @@ class AwsCtx:
 
 class AwsCliError(RuntimeError):
     pass
+
+
+class SsmCommandFailed(AwsCliError):
+    def __init__(self, report: dict[str, Any]):
+        self.report = report
+        super().__init__(_format_failure_message(report))
 
 
 def _run_aws(ctx: AwsCtx, args: list[str], *, expect_json: bool = True) -> Any:
@@ -106,7 +115,122 @@ def _ssm_send_shell(ctx: AwsCtx, instance_id: str, script: str, comment: str) ->
     return str(out["Command"]["CommandId"])
 
 
-def _wait(ctx: AwsCtx, *, command_id: str, instance_id: str) -> None:
+def _truncate_output(value: str, *, limit: int = 12000) -> str:
+    if len(value) <= limit:
+        return value
+    return value[-limit:]
+
+
+def _extract_invocation_report(
+    invocation: dict[str, Any], *, instance_id: str, command_id: str
+) -> dict[str, Any]:
+    stdout = str(invocation.get("StandardOutputContent") or "").strip()
+    stderr = str(invocation.get("StandardErrorContent") or "").strip()
+    return {
+        "instance_id": instance_id,
+        "command_id": command_id,
+        "status": str(invocation.get("Status") or "Unknown"),
+        "status_details": str(invocation.get("StatusDetails") or ""),
+        "response_code": invocation.get("ResponseCode"),
+        "execution_start_date_time": str(
+            invocation.get("ExecutionStartDateTime") or ""
+        ),
+        "execution_end_date_time": str(invocation.get("ExecutionEndDateTime") or ""),
+        "standard_output_url": str(invocation.get("StandardOutputUrl") or ""),
+        "standard_error_url": str(invocation.get("StandardErrorUrl") or ""),
+        "stdout_tail": _truncate_output(stdout),
+        "stderr_tail": _truncate_output(stderr),
+    }
+
+
+def _format_failure_message(report: dict[str, Any]) -> str:
+    return (
+        "Deploy failed. "
+        f"instance_id={report['instance_id']} "
+        f"command_id={report['command_id']} "
+        f"status={report['status']} "
+        f"status_details={report['status_details'] or '<none>'} "
+        f"response_code={report['response_code']}\n"
+        f"STDOUT:\n{report['stdout_tail']}\n"
+        f"STDERR:\n{report['stderr_tail']}"
+    )
+
+
+def _write_diagnostics_json(path: str, payload: dict[str, Any]) -> None:
+    target = Path(path)
+    target.parent.mkdir(parents=True, exist_ok=True)
+    target.write_text(json.dumps(payload, indent=2, sort_keys=True), encoding="utf-8")
+
+
+def _append_github_summary(report: dict[str, Any]) -> None:
+    summary_path = os.getenv("GITHUB_STEP_SUMMARY")
+    if not summary_path:
+        return
+
+    status = str(report.get("status") or "Unknown")
+    icon = "✅" if status == "Success" else "❌"
+    lines = [
+        f"### {icon} Deploy via SSM diagnostics",
+        "",
+        f"- Environment: `{report.get('environment', '')}`",
+        f"- Mode: `{report.get('mode', '')}`",
+        f"- Git ref: `{report.get('git_ref') or '<n/a>'}`",
+        f"- Instance ID: `{report.get('instance_id', '')}`",
+        f"- Command ID: `{report.get('command_id', '')}`",
+        f"- Status: `{status}`",
+        f"- Status details: `{report.get('status_details') or '<none>'}`",
+        f"- Response code: `{report.get('response_code')}`",
+    ]
+
+    stdout_tail = str(report.get("stdout_tail") or "")
+    stderr_tail = str(report.get("stderr_tail") or "")
+    if stdout_tail:
+        lines.extend(["", "#### STDOUT tail", "", "```text", stdout_tail, "```"])
+    if stderr_tail:
+        lines.extend(["", "#### STDERR tail", "", "```text", stderr_tail, "```"])
+
+    with open(summary_path, "a", encoding="utf-8") as summary_file:
+        summary_file.write("\n".join(lines) + "\n")
+
+
+def _build_generic_report(
+    *,
+    env_name: str,
+    mode: str,
+    git_ref: str | None,
+    instance_id: str,
+    command_id: str | None,
+    error: str,
+) -> dict[str, Any]:
+    return {
+        "environment": env_name,
+        "mode": mode,
+        "git_ref": git_ref or "",
+        "instance_id": instance_id,
+        "command_id": command_id or "",
+        "status": "ClientError",
+        "status_details": error,
+        "response_code": None,
+        "execution_start_date_time": "",
+        "execution_end_date_time": "",
+        "standard_output_url": "",
+        "standard_error_url": "",
+        "stdout_tail": "",
+        "stderr_tail": error,
+    }
+
+
+def _record_diagnostics(
+    *,
+    diagnostics_json_path: str | None,
+    report: dict[str, Any],
+) -> None:
+    if diagnostics_json_path:
+        _write_diagnostics_json(diagnostics_json_path, report)
+    _append_github_summary(report)
+
+
+def _wait(ctx: AwsCtx, *, command_id: str, instance_id: str) -> dict[str, Any]:
     deadline = time.time() + 1200
     while time.time() < deadline:
         out = _run_aws(
@@ -127,15 +251,12 @@ def _wait(ctx: AwsCtx, *, command_id: str, instance_id: str) -> None:
             time.sleep(5)
             continue
         if status != "Success":
-            stdout = str(out.get("StandardOutputContent") or "").strip()
-            stderr = str(out.get("StandardErrorContent") or "").strip()
-            tail_limit = 12000
-            raise AwsCliError(
-                "Deploy failed. "
-                f"instance_id={instance_id} command_id={command_id} status={status}\n"
-                f"STDOUT:\n{stdout[-tail_limit:]}\nSTDERR:\n{stderr[-tail_limit:]}"
+            raise SsmCommandFailed(
+                _extract_invocation_report(
+                    out, instance_id=instance_id, command_id=command_id
+                )
             )
-        return
+        return dict(out)
     raise AwsCliError(
         "Timeout waiting SSM command. "
         f"instance_id={instance_id} command_id={command_id}"
@@ -841,6 +962,11 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--region", default=DEFAULT_REGION)
     p.add_argument("--prod-instance-id", default=DEFAULT_PROD_INSTANCE_ID)
     p.add_argument("--dev-instance-id", default=DEFAULT_DEV_INSTANCE_ID)
+    p.add_argument(
+        "--diagnostics-json-path",
+        default="",
+        help="Optional path to persist SSM invocation diagnostics as JSON.",
+    )
 
     sub = p.add_subparsers(dest="cmd", required=True)
     p_deploy = sub.add_parser("deploy", help="Deploy a git ref to DEV/PROD.")
@@ -869,6 +995,7 @@ def main() -> int:
         mode = str(args.cmd)
         git_ref: str | None = None
         comment_ref = ""
+        diagnostics_json_path = str(args.diagnostics_json_path or "") or None
         if mode == "deploy":
             git_ref = str(args.git_ref)
             comment_ref = f" ref={git_ref}"
@@ -879,15 +1006,61 @@ def main() -> int:
             git_ref=git_ref,
             mode=mode,
         )
-        cmd_id = _ssm_send_shell(
-            ctx,
-            instance_id,
-            script,
-            f"auraxis: i6 {mode} ({env_name}){comment_ref}",
-        )
-        print(f"{env_name.upper()} command_id={cmd_id}")
-        _wait(ctx, command_id=cmd_id, instance_id=instance_id)
-        return 0
+        cmd_id = ""
+        try:
+            cmd_id = _ssm_send_shell(
+                ctx,
+                instance_id,
+                script,
+                f"auraxis: i6 {mode} ({env_name}){comment_ref}",
+            )
+            print(f"{env_name.upper()} command_id={cmd_id}")
+            invocation = _wait(ctx, command_id=cmd_id, instance_id=instance_id)
+            report = _extract_invocation_report(
+                invocation, instance_id=instance_id, command_id=cmd_id
+            )
+            report.update(
+                {
+                    "environment": env_name,
+                    "mode": mode,
+                    "git_ref": git_ref or "",
+                }
+            )
+            _record_diagnostics(
+                diagnostics_json_path=diagnostics_json_path,
+                report=report,
+            )
+            return 0
+        except SsmCommandFailed as exc:
+            report = dict(exc.report)
+            report.update(
+                {
+                    "environment": env_name,
+                    "mode": mode,
+                    "git_ref": git_ref or "",
+                }
+            )
+            _record_diagnostics(
+                diagnostics_json_path=diagnostics_json_path,
+                report=report,
+            )
+            print(str(exc), file=sys.stderr)
+            return 1
+        except AwsCliError as exc:
+            report = _build_generic_report(
+                env_name=env_name,
+                mode=mode,
+                git_ref=git_ref,
+                instance_id=instance_id,
+                command_id=cmd_id or None,
+                error=str(exc),
+            )
+            _record_diagnostics(
+                diagnostics_json_path=diagnostics_json_path,
+                report=report,
+            )
+            print(str(exc), file=sys.stderr)
+            return 1
 
     raise AssertionError("unreachable")
 
