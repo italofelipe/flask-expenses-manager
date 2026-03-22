@@ -5,6 +5,10 @@ set -eu
 # - EDGE_TLS_MODE=alb:
 #   - renders HTTP-only nginx config suitable for ALB TLS termination
 #   - skips local certificate issuance entirely
+# - EDGE_TLS_MODE=alb_dual:
+#   - transitional mode for safe cutover to ALB HTTP origins
+#   - requires an existing local certificate
+#   - serves HTTP:80 for the new ALB target group while keeping HTTPS:443 alive
 # - EDGE_TLS_MODE=instance_tls (default):
 #   - if cert exists for DOMAIN: renders TLS nginx config and recreates reverse-proxy
 #   - if cert does not exist:
@@ -35,7 +39,7 @@ if [ -z "${DOMAIN}" ]; then
   exit 2
 fi
 
-if [ ! -f "deploy/nginx/default.tls.conf" ] || [ ! -f "deploy/nginx/default.http.conf" ] || [ ! -f "deploy/nginx/default.alb.conf" ]; then
+if [ ! -f "deploy/nginx/default.tls.conf" ] || [ ! -f "deploy/nginx/default.http.conf" ] || [ ! -f "deploy/nginx/default.alb.conf" ] || [ ! -f "deploy/nginx/default.alb_dual.conf" ]; then
   echo "[tls] missing nginx templates in deploy/nginx/."
   exit 3
 fi
@@ -58,6 +62,11 @@ render_tls_config() {
 render_alb_config() {
   sed "s/__DOMAIN__/${DOMAIN}/g" deploy/nginx/default.alb.conf > deploy/nginx/default.conf
   echo "[tls] mode=alb domain=${DOMAIN}"
+}
+
+render_alb_dual_config() {
+  sed "s/__DOMAIN__/${DOMAIN}/g" deploy/nginx/default.alb_dual.conf > deploy/nginx/default.conf
+  echo "[tls] mode=alb_dual domain=${DOMAIN}"
 }
 
 recreate_proxy() {
@@ -84,6 +93,16 @@ if [ "${EDGE_TLS_MODE}" = "alb" ]; then
   render_alb_config
   recreate_proxy
   exit 0
+fi
+
+if [ "${EDGE_TLS_MODE}" = "alb_dual" ]; then
+  if cert_exists; then
+    render_alb_dual_config
+    recreate_proxy
+    exit 0
+  fi
+  echo "[tls] EDGE_TLS_MODE=alb_dual requires an existing certificate for ${DOMAIN}."
+  exit 4
 fi
 
 if cert_exists; then

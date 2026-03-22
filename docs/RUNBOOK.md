@@ -67,6 +67,7 @@ Notas:
   - `EDGE_TLS_MODE=instance_tls` tenta emitir cert em PROD quando possível
   - `EDGE_TLS_MODE=instance_tls` mantém HTTP sem derrubar proxy quando cert ainda não existe
   - `EDGE_TLS_MODE=alb` renderiza config HTTP-only para ALB com TLS terminando no ACM
+  - `EDGE_TLS_MODE=alb_dual` serve `80` e `443` ao mesmo tempo para cutover seguro de `HTTPS origin -> HTTP origin`
 - O deploy normal (`mode=deploy`) ainda depende de acesso Git remoto no host.
 - O rollback (`mode=rollback`) **não** depende de `git fetch` remoto; usa o commit local salvo no estado.
 - O deploy bloqueia se detectar drift real entre `/opt/auraxis` e `/opt/flask_expenses` para evitar update na copia errada.
@@ -135,6 +136,12 @@ Nesse modo:
 - o host nao emite nem renova certificados para `api.auraxis.com.br`
 - o `nginx` preserva `X-Forwarded-Proto` e `X-Forwarded-Port` vindos do ALB
 - o cutover de DNS deve apontar `api.auraxis.com.br` para o ALB, nao para EIP
+
+Para migracao segura de `HTTPS origin` para `HTTP origin` sem depender de timing fragil:
+- usar `EDGE_TLS_MODE=alb_dual` no host com certificado local ainda presente
+- registrar e aquecer o target group `HTTP:80` ate ficar `healthy`
+- so entao trocar o listener do ALB para o target group HTTP
+- depois do cutover estavel, trocar o host para `EDGE_TLS_MODE=alb` e remover a dependencia do certificado local
 
 ## Backups PostgreSQL (S3) e Restore Drill
 
