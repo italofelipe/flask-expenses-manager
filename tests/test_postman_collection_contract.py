@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import re
 from pathlib import Path
+from typing import Any
 
 SMOKE_REQUESTS = {
     "01 - Healthz",
@@ -121,6 +122,7 @@ def test_postman_collection_covers_critical_rest_routes() -> None:
         ("PUT", "/user/profile"),
         ("GET", "/user/profile/questionnaire"),
         ("POST", "/user/profile/questionnaire"),
+        ("POST", "/user/simulate-salary-increase"),
         ("POST", "/transactions"),
         ("PUT", "/transactions/{param}"),
         ("DELETE", "/transactions/{param}"),
@@ -136,6 +138,7 @@ def test_postman_collection_covers_critical_rest_routes() -> None:
         ("POST", "/goals"),
         ("GET", "/goals/{param}"),
         ("PUT", "/goals/{param}"),
+        ("PATCH", "/goals/{param}"),
         ("DELETE", "/goals/{param}"),
         ("GET", "/goals/{param}/plan"),
         ("POST", "/goals/simulate"),
@@ -156,10 +159,14 @@ def test_postman_collection_covers_critical_rest_routes() -> None:
         ("GET", "/wallet/{param}/operations/invested-amount"),
         ("POST", "/simulations/installment-vs-cash/calculate"),
         ("POST", "/simulations/installment-vs-cash/save"),
+        ("GET", "/simulations"),
+        ("POST", "/simulations"),
+        ("GET", "/simulations/{param}"),
+        ("DELETE", "/simulations/{param}"),
         ("POST", "/simulations/{param}/goal"),
         ("POST", "/simulations/{param}/planned-expense"),
         ("GET", "/alerts/preferences"),
-        ("PUT", "/alerts/preferences/system"),
+        ("PUT", "/alerts/preferences/{param}"),
         ("GET", "/alerts"),
         ("POST", "/alerts/{param}/read"),
         ("DELETE", "/alerts/{param}"),
@@ -242,3 +249,39 @@ def test_postman_collection_smoke_profile_excludes_privileged_only_requests() ->
     }
     overlap = sorted(SMOKE_REQUESTS & privileged_only)
     assert not overlap, f"Smoke profile must not include privileged requests: {overlap}"
+
+
+def test_postman_collection_covers_registered_rest_routes(app: Any) -> None:
+    covered = {
+        (
+            str(item["request"]["method"]).upper(),
+            _normalize_path(str(item["request"]["url"]["raw"])),
+        )
+        for item in _flatten_request_items(_load_postman_items())
+    }
+    allowed_gaps = {
+        ("PUT", "/transactions"),
+        ("DELETE", "/transactions"),
+    }
+    missing: list[tuple[str, str, str]] = []
+
+    with app.app_context():
+        for rule in sorted(
+            app.url_map.iter_rules(),
+            key=lambda r: (r.rule, sorted(r.methods)),
+        ):
+            if rule.endpoint == "static" or rule.endpoint.startswith("flask-apispec."):
+                continue
+            if rule.rule.startswith("/docs") or rule.rule.startswith("/swagger"):
+                continue
+            normalized_rule = re.sub(r"<(?:[^:>]+:)?[^>]+>", "{param}", rule.rule)
+            for method in sorted(
+                m for m in rule.methods if m not in {"HEAD", "OPTIONS"}
+            ):
+                route_key = (method, normalized_rule)
+                if route_key in allowed_gaps:
+                    continue
+                if route_key not in covered:
+                    missing.append((method, normalized_rule, rule.endpoint))
+
+    assert not missing, f"Postman collection missing registered REST routes: {missing}"
