@@ -23,6 +23,13 @@ from .request_context import (
     get_request_context,
     register_request_context_adapter,
 )
+from .runtime import (
+    runtime_config,
+    runtime_debug_or_testing,
+    runtime_extension,
+    runtime_logger,
+    set_runtime_extension,
+)
 
 __all__ = [
     "RequestContext",
@@ -43,5 +50,10 @@ __all__ = [
     "get_request_context",
     "mark_request_start",
     "register_request_context_adapter",
+    "runtime_config",
+    "runtime_debug_or_testing",
+    "runtime_extension",
+    "runtime_logger",
     "serialize_error_contract",
+    "set_runtime_extension",
 ]

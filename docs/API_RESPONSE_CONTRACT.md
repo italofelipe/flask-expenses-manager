@@ -108,3 +108,5 @@ Para endpoints paginados, usar:
 - Endpoint documentado com exemplos de sucesso/erro.
 - Teste de contrato cobrindo campos obrigatórios.
 - Mapeamento explícito de exceptions para `error.code`.
+- Controllers REST devem preferir `compat_error_response` / `compat_error_tuple`
+  para não vazar payloads crus fora do contrato compartilhado.

@@ -7,9 +7,14 @@ from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from typing import cast
 
-from flask import current_app
-
 from app.extensions.database import db
+from app.http.runtime import (
+    runtime_config,
+    runtime_debug_or_testing,
+    runtime_extension,
+    runtime_logger,
+    set_runtime_extension,
+)
 from app.models.user import User
 
 PASSWORD_RESET_NEUTRAL_MESSAGE = (
@@ -30,11 +35,11 @@ def _utcnow() -> datetime:
 
 
 def _secret_key() -> str:
-    return str(current_app.config.get("SECRET_KEY", ""))
+    return str(runtime_config("SECRET_KEY", ""))
 
 
 def _token_ttl_minutes() -> int:
-    raw_value = current_app.config.get("PASSWORD_RESET_TOKEN_TTL_MINUTES", 30)
+    raw_value = runtime_config("PASSWORD_RESET_TOKEN_TTL_MINUTES", 30)
     try:
         ttl = int(raw_value)
     except (TypeError, ValueError):
@@ -52,22 +57,22 @@ def _token_digest(token: str) -> str:
 
 
 def _testing_outbox() -> list[dict[str, str]]:
-    outbox = current_app.extensions.setdefault("password_reset_outbox", [])
+    outbox = runtime_extension("password_reset_outbox")
     if isinstance(outbox, list):
         return cast(list[dict[str, str]], outbox)
-    current_app.extensions["password_reset_outbox"] = []
-    return cast(list[dict[str, str]], current_app.extensions["password_reset_outbox"])
+    set_runtime_extension("password_reset_outbox", [])
+    return cast(list[dict[str, str]], runtime_extension("password_reset_outbox", []))
 
 
 def _dispatch_reset_instructions(*, email: str, token: str) -> None:
-    base_url = str(current_app.config.get("PASSWORD_RESET_FRONTEND_URL", "")).strip()
+    base_url = str(runtime_config("PASSWORD_RESET_FRONTEND_URL", "")).strip()
     if base_url:
         separator = "&" if "?" in base_url else "?"
         reset_url = f"{base_url}{separator}token={token}"
     else:
         reset_url = "n/a"
 
-    if bool(current_app.config.get("TESTING")):
+    if runtime_debug_or_testing():
         _testing_outbox().append(
             {
                 "email": email,
@@ -76,7 +81,7 @@ def _dispatch_reset_instructions(*, email: str, token: str) -> None:
             }
         )
 
-    current_app.logger.info(
+    runtime_logger().info(
         (
             "event=auth.password_reset_instructions_dispatched "
             "email=%s reset_url_present=%s"
@@ -101,7 +106,7 @@ def request_password_reset(email: str) -> PasswordResetResult:
     db.session.commit()
 
     _dispatch_reset_instructions(email=normalized_email, token=token)
-    current_app.logger.info(
+    runtime_logger().info(
         "event=auth.password_reset_requested user_id=%s",
         str(user.id),
     )
@@ -133,7 +138,7 @@ def reset_password(*, token: str, new_password_hash: str) -> PasswordResetResult
     user.password_reset_requested_at = None
     db.session.commit()
 
-    current_app.logger.info(
+    runtime_logger().info(
         "event=auth.password_reset_completed user_id=%s",
         str(user.id),
     )

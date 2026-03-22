@@ -2,10 +2,15 @@ from __future__ import annotations
 
 from typing import Any
 
-from flask import Response, current_app, has_app_context
+from flask import Response
 
 from app.exceptions import APIError
-from app.http import ErrorContract, flask_error_response, serialize_error_contract
+from app.http import (
+    ErrorContract,
+    flask_error_response,
+    runtime_debug_or_testing,
+    serialize_error_contract,
+)
 from app.utils.api_contract import CONTRACT_HEADER, CONTRACT_V2, is_v2_contract_request
 from app.utils.response_builder import (
     SENSITIVE_DATA_FIELDS,
@@ -15,9 +20,7 @@ from app.utils.response_builder import (
 
 
 def _debug_or_testing() -> bool:
-    if not has_app_context():
-        return False
-    return bool(current_app.config.get("DEBUG") or current_app.config.get("TESTING"))
+    return runtime_debug_or_testing()
 
 
 class ResponseContractError(APIError):
@@ -120,6 +123,20 @@ def compat_error_tuple(
     return payload, status_code
 
 
+def compat_error_tuple_from_api_error(
+    error: APIError,
+    *,
+    legacy_payload: dict[str, Any] | None = None,
+) -> tuple[dict[str, Any], int]:
+    return compat_error_tuple(
+        legacy_payload=legacy_payload or {"error": error.message},
+        status_code=error.status_code,
+        message=error.message,
+        error_code=error.code,
+        details=error.details,
+    )
+
+
 def response_from_contract_error(error: ResponseContractError) -> Response:
     return compat_error_response(
         legacy_payload=error.legacy_payload,
@@ -139,5 +156,6 @@ __all__ = [
     "compat_error_response",
     "compat_success_tuple",
     "compat_error_tuple",
+    "compat_error_tuple_from_api_error",
     "response_from_contract_error",
 ]

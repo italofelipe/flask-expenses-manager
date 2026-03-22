@@ -2,10 +2,23 @@ from __future__ import annotations
 
 import threading
 from collections import Counter
+from math import ceil
 from typing import Any
 
 _lock = threading.Lock()
 _counters: Counter[str] = Counter()
+_samples: dict[str, list[int]] = {}
+_HTTP_LATENCY_BUDGETS: dict[str, dict[str, Any]] = {
+    "health.healthz": {"budget_ms": 100, "method": "GET", "path": "/healthz"},
+    "auth.authresource": {"budget_ms": 250, "method": "POST", "path": "/auth/login"},
+    "user.me": {"budget_ms": 250, "method": "GET", "path": "/users/me"},
+    "graphql.execute_graphql": {
+        "budget_ms": 400,
+        "method": "POST",
+        "path": "/graphql",
+    },
+}
+_MAX_SAMPLES_PER_METRIC = 200
 
 
 def increment_metric(name: str, amount: int = 1) -> None:
@@ -23,9 +36,33 @@ def snapshot_metrics(prefix: str | None = None) -> dict[str, int]:
     return {key: value for key, value in raw.items() if key.startswith(prefix)}
 
 
+def record_metric_sample(
+    name: str,
+    value: int,
+    *,
+    max_samples: int = _MAX_SAMPLES_PER_METRIC,
+) -> None:
+    if value < 0:
+        return
+    with _lock:
+        bucket = _samples.setdefault(name, [])
+        bucket.append(value)
+        if max_samples > 0 and len(bucket) > max_samples:
+            del bucket[:-max_samples]
+
+
+def snapshot_metric_samples(prefix: str | None = None) -> dict[str, list[int]]:
+    with _lock:
+        raw = {key: list(values) for key, values in _samples.items()}
+    if prefix is None:
+        return raw
+    return {key: value for key, value in raw.items() if key.startswith(prefix)}
+
+
 def reset_metrics() -> None:
     with _lock:
         _counters.clear()
+        _samples.clear()
 
 
 def reset_metrics_for_tests() -> None:
@@ -108,3 +145,36 @@ def build_http_observability_metrics_payload() -> dict[str, Any]:
             "fastapi_requests": metrics.get("http.request.framework.fastapi", 0),
         },
     }
+
+
+def _nearest_rank_percentile(values: list[int], percentile: int) -> int:
+    if not values:
+        return 0
+    ordered = sorted(values)
+    rank = max(1, ceil((percentile / 100) * len(ordered)))
+    return ordered[rank - 1]
+
+
+def build_http_latency_budget_payload() -> dict[str, Any]:
+    routes: dict[str, Any] = {}
+    for route, metadata in _HTTP_LATENCY_BUDGETS.items():
+        metric_key = f"http.route.duration_ms.{route}"
+        samples = snapshot_metric_samples(prefix=metric_key).get(metric_key, [])
+        sample_count = len(samples)
+        budget_ms = int(metadata["budget_ms"])
+        routes[route] = {
+            "path": metadata["path"],
+            "method": metadata["method"],
+            "budget_ms": budget_ms,
+            "samples": sample_count,
+            "p50_ms": _nearest_rank_percentile(samples, 50),
+            "p95_ms": _nearest_rank_percentile(samples, 95),
+            "max_ms": max(samples) if samples else 0,
+            "avg_ms": round(sum(samples) / sample_count, 2) if sample_count else 0.0,
+            "within_budget": (
+                samples and _nearest_rank_percentile(samples, 95) <= budget_ms
+            )
+            if sample_count
+            else None,
+        }
+    return {"component": "http_latency_budget", "routes": routes}

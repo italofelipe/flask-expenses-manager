@@ -2,7 +2,11 @@ from __future__ import annotations
 
 import json
 
-from app.extensions.integration_metrics import increment_metric, reset_metrics_for_tests
+from app.extensions.integration_metrics import (
+    increment_metric,
+    record_metric_sample,
+    reset_metrics_for_tests,
+)
 
 
 def test_integration_metrics_snapshot_filters_by_prefix(app) -> None:
@@ -42,3 +46,23 @@ def test_integration_metrics_snapshot_can_reset_counters(app) -> None:
     after_reset_payload = json.loads(after_reset_result.output.strip())
     assert after_reset_payload["counters"] == {}
     assert after_reset_payload["total"] == 0
+
+
+def test_integration_metrics_latency_budget_reports_percentiles(app) -> None:
+    reset_metrics_for_tests()
+    record_metric_sample("http.route.duration_ms.health.healthz", 10)
+    record_metric_sample("http.route.duration_ms.health.healthz", 20)
+    record_metric_sample("http.route.duration_ms.health.healthz", 40)
+
+    runner = app.test_cli_runner()
+    result = runner.invoke(args=["integration-metrics", "latency-budget"])
+
+    assert result.exit_code == 0
+    payload = json.loads(result.output.strip())
+    route = payload["routes"]["health.healthz"]
+    assert route["path"] == "/healthz"
+    assert route["budget_ms"] == 100
+    assert route["samples"] == 3
+    assert route["p50_ms"] == 20
+    assert route["p95_ms"] == 40
+    assert route["within_budget"] is True

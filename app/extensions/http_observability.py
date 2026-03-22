@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from flask import Flask, Response, current_app
 
-from app.extensions.integration_metrics import increment_metric
+from app.extensions.integration_metrics import increment_metric, record_metric_sample
 from app.http import (
     build_observability_envelope,
     format_observability_log,
@@ -37,6 +37,10 @@ def register_http_observability(app: Flask) -> None:
             f"http.request.route.{_metric_suffix(envelope.route)}",
         )
         increment_metric("http.request.duration_ms_total", amount=envelope.duration_ms)
+        record_metric_sample(
+            f"http.route.duration_ms.{envelope.route}",
+            envelope.duration_ms,
+        )
         if envelope.auth_subject:
             increment_metric("http.request.authenticated")
         else:

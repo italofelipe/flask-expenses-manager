@@ -285,6 +285,24 @@ def test_post_shared_entries_missing_fields(client) -> None:
     assert resp.status_code == 400
 
 
+def test_post_shared_entries_missing_fields_v2_contract(client) -> None:
+    _uid, token = _register_and_login(client, "v2-shared")
+    resp = client.post(
+        "/shared-entries",
+        json={},
+        headers={**_auth(token), "X-API-Contract": "v2"},
+    )
+
+    assert resp.status_code == 400
+    body = resp.get_json()
+    assert body["success"] is False
+    assert body["error"]["code"] == "VALIDATION_ERROR"
+    assert body["error"]["details"] == {
+        "transaction_id": ["required"],
+        "split_type": ["required"],
+    }
+
+
 def test_get_shared_entries_by_me_empty(client) -> None:
     """GET /shared-entries/by-me returns empty list for new user."""
     _uid, token = _register_and_login(client)
@@ -314,6 +332,24 @@ def test_post_invitation_missing_fields(client) -> None:
     _uid, token = _register_and_login(client)
     resp = client.post("/shared-entries/invitations", json={}, headers=_auth(token))
     assert resp.status_code == 400
+
+
+def test_post_invitation_missing_fields_v2_contract(client) -> None:
+    _uid, token = _register_and_login(client, "v2-inv")
+    resp = client.post(
+        "/shared-entries/invitations",
+        json={},
+        headers={**_auth(token), "X-API-Contract": "v2"},
+    )
+
+    assert resp.status_code == 400
+    body = resp.get_json()
+    assert body["success"] is False
+    assert body["error"]["code"] == "VALIDATION_ERROR"
+    assert body["error"]["details"] == {
+        "shared_entry_id": ["required"],
+        "invitee_email": ["required"],
+    }
 
 
 def test_accept_invitation_not_found(client) -> None:

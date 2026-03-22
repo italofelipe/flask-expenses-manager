@@ -8,6 +8,8 @@ from uuid import UUID
 from flask import request
 
 from app.auth import current_user_id
+from app.controllers.response_contract import compat_error_tuple_from_api_error
+from app.exceptions import ValidationAPIError
 from app.utils.typed_decorators import typed_jwt_required as jwt_required
 
 from .blueprint import shared_entries_bp
@@ -65,11 +67,24 @@ def create_shared_entry() -> tuple[dict[str, Any], int]:
     transaction_id_raw = payload.get("transaction_id")
     split_type = payload.get("split_type")
     if not transaction_id_raw or not split_type:
-        return {"error": "transaction_id e split_type são obrigatórios."}, 400
+        return compat_error_tuple_from_api_error(
+            ValidationAPIError(
+                message="transaction_id e split_type são obrigatórios.",
+                details={
+                    "transaction_id": ["required"],
+                    "split_type": ["required"],
+                },
+            )
+        )
     try:
         transaction_id = UUID(str(transaction_id_raw))
     except (ValueError, AttributeError):
-        return {"error": "transaction_id inválido."}, 400
+        return compat_error_tuple_from_api_error(
+            ValidationAPIError(
+                message="transaction_id inválido.",
+                details={"transaction_id": ["invalid_uuid"]},
+            )
+        )
 
     try:
         entry = share_entry(
@@ -78,7 +93,7 @@ def create_shared_entry() -> tuple[dict[str, Any], int]:
             split_type=split_type,
         )
     except (SharedEntryNotFoundError, SharedEntryForbiddenError) as exc:
-        return {"error": exc.message}, exc.status_code
+        return compat_error_tuple_from_api_error(exc)
 
     return {"shared_entry": _serialize_shared_entry(entry)}, 201
 
@@ -120,11 +135,11 @@ def revoke_shared_entry(shared_entry_id: UUID) -> tuple[dict[str, Any], int]:
     try:
         entry = revoke_share(shared_entry_id=shared_entry_id, owner_id=user_id)
     except SharedEntryNotFoundError as exc:
-        return {"error": exc.message}, exc.status_code
+        return compat_error_tuple_from_api_error(exc)
     except SharedEntryForbiddenError as exc:
-        return {"error": exc.message}, exc.status_code
+        return compat_error_tuple_from_api_error(exc)
     except SharedEntryAlreadyRevokedError as exc:
-        return {"error": exc.message}, exc.status_code
+        return compat_error_tuple_from_api_error(exc)
 
     return {"shared_entry": _serialize_shared_entry(entry)}, 200
 
@@ -162,11 +177,24 @@ def create_invitation() -> tuple[dict[str, Any], int]:
     shared_entry_id_raw = payload.get("shared_entry_id")
     invitee_email = payload.get("invitee_email")
     if not shared_entry_id_raw or not invitee_email:
-        return {"error": "shared_entry_id e invitee_email são obrigatórios."}, 400
+        return compat_error_tuple_from_api_error(
+            ValidationAPIError(
+                message="shared_entry_id e invitee_email são obrigatórios.",
+                details={
+                    "shared_entry_id": ["required"],
+                    "invitee_email": ["required"],
+                },
+            )
+        )
     try:
         shared_entry_id = UUID(str(shared_entry_id_raw))
     except (ValueError, AttributeError):
-        return {"error": "shared_entry_id inválido."}, 400
+        return compat_error_tuple_from_api_error(
+            ValidationAPIError(
+                message="shared_entry_id inválido.",
+                details={"shared_entry_id": ["invalid_uuid"]},
+            )
+        )
 
     try:
         invitation = _create(
@@ -179,7 +207,7 @@ def create_invitation() -> tuple[dict[str, Any], int]:
             expires_in_hours=int(payload.get("expires_in_hours", 48)),
         )
     except (SharedEntryNotFoundError, InvitationOwnershipError) as exc:
-        return {"error": exc.message}, exc.status_code
+        return compat_error_tuple_from_api_error(exc)
 
     return {"invitation": _serialize_invitation(invitation)}, 201
 
@@ -201,11 +229,11 @@ def accept_invitation(token: str) -> tuple[dict[str, Any], int]:
     try:
         invitation = _accept(token=token, accepting_user_id=user_id)
     except InvitationExpiredError as exc:
-        return {"error": exc.message}, exc.status_code
+        return compat_error_tuple_from_api_error(exc)
     except InvitationNotFoundError as exc:
-        return {"error": exc.message}, exc.status_code
+        return compat_error_tuple_from_api_error(exc)
     except InvitationAlreadyProcessedError as exc:
-        return {"error": exc.message}, exc.status_code
+        return compat_error_tuple_from_api_error(exc)
 
     return {"invitation": _serialize_invitation(invitation)}, 200
 
@@ -227,10 +255,10 @@ def revoke_invitation(invitation_id: UUID) -> tuple[dict[str, Any], int]:
     try:
         invitation = _revoke(invitation_id=invitation_id, inviter_id=user_id)
     except InvitationNotFoundError as exc:
-        return {"error": exc.message}, exc.status_code
+        return compat_error_tuple_from_api_error(exc)
     except InvitationForbiddenError as exc:
-        return {"error": exc.message}, exc.status_code
+        return compat_error_tuple_from_api_error(exc)
     except InvitationAlreadyProcessedError as exc:
-        return {"error": exc.message}, exc.status_code
+        return compat_error_tuple_from_api_error(exc)
 
     return {"invitation": _serialize_invitation(invitation)}, 200

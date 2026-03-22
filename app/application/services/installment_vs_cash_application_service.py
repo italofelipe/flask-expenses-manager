@@ -5,7 +5,6 @@ from decimal import Decimal
 from typing import Callable, TypeAlias, cast
 from uuid import UUID
 
-from flask import current_app
 from marshmallow import Schema, ValidationError
 
 from app.application.services.installment_vs_cash_bridge_service import (
@@ -15,6 +14,7 @@ from app.application.services.transaction_application_service import (
     TransactionApplicationError,
 )
 from app.extensions.database import db
+from app.http.runtime import runtime_config
 from app.models.simulation import Simulation
 from app.schemas.installment_vs_cash_schema import (
     InstallmentVsCashCalculationSchema,
@@ -72,7 +72,7 @@ class InstallmentVsCashApplicationService:
     ) -> InstallmentVsCashApplicationService:
         default_rate = Decimal(
             str(
-                current_app.config.get(
+                runtime_config(
                     "INSTALLMENT_VS_CASH_DEFAULT_OPPORTUNITY_RATE_ANNUAL",
                     "12.00",
                 )

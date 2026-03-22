@@ -305,6 +305,17 @@ Runbooks curtos de incidente:
 - seguir o link da issue automatica reaberta/comentada pelo workflow
 - validar `RECURRENCE_DATABASE_URL` e executar `scripts/generate_recurring_transactions.py` manualmente se necessario
 
+Baseline local de latência por rota crítica:
+```bash
+FLASK_APP=run.py ./scripts/repo_bin.sh flask integration-metrics latency-budget
+```
+
+Orçamento operacional atual:
+- `GET /healthz` -> `100ms`
+- `POST /auth/login` -> `250ms`
+- `GET /users/me` -> `250ms`
+- `POST /graphql` -> `400ms`
+
 ## Firewall host (UFW)
 
 Aplicacao via SSM (mantem SSM funcionando, nao abre SSH):
