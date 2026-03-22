@@ -91,8 +91,9 @@ check_contains "app/controllers/auth/dependencies.py" "generate_password_hash" "
 } >>"${REPORT_FILE}"
 
 check_exists ".gitleaks.toml" "Gitleaks config is versioned in repository"
-check_contains ".github/workflows/ci.yml" "name: Security Scan \(Snyk\)" "Snyk security scan job configured"
-check_contains ".github/workflows/ci.yml" "vars\.ENABLE_SNYK == 'true'" "Snyk security scan uses explicit opt-in gate (ENABLE_SNYK)"
+check_contains ".github/workflows/ci.yml" "name: Dependency Security \(OSV-Scanner\)" "OSV-Scanner dependency scan job configured"
+check_contains ".github/workflows/ci.yml" "bash scripts/run_osv_scanner\.sh" "OSV-Scanner is executed through the canonical script"
+check_contains ".github/workflows/ci.yml" "name: Container Security \(Trivy\)" "Trivy container/filesystem scan job configured"
 
 if command -v rg >/dev/null 2>&1; then
   jwt_count=$(rg -n "@jwt_required\(" app/controllers | wc -l | tr -d ' ')

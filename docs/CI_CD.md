@@ -56,9 +56,10 @@ Jobs relevantes:
 9. `trivy`
 - scan de filesystem + imagem Docker
 
-10. `snyk` (obrigatorio)
-- scan de dependencias Python
-- scan de container calibrado para reduzir ruido recorrente de base image
+10. `osv-scanner` (obrigatorio)
+- scan open source de lockfiles/dependencias versionadas
+- usa a base `OSV.dev` como complemento ao `pip-audit` e ao `dependency-review`
+- publica `reports/security/osv-results.json` como artifact
 
 11. `security-evidence`
 - executa `scripts/security_evidence_check.sh`
@@ -70,6 +71,7 @@ Notas:
 - `Cursor Bugbot` e camada complementar de review em PR.
 - Bugbot nao eh gate obrigatorio no ruleset (quota/ruido), mas continua util como sinal adicional.
 - O job `Review Signal (Cursor Bugbot)` publica resumo no `Step Summary` para triagem objetiva.
+- `Trivy` continua responsavel por filesystem + container; `OSV-Scanner` assume a trilha open source de SCA para lockfiles/dependencias.
 
 ### 2) Deploy
 Arquivo: `.github/workflows/deploy.yml`
@@ -195,7 +197,6 @@ Exemplos:
 
 Secrets:
 - `SONAR_TOKEN`
-- `SNYK_TOKEN`
 - `TOKEN_GITHUB_ADMIN`
 
 Vars:
