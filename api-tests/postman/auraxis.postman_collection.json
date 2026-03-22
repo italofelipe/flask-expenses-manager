@@ -4523,7 +4523,87 @@
           ]
         },
         {
-          "name": "04 - GraphQL installment vs cash calculate (public)",
+          "name": "04 - GraphQL forgot password stays neutral",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/graphql",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "graphql"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n                      \"query\": \"mutation ForgotPassword($email: String!) { forgotPassword(email: $email) { message } }\",\n                      \"variables\": {\n                        \"email\": \"unknown-user@email.com\"\n                      }\n                    }\n"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('graphql forgot password returns 200', function () { pm.response.to.have.status(200); });",
+                  "var body = pm.response.json();",
+                  "pm.test('graphql forgot password stays neutral', function () {",
+                  "  pm.expect(body.errors).to.eql(undefined);",
+                  "  pm.expect(body.data.forgotPassword.message).to.be.a('string').and.not.empty;",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "05 - GraphQL reset password invalid token is public validation error",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/graphql",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "graphql"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n                      \"query\": \"mutation ResetPassword($token: String!, $newPassword: String!) { resetPassword(token: $token, newPassword: $newPassword) { message } }\",\n                      \"variables\": {\n                        \"token\": \"invalid-token-value-with-sufficient-length-123456\",\n                        \"newPassword\": \"NovaSenha@123\"\n                      }\n                    }\n"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('graphql reset invalid token returns 200', function () { pm.response.to.have.status(200); });",
+                  "var body = pm.response.json();",
+                  "var firstErr = body.errors && body.errors[0] ? body.errors[0] : {};",
+                  "pm.test('graphql reset invalid token returns VALIDATION_ERROR', function () { pm.expect(firstErr.extensions.code).to.eql('VALIDATION_ERROR'); });"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "06 - GraphQL installment vs cash calculate (public)",
           "request": {
             "method": "POST",
             "header": [
@@ -4561,7 +4641,7 @@
           ]
         },
         {
-          "name": "05 - GraphQL installment vs cash save (auth required)",
+          "name": "07 - GraphQL installment vs cash save (auth required)",
           "request": {
             "method": "POST",
             "header": [
@@ -4598,6 +4678,237 @@
                   "pm.test('graphql installment save persists simulation', function () {",
                   "  pm.expect(body.errors).to.eql(undefined);",
                   "  pm.expect(body.data.saveInstallmentVsCashSimulation.simulation.saved).to.eql(true);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "08 - GraphQL transaction dashboard seed (auth required)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{authToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/graphql",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "graphql"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n                      \"query\": \"mutation SeedExpense($title: String!, $amount: String!, $dueDate: String!) { createTransaction(title: $title, amount: $amount, type: \\\"expense\\\", dueDate: $dueDate) { items { id title } } }\",\n                      \"variables\": {\n                        \"title\": \"Conta luz {{runSeed}}\",\n                        \"amount\": \"150.00\",\n                        \"dueDate\": \"{{runToday}}\"\n                      }\n                    }\n"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('graphql transaction seed returns 200', function () { pm.response.to.have.status(200); });",
+                  "var body = pm.response.json();",
+                  "pm.test('graphql transaction seed creates an item', function () {",
+                  "  pm.expect(body.errors).to.eql(undefined);",
+                  "  pm.expect(body.data.createTransaction.items[0].id).to.be.a('string').and.not.empty;",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "09 - GraphQL transaction summary and dashboard (auth required)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{authToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/graphql",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "graphql"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n                      \"query\": \"query GraphqlDashboard($month: String!, $initialDate: String!, $finalDate: String!) { transactionSummary(month: $month, page: 1, pageSize: 10) { month pagination { total } } transactionDashboard(month: $month) { month counts { totalTransactions } } transactionDueRange(initialDate: $initialDate, finalDate: $finalDate, page: 1, perPage: 10, orderBy: \\\"overdue_first\\\") { counts { totalTransactions } pagination { total } } }\",\n                      \"variables\": {\n                        \"month\": \"{{runMonthRef}}\",\n                        \"initialDate\": \"{{runYesterday}}\",\n                        \"finalDate\": \"{{runToday}}\"\n                      }\n                    }\n"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('graphql dashboard returns 200', function () { pm.response.to.have.status(200); });",
+                  "var body = pm.response.json();",
+                  "pm.test('graphql dashboard aggregates transaction data', function () {",
+                  "  pm.expect(body.errors).to.eql(undefined);",
+                  "  pm.expect(body.data.transactionSummary.month).to.eql(pm.collectionVariables.get('runMonthRef'));",
+                  "  pm.expect(body.data.transactionDashboard.month).to.eql(pm.collectionVariables.get('runMonthRef'));",
+                  "  pm.expect(body.data.transactionDueRange.counts.totalTransactions).to.be.at.least(1);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "10 - GraphQL wallet create (auth required)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{authToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/graphql",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "graphql"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n                      \"query\": \"mutation AddWalletEntry { addWalletEntry(name: \\\"Reserva {{runSeed}}\\\", value: 1000, registerDate: \\\"{{runToday}}\\\", shouldBeOnWallet: true) { item { id name assetClass } } }\"\n                    }\n"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('graphql wallet create returns 200', function () { pm.response.to.have.status(200); });",
+                  "var body = pm.response.json();",
+                  "var item = body.data.addWalletEntry.item;",
+                  "pm.collectionVariables.set('graphqlWalletId', item.id);",
+                  "pm.test('graphql wallet create stores investment id', function () {",
+                  "  pm.expect(body.errors).to.eql(undefined);",
+                  "  pm.expect(item.id).to.be.a('string').and.not.empty;",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "11 - GraphQL wallet list and valuation (auth required)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{authToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/graphql",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "graphql"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n                      \"query\": \"query WalletCoverage($investmentId: UUID!) { walletEntries(page: 1, perPage: 10) { pagination { total } items { id name shouldBeOnWallet } } investmentValuation(investmentId: $investmentId) { investmentId assetClass valuationSource } portfolioValuation { summary { totalInvestments } } }\",\n                      \"variables\": {\n                        \"investmentId\": \"{{graphqlWalletId}}\"\n                      }\n                    }\n"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('graphql wallet coverage returns 200', function () { pm.response.to.have.status(200); });",
+                  "var body = pm.response.json();",
+                  "pm.test('graphql wallet coverage returns canonical portfolio payload', function () {",
+                  "  pm.expect(body.errors).to.eql(undefined);",
+                  "  pm.expect(body.data.walletEntries.pagination.total).to.be.at.least(1);",
+                  "  pm.expect(body.data.investmentValuation.investmentId).to.eql(pm.collectionVariables.get('graphqlWalletId'));",
+                  "  pm.expect(body.data.portfolioValuation.summary.totalInvestments).to.be.at.least(1);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "12 - GraphQL logout mutation (auth required)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{authToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/graphql",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "graphql"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n                      \"query\": \"mutation Logout { logout { ok message } }\"\n                    }\n"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('graphql logout returns 200', function () { pm.response.to.have.status(200); });",
+                  "var body = pm.response.json();",
+                  "pm.test('graphql logout confirms success', function () {",
+                  "  pm.expect(body.errors).to.eql(undefined);",
+                  "  pm.expect(body.data.logout.ok).to.eql(true);",
                   "});"
                 ],
                 "type": "text/javascript"
@@ -4683,6 +4994,10 @@
     },
     {
       "key": "subscriptionId",
+      "value": ""
+    },
+    {
+      "key": "graphqlWalletId",
       "value": ""
     },
     {
