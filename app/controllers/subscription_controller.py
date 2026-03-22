@@ -17,6 +17,7 @@ from typing import Any
 from uuid import UUID
 
 from flask import Blueprint, current_app, jsonify, request
+from flask.ctx import has_app_context
 from flask.typing import ResponseReturnValue
 
 from app.auth import get_active_auth_context
@@ -166,7 +167,27 @@ def _read_bool_env(name: str, default: bool = False) -> bool:
 
 def _allow_unsigned_webhooks() -> bool:
     """Unsigned webhook traffic must be explicitly enabled per environment."""
-    return _read_bool_env(_WEBHOOK_ALLOW_UNSIGNED_ENV, default=False)
+    if not _read_bool_env(_WEBHOOK_ALLOW_UNSIGNED_ENV, default=False):
+        return False
+    if not has_app_context():
+        return False
+    if current_app.testing:
+        return True
+
+    runtime_env = (
+        str(
+            current_app.config.get("ENV")
+            or current_app.config.get("FLASK_ENV")
+            or current_app.config.get("APP_ENV")
+            or os.getenv("FLASK_ENV")
+            or os.getenv("APP_ENV")
+            or os.getenv("AURAXIS_ENV")
+            or ""
+        )
+        .strip()
+        .lower()
+    )
+    return runtime_env in {"local", "test"}
 
 
 def _verify_webhook_signature(payload: bytes, signature: str) -> bool:
