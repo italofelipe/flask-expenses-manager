@@ -43,10 +43,22 @@ Runner local (Newman):
 npm run postman:local
 ```
 
+Perfis oficiais:
+```bash
+npm run postman:smoke:local
+npm run postman:full:local
+```
+
 Runner com environment específico:
 ```bash
 ./scripts/run_postman_suite.sh ./api-tests/postman/environments/dev.postman_environment.json
 ./scripts/run_postman_suite.sh ./api-tests/postman/environments/prod.postman_environment.json
+```
+
+Runner com perfil explícito:
+```bash
+./scripts/run_postman_suite.sh ./api-tests/postman/environments/dev.postman_environment.json --profile smoke
+./scripts/run_postman_suite.sh ./api-tests/postman/environments/dev.postman_environment.json --profile full
 ```
 
 Fluxos privilegiados opcionais:
@@ -64,6 +76,10 @@ Cobertura canonica atual:
 - Wallet: create, list, update, history, valuation, operations CRUD, position, invested amount
 - Simulations: installment-vs-cash calculate/save e bridges com subset privilegiado opcional
 - GraphQL: validation, auth-safe errors, me, installment-vs-cash calculate/save
+
+Perfis da suíte:
+- `smoke`: subconjunto mínimo canônico de saúde funcional cross-domain
+- `full`: coleção completa REST + GraphQL
 
 ## Como a suíte está configurada
 - `pytest.ini` define padrão de descoberta dos testes.

@@ -4,6 +4,30 @@ import json
 import re
 from pathlib import Path
 
+SMOKE_REQUESTS = {
+    "01 - Healthz",
+    "02 - Register user (REST v2)",
+    "03 - Login user (REST v2)",
+    "04 - Login invalid credentials returns safe error",
+    "05 - Me (REST v2)",
+    "01 - Create transaction (REST v2)",
+    "04 - List active transactions (REST v2)",
+    "05 - Transaction summary by month (REST v2)",
+    "01 - Create goal (REST v2)",
+    "02 - List goals (REST v2)",
+    "05 - Goal simulate (REST v2)",
+    "01 - Create wallet investment (REST v2)",
+    "02 - List wallet investments (REST v2)",
+    "08 - Create wallet operation (REST v2)",
+    "10 - Wallet operation summary (REST v2)",
+    "01 - Installment vs cash calculate (REST public)",
+    "02 - Installment vs cash save (REST auth required)",
+    "03 - Simulation goal bridge without entitlement returns 403",
+    "02 - GraphQL login invalid credentials (safe error)",
+    "03 - GraphQL me query (auth required)",
+    "04 - GraphQL installment vs cash calculate (public)",
+}
+
 
 def _load_postman_items() -> list[dict[str, object]]:
     collection_path = (
@@ -131,3 +155,16 @@ def test_postman_collection_uses_domain_folders() -> None:
         "04 - Simulations",
         "05 - GraphQL",
     ]
+
+
+def test_postman_collection_request_names_are_unique() -> None:
+    items = _flatten_request_items(_load_postman_items())
+    names = [str(item.get("name")) for item in items]
+    assert len(names) == len(set(names)), "Postman request names must stay unique"
+
+
+def test_postman_collection_smoke_profile_covers_known_requests() -> None:
+    items = _flatten_request_items(_load_postman_items())
+    names = {str(item.get("name")) for item in items}
+    missing = sorted(SMOKE_REQUESTS - names)
+    assert not missing, f"Smoke profile references unknown requests: {missing}"

@@ -8,6 +8,29 @@ from typing import Any
 
 ROOT = Path(__file__).resolve().parents[1]
 COLLECTION_PATH = ROOT / "api-tests" / "postman" / "auraxis.postman_collection.json"
+SMOKE_REQUESTS = [
+    "01 - Healthz",
+    "02 - Register user (REST v2)",
+    "03 - Login user (REST v2)",
+    "04 - Login invalid credentials returns safe error",
+    "05 - Me (REST v2)",
+    "01 - Create transaction (REST v2)",
+    "04 - List active transactions (REST v2)",
+    "05 - Transaction summary by month (REST v2)",
+    "01 - Create goal (REST v2)",
+    "02 - List goals (REST v2)",
+    "05 - Goal simulate (REST v2)",
+    "01 - Create wallet investment (REST v2)",
+    "02 - List wallet investments (REST v2)",
+    "08 - Create wallet operation (REST v2)",
+    "10 - Wallet operation summary (REST v2)",
+    "01 - Installment vs cash calculate (REST public)",
+    "02 - Installment vs cash save (REST auth required)",
+    "03 - Simulation goal bridge without entitlement returns 403",
+    "02 - GraphQL login invalid credentials (safe error)",
+    "03 - GraphQL me query (auth required)",
+    "04 - GraphQL installment vs cash calculate (public)",
+]
 
 
 def _js(lines: list[str]) -> dict[str, Any]:
@@ -80,6 +103,22 @@ def _item(
 
 def _folder(name: str, items: list[dict[str, Any]]) -> dict[str, Any]:
     return {"name": name, "item": items}
+
+
+def _suite_profile_prerequest() -> list[str]:
+    smoke_json = json.dumps(SMOKE_REQUESTS, ensure_ascii=True)
+    return [
+        f"var smokeRequests = {smoke_json};",
+        "var activeProfile = String(pm.environment.get('suiteProfile') || pm.collectionVariables.get('suiteProfile') || 'full').toLowerCase();",
+        "if (!['smoke', 'full'].includes(activeProfile)) {",
+        "  throw new Error('Unsupported suiteProfile: ' + activeProfile + '. Use smoke or full.');",
+        "}",
+        "pm.collectionVariables.set('suiteProfile', activeProfile);",
+        "if (activeProfile === 'smoke' && !smokeRequests.includes(pm.info.requestName)) {",
+        "  console.log('Skipping request outside smoke profile:', pm.info.requestName);",
+        "  pm.execution.skipRequest();",
+        "}",
+    ]
 
 
 def _skip_if_privileged_flows_disabled() -> list[str]:
@@ -1464,6 +1503,9 @@ def build_collection() -> dict[str, Any]:
                 "Privileged flows are optional and gated by adminToken + enablePrivilegedFlows."
             ),
         },
+        "event": [
+            _prerequest_event(_suite_profile_prerequest()),
+        ],
         "item": [
             _folder("00 - Auth and User Bootstrap", auth_items),
             _folder("01 - Transactions", transaction_items),
@@ -1486,6 +1528,7 @@ def build_collection() -> dict[str, Any]:
             {"key": "advancedSimulationId", "value": ""},
             {"key": "feeSimulationId", "value": ""},
             {"key": "entitlementId", "value": ""},
+            {"key": "suiteProfile", "value": "full"},
         ],
     }
     return collection
