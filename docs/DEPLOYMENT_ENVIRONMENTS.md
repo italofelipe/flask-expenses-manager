@@ -36,6 +36,7 @@ docker compose -f docker-compose.dev.yml up --build
 - Exposes app on `localhost:80`.
 - Supports TLS with Certbot + Nginx (`443`) using shared challenge/certificate volumes.
 - Supports an ALB edge mode with TLS termination in ACM/ALB and HTTP-only origin on the instance (`EDGE_TLS_MODE=alb`).
+- Supports a transitional dual-edge mode for safe origin cutover (`EDGE_TLS_MODE=alb_dual`).
 
 ### Commands
 ```bash
@@ -65,6 +66,20 @@ Operational expectations:
 - target group forwards HTTP to the instance
 - Route 53 points `api.auraxis.com.br` to the ALB
 - host-level Certbot is no longer part of the public edge for that domain
+
+### ALB transitional cutover mode
+Use when moving a live environment from `HTTPS origin` to `HTTP origin` behind the ALB:
+
+```bash
+echo 'EDGE_TLS_MODE=alb_dual' >> .env.prod
+docker compose --env-file .env.prod -f docker-compose.prod.yml up -d --force-recreate reverse-proxy
+```
+
+Operational expectations:
+- requires an existing local certificate on the host
+- keeps `443` alive for the current ALB target group
+- exposes `80` at the same time so the new HTTP target group can warm up
+- after the ALB listener cutover is stable, switch the host from `alb_dual` to `alb`
 
 Detailed runbook:
 - `docs/RUNBOOK.md`

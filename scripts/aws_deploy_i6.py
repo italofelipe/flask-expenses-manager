@@ -475,6 +475,61 @@ CONF
   echo "[i6] bootstrapped deploy/nginx/default.alb.conf"
 fi
 
+if [ ! -f "deploy/nginx/default.alb_dual.conf" ]; then
+  mkdir -p deploy/nginx
+  cat > deploy/nginx/default.alb_dual.conf <<'CONF'
+server {{
+    listen 80;
+    server_name __DOMAIN__;
+
+    client_max_body_size 10m;
+
+    location / {{
+        proxy_pass http://web:8000;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Host $host;
+        proxy_set_header X-Forwarded-Port $http_x_forwarded_port;
+        proxy_set_header X-Forwarded-Proto $http_x_forwarded_proto;
+        proxy_set_header Connection "";
+    }}
+}}
+
+server {{
+    listen 443 ssl http2;
+    server_name __DOMAIN__;
+
+    ssl_certificate /etc/letsencrypt/live/__DOMAIN__/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/__DOMAIN__/privkey.pem;
+
+    ssl_protocols TLSv1.2 TLSv1.3;
+    ssl_prefer_server_ciphers off;
+    ssl_session_cache shared:SSL:10m;
+    ssl_session_timeout 1d;
+
+    add_header Strict-Transport-Security "max-age=31536000; includeSubDomains" always;
+    add_header X-Frame-Options "SAMEORIGIN" always;
+    add_header X-Content-Type-Options "nosniff" always;
+    add_header Referrer-Policy "strict-origin-when-cross-origin" always;
+
+    client_max_body_size 10m;
+
+    location / {{
+        proxy_pass http://web:8000;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_set_header Connection "";
+    }}
+}}
+CONF
+  echo "[i6] bootstrapped deploy/nginx/default.alb_dual.conf"
+fi
+
 if [ ! -f "scripts/ensure_tls_runtime.sh" ]; then
   mkdir -p scripts
   cat > scripts/ensure_tls_runtime.sh <<'SH'
@@ -484,6 +539,10 @@ set -eu
 # - EDGE_TLS_MODE=alb:
 #   - renders HTTP-only nginx config suitable for ALB TLS termination
 #   - skips local certificate issuance entirely
+# - EDGE_TLS_MODE=alb_dual:
+#   - transitional mode for safe cutover to ALB HTTP origins
+#   - requires an existing local certificate
+#   - serves HTTP:80 for the new ALB target group while keeping HTTPS:443 alive
 # - EDGE_TLS_MODE=instance_tls (default):
 #   - if cert exists for DOMAIN: renders TLS nginx config and recreates reverse-proxy
 #   - if cert does not exist:
@@ -531,6 +590,11 @@ render_alb_config() {{
     deploy/nginx/default.alb.conf > deploy/nginx/default.conf
 }}
 
+render_alb_dual_config() {{
+  sed "s/__DOMAIN__/${{DOMAIN}}/g" \\
+    deploy/nginx/default.alb_dual.conf > deploy/nginx/default.conf
+}}
+
 recreate_proxy() {{
   docker compose --env-file "$ENV_FILE" -f "$COMPOSE_FILE" \\
     up -d --force-recreate reverse-proxy
@@ -554,6 +618,16 @@ if [ "${{EDGE_TLS_MODE}}" = "alb" ]; then
   render_alb_config
   recreate_proxy
   exit 0
+fi
+
+if [ "${{EDGE_TLS_MODE}}" = "alb_dual" ]; then
+  if cert_exists; then
+    render_alb_dual_config
+    recreate_proxy
+    exit 0
+  fi
+  echo "[tls] EDGE_TLS_MODE=alb_dual requires an existing certificate for ${{DOMAIN}}."
+  exit 4
 fi
 
 if cert_exists; then
