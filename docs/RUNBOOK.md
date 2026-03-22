@@ -58,6 +58,16 @@ Rollback (para o ref anterior bem sucedido, por instancia):
 
 Notas:
 - O estado do deploy fica em `/var/lib/auraxis/deploy_state.json` na instancia.
+- O helper `scripts/aws_deploy_i6.py` agora pode materializar diagnostico de SSM no runner via `--diagnostics-json-path`.
+- No GitHub Actions, o workflow `deploy.yml` publica artifacts por ambiente:
+  - `deploy-dev-ssm-diagnostics`
+  - `deploy-prod-ssm-diagnostics`
+- Em caso de falha, o job summary do workflow passa a incluir:
+  - `command_id`
+  - `status`
+  - `status_details`
+  - `response_code`
+  - tail de `stdout`/`stderr` do `AWS-RunShellScript`
 - O workflow de deploy tambem executa smoke checks HTTP de REST + GraphQL apos cada deploy:
   - `GET /healthz`
   - `POST /graphql` com query vazia (espera `VALIDATION_ERROR`)
@@ -192,6 +202,23 @@ Para migracao segura de `HTTPS origin` para `HTTP origin` sem depender de timing
 - registrar e aquecer o target group `HTTP:80` ate ficar `healthy`
 - so entao trocar o listener do ALB para o target group HTTP
 - depois do cutover estavel, trocar o host para `EDGE_TLS_MODE=alb` e remover a dependencia do certificado local
+
+## Sonar no CI
+
+O job `SonarQube Cloud` continua bloqueante, mas agora ficou mais explicito quando a falha vem do
+gate customizado da Auraxis e nao do scan/quality gate padrao.
+
+Melhorias operacionais:
+- `scripts/sonar_enforce_ci.py` gera um relatorio estruturado da policy
+- o workflow `ci.yml` publica o artifact `sonar-policy-report`
+- o job summary passa a registrar:
+  - outcome do `quality gate`
+  - outcome do `custom policy`
+  - lista das regras que reprovaram o run
+
+Quando o scan/quality gate passarem e a policy customizada reprovar:
+- o summary mostra explicitamente que o job ficou vermelho por causa da policy Auraxis
+- o artifact `sonar-policy-report` traz os detalhes em JSON para triagem
 
 ## Backups PostgreSQL (S3) e Restore Drill
 
