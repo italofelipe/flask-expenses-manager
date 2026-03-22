@@ -30,7 +30,8 @@ def verify_password_with_timing_protection(
     """
 
     if password_hash:
-        return check_password_hash(password_hash, plain_password)
+        verified: bool = check_password_hash(password_hash, plain_password)
+        return verified
 
     _burn_hash_cycles(plain_password)
     return False
