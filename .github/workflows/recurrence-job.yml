@@ -5,6 +5,10 @@ on:
     - cron: "0 3 * * *"
   workflow_dispatch:
 
+concurrency:
+  group: recurrence-job-${{ github.ref }}
+  cancel-in-progress: false
+
 jobs:
   generate-recurring-transactions:
     name: Generate Recurring Transactions
@@ -46,25 +50,65 @@ jobs:
           script: |
             const runUrl = `https://github.com/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`;
             const now = new Date().toISOString();
+            const title = '🚨 [recurrence-job] Falha na geração de transações recorrentes';
+            const issueBody = [
+              '## Recurrence Job falhou',
+              '',
+              `**Última falha:** ${now}`,
+              `**Run:** ${runUrl}`,
+              '',
+              'O job agendado de geração de transações recorrentes falhou.',
+              'Verifique os logs do workflow e o estado do banco de dados de produção.',
+              '',
+              '### Ações sugeridas',
+              '- Revisar logs da execução no link acima',
+              '- Verificar conectividade com `RECURRENCE_DATABASE_URL`',
+              '- Executar `scripts/generate_recurring_transactions.py` manualmente se necessário',
+              '',
+              '_Issue criada automaticamente pelo GitHub Actions._',
+            ].join('\n');
+            const commentBody = [
+              'Nova falha detectada no recurrence job.',
+              '',
+              `- Data: ${now}`,
+              `- Run: ${runUrl}`,
+            ].join('\n');
+            const query = [
+              `repo:${context.repo.owner}/${context.repo.repo}`,
+              'is:issue',
+              'in:title',
+              `"${title}"`,
+            ].join(' ');
+            const search = await github.rest.search.issuesAndPullRequests({
+              q: query,
+              per_page: 10,
+            });
+            const matchingIssue = search.data.items.find(
+              (item) => item.title === title,
+            );
+
+            if (matchingIssue) {
+              if (matchingIssue.state === 'closed') {
+                await github.rest.issues.update({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  issue_number: matchingIssue.number,
+                  state: 'open',
+                });
+              }
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: matchingIssue.number,
+                body: commentBody,
+              });
+              return;
+            }
+
             await github.rest.issues.create({
               owner: context.repo.owner,
               repo: context.repo.repo,
-              title: `🚨 [recurrence-job] Falha na geração de transações recorrentes — ${now.slice(0,10)}`,
-              body: [
-                '## Recurrence Job falhou',
-                '',
-                `**Data:** ${now}`,
-                `**Run:** ${runUrl}`,
-                '',
-                'O job agendado de geração de transações recorrentes falhou.',
-                'Verifique os logs do workflow e o estado do banco de dados de produção.',
-                '',
-                '### Ações sugeridas',
-                '- Revisar logs da execução no link acima',
-                '- Verificar conectividade com `RECURRENCE_DATABASE_URL`',
-                '- Executar `scripts/generate_recurring_transactions.py` manualmente se necessário',
-                '',
-                '_Issue criada automaticamente pelo GitHub Actions._',
-              ].join('\n'),
+              title,
+              body: issueBody,
               labels: ['bug', 'ops'],
             });
