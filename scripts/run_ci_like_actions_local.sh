@@ -12,7 +12,8 @@ set -euo pipefail
 #   --help                show usage
 #
 # Notes:
-# - Trivy/Snyk jobs remain CI-native because they depend on runner secrets/tools.
+# - Trivy remains CI-native because image scanning depends on runner/container tooling.
+# - OSV-Scanner is reproducible locally through scripts/run_osv_scanner.sh.
 # - Use this script before push to reduce CI surprises.
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -143,6 +144,9 @@ run_core_pipeline() {
   else
     echo "[ci-like-local] step=security:gitleaks skipped (gitleaks not installed)"
   fi
+
+  echo "[ci-like-local] step=security:osv-scanner"
+  bash scripts/run_osv_scanner.sh
 
   echo "[ci-like-local] step=tests:pytest+coverage"
   "${PYTHON_BIN}" -m pytest -m "not schemathesis" \

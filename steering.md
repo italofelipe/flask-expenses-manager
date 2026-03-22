@@ -133,7 +133,7 @@ push/PR
  │    ├── api-smoke (Newman — smoke black-box oficial pré-merge)
  │    ├── mutation (Cosmic Ray — 0% survival)
  │    └── trivy (FS + image scan)
- │         └── snyk [se ENABLE_SNYK=true]
+ │    └── osv-scanner (lockfiles/dependency SCA open source)
  │
  ├── schemathesis (contract reliability)
  └── security-evidence
