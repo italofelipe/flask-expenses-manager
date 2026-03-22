@@ -7,10 +7,10 @@ from datetime import UTC, datetime
 from typing import Any, Dict, Optional
 
 import requests
-from flask import current_app, has_app_context
 from requests.exceptions import RequestException
 
 from app.extensions.integration_metrics import increment_metric
+from app.http.runtime import runtime_logger
 from config import Config
 
 
@@ -52,12 +52,11 @@ class InvestmentService:
     def _record_brapi_event(event: str, *, detail: str | None = None) -> None:
         metric_name = f"brapi.{event}"
         increment_metric(metric_name)
-        if has_app_context():
-            current_app.logger.warning(
-                "integration_event provider=brapi event=%s detail=%s",
-                event,
-                detail or "",
-            )
+        runtime_logger("auraxis.brapi").warning(
+            "integration_event provider=brapi event=%s detail=%s",
+            event,
+            detail or "",
+        )
 
     @staticmethod
     def _request_json(

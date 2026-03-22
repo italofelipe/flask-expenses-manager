@@ -21,6 +21,7 @@ from flask.ctx import has_app_context
 from flask.typing import ResponseReturnValue
 
 from app.auth import get_active_auth_context
+from app.controllers.response_contract import compat_error_response
 from app.extensions.database import db
 from app.http.request_context import current_request_id
 from app.models.subscription import Subscription, SubscriptionStatus
@@ -68,10 +69,20 @@ def _ok(data: dict[str, Any], status: int = 200) -> ResponseReturnValue:
     return jsonify({"success": True, "data": data}), status
 
 
-def _err(message: str, code: str, status: int) -> ResponseReturnValue:
-    return jsonify(
-        {"success": False, "error": {"code": code, "message": message}}
-    ), status
+def _err(
+    message: str,
+    code: str,
+    status: int,
+    *,
+    details: dict[str, Any] | None = None,
+) -> ResponseReturnValue:
+    return compat_error_response(
+        legacy_payload={"success": False, "error": {"code": code, "message": message}},
+        status_code=status,
+        message=message,
+        error_code=code,
+        details=details,
+    )
 
 
 def _get_provider() -> BillingProvider:
@@ -230,7 +241,12 @@ def handle_webhook() -> ResponseReturnValue:
             "Billing webhook invalid signature request_id=%s",
             current_request_id(),
         )
-        return _err("Invalid signature", "UNAUTHORIZED", 401)
+        return _err(
+            "Invalid signature",
+            "UNAUTHORIZED",
+            401,
+            details={"request_id": current_request_id()},
+        )
 
     payload: dict[str, Any] = request.get_json(silent=True) or {}
     event_type: str = payload.get("event", "")

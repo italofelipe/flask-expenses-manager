@@ -107,6 +107,24 @@ Perfis da suíte:
   e mantém fallback para PostgreSQL nos demais ambientes.
 - `tests/test_postman_collection_contract.py` trava a paridade entre a collection canônica e as rotas REST críticas do contrato.
 
+## Baseline de performance e orçamento de latência
+
+Snapshot do baseline local por rota crítica:
+```bash
+FLASK_APP=run.py ./scripts/repo_bin.sh flask integration-metrics latency-budget
+```
+
+Rotas críticas monitoradas no baseline:
+- `health.healthz` -> `GET /healthz` -> budget `100ms`
+- `auth.authresource` -> `POST /auth/login` -> budget `250ms`
+- `user.me` -> `GET /users/me` -> budget `250ms`
+- `graphql.execute_graphql` -> `POST /graphql` -> budget `400ms`
+
+Uso recomendado:
+- rodar Newman `smoke` ou os testes HTTP críticos
+- emitir o snapshot de latência logo depois
+- comparar `p50/p95` com o budget antes de fechar blocos sensíveis de performance
+
 ## Observações
 - A suite não depende de `.env.test`.
 - Cada teste roda com schema limpo (`create_all`/`drop_all`).

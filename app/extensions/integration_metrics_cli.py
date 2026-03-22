@@ -5,7 +5,11 @@ import json
 import click
 from flask import Flask
 
-from app.extensions.integration_metrics import reset_metrics, snapshot_metrics
+from app.extensions.integration_metrics import (
+    build_http_latency_budget_payload,
+    reset_metrics,
+    snapshot_metrics,
+)
 
 
 def register_integration_metrics_commands(app: Flask) -> None:
@@ -33,6 +37,19 @@ def register_integration_metrics_commands(app: Flask) -> None:
             "counters": counters,
             "total": sum(counters.values()),
         }
+        click.echo(json.dumps(payload, sort_keys=True))
+        if reset:
+            reset_metrics()
+
+    @integration_metrics_group.command("latency-budget")
+    @click.option(
+        "--reset",
+        is_flag=True,
+        default=False,
+        help="Reset counters and latency samples after emitting the report.",
+    )
+    def integration_metrics_latency_budget(reset: bool) -> None:
+        payload = build_http_latency_budget_payload()
         click.echo(json.dumps(payload, sort_keys=True))
         if reset:
             reset_metrics()

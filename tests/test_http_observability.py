@@ -5,6 +5,7 @@ import logging
 import pytest
 
 from app.extensions.integration_metrics import (
+    build_http_latency_budget_payload,
     build_http_observability_metrics_payload,
     reset_metrics_for_tests,
 )
@@ -60,3 +61,8 @@ def test_http_observability_logs_and_tracks_metrics(
     assert payload["summary"]["flask_requests"] >= 1
     assert payload["summary"]["anonymous"] >= 1
     assert payload["summary"]["duration_ms_total"] >= 0
+
+    latency_payload = build_http_latency_budget_payload()
+    health_route = latency_payload["routes"]["health.healthz"]
+    assert health_route["samples"] >= 1
+    assert health_route["budget_ms"] == 100
