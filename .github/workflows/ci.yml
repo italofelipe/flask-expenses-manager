@@ -208,6 +208,19 @@ jobs:
       - name: Run Postman smoke suite
         run: npm run postman:smoke:ci
 
+      - name: Summarize smoke release gate
+        if: always()
+        run: |
+          {
+            echo "## API release gate: smoke"
+            echo
+            echo "- Profile: \`smoke\`"
+            echo "- Purpose: fast pre-merge black-box validation across critical domains"
+            echo "- Policy: this gate must pass before the dedicated \`full\` integration gate starts"
+            echo "- Artifact: \`newman-smoke-report\` (\`reports/newman-smoke-report.xml\`)"
+            echo "- Canonical runner: \`scripts/run_postman_suite.sh --profile smoke\`"
+          } >> "$GITHUB_STEP_SUMMARY"
+
       - name: Upload Newman report
         if: always()
         uses: actions/upload-artifact@v4
@@ -226,7 +239,7 @@ jobs:
         run: docker compose down -v --remove-orphans
 
   api-integration:
-    name: API Integration (Postman/Newman Full)
+    name: API Release Gate (Postman/Newman Full)
     runs-on: ubuntu-latest
     needs: api-smoke
 
@@ -281,6 +294,19 @@ jobs:
 
       - name: Run Postman full integration suite
         run: npm run postman:full:ci
+
+      - name: Summarize full release gate
+        if: always()
+        run: |
+          {
+            echo "## API release gate: full"
+            echo
+            echo "- Profile: \`full\`"
+            echo "- Purpose: dedicated release-gate integration coverage for the canonical REST + GraphQL surface"
+            echo "- Policy: release readiness depends on \`smoke\` and \`full\` both passing; \`privileged\` remains manual and out of the common merge path"
+            echo "- Artifact: \`newman-full-report\` (\`reports/newman-full-report.xml\`)"
+            echo "- Canonical runner: \`scripts/run_postman_suite.sh --profile full\`"
+          } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Upload Newman full report
         if: always()

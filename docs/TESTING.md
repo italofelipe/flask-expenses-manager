@@ -94,7 +94,9 @@ Perfis da suíte:
 - `smoke`: subconjunto mínimo canônico de saúde funcional cross-domain
 - `full`: coleção completa REST + GraphQL não-privilegiada
 - `privileged`: bootstrap mínimo + fluxos admin/privilegiados que exigem `POSTMAN_ENABLE_PRIVILEGED_FLOWS=true` e `POSTMAN_ADMIN_TOKEN`
-- O CI roda `smoke` como gate rápido e `full` em job dedicado de integração com artifact separado
+- O CI trata `smoke` como gate oficial rápido de release/pre-merge
+- O CI trata `full` como gate oficial dedicado de release/integracao com artifact separado
+- readiness de merge/release exige `smoke` + `full` verdes no caminho comum
 - O perfil `privileged` roda em workflow manual separado, para evitar acoplamento do CI comum a token administrativo
 
 ## Como a suíte está configurada
@@ -110,4 +112,5 @@ Perfis da suíte:
 - Cada teste roda com schema limpo (`create_all`/`drop_all`).
 - Ao final de cada teste, a sessão SQLAlchemy é removida, o engine é `dispose()` e o arquivo SQLite temporário é limpo.
 - Newman e Postman sao a trilha oficial de validacao black-box da API; o smoke pós-deploy oficial continua em `scripts/http_smoke_check.py`.
+- No caminho comum de CI, a evidencia oficial de release da trilha black-box e publicada como artifacts separados: `newman-smoke-report` e `newman-full-report`.
 - O environment `prod` deve ser usado apenas com total consciencia de que a collection cria dados de teste reais via registro/login e recursos associados.
