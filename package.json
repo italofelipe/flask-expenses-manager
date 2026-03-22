@@ -15,6 +15,9 @@
     "postman:full:ci": "POSTMAN_REPORT_FILE=reports/newman-full-report.xml bash scripts/run_postman_suite.sh api-tests/postman/environments/local.postman_environment.json --profile full",
     "postman:full:dev": "bash scripts/run_postman_suite.sh api-tests/postman/environments/dev.postman_environment.json --profile full",
     "postman:full:prod": "bash scripts/run_postman_suite.sh api-tests/postman/environments/prod.postman_environment.json --profile full",
+    "postman:privileged:local": "POSTMAN_ENABLE_PRIVILEGED_FLOWS=true bash scripts/run_postman_suite.sh --profile privileged",
+    "postman:privileged:dev": "POSTMAN_ENABLE_PRIVILEGED_FLOWS=true bash scripts/run_postman_suite.sh api-tests/postman/environments/dev.postman_environment.json --profile privileged",
+    "postman:privileged:prod": "POSTMAN_ENABLE_PRIVILEGED_FLOWS=true bash scripts/run_postman_suite.sh api-tests/postman/environments/prod.postman_environment.json --profile privileged",
     "smoke:local": "bash scripts/run_postman_suite.sh",
     "smoke:ci": "bash scripts/run_postman_suite.sh api-tests/postman/environments/local.postman_environment.json"
   },
