@@ -1,9 +1,12 @@
 {
-  "name": "auraxis-api-smoke",
+  "name": "auraxis-api-postman-suite",
   "version": "1.0.0",
-  "description": "Newman smoke test runner for Auraxis API CI validation",
+  "description": "Canonical Postman/Newman E2E runner for Auraxis API",
   "private": true,
   "scripts": {
+    "postman:build": "python3 scripts/build_postman_collection.py",
+    "postman:local": "bash scripts/run_postman_suite.sh",
+    "postman:ci": "bash scripts/run_postman_suite.sh api-tests/postman/environments/local.postman_environment.json",
     "smoke:local": "bash scripts/run_postman_suite.sh",
     "smoke:ci": "bash scripts/run_postman_suite.sh api-tests/postman/environments/local.postman_environment.json"
   },
