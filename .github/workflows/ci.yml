@@ -459,47 +459,47 @@ jobs:
           SONAR_POLICY_REPORT_PATH: ${{ runner.temp }}/sonar-policy-report.json
         run: |
           python - <<'PY'
-import json
-import os
-from pathlib import Path
+          import json
+          import os
+          from pathlib import Path
 
-summary_path = os.environ["GITHUB_STEP_SUMMARY"]
-report_path = Path(os.environ["SONAR_POLICY_REPORT_PATH"])
-quality_gate_outcome = os.environ.get("SONAR_QUALITY_GATE_OUTCOME", "unknown")
-policy_outcome = os.environ.get("SONAR_POLICY_OUTCOME", "unknown")
+          summary_path = os.environ["GITHUB_STEP_SUMMARY"]
+          report_path = Path(os.environ["SONAR_POLICY_REPORT_PATH"])
+          quality_gate_outcome = os.environ.get("SONAR_QUALITY_GATE_OUTCOME", "unknown")
+          policy_outcome = os.environ.get("SONAR_POLICY_OUTCOME", "unknown")
 
-lines = [
-    "## Sonar Outcome",
-    "",
-    f"- Quality Gate step outcome: `{quality_gate_outcome}`",
-    f"- Custom policy step outcome: `{policy_outcome}`",
-]
+          lines = [
+              "## Sonar Outcome",
+              "",
+              f"- Quality Gate step outcome: `{quality_gate_outcome}`",
+              f"- Custom policy step outcome: `{policy_outcome}`",
+          ]
 
-if report_path.exists():
-    payload = json.loads(report_path.read_text(encoding="utf-8"))
-    errors = payload.get("errors", [])
-    lines.append("- Policy artifact: `sonar-policy-report`")
-    if quality_gate_outcome == "success" and policy_outcome == "failure":
-        lines.extend([
-            "",
-            "### Why the job is red",
-            "",
-            "The Sonar scan and quality gate completed, but the **custom Auraxis Sonar policy** rejected the run.",
-        ])
-    if errors:
-        lines.extend(["", "### Policy rejection details", ""])
-        lines.extend(f"- {error}" for error in errors)
-else:
-    lines.extend([
-        "",
-        "### Policy report unavailable",
-        "",
-        "- The custom policy report file was not generated.",
-    ])
+          if report_path.exists():
+              payload = json.loads(report_path.read_text(encoding="utf-8"))
+              errors = payload.get("errors", [])
+              lines.append("- Policy artifact: `sonar-policy-report`")
+              if quality_gate_outcome == "success" and policy_outcome == "failure":
+                  lines.extend([
+                      "",
+                      "### Why the job is red",
+                      "",
+                      "The Sonar scan and quality gate completed, but the **custom Auraxis Sonar policy** rejected the run.",
+                  ])
+              if errors:
+                  lines.extend(["", "### Policy rejection details", ""])
+                  lines.extend(f"- {error}" for error in errors)
+          else:
+              lines.extend([
+                  "",
+                  "### Policy report unavailable",
+                  "",
+                  "- The custom policy report file was not generated.",
+              ])
 
-with open(summary_path, "a", encoding="utf-8") as handle:
-    handle.write("\n".join(lines) + "\n")
-PY
+          with open(summary_path, "a", encoding="utf-8") as handle:
+              handle.write("\n".join(lines) + "\n")
+          PY
 
       - name: Fail on Sonar gate or policy rejection
         if: >-

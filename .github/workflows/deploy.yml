@@ -143,15 +143,15 @@ jobs:
             if [ -f "${{ runner.temp }}/deploy-dev-ssm-diagnostics.json" ]; then
               echo "- diagnostics artifact: \`deploy-dev-ssm-diagnostics\`"
               python - <<'PY' "${{ runner.temp }}/deploy-dev-ssm-diagnostics.json"
-import json
-import sys
+              import json
+              import sys
 
-payload = json.load(open(sys.argv[1], encoding="utf-8"))
-print(f"- SSM command id: `{payload.get('command_id', '')}`")
-print(f"- SSM status: `{payload.get('status', '')}`")
-print(f"- SSM status details: `{payload.get('status_details') or '<none>'}`")
-print(f"- SSM response code: `{payload.get('response_code')}`")
-PY
+              payload = json.load(open(sys.argv[1], encoding="utf-8"))
+              print(f"- SSM command id: `{payload.get('command_id', '')}`")
+              print(f"- SSM status: `{payload.get('status', '')}`")
+              print(f"- SSM status details: `{payload.get('status_details') or '<none>'}`")
+              print(f"- SSM response code: `{payload.get('response_code')}`")
+              PY
             fi
             echo "- ref resolution:"
             echo "  - event: \`${{ github.event_name }}\`"
@@ -280,15 +280,15 @@ PY
             if [ -f "${{ runner.temp }}/deploy-prod-ssm-diagnostics.json" ]; then
               echo "- diagnostics artifact: \`deploy-prod-ssm-diagnostics\`"
               python - <<'PY' "${{ runner.temp }}/deploy-prod-ssm-diagnostics.json"
-import json
-import sys
+              import json
+              import sys
 
-payload = json.load(open(sys.argv[1], encoding="utf-8"))
-print(f"- SSM command id: `{payload.get('command_id', '')}`")
-print(f"- SSM status: `{payload.get('status', '')}`")
-print(f"- SSM status details: `{payload.get('status_details') or '<none>'}`")
-print(f"- SSM response code: `{payload.get('response_code')}`")
-PY
+              payload = json.load(open(sys.argv[1], encoding="utf-8"))
+              print(f"- SSM command id: `{payload.get('command_id', '')}`")
+              print(f"- SSM status: `{payload.get('status', '')}`")
+              print(f"- SSM status details: `{payload.get('status_details') or '<none>'}`")
+              print(f"- SSM response code: `{payload.get('response_code')}`")
+              PY
             fi
             echo "- ref resolution:"
             echo "  - event: \`${{ github.event_name }}\`"
