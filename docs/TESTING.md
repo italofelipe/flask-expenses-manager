@@ -18,7 +18,7 @@ scripts/repo_bin.sh pytest
 scripts/repo_bin.sh pytest tests/test_response_contract.py
 ```
 
-## Suíte Postman / API Dog (Smoke + Regression)
+## Suite Postman / Newman (Canonica E2E + Smoke)
 
 Coleção versionada:
 - `api-tests/postman/auraxis.postman_collection.json`
@@ -33,9 +33,14 @@ Bootstrap do runner:
 npm ci
 ```
 
+Gerar/regravar a collection oficial:
+```bash
+npm run postman:build
+```
+
 Runner local (Newman):
 ```bash
-npm run smoke:local
+npm run postman:local
 ```
 
 Runner com environment específico:
@@ -44,13 +49,21 @@ Runner com environment específico:
 ./scripts/run_postman_suite.sh ./api-tests/postman/environments/prod.postman_environment.json
 ```
 
-Cobertura inicial da coleção:
-- `GET /healthz`
-- `POST /auth/register`
-- `POST /auth/login`
-- `GET /user/me` (autenticado)
-- `POST /graphql` login inválido (garante erro público seguro)
-- `POST /graphql` query `me` (autenticado)
+Fluxos privilegiados opcionais:
+```bash
+POSTMAN_ENABLE_PRIVILEGED_FLOWS=true \
+POSTMAN_ADMIN_TOKEN=<token-admin> \
+./scripts/run_postman_suite.sh ./api-tests/postman/environments/dev.postman_environment.json
+```
+
+Cobertura canonica atual:
+- Auth: register, login, logout, forgot/reset invalid token
+- User: me, profile, questionnaire
+- Transactions: create, update, list, summary, dashboard, expenses, due-range, delete/restore/force-delete
+- Goals: create, list, get, plan, simulate, update, delete
+- Wallet: create, list, update, history, valuation, operations CRUD, position, invested amount
+- Simulations: installment-vs-cash calculate/save e bridges com subset privilegiado opcional
+- GraphQL: validation, auth-safe errors, me, installment-vs-cash calculate/save
 
 ## Como a suíte está configurada
 - `pytest.ini` define padrão de descoberta dos testes.
@@ -58,9 +71,11 @@ Cobertura inicial da coleção:
 - `tests/conftest.py` isola variáveis de ambiente por teste e restaura o estado original ao final.
 - A aplicação usa `DATABASE_URL` quando definida (ambiente de teste),
   e mantém fallback para PostgreSQL nos demais ambientes.
+- `tests/test_postman_collection_contract.py` trava a paridade entre a collection canônica e as rotas REST críticas do contrato.
 
 ## Observações
-- A suíte não depende de `.env.test`.
+- A suite não depende de `.env.test`.
 - Cada teste roda com schema limpo (`create_all`/`drop_all`).
 - Ao final de cada teste, a sessão SQLAlchemy é removida, o engine é `dispose()` e o arquivo SQLite temporário é limpo.
-- Newman é a trilha oficial de smoke black-box pré-merge no CI; o smoke pós-deploy oficial fica em `scripts/http_smoke_check.py`.
+- Newman e Postman sao a trilha oficial de validacao black-box da API; o smoke pós-deploy oficial continua em `scripts/http_smoke_check.py`.
+- O environment `prod` deve ser usado apenas com total consciencia de que a collection cria dados de teste reais via registro/login e recursos associados.

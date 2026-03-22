@@ -1,15 +1,59 @@
 # postman
 
 ## Objetivo
-Suite de smoke/regressao REST + GraphQL para validacao rapida de saude funcional da API.
+Suite canonica black-box da API Auraxis para importacao direta no Postman e execucao automatizada com Newman.
 
-## Arquivos
-- `auraxis.postman_collection.json`: colecao principal.
-- `environments/local.postman_environment.json`: ambiente local.
-- `environments/dev.postman_environment.json`: ambiente DEV.
-- `environments/prod.postman_environment.json`: ambiente PROD.
+Ela cobre as superficies REST criticas por dominio e um smoke representativo de GraphQL. A colecao oficial fica em:
+- `api-tests/postman/auraxis.postman_collection.json`
 
-## Convencoes
-- Variaveis de ambiente devem manter nomes estaveis (`baseUrl`, `testPassword`, etc.).
-- Cenarios de erro GraphQL devem validar codigo publico e nao expor `INTERNAL_ERROR` para erros de credencial invalida.
-- Novas requests devem incluir assertions minimas de status e contrato.
+## Estrutura oficial
+- `00 - Auth and User Bootstrap`
+- `01 - Transactions`
+- `02 - Goals`
+- `03 - Wallet`
+- `04 - Simulations`
+- `05 - GraphQL`
+
+## Ambientes versionados
+- `environments/local.postman_environment.json`
+- `environments/dev.postman_environment.json`
+- `environments/prod.postman_environment.json`
+
+Os environments devem conter apenas valores seguros para versionamento:
+- `baseUrl`
+- `testPassword`
+- `testPasswordWrong`
+- `enablePrivilegedFlows`
+- `adminToken`
+
+## Regras operacionais
+- Existe uma unica collection canonica. Nao manter exports duplicados, mocks soltos ou snapshots antigos fora desta arvore.
+- Requests devem usar assertions minimas de status + contrato.
+- IDs e tokens devem ser encadeados por collection variables.
+- Fluxos privilegiados devem ser opcionais e gateados por `enablePrivilegedFlows=true` e `adminToken`.
+- O subset padrao que roda no CI deve continuar deterministico e seguro sem token administrativo.
+
+## Execucao
+Gerar/regravar a collection oficial:
+```bash
+npm run postman:build
+```
+
+Rodar localmente com Newman:
+```bash
+npm ci
+npm run postman:local
+```
+
+Rodar com outro environment:
+```bash
+./scripts/run_postman_suite.sh ./api-tests/postman/environments/dev.postman_environment.json
+./scripts/run_postman_suite.sh ./api-tests/postman/environments/prod.postman_environment.json
+```
+
+Rodar fluxos privilegiados:
+```bash
+POSTMAN_ENABLE_PRIVILEGED_FLOWS=true \
+POSTMAN_ADMIN_TOKEN=<token-admin> \
+./scripts/run_postman_suite.sh ./api-tests/postman/environments/dev.postman_environment.json
+```
