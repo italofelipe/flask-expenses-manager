@@ -152,7 +152,7 @@ jobs:
           path: pytest-report.xml
 
   api-smoke:
-    name: API Release Gate (Postman/Newman Smoke)
+    name: API Smoke (Postman/Newman)
     runs-on: ubuntu-latest
     needs: tests
 
