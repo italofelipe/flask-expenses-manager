@@ -54,6 +54,12 @@ npm run postman:smoke:local
 npm run postman:full:local
 ```
 
+Perfis oficiais do CI:
+```bash
+npm run postman:smoke:ci
+npm run postman:full:ci
+```
+
 Rodar com outro environment:
 ```bash
 ./scripts/run_postman_suite.sh ./api-tests/postman/environments/dev.postman_environment.json
@@ -72,3 +78,8 @@ POSTMAN_ENABLE_PRIVILEGED_FLOWS=true \
 POSTMAN_ADMIN_TOKEN=<token-admin> \
 ./scripts/run_postman_suite.sh ./api-tests/postman/environments/dev.postman_environment.json
 ```
+
+## Integracao CI
+- `smoke` continua sendo o gate rapido minimo para saude funcional cross-domain.
+- `full` roda em job dedicado de integracao, com report JUnit separado.
+- Ambos usam a mesma collection canonica; muda apenas o `suiteProfile`.

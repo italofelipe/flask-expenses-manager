@@ -18,6 +18,30 @@ is_supported_python() {
   [[ "$version" == "3.13" ]]
 }
 
+resolve_pyenv_python() {
+  local pyenv_bin="${PYENV_BIN:-pyenv}"
+  local version=""
+  local prefix=""
+
+  if ! command -v "$pyenv_bin" >/dev/null 2>&1; then
+    return 1
+  fi
+
+  version="$("$pyenv_bin" versions --bare 2>/dev/null | awk '/^3\.13(\.|$)/ { print; exit }')"
+  [[ -z "$version" ]] && return 1
+
+  prefix="$("$pyenv_bin" prefix "$version" 2>/dev/null || true)"
+  [[ -z "$prefix" ]] && return 1
+  [[ -x "${prefix}/bin/python" ]] || return 1
+
+  if is_supported_python "${prefix}/bin/python"; then
+    printf '%s\n' "${prefix}/bin/python"
+    return 0
+  fi
+
+  return 1
+}
+
 resolve_repo_python() {
   local root_dir="${1:?root_dir is required}"
   local configured="${PYTHON_BIN:-}"
@@ -64,6 +88,11 @@ resolve_repo_python() {
     return 1
   fi
 
+  if candidate="$(resolve_pyenv_python)"; then
+    printf '%s\n' "$candidate"
+    return 0
+  fi
+
   for candidate in "${AURAXIS_BOOTSTRAP_PYTHON:-python3.13}" python3.13 python3 python; do
     [[ -z "$candidate" ]] && continue
     if command -v "$candidate" >/dev/null 2>&1; then
@@ -75,7 +104,7 @@ resolve_repo_python() {
     fi
   done
 
-  echo "No supported Python interpreter found. Expected Python 3.13 in PATH." >&2
+  echo "No supported Python interpreter found. Expected Python 3.13 via PYTHON_BIN, .venv, VIRTUAL_ENV, pyenv, or PATH." >&2
   return 1
 }
 

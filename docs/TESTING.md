@@ -2,6 +2,7 @@
 
 ## Pré-requisitos
 - Python 3.13
+- Se `python3.13` nao estiver no `PATH`, os scripts oficiais tentam resolver uma instalacao `3.13.x` do `pyenv`
 
 ## Setup local
 ```bash
@@ -49,6 +50,12 @@ npm run postman:smoke:local
 npm run postman:full:local
 ```
 
+Perfis oficiais no CI:
+```bash
+npm run postman:smoke:ci
+npm run postman:full:ci
+```
+
 Runner com environment específico:
 ```bash
 ./scripts/run_postman_suite.sh ./api-tests/postman/environments/dev.postman_environment.json
@@ -80,6 +87,7 @@ Cobertura canonica atual:
 Perfis da suíte:
 - `smoke`: subconjunto mínimo canônico de saúde funcional cross-domain
 - `full`: coleção completa REST + GraphQL
+- O CI roda `smoke` como gate rápido e `full` em job dedicado de integração com artifact separado
 
 ## Como a suíte está configurada
 - `pytest.ini` define padrão de descoberta dos testes.

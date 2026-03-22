@@ -6,7 +6,7 @@ COLLECTION="${ROOT_DIR}/api-tests/postman/auraxis.postman_collection.json"
 ENV_FILE_DEFAULT="${ROOT_DIR}/api-tests/postman/environments/local.postman_environment.json"
 ENV_FILE="$ENV_FILE_DEFAULT"
 REPORT_DIR="${ROOT_DIR}/reports"
-REPORT_FILE="${REPORT_DIR}/newman-report.xml"
+REPORT_FILE="${POSTMAN_REPORT_FILE:-${REPORT_DIR}/newman-report.xml}"
 TEST_PASSWORD="${POSTMAN_TEST_PASSWORD:-StrongPass@123}"
 TEST_PASSWORD_WRONG="${POSTMAN_TEST_PASSWORD_WRONG:-WrongPass@123}"
 ENABLE_PRIVILEGED_FLOWS="${POSTMAN_ENABLE_PRIVILEGED_FLOWS:-false}"
@@ -84,6 +84,7 @@ mkdir -p "$REPORT_DIR"
 echo "[postman-suite] collection=$COLLECTION"
 echo "[postman-suite] environment=$ENV_FILE"
 echo "[postman-suite] profile=$SUITE_PROFILE"
+echo "[postman-suite] report=$REPORT_FILE"
 
 NEWMAN_ARGS=(
   run "$COLLECTION"
@@ -103,5 +104,3 @@ if [[ -n "$ADMIN_TOKEN" ]]; then
 fi
 
 npx --no-install newman "${NEWMAN_ARGS[@]}"
-
-echo "[postman-suite] report=$REPORT_FILE"

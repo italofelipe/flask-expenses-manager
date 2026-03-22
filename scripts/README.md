@@ -18,11 +18,14 @@ Scripts operacionais e de engenharia para CI/CD, seguranca, deploy, observabilid
 
 ## Uso recomendado
 - Bootstrap local portável: `bash scripts/bootstrap_local_env.sh`.
+- Se `python3.13` nao estiver no `PATH`, os wrappers oficiais tentam localizar uma instalacao `3.13.x` via `pyenv` antes de falhar.
 - Executar módulo Python com o interpreter da repo: `scripts/python_tool.sh <module> [args...]`.
 - Executar script Python com o interpreter da repo: `scripts/python_exec.sh <script.py> [args...]`.
 - Executar binário da `.venv` com fallback seguro: `scripts/repo_bin.sh <tool> [args...]`.
 - Antes de push: rodar `scripts/run_ci_like_actions_local.sh`.
 - Para smoke API pré-merge: `npm ci && scripts/run_postman_suite.sh`.
+- Para gate rapido canonico: `npm run postman:smoke:ci`.
+- Para integracao black-box completa: `npm run postman:full:ci`.
 - Para smoke HTTP pós-deploy (REST + GraphQL): `scripts/python_exec.sh scripts/http_smoke_check.py --base-url <url> --env-name <dev|prod>`.
 - Para contrato OpenAPI determinístico: `bash scripts/run_schemathesis_contract.sh`.
 - Para sinal de review Cursor Bugbot: `scripts/python_exec.sh scripts/pr_review_signal_check.py --repo <owner/repo> --pr-number <numero> --mode advisory`.
