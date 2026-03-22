@@ -24,10 +24,7 @@ def test_runtime_extension_roundtrip_inside_app_context() -> None:
 
     with app.app_context():
         assert runtime_extension("password_reset_outbox") is None
-        stored = set_runtime_extension(
-            "password_reset_outbox", [{"email": "a@test.com"}]
-        )
-        assert stored == [{"email": "a@test.com"}]
+        set_runtime_extension("password_reset_outbox", [{"email": "a@test.com"}])
         assert runtime_extension("password_reset_outbox") == [{"email": "a@test.com"}]
         assert runtime_debug_or_testing() is True
 

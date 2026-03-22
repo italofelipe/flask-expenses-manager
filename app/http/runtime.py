@@ -18,11 +18,10 @@ def runtime_extension(name: str, default: Any = None) -> Any:
     return current_app.extensions.get(name, default)
 
 
-def set_runtime_extension(name: str, value: Any) -> Any:
+def set_runtime_extension(name: str, value: Any) -> None:
     if not has_app_context():
-        return value
+        return
     current_app.extensions[name] = value
-    return value
 
 
 def runtime_logger(name: str = "auraxis.runtime") -> logging.Logger:
