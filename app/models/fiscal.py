@@ -23,6 +23,10 @@ from app.extensions.database import db
 from app.utils.datetime_utils import utc_now_naive
 
 
+def _enum_values(enum_cls: type[enum.Enum]) -> list[str]:
+    return [str(item.value) for item in enum_cls]
+
+
 class FiscalImportStatus(enum.Enum):
     PROCESSING = "processing"
     PREVIEW_READY = "preview_ready"
@@ -72,7 +76,7 @@ class FiscalImport(db.Model):
         UUID(as_uuid=True), db.ForeignKey("users.id"), nullable=False, index=True
     )
     status = db.Column(
-        db.Enum(FiscalImportStatus),
+        db.Enum(FiscalImportStatus, values_callable=_enum_values),
         nullable=False,
         default=FiscalImportStatus.PROCESSING,
     )
@@ -107,9 +111,11 @@ class FiscalDocument(db.Model):
         UUID(as_uuid=True), db.ForeignKey("fiscal_imports.id"), nullable=True
     )
     external_id = db.Column(db.String(120), nullable=False)
-    type = db.Column(db.Enum(FiscalDocumentType), nullable=False)
+    type = db.Column(
+        db.Enum(FiscalDocumentType, values_callable=_enum_values), nullable=False
+    )
     status = db.Column(
-        db.Enum(FiscalDocumentStatus),
+        db.Enum(FiscalDocumentStatus, values_callable=_enum_values),
         nullable=False,
         default=FiscalDocumentStatus.ISSUED,
     )
@@ -173,7 +179,7 @@ class ReceivableEntry(db.Model):
     # outstanding_amount = expected_net_amount - received_amount (calculated in app)
     outstanding_amount = db.Column(db.Numeric(14, 2), nullable=True)
     reconciliation_status = db.Column(
-        db.Enum(ReconciliationStatus),
+        db.Enum(ReconciliationStatus, values_callable=_enum_values),
         nullable=False,
         default=ReconciliationStatus.PENDING,
     )
@@ -212,7 +218,9 @@ class FiscalAdjustment(db.Model):
         index=True,
     )
     user_id = db.Column(UUID(as_uuid=True), db.ForeignKey("users.id"), nullable=False)
-    type = db.Column(db.Enum(FiscalAdjustmentType), nullable=False)
+    type = db.Column(
+        db.Enum(FiscalAdjustmentType, values_callable=_enum_values), nullable=False
+    )
     description = db.Column(db.String(300), nullable=False)
     amount = db.Column(db.Numeric(14, 2), nullable=False)
     # "gross" | "net"

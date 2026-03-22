@@ -12,6 +12,10 @@ from app.extensions.database import db
 from app.utils.datetime_utils import utc_now_naive
 
 
+def _enum_values(enum_cls: type[enum.Enum]) -> list[str]:
+    return [str(item.value) for item in enum_cls]
+
+
 class SharedEntryStatus(enum.Enum):
     PENDING = "pending"
     ACTIVE = "active"
@@ -53,11 +57,13 @@ class SharedEntry(db.Model):
         index=True,
     )
     status = db.Column(
-        db.Enum(SharedEntryStatus),
+        db.Enum(SharedEntryStatus, values_callable=_enum_values),
         nullable=False,
         default=SharedEntryStatus.PENDING,
     )
-    split_type = db.Column(db.Enum(SplitType), nullable=False)
+    split_type = db.Column(
+        db.Enum(SplitType, values_callable=_enum_values), nullable=False
+    )
     created_at = db.Column(db.DateTime, nullable=False, default=utc_now_naive)
     updated_at = db.Column(
         db.DateTime, nullable=False, default=utc_now_naive, onupdate=utc_now_naive
@@ -94,7 +100,7 @@ class Invitation(db.Model):
     share_amount = db.Column(db.Numeric(12, 2), nullable=True)
     message = db.Column(db.String(300), nullable=True)
     status = db.Column(
-        db.Enum(InvitationStatus),
+        db.Enum(InvitationStatus, values_callable=_enum_values),
         nullable=False,
         default=InvitationStatus.PENDING,
     )
