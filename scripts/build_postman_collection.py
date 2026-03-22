@@ -30,6 +30,11 @@ SMOKE_REQUESTS = [
     "02 - GraphQL login invalid credentials (safe error)",
     "03 - GraphQL me query (auth required)",
     "04 - GraphQL installment vs cash calculate (public)",
+    "01 - List alert preferences (REST v2)",
+    "01 - Get my subscription (REST v2)",
+    "01 - List entitlements (REST v2)",
+    "01 - List shared entries by me (REST v2)",
+    "01 - CSV upload preview (REST v2)",
 ]
 
 
@@ -158,7 +163,9 @@ def _bootstrap_prerequest() -> list[str]:
         "pm.collectionVariables.set('runIn365Days', isoDate(365));",
         "pm.collectionVariables.set('runMonthRef', isoMonth(0));",
         "pm.collectionVariables.set('graphSimulationLabel', 'Notebook ' + seed);",
-        "['authToken', 'userId', 'transactionId', 'goalId', 'investmentId', 'operationId', 'simulationId', 'advancedSimulationId', 'feeSimulationId', 'entitlementId'].forEach(function (key) { pm.collectionVariables.unset(key); });",
+        "pm.collectionVariables.set('fakeUuid', '00000000-0000-4000-8000-000000000001');",
+        "pm.collectionVariables.set('nonexistentInvitationToken', 'nonexistent-token-' + seed);",
+        "['authToken', 'userId', 'transactionId', 'goalId', 'investmentId', 'operationId', 'simulationId', 'advancedSimulationId', 'feeSimulationId', 'entitlementId', 'receivableId', 'fiscalDocumentId', 'sharedEntryId', 'invitationId', 'subscriptionId'].forEach(function (key) { pm.collectionVariables.unset(key); });",
     ]
 
 
@@ -1377,6 +1384,469 @@ def build_collection() -> dict[str, Any]:
         ),
     ]
 
+    alert_items = [
+        _item(
+            "01 - List alert preferences (REST v2)",
+            _request(
+                method="GET",
+                raw_url="{{baseUrl}}/alerts/preferences",
+                headers=auth_contract_headers,
+            ),
+            test_lines=[
+                "pm.test('alert preferences returns 200', function () { pm.response.to.have.status(200); });",
+                "var body = pm.response.json();",
+                "pm.test('alert preferences returns list payload', function () {",
+                "  pm.expect(body.success).to.eql(true);",
+                "  pm.expect(body.data.preferences).to.be.an('array');",
+                "});",
+            ],
+        ),
+        _item(
+            "02 - Update alert preference (REST v2)",
+            _request(
+                method="PUT",
+                raw_url="{{baseUrl}}/alerts/preferences/system",
+                headers=auth_json_headers,
+                body=_json_body(
+                    """
+                    {
+                      "enabled": true,
+                      "channels": ["in_app"],
+                      "global_opt_out": false
+                    }
+                    """
+                ),
+            ),
+            test_lines=[
+                "pm.test('alert preference update returns 200', function () { pm.response.to.have.status(200); });",
+                "var body = pm.response.json();",
+                "pm.test('alert preference update returns preference payload', function () {",
+                "  pm.expect(body.success).to.eql(true);",
+                "  pm.expect(body.data.preference.category).to.eql('system');",
+                "});",
+            ],
+        ),
+        _item(
+            "03 - List alerts (REST v2)",
+            _request(
+                method="GET",
+                raw_url="{{baseUrl}}/alerts?unread_only=false",
+                headers=auth_contract_headers,
+                query=[("unread_only", "false")],
+            ),
+            test_lines=[
+                "pm.test('alerts list returns 200', function () { pm.response.to.have.status(200); });",
+                "var body = pm.response.json();",
+                "pm.test('alerts list returns alerts array', function () {",
+                "  pm.expect(body.success).to.eql(true);",
+                "  pm.expect(body.data.alerts).to.be.an('array');",
+                "});",
+            ],
+        ),
+        _item(
+            "04 - Mark alert as read for nonexistent id returns 404",
+            _request(
+                method="POST",
+                raw_url="{{baseUrl}}/alerts/{{fakeUuid}}/read",
+                headers=auth_contract_headers,
+            ),
+            test_lines=[
+                "pm.test('alert read missing id returns 404', function () { pm.response.to.have.status(404); });",
+            ],
+        ),
+        _item(
+            "05 - Delete alert for nonexistent id returns 404",
+            _request(
+                method="DELETE",
+                raw_url="{{baseUrl}}/alerts/{{fakeUuid}}",
+                headers=auth_contract_headers,
+            ),
+            test_lines=[
+                "pm.test('alert delete missing id returns 404', function () { pm.response.to.have.status(404); });",
+            ],
+        ),
+    ]
+
+    subscription_items = [
+        _item(
+            "01 - Get my subscription (REST v2)",
+            _request(
+                method="GET",
+                raw_url="{{baseUrl}}/subscriptions/me",
+                headers=auth_contract_headers,
+            ),
+            test_lines=[
+                "pm.test('subscription me returns 200', function () { pm.response.to.have.status(200); });",
+                "var body = pm.response.json();",
+                "pm.test('subscription me returns subscription payload', function () {",
+                "  pm.expect(body.success).to.eql(true);",
+                "  pm.expect(body.data.subscription.id).to.be.a('string').and.not.empty;",
+                "});",
+                "pm.collectionVariables.set('subscriptionId', pm.response.json().data.subscription.id);",
+            ],
+        ),
+        _item(
+            "02 - Create checkout session (REST v2)",
+            _request(
+                method="POST",
+                raw_url="{{baseUrl}}/subscriptions/checkout",
+                headers=auth_json_headers,
+                body=_json_body(
+                    """
+                    {
+                      "plan_slug": "pro_monthly"
+                    }
+                    """
+                ),
+            ),
+            test_lines=[
+                "pm.test('subscription checkout returns 201', function () { pm.response.to.have.status(201); });",
+                "var body = pm.response.json();",
+                "pm.test('subscription checkout returns checkout url', function () {",
+                "  pm.expect(body.success).to.eql(true);",
+                "  pm.expect(body.data.checkout_url).to.be.a('string').and.not.empty;",
+                "});",
+            ],
+        ),
+        _item(
+            "03 - Cancel subscription (REST v2)",
+            _request(
+                method="POST",
+                raw_url="{{baseUrl}}/subscriptions/cancel",
+                headers=auth_contract_headers,
+            ),
+            test_lines=[
+                "pm.test('subscription cancel returns 200', function () { pm.response.to.have.status(200); });",
+                "var body = pm.response.json();",
+                "pm.test('subscription cancel returns canceled status', function () {",
+                "  pm.expect(body.success).to.eql(true);",
+                "  pm.expect(body.data.subscription.status).to.eql('canceled');",
+                "});",
+            ],
+        ),
+        _item(
+            "04 - Webhook invalid signature returns 401",
+            _request(
+                method="POST",
+                raw_url="{{baseUrl}}/subscriptions/webhook",
+                headers=_headers(
+                    ("Content-Type", "application/json"),
+                    ("X-Billing-Signature", "invalid-signature"),
+                ),
+                body=_json_body(
+                    """
+                    {
+                      "event": "subscription.activated",
+                      "subscription_id": "sub_fake"
+                    }
+                    """
+                ),
+            ),
+            test_lines=[
+                "pm.test('subscription webhook invalid signature returns 401', function () { pm.response.to.have.status(401); });",
+            ],
+        ),
+    ]
+
+    entitlement_items = [
+        _item(
+            "01 - List entitlements (REST v2)",
+            _request(
+                method="GET",
+                raw_url="{{baseUrl}}/entitlements",
+                headers=auth_contract_headers,
+            ),
+            test_lines=[
+                "pm.test('entitlements list returns 200', function () { pm.response.to.have.status(200); });",
+                "var body = pm.response.json();",
+                "pm.test('entitlements list returns items array', function () {",
+                "  pm.expect(body.success).to.eql(true);",
+                "  pm.expect(body.data.items).to.be.an('array');",
+                "});",
+            ],
+        ),
+        _item(
+            "02 - Check entitlement missing feature key returns 400",
+            _request(
+                method="GET",
+                raw_url="{{baseUrl}}/entitlements/check",
+                headers=auth_contract_headers,
+            ),
+            test_lines=[
+                "pm.test('entitlement check missing feature key returns 400', function () { pm.response.to.have.status(400); });",
+            ],
+        ),
+    ]
+
+    shared_entries_items = [
+        _item(
+            "01 - List shared entries by me (REST v2)",
+            _request(
+                method="GET",
+                raw_url="{{baseUrl}}/shared-entries/by-me",
+                headers=auth_contract_headers,
+            ),
+            test_lines=[
+                "pm.test('shared entries by me returns 200', function () { pm.response.to.have.status(200); });",
+                "pm.test('shared entries by me returns array', function () { pm.expect(pm.response.json().shared_entries).to.be.an('array'); });",
+            ],
+        ),
+        _item(
+            "02 - List shared entries with me (REST v2)",
+            _request(
+                method="GET",
+                raw_url="{{baseUrl}}/shared-entries/with-me",
+                headers=auth_contract_headers,
+            ),
+            test_lines=[
+                "pm.test('shared entries with me returns 200', function () { pm.response.to.have.status(200); });",
+                "pm.test('shared entries with me returns array', function () { pm.expect(pm.response.json().shared_entries).to.be.an('array'); });",
+            ],
+        ),
+        _item(
+            "03 - Create shared entry missing fields returns 400",
+            _request(
+                method="POST",
+                raw_url="{{baseUrl}}/shared-entries",
+                headers=auth_json_headers,
+                body=_json_body("{}"),
+            ),
+            test_lines=[
+                "pm.test('shared entry missing fields returns 400', function () { pm.response.to.have.status(400); });",
+            ],
+        ),
+        _item(
+            "04 - List invitations (REST v2)",
+            _request(
+                method="GET",
+                raw_url="{{baseUrl}}/shared-entries/invitations",
+                headers=auth_contract_headers,
+            ),
+            test_lines=[
+                "pm.test('shared invitations list returns 200', function () { pm.response.to.have.status(200); });",
+                "pm.test('shared invitations list returns array', function () { pm.expect(pm.response.json().invitations).to.be.an('array'); });",
+            ],
+        ),
+        _item(
+            "05 - Create invitation missing fields returns 400",
+            _request(
+                method="POST",
+                raw_url="{{baseUrl}}/shared-entries/invitations",
+                headers=auth_json_headers,
+                body=_json_body("{}"),
+            ),
+            test_lines=[
+                "pm.test('shared invitation missing fields returns 400', function () { pm.response.to.have.status(400); });",
+            ],
+        ),
+        _item(
+            "06 - Accept nonexistent invitation returns 404",
+            _request(
+                method="POST",
+                raw_url="{{baseUrl}}/shared-entries/invitations/{{nonexistentInvitationToken}}/accept",
+                headers=auth_contract_headers,
+            ),
+            test_lines=[
+                "pm.test('shared invitation accept missing token returns 404', function () { pm.response.to.have.status(404); });",
+            ],
+        ),
+        _item(
+            "07 - Delete nonexistent shared entry returns 404",
+            _request(
+                method="DELETE",
+                raw_url="{{baseUrl}}/shared-entries/{{fakeUuid}}",
+                headers=auth_contract_headers,
+            ),
+            test_lines=[
+                "pm.test('shared entry delete missing id returns 404', function () { pm.response.to.have.status(404); });",
+            ],
+        ),
+        _item(
+            "08 - Delete nonexistent invitation returns 404",
+            _request(
+                method="DELETE",
+                raw_url="{{baseUrl}}/shared-entries/invitations/{{fakeUuid}}",
+                headers=auth_contract_headers,
+            ),
+            test_lines=[
+                "pm.test('shared invitation delete missing id returns 404', function () { pm.response.to.have.status(404); });",
+            ],
+        ),
+    ]
+
+    fiscal_items = [
+        _item(
+            "01 - CSV upload preview (REST v2)",
+            _request(
+                method="POST",
+                raw_url="{{baseUrl}}/fiscal/csv/upload",
+                headers=auth_json_headers,
+                body=_json_body(
+                    """
+                    {
+                      "content": "description,amount,date,category,external_id\\nConsultoria,1500.00,2026-03-22,consulting,ext-{{runSeed}}\\nLicenca,900.00,2026-03-23,software,ext2-{{runSeed}}",
+                      "column_map": {
+                        "description": "description",
+                        "amount": "amount",
+                        "date": "date",
+                        "category": "category",
+                        "external_id": "external_id"
+                      }
+                    }
+                    """
+                ),
+            ),
+            test_lines=[
+                "pm.test('fiscal csv upload returns 200', function () { pm.response.to.have.status(200); });",
+                "var body = pm.response.json();",
+                "pm.test('fiscal csv upload returns preview rows', function () { pm.expect(body.data.preview || body.preview).to.be.an('array'); });",
+            ],
+        ),
+        _item(
+            "02 - CSV confirm import (REST v2)",
+            _request(
+                method="POST",
+                raw_url="{{baseUrl}}/fiscal/csv/confirm",
+                headers=auth_json_headers,
+                body=_json_body(
+                    """
+                    {
+                      "content": "description,amount,date,category,external_id\\nConsultoria,1500.00,2026-03-22,consulting,ext-{{runSeed}}\\nLicenca,900.00,2026-03-23,software,ext2-{{runSeed}}",
+                      "column_map": {
+                        "description": "description",
+                        "amount": "amount",
+                        "date": "date",
+                        "category": "category",
+                        "external_id": "external_id"
+                      }
+                    }
+                    """
+                ),
+            ),
+            test_lines=[
+                "pm.test('fiscal csv confirm returns 201', function () { pm.response.to.have.status(201); });",
+            ],
+        ),
+        _item(
+            "03 - List receivables (REST v2)",
+            _request(
+                method="GET",
+                raw_url="{{baseUrl}}/fiscal/receivables",
+                headers=auth_contract_headers,
+            ),
+            test_lines=[
+                "pm.test('fiscal receivables list returns 200', function () { pm.response.to.have.status(200); });",
+                "var body = pm.response.json();",
+                "var items = body.data ? body.data.receivables : body.receivables;",
+                "pm.test('fiscal receivables list returns items array', function () { pm.expect(items).to.be.an('array'); });",
+                "if (items.length > 0) { pm.collectionVariables.set('receivableId', items[0].id); }",
+            ],
+        ),
+        _item(
+            "04 - Create manual receivable (REST v2)",
+            _request(
+                method="POST",
+                raw_url="{{baseUrl}}/fiscal/receivables",
+                headers=auth_json_headers,
+                body=_json_body(
+                    """
+                    {
+                      "description": "Servico extra {{runSeed}}",
+                      "amount": "2500.00",
+                      "expected_date": "{{runTomorrow}}",
+                      "category": "consulting"
+                    }
+                    """
+                ),
+            ),
+            test_lines=[
+                "pm.test('fiscal receivable create returns 201', function () { pm.response.to.have.status(201); });",
+                "var body = pm.response.json();",
+                "var receivable = body.data ? body.data.receivable : body.receivable;",
+                "pm.collectionVariables.set('receivableId', receivable.id);",
+                "pm.test('fiscal receivable create returns id', function () { pm.expect(receivable.id).to.be.a('string').and.not.empty; });",
+            ],
+        ),
+        _item(
+            "05 - Mark receivable as received (REST v2)",
+            _request(
+                method="PATCH",
+                raw_url="{{baseUrl}}/fiscal/receivables/{{receivableId}}/receive",
+                headers=auth_json_headers,
+                body=_json_body(
+                    """
+                    {
+                      "received_date": "{{runToday}}",
+                      "received_amount": "2500.00"
+                    }
+                    """
+                ),
+            ),
+            test_lines=[
+                "pm.test('fiscal receivable receive returns 200', function () { pm.response.to.have.status(200); });",
+            ],
+        ),
+        _item(
+            "06 - Receivables summary (REST v2)",
+            _request(
+                method="GET",
+                raw_url="{{baseUrl}}/fiscal/receivables/summary",
+                headers=auth_contract_headers,
+            ),
+            test_lines=[
+                "pm.test('fiscal receivables summary returns 200', function () { pm.response.to.have.status(200); });",
+            ],
+        ),
+        _item(
+            "07 - Delete settled receivable returns 409",
+            _request(
+                method="DELETE",
+                raw_url="{{baseUrl}}/fiscal/receivables/{{receivableId}}",
+                headers=auth_contract_headers,
+            ),
+            test_lines=[
+                "pm.test('fiscal receivable delete settled returns 409', function () { pm.response.to.have.status(409); });",
+            ],
+        ),
+        _item(
+            "08 - List fiscal documents (REST v2)",
+            _request(
+                method="GET",
+                raw_url="{{baseUrl}}/fiscal/fiscal-documents",
+                headers=auth_contract_headers,
+            ),
+            test_lines=[
+                "pm.test('fiscal documents list returns 200', function () { pm.response.to.have.status(200); });",
+            ],
+        ),
+        _item(
+            "09 - Create fiscal document (REST v2)",
+            _request(
+                method="POST",
+                raw_url="{{baseUrl}}/fiscal/fiscal-documents",
+                headers=auth_json_headers,
+                body=_json_body(
+                    """
+                    {
+                      "type": "service_invoice",
+                      "amount": "1999.90",
+                      "issued_at": "{{runToday}}",
+                      "counterpart_name": "Cliente {{runSeed}}",
+                      "external_id": "invoice-{{runSeed}}"
+                    }
+                    """
+                ),
+            ),
+            test_lines=[
+                "pm.test('fiscal document create returns 201', function () { pm.response.to.have.status(201); });",
+                "var body = pm.response.json();",
+                "var doc = body.data ? body.data.fiscal_document : body.fiscal_document;",
+                "pm.collectionVariables.set('fiscalDocumentId', doc.id);",
+                "pm.test('fiscal document create returns id', function () { pm.expect(doc.id).to.be.a('string').and.not.empty; });",
+            ],
+        ),
+    ]
+
     graphql_items = [
         _item(
             "01 - GraphQL empty query (validation error)",
@@ -1512,7 +1982,14 @@ def build_collection() -> dict[str, Any]:
             _folder("02 - Goals", goal_items),
             _folder("03 - Wallet", wallet_items),
             _folder("04 - Simulations", simulation_items),
-            _folder("05 - GraphQL", graphql_items),
+            _folder("05 - Alerts", alert_items),
+            _folder(
+                "06 - Subscriptions and Entitlements",
+                subscription_items + entitlement_items,
+            ),
+            _folder("07 - Shared Entries", shared_entries_items),
+            _folder("08 - Fiscal", fiscal_items),
+            _folder("09 - GraphQL", graphql_items),
         ],
         "variable": [
             {"key": "runSeed", "value": ""},
@@ -1528,6 +2005,13 @@ def build_collection() -> dict[str, Any]:
             {"key": "advancedSimulationId", "value": ""},
             {"key": "feeSimulationId", "value": ""},
             {"key": "entitlementId", "value": ""},
+            {"key": "receivableId", "value": ""},
+            {"key": "fiscalDocumentId", "value": ""},
+            {"key": "sharedEntryId", "value": ""},
+            {"key": "invitationId", "value": ""},
+            {"key": "subscriptionId", "value": ""},
+            {"key": "fakeUuid", "value": "00000000-0000-4000-8000-000000000001"},
+            {"key": "nonexistentInvitationToken", "value": ""},
             {"key": "suiteProfile", "value": "full"},
         ],
     }

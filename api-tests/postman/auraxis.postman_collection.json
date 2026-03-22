@@ -10,7 +10,7 @@
       "listen": "prerequest",
       "script": {
         "exec": [
-          "var smokeRequests = [\"01 - Healthz\", \"02 - Register user (REST v2)\", \"03 - Login user (REST v2)\", \"04 - Login invalid credentials returns safe error\", \"05 - Me (REST v2)\", \"01 - Create transaction (REST v2)\", \"04 - List active transactions (REST v2)\", \"05 - Transaction summary by month (REST v2)\", \"01 - Create goal (REST v2)\", \"02 - List goals (REST v2)\", \"05 - Goal simulate (REST v2)\", \"01 - Create wallet investment (REST v2)\", \"02 - List wallet investments (REST v2)\", \"08 - Create wallet operation (REST v2)\", \"10 - Wallet operation summary (REST v2)\", \"01 - Installment vs cash calculate (REST public)\", \"02 - Installment vs cash save (REST auth required)\", \"03 - Simulation goal bridge without entitlement returns 403\", \"02 - GraphQL login invalid credentials (safe error)\", \"03 - GraphQL me query (auth required)\", \"04 - GraphQL installment vs cash calculate (public)\"];",
+          "var smokeRequests = [\"01 - Healthz\", \"02 - Register user (REST v2)\", \"03 - Login user (REST v2)\", \"04 - Login invalid credentials returns safe error\", \"05 - Me (REST v2)\", \"01 - Create transaction (REST v2)\", \"04 - List active transactions (REST v2)\", \"05 - Transaction summary by month (REST v2)\", \"01 - Create goal (REST v2)\", \"02 - List goals (REST v2)\", \"05 - Goal simulate (REST v2)\", \"01 - Create wallet investment (REST v2)\", \"02 - List wallet investments (REST v2)\", \"08 - Create wallet operation (REST v2)\", \"10 - Wallet operation summary (REST v2)\", \"01 - Installment vs cash calculate (REST public)\", \"02 - Installment vs cash save (REST auth required)\", \"03 - Simulation goal bridge without entitlement returns 403\", \"02 - GraphQL login invalid credentials (safe error)\", \"03 - GraphQL me query (auth required)\", \"04 - GraphQL installment vs cash calculate (public)\", \"01 - List alert preferences (REST v2)\", \"01 - Get my subscription (REST v2)\", \"01 - List entitlements (REST v2)\", \"01 - List shared entries by me (REST v2)\", \"01 - CSV upload preview (REST v2)\"];",
           "var activeProfile = String(pm.environment.get('suiteProfile') || pm.collectionVariables.get('suiteProfile') || 'full').toLowerCase();",
           "if (!['smoke', 'full'].includes(activeProfile)) {",
           "  throw new Error('Unsupported suiteProfile: ' + activeProfile + '. Use smoke or full.');",
@@ -114,7 +114,9 @@
                   "pm.collectionVariables.set('runIn365Days', isoDate(365));",
                   "pm.collectionVariables.set('runMonthRef', isoMonth(0));",
                   "pm.collectionVariables.set('graphSimulationLabel', 'Notebook ' + seed);",
-                  "['authToken', 'userId', 'transactionId', 'goalId', 'investmentId', 'operationId', 'simulationId', 'advancedSimulationId', 'feeSimulationId', 'entitlementId'].forEach(function (key) { pm.collectionVariables.unset(key); });"
+                  "pm.collectionVariables.set('fakeUuid', '00000000-0000-4000-8000-000000000001');",
+                  "pm.collectionVariables.set('nonexistentInvitationToken', 'nonexistent-token-' + seed);",
+                  "['authToken', 'userId', 'transactionId', 'goalId', 'investmentId', 'operationId', 'simulationId', 'advancedSimulationId', 'feeSimulationId', 'entitlementId', 'receivableId', 'fiscalDocumentId', 'sharedEntryId', 'invitationId', 'subscriptionId'].forEach(function (key) { pm.collectionVariables.unset(key); });"
                 ],
                 "type": "text/javascript"
               }
@@ -2882,7 +2884,1206 @@
       ]
     },
     {
-      "name": "05 - GraphQL",
+      "name": "05 - Alerts",
+      "item": [
+        {
+          "name": "01 - List alert preferences (REST v2)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{authToken}}"
+              },
+              {
+                "key": "X-API-Contract",
+                "value": "v2"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/alerts/preferences",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "alerts",
+                "preferences"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('alert preferences returns 200', function () { pm.response.to.have.status(200); });",
+                  "var body = pm.response.json();",
+                  "pm.test('alert preferences returns list payload', function () {",
+                  "  pm.expect(body.success).to.eql(true);",
+                  "  pm.expect(body.data.preferences).to.be.an('array');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "02 - Update alert preference (REST v2)",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{authToken}}"
+              },
+              {
+                "key": "X-API-Contract",
+                "value": "v2"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/alerts/preferences/system",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "alerts",
+                "preferences",
+                "system"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n                      \"enabled\": true,\n                      \"channels\": [\"in_app\"],\n                      \"global_opt_out\": false\n                    }\n"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('alert preference update returns 200', function () { pm.response.to.have.status(200); });",
+                  "var body = pm.response.json();",
+                  "pm.test('alert preference update returns preference payload', function () {",
+                  "  pm.expect(body.success).to.eql(true);",
+                  "  pm.expect(body.data.preference.category).to.eql('system');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "03 - List alerts (REST v2)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{authToken}}"
+              },
+              {
+                "key": "X-API-Contract",
+                "value": "v2"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/alerts?unread_only=false",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "alerts"
+              ],
+              "query": [
+                {
+                  "key": "unread_only",
+                  "value": "false"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('alerts list returns 200', function () { pm.response.to.have.status(200); });",
+                  "var body = pm.response.json();",
+                  "pm.test('alerts list returns alerts array', function () {",
+                  "  pm.expect(body.success).to.eql(true);",
+                  "  pm.expect(body.data.alerts).to.be.an('array');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "04 - Mark alert as read for nonexistent id returns 404",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{authToken}}"
+              },
+              {
+                "key": "X-API-Contract",
+                "value": "v2"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/alerts/{{fakeUuid}}/read",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "alerts",
+                "{{fakeUuid}}",
+                "read"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('alert read missing id returns 404', function () { pm.response.to.have.status(404); });"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "05 - Delete alert for nonexistent id returns 404",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{authToken}}"
+              },
+              {
+                "key": "X-API-Contract",
+                "value": "v2"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/alerts/{{fakeUuid}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "alerts",
+                "{{fakeUuid}}"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('alert delete missing id returns 404', function () { pm.response.to.have.status(404); });"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "06 - Subscriptions and Entitlements",
+      "item": [
+        {
+          "name": "01 - Get my subscription (REST v2)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{authToken}}"
+              },
+              {
+                "key": "X-API-Contract",
+                "value": "v2"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/subscriptions/me",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "subscriptions",
+                "me"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('subscription me returns 200', function () { pm.response.to.have.status(200); });",
+                  "var body = pm.response.json();",
+                  "pm.test('subscription me returns subscription payload', function () {",
+                  "  pm.expect(body.success).to.eql(true);",
+                  "  pm.expect(body.data.subscription.id).to.be.a('string').and.not.empty;",
+                  "});",
+                  "pm.collectionVariables.set('subscriptionId', pm.response.json().data.subscription.id);"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "02 - Create checkout session (REST v2)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{authToken}}"
+              },
+              {
+                "key": "X-API-Contract",
+                "value": "v2"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/subscriptions/checkout",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "subscriptions",
+                "checkout"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n                      \"plan_slug\": \"pro_monthly\"\n                    }\n"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('subscription checkout returns 201', function () { pm.response.to.have.status(201); });",
+                  "var body = pm.response.json();",
+                  "pm.test('subscription checkout returns checkout url', function () {",
+                  "  pm.expect(body.success).to.eql(true);",
+                  "  pm.expect(body.data.checkout_url).to.be.a('string').and.not.empty;",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "03 - Cancel subscription (REST v2)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{authToken}}"
+              },
+              {
+                "key": "X-API-Contract",
+                "value": "v2"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/subscriptions/cancel",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "subscriptions",
+                "cancel"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('subscription cancel returns 200', function () { pm.response.to.have.status(200); });",
+                  "var body = pm.response.json();",
+                  "pm.test('subscription cancel returns canceled status', function () {",
+                  "  pm.expect(body.success).to.eql(true);",
+                  "  pm.expect(body.data.subscription.status).to.eql('canceled');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "04 - Webhook invalid signature returns 401",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Billing-Signature",
+                "value": "invalid-signature"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/subscriptions/webhook",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "subscriptions",
+                "webhook"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n                      \"event\": \"subscription.activated\",\n                      \"subscription_id\": \"sub_fake\"\n                    }\n"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('subscription webhook invalid signature returns 401', function () { pm.response.to.have.status(401); });"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "01 - List entitlements (REST v2)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{authToken}}"
+              },
+              {
+                "key": "X-API-Contract",
+                "value": "v2"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/entitlements",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "entitlements"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('entitlements list returns 200', function () { pm.response.to.have.status(200); });",
+                  "var body = pm.response.json();",
+                  "pm.test('entitlements list returns items array', function () {",
+                  "  pm.expect(body.success).to.eql(true);",
+                  "  pm.expect(body.data.items).to.be.an('array');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "02 - Check entitlement missing feature key returns 400",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{authToken}}"
+              },
+              {
+                "key": "X-API-Contract",
+                "value": "v2"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/entitlements/check",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "entitlements",
+                "check"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('entitlement check missing feature key returns 400', function () { pm.response.to.have.status(400); });"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "07 - Shared Entries",
+      "item": [
+        {
+          "name": "01 - List shared entries by me (REST v2)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{authToken}}"
+              },
+              {
+                "key": "X-API-Contract",
+                "value": "v2"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/shared-entries/by-me",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "shared-entries",
+                "by-me"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('shared entries by me returns 200', function () { pm.response.to.have.status(200); });",
+                  "pm.test('shared entries by me returns array', function () { pm.expect(pm.response.json().shared_entries).to.be.an('array'); });"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "02 - List shared entries with me (REST v2)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{authToken}}"
+              },
+              {
+                "key": "X-API-Contract",
+                "value": "v2"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/shared-entries/with-me",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "shared-entries",
+                "with-me"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('shared entries with me returns 200', function () { pm.response.to.have.status(200); });",
+                  "pm.test('shared entries with me returns array', function () { pm.expect(pm.response.json().shared_entries).to.be.an('array'); });"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "03 - Create shared entry missing fields returns 400",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{authToken}}"
+              },
+              {
+                "key": "X-API-Contract",
+                "value": "v2"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/shared-entries",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "shared-entries"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{}\n"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('shared entry missing fields returns 400', function () { pm.response.to.have.status(400); });"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "04 - List invitations (REST v2)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{authToken}}"
+              },
+              {
+                "key": "X-API-Contract",
+                "value": "v2"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/shared-entries/invitations",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "shared-entries",
+                "invitations"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('shared invitations list returns 200', function () { pm.response.to.have.status(200); });",
+                  "pm.test('shared invitations list returns array', function () { pm.expect(pm.response.json().invitations).to.be.an('array'); });"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "05 - Create invitation missing fields returns 400",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{authToken}}"
+              },
+              {
+                "key": "X-API-Contract",
+                "value": "v2"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/shared-entries/invitations",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "shared-entries",
+                "invitations"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{}\n"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('shared invitation missing fields returns 400', function () { pm.response.to.have.status(400); });"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "06 - Accept nonexistent invitation returns 404",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{authToken}}"
+              },
+              {
+                "key": "X-API-Contract",
+                "value": "v2"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/shared-entries/invitations/{{nonexistentInvitationToken}}/accept",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "shared-entries",
+                "invitations",
+                "{{nonexistentInvitationToken}}",
+                "accept"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('shared invitation accept missing token returns 404', function () { pm.response.to.have.status(404); });"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "07 - Delete nonexistent shared entry returns 404",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{authToken}}"
+              },
+              {
+                "key": "X-API-Contract",
+                "value": "v2"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/shared-entries/{{fakeUuid}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "shared-entries",
+                "{{fakeUuid}}"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('shared entry delete missing id returns 404', function () { pm.response.to.have.status(404); });"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "08 - Delete nonexistent invitation returns 404",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{authToken}}"
+              },
+              {
+                "key": "X-API-Contract",
+                "value": "v2"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/shared-entries/invitations/{{fakeUuid}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "shared-entries",
+                "invitations",
+                "{{fakeUuid}}"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('shared invitation delete missing id returns 404', function () { pm.response.to.have.status(404); });"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "08 - Fiscal",
+      "item": [
+        {
+          "name": "01 - CSV upload preview (REST v2)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{authToken}}"
+              },
+              {
+                "key": "X-API-Contract",
+                "value": "v2"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/fiscal/csv/upload",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "fiscal",
+                "csv",
+                "upload"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n                      \"content\": \"description,amount,date,category,external_id\\nConsultoria,1500.00,2026-03-22,consulting,ext-{{runSeed}}\\nLicenca,900.00,2026-03-23,software,ext2-{{runSeed}}\",\n                      \"column_map\": {\n                        \"description\": \"description\",\n                        \"amount\": \"amount\",\n                        \"date\": \"date\",\n                        \"category\": \"category\",\n                        \"external_id\": \"external_id\"\n                      }\n                    }\n"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('fiscal csv upload returns 200', function () { pm.response.to.have.status(200); });",
+                  "var body = pm.response.json();",
+                  "pm.test('fiscal csv upload returns preview rows', function () { pm.expect(body.data.preview || body.preview).to.be.an('array'); });"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "02 - CSV confirm import (REST v2)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{authToken}}"
+              },
+              {
+                "key": "X-API-Contract",
+                "value": "v2"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/fiscal/csv/confirm",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "fiscal",
+                "csv",
+                "confirm"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n                      \"content\": \"description,amount,date,category,external_id\\nConsultoria,1500.00,2026-03-22,consulting,ext-{{runSeed}}\\nLicenca,900.00,2026-03-23,software,ext2-{{runSeed}}\",\n                      \"column_map\": {\n                        \"description\": \"description\",\n                        \"amount\": \"amount\",\n                        \"date\": \"date\",\n                        \"category\": \"category\",\n                        \"external_id\": \"external_id\"\n                      }\n                    }\n"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('fiscal csv confirm returns 201', function () { pm.response.to.have.status(201); });"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "03 - List receivables (REST v2)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{authToken}}"
+              },
+              {
+                "key": "X-API-Contract",
+                "value": "v2"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/fiscal/receivables",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "fiscal",
+                "receivables"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('fiscal receivables list returns 200', function () { pm.response.to.have.status(200); });",
+                  "var body = pm.response.json();",
+                  "var items = body.data ? body.data.receivables : body.receivables;",
+                  "pm.test('fiscal receivables list returns items array', function () { pm.expect(items).to.be.an('array'); });",
+                  "if (items.length > 0) { pm.collectionVariables.set('receivableId', items[0].id); }"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "04 - Create manual receivable (REST v2)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{authToken}}"
+              },
+              {
+                "key": "X-API-Contract",
+                "value": "v2"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/fiscal/receivables",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "fiscal",
+                "receivables"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n                      \"description\": \"Servico extra {{runSeed}}\",\n                      \"amount\": \"2500.00\",\n                      \"expected_date\": \"{{runTomorrow}}\",\n                      \"category\": \"consulting\"\n                    }\n"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('fiscal receivable create returns 201', function () { pm.response.to.have.status(201); });",
+                  "var body = pm.response.json();",
+                  "var receivable = body.data ? body.data.receivable : body.receivable;",
+                  "pm.collectionVariables.set('receivableId', receivable.id);",
+                  "pm.test('fiscal receivable create returns id', function () { pm.expect(receivable.id).to.be.a('string').and.not.empty; });"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "05 - Mark receivable as received (REST v2)",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{authToken}}"
+              },
+              {
+                "key": "X-API-Contract",
+                "value": "v2"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/fiscal/receivables/{{receivableId}}/receive",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "fiscal",
+                "receivables",
+                "{{receivableId}}",
+                "receive"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n                      \"received_date\": \"{{runToday}}\",\n                      \"received_amount\": \"2500.00\"\n                    }\n"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('fiscal receivable receive returns 200', function () { pm.response.to.have.status(200); });"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "06 - Receivables summary (REST v2)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{authToken}}"
+              },
+              {
+                "key": "X-API-Contract",
+                "value": "v2"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/fiscal/receivables/summary",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "fiscal",
+                "receivables",
+                "summary"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('fiscal receivables summary returns 200', function () { pm.response.to.have.status(200); });"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "07 - Delete settled receivable returns 409",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{authToken}}"
+              },
+              {
+                "key": "X-API-Contract",
+                "value": "v2"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/fiscal/receivables/{{receivableId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "fiscal",
+                "receivables",
+                "{{receivableId}}"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('fiscal receivable delete settled returns 409', function () { pm.response.to.have.status(409); });"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "08 - List fiscal documents (REST v2)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{authToken}}"
+              },
+              {
+                "key": "X-API-Contract",
+                "value": "v2"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/fiscal/fiscal-documents",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "fiscal",
+                "fiscal-documents"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('fiscal documents list returns 200', function () { pm.response.to.have.status(200); });"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "09 - Create fiscal document (REST v2)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{authToken}}"
+              },
+              {
+                "key": "X-API-Contract",
+                "value": "v2"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/fiscal/fiscal-documents",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "fiscal",
+                "fiscal-documents"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n                      \"type\": \"service_invoice\",\n                      \"amount\": \"1999.90\",\n                      \"issued_at\": \"{{runToday}}\",\n                      \"counterpart_name\": \"Cliente {{runSeed}}\",\n                      \"external_id\": \"invoice-{{runSeed}}\"\n                    }\n"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('fiscal document create returns 201', function () { pm.response.to.have.status(201); });",
+                  "var body = pm.response.json();",
+                  "var doc = body.data ? body.data.fiscal_document : body.fiscal_document;",
+                  "pm.collectionVariables.set('fiscalDocumentId', doc.id);",
+                  "pm.test('fiscal document create returns id', function () { pm.expect(doc.id).to.be.a('string').and.not.empty; });"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "09 - GraphQL",
       "item": [
         {
           "name": "01 - GraphQL empty query (validation error)",
@@ -3144,6 +4345,34 @@
     },
     {
       "key": "entitlementId",
+      "value": ""
+    },
+    {
+      "key": "receivableId",
+      "value": ""
+    },
+    {
+      "key": "fiscalDocumentId",
+      "value": ""
+    },
+    {
+      "key": "sharedEntryId",
+      "value": ""
+    },
+    {
+      "key": "invitationId",
+      "value": ""
+    },
+    {
+      "key": "subscriptionId",
+      "value": ""
+    },
+    {
+      "key": "fakeUuid",
+      "value": "00000000-0000-4000-8000-000000000001"
+    },
+    {
+      "key": "nonexistentInvitationToken",
       "value": ""
     },
     {

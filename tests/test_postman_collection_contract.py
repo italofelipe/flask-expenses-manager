@@ -26,6 +26,11 @@ SMOKE_REQUESTS = {
     "02 - GraphQL login invalid credentials (safe error)",
     "03 - GraphQL me query (auth required)",
     "04 - GraphQL installment vs cash calculate (public)",
+    "01 - List alert preferences (REST v2)",
+    "01 - Get my subscription (REST v2)",
+    "01 - List entitlements (REST v2)",
+    "01 - List shared entries by me (REST v2)",
+    "01 - CSV upload preview (REST v2)",
 }
 
 
@@ -138,6 +143,36 @@ def test_postman_collection_covers_critical_rest_routes() -> None:
         ("POST", "/simulations/installment-vs-cash/save"),
         ("POST", "/simulations/{param}/goal"),
         ("POST", "/simulations/{param}/planned-expense"),
+        ("GET", "/alerts/preferences"),
+        ("PUT", "/alerts/preferences/system"),
+        ("GET", "/alerts"),
+        ("POST", "/alerts/{param}/read"),
+        ("DELETE", "/alerts/{param}"),
+        ("GET", "/subscriptions/me"),
+        ("POST", "/subscriptions/checkout"),
+        ("POST", "/subscriptions/cancel"),
+        ("POST", "/subscriptions/webhook"),
+        ("GET", "/entitlements"),
+        ("GET", "/entitlements/check"),
+        ("POST", "/entitlements/admin"),
+        ("DELETE", "/entitlements/admin/{param}"),
+        ("POST", "/shared-entries"),
+        ("GET", "/shared-entries/by-me"),
+        ("GET", "/shared-entries/with-me"),
+        ("DELETE", "/shared-entries/{param}"),
+        ("GET", "/shared-entries/invitations"),
+        ("POST", "/shared-entries/invitations"),
+        ("POST", "/shared-entries/invitations/{param}/accept"),
+        ("DELETE", "/shared-entries/invitations/{param}"),
+        ("POST", "/fiscal/csv/upload"),
+        ("POST", "/fiscal/csv/confirm"),
+        ("GET", "/fiscal/receivables"),
+        ("POST", "/fiscal/receivables"),
+        ("PATCH", "/fiscal/receivables/{param}/receive"),
+        ("DELETE", "/fiscal/receivables/{param}"),
+        ("GET", "/fiscal/receivables/summary"),
+        ("GET", "/fiscal/fiscal-documents"),
+        ("POST", "/fiscal/fiscal-documents"),
     }
 
     missing = sorted(expected - covered)
@@ -153,7 +188,11 @@ def test_postman_collection_uses_domain_folders() -> None:
         "02 - Goals",
         "03 - Wallet",
         "04 - Simulations",
-        "05 - GraphQL",
+        "05 - Alerts",
+        "06 - Subscriptions and Entitlements",
+        "07 - Shared Entries",
+        "08 - Fiscal",
+        "09 - GraphQL",
     ]
 
 

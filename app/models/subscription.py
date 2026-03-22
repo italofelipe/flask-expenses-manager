@@ -12,6 +12,10 @@ from app.extensions.database import db
 from app.utils.datetime_utils import utc_now_naive
 
 
+def _enum_values(enum_cls: type[enum.Enum]) -> list[str]:
+    return [str(item.value) for item in enum_cls]
+
+
 class SubscriptionStatus(enum.Enum):
     FREE = "free"
     TRIALING = "trialing"
@@ -44,11 +48,13 @@ class Subscription(db.Model):
     )
     plan_code = db.Column(db.String(40), nullable=False)
     status = db.Column(
-        db.Enum(SubscriptionStatus),
+        db.Enum(SubscriptionStatus, values_callable=_enum_values),
         nullable=False,
         default=SubscriptionStatus.FREE,
     )
-    billing_cycle = db.Column(db.Enum(BillingCycle), nullable=True)
+    billing_cycle = db.Column(
+        db.Enum(BillingCycle, values_callable=_enum_values), nullable=True
+    )
 
     # Billing provider fields (Asaas)
     provider = db.Column(db.String(40), nullable=True)
