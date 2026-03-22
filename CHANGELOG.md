@@ -1,5 +1,23 @@
 # Changelog
 
+## [1.4.0](https://github.com/italofelipe/auraxis-api/compare/v1.3.0...v1.4.0) (2026-03-22)
+
+
+### Features
+
+* **postman:** audit remaining route parity gaps ([#684](https://github.com/italofelipe/auraxis-api/issues/684)) ([e35dbe6](https://github.com/italofelipe/auraxis-api/commit/e35dbe62f4c8e26eb76cc751bb89e8c79d1199c9))
+* **postman:** expand canonical e2e parity coverage ([#682](https://github.com/italofelipe/auraxis-api/issues/682)) ([45d6dc2](https://github.com/italofelipe/auraxis-api/commit/45d6dc2802fad8a869c81e8ca25cf99c326b049c))
+* **postman:** isolate privileged integration profile ([#683](https://github.com/italofelipe/auraxis-api/issues/683)) ([dfc6b5d](https://github.com/italofelipe/auraxis-api/commit/dfc6b5d062971ee1753793794f2f5514b31c8bee))
+* **test:** add smoke and full postman profiles ([#669](https://github.com/italofelipe/auraxis-api/issues/669)) ([dd19e82](https://github.com/italofelipe/auraxis-api/commit/dd19e82dea39ff9a75ca84f8c19cd3576ad40ae4))
+
+
+### Bug Fixes
+
+* **auth:** harden webhook boundary and remove legacy jwt path ([#679](https://github.com/italofelipe/auraxis-api/issues/679)) ([774aab9](https://github.com/italofelipe/auraxis-api/commit/774aab991528a880610a9b4b4bd5f846b763417d))
+* **ci:** add dedicated newman integration gate ([#681](https://github.com/italofelipe/auraxis-api/issues/681)) ([866cd48](https://github.com/italofelipe/auraxis-api/commit/866cd482cfd34c74ddb604107025006edf19ad76))
+* **ops:** harden recurrence incidents and rate limit fallback ([#680](https://github.com/italofelipe/auraxis-api/issues/680)) ([784ab2c](https://github.com/italofelipe/auraxis-api/commit/784ab2cf88ac0ad1e8eec7673218845ec78108cf))
+* **ops:** stabilize newman full runtime drift ([#686](https://github.com/italofelipe/auraxis-api/issues/686)) ([9441a52](https://github.com/italofelipe/auraxis-api/commit/9441a5215a9ea2bae6699c6f2c73808a54e12d0e))
+
 ## [1.3.0](https://github.com/italofelipe/auraxis-api/compare/v1.2.0...v1.3.0) (2026-03-22)
 
 
