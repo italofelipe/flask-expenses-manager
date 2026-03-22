@@ -125,8 +125,9 @@
                   "pm.collectionVariables.set('runMonthRef', isoMonth(0));",
                   "pm.collectionVariables.set('graphSimulationLabel', 'Notebook ' + seed);",
                   "pm.collectionVariables.set('fakeUuid', '00000000-0000-4000-8000-000000000001');",
+                  "pm.collectionVariables.set('alertCategory', 'system');",
                   "pm.collectionVariables.set('nonexistentInvitationToken', 'nonexistent-token-' + seed);",
-                  "['authToken', 'userId', 'transactionId', 'goalId', 'investmentId', 'operationId', 'simulationId', 'advancedSimulationId', 'feeSimulationId', 'entitlementId', 'receivableId', 'fiscalDocumentId', 'sharedEntryId', 'invitationId', 'subscriptionId'].forEach(function (key) { pm.collectionVariables.unset(key); });"
+                  "['authToken', 'userId', 'transactionId', 'goalId', 'investmentId', 'operationId', 'simulationId', 'genericSimulationId', 'advancedSimulationId', 'feeSimulationId', 'entitlementId', 'receivableId', 'fiscalDocumentId', 'sharedEntryId', 'invitationId', 'subscriptionId'].forEach(function (key) { pm.collectionVariables.unset(key); });"
                 ],
                 "type": "text/javascript"
               }
@@ -740,6 +741,57 @@
                   "pm.test('password reset invalid token is a validation error', function () {",
                   "  pm.expect(body.success).to.eql(false);",
                   "  pm.expect(body.error.code).to.eql('VALIDATION_ERROR');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "16 - Salary increase simulation (REST v2)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{authToken}}"
+              },
+              {
+                "key": "X-API-Contract",
+                "value": "v2"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/user/simulate-salary-increase",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "user",
+                "simulate-salary-increase"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n                      \"base_salary\": \"5000.00\",\n                      \"base_date\": \"2024-01-01\",\n                      \"discounts\": \"500.00\",\n                      \"target_real_increase\": \"7.50\"\n                    }\n"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('salary increase simulation returns 200', function () { pm.response.to.have.status(200); });",
+                  "var body = pm.response.json();",
+                  "pm.test('salary increase simulation returns target payload', function () {",
+                  "  pm.expect(body.success).to.eql(true);",
+                  "  pm.expect(body.data.recomposition).to.be.a('string').and.not.empty;",
+                  "  pm.expect(body.data.target).to.be.a('string').and.not.empty;",
                   "});"
                 ],
                 "type": "text/javascript"
@@ -1653,7 +1705,57 @@
           ]
         },
         {
-          "name": "07 - Delete goal by id (REST v2)",
+          "name": "07 - Goal PATCH by id (REST v2)",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{authToken}}"
+              },
+              {
+                "key": "X-API-Contract",
+                "value": "v2"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/goals/{{goalId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "goals",
+                "{{goalId}}"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n                      \"status\": \"active\",\n                      \"current_amount\": \"6500.00\"\n                    }\n"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('goal patch returns 200', function () { pm.response.to.have.status(200); });",
+                  "var body = pm.response.json();",
+                  "pm.test('goal patch reflects updated amount', function () {",
+                  "  pm.expect(body.success).to.eql(true);",
+                  "  pm.expect(body.data.goal.current_amount).to.eql('6500.00');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "08 - Delete goal by id (REST v2)",
           "request": {
             "method": "DELETE",
             "header": [
@@ -2908,6 +3010,190 @@
               }
             }
           ]
+        },
+        {
+          "name": "10 - Save generic simulation (REST v2)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{authToken}}"
+              },
+              {
+                "key": "X-API-Contract",
+                "value": "v2"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/simulations",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "simulations"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n                      \"tool_id\": \"salary_projection\",\n                      \"rule_version\": \"v1\",\n                      \"inputs\": {\n                        \"base_salary\": \"5000.00\",\n                        \"target_raise\": \"7.50\"\n                      },\n                      \"result\": {\n                        \"projected_salary\": \"5375.00\"\n                      }\n                    }\n"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('generic simulation create returns 201', function () { pm.response.to.have.status(201); });",
+                  "var body = pm.response.json();",
+                  "pm.collectionVariables.set('genericSimulationId', body.data.simulation.id);",
+                  "pm.test('generic simulation create captures id', function () {",
+                  "  pm.expect(body.success).to.eql(true);",
+                  "  pm.expect(body.data.simulation.id).to.be.a('string').and.not.empty;",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "11 - List saved simulations (REST v2)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{authToken}}"
+              },
+              {
+                "key": "X-API-Contract",
+                "value": "v2"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/simulations?page=1&per_page=20",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "simulations"
+              ],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "1"
+                },
+                {
+                  "key": "per_page",
+                  "value": "20"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('simulation list returns 200', function () { pm.response.to.have.status(200); });",
+                  "var body = pm.response.json();",
+                  "pm.test('simulation list includes pagination and items', function () {",
+                  "  pm.expect(body.success).to.eql(true);",
+                  "  pm.expect(body.data.items).to.be.an('array');",
+                  "  pm.expect(body.meta.pagination.total).to.be.at.least(1);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "12 - Get saved simulation by id (REST v2)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{authToken}}"
+              },
+              {
+                "key": "X-API-Contract",
+                "value": "v2"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/simulations/{{genericSimulationId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "simulations",
+                "{{genericSimulationId}}"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('simulation get returns 200', function () { pm.response.to.have.status(200); });",
+                  "var body = pm.response.json();",
+                  "pm.test('simulation get returns requested id', function () {",
+                  "  pm.expect(body.success).to.eql(true);",
+                  "  pm.expect(body.data.simulation.id).to.eql(pm.collectionVariables.get('genericSimulationId'));",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "13 - Delete saved simulation by id (REST v2)",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{authToken}}"
+              },
+              {
+                "key": "X-API-Contract",
+                "value": "v2"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/simulations/{{genericSimulationId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "simulations",
+                "{{genericSimulationId}}"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('simulation delete returns 200', function () { pm.response.to.have.status(200); });",
+                  "pm.test('simulation delete canonical success', function () {",
+                  "  pm.expect(pm.response.json().success).to.eql(true);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
         }
       ]
     },
@@ -2975,14 +3261,14 @@
               }
             ],
             "url": {
-              "raw": "{{baseUrl}}/alerts/preferences/system",
+              "raw": "{{baseUrl}}/alerts/preferences/{{alertCategory}}",
               "host": [
                 "{{baseUrl}}"
               ],
               "path": [
                 "alerts",
                 "preferences",
-                "system"
+                "{{alertCategory}}"
               ]
             },
             "body": {
@@ -2999,7 +3285,7 @@
                   "var body = pm.response.json();",
                   "pm.test('alert preference update returns preference payload', function () {",
                   "  pm.expect(body.success).to.eql(true);",
-                  "  pm.expect(body.data.preference.category).to.eql('system');",
+                  "  pm.expect(body.data.preference.category).to.eql(pm.collectionVariables.get('alertCategory'));",
                   "});"
                 ],
                 "type": "text/javascript"
@@ -4364,6 +4650,10 @@
       "value": ""
     },
     {
+      "key": "genericSimulationId",
+      "value": ""
+    },
+    {
       "key": "advancedSimulationId",
       "value": ""
     },
@@ -4398,6 +4688,10 @@
     {
       "key": "fakeUuid",
       "value": "00000000-0000-4000-8000-000000000001"
+    },
+    {
+      "key": "alertCategory",
+      "value": "system"
     },
     {
       "key": "nonexistentInvitationToken",

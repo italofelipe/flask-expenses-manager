@@ -200,8 +200,9 @@ def _bootstrap_prerequest() -> list[str]:
         "pm.collectionVariables.set('runMonthRef', isoMonth(0));",
         "pm.collectionVariables.set('graphSimulationLabel', 'Notebook ' + seed);",
         "pm.collectionVariables.set('fakeUuid', '00000000-0000-4000-8000-000000000001');",
+        "pm.collectionVariables.set('alertCategory', 'system');",
         "pm.collectionVariables.set('nonexistentInvitationToken', 'nonexistent-token-' + seed);",
-        "['authToken', 'userId', 'transactionId', 'goalId', 'investmentId', 'operationId', 'simulationId', 'advancedSimulationId', 'feeSimulationId', 'entitlementId', 'receivableId', 'fiscalDocumentId', 'sharedEntryId', 'invitationId', 'subscriptionId'].forEach(function (key) { pm.collectionVariables.unset(key); });",
+        "['authToken', 'userId', 'transactionId', 'goalId', 'investmentId', 'operationId', 'simulationId', 'genericSimulationId', 'advancedSimulationId', 'feeSimulationId', 'entitlementId', 'receivableId', 'fiscalDocumentId', 'sharedEntryId', 'invitationId', 'subscriptionId'].forEach(function (key) { pm.collectionVariables.unset(key); });",
     ]
 
 
@@ -530,6 +531,33 @@ def build_collection() -> dict[str, Any]:
                 "pm.test('password reset invalid token is a validation error', function () {",
                 "  pm.expect(body.success).to.eql(false);",
                 "  pm.expect(body.error.code).to.eql('VALIDATION_ERROR');",
+                "});",
+            ],
+        ),
+        _item(
+            "16 - Salary increase simulation (REST v2)",
+            _request(
+                method="POST",
+                raw_url="{{baseUrl}}/user/simulate-salary-increase",
+                headers=auth_json_headers,
+                body=_json_body(
+                    """
+                    {
+                      "base_salary": "5000.00",
+                      "base_date": "2024-01-01",
+                      "discounts": "500.00",
+                      "target_real_increase": "7.50"
+                    }
+                    """
+                ),
+            ),
+            test_lines=[
+                "pm.test('salary increase simulation returns 200', function () { pm.response.to.have.status(200); });",
+                "var body = pm.response.json();",
+                "pm.test('salary increase simulation returns target payload', function () {",
+                "  pm.expect(body.success).to.eql(true);",
+                "  pm.expect(body.data.recomposition).to.be.a('string').and.not.empty;",
+                "  pm.expect(body.data.target).to.be.a('string').and.not.empty;",
                 "});",
             ],
         ),
@@ -901,7 +929,31 @@ def build_collection() -> dict[str, Any]:
             ],
         ),
         _item(
-            "07 - Delete goal by id (REST v2)",
+            "07 - Goal PATCH by id (REST v2)",
+            _request(
+                method="PATCH",
+                raw_url="{{baseUrl}}/goals/{{goalId}}",
+                headers=auth_json_headers,
+                body=_json_body(
+                    """
+                    {
+                      "status": "active",
+                      "current_amount": "6500.00"
+                    }
+                    """
+                ),
+            ),
+            test_lines=[
+                "pm.test('goal patch returns 200', function () { pm.response.to.have.status(200); });",
+                "var body = pm.response.json();",
+                "pm.test('goal patch reflects updated amount', function () {",
+                "  pm.expect(body.success).to.eql(true);",
+                "  pm.expect(body.data.goal.current_amount).to.eql('6500.00');",
+                "});",
+            ],
+        ),
+        _item(
+            "08 - Delete goal by id (REST v2)",
             _request(
                 method="DELETE",
                 raw_url="{{baseUrl}}/goals/{{goalId}}",
@@ -1418,6 +1470,86 @@ def build_collection() -> dict[str, Any]:
                 "pm.test('entitlement revoke returns 200', function () { pm.response.to.have.status(200); });",
             ],
         ),
+        _item(
+            "10 - Save generic simulation (REST v2)",
+            _request(
+                method="POST",
+                raw_url="{{baseUrl}}/simulations",
+                headers=auth_json_headers,
+                body=_json_body(
+                    """
+                    {
+                      "tool_id": "salary_projection",
+                      "rule_version": "v1",
+                      "inputs": {
+                        "base_salary": "5000.00",
+                        "target_raise": "7.50"
+                      },
+                      "result": {
+                        "projected_salary": "5375.00"
+                      }
+                    }
+                    """
+                ),
+            ),
+            test_lines=[
+                "pm.test('generic simulation create returns 201', function () { pm.response.to.have.status(201); });",
+                "var body = pm.response.json();",
+                "pm.collectionVariables.set('genericSimulationId', body.data.simulation.id);",
+                "pm.test('generic simulation create captures id', function () {",
+                "  pm.expect(body.success).to.eql(true);",
+                "  pm.expect(body.data.simulation.id).to.be.a('string').and.not.empty;",
+                "});",
+            ],
+        ),
+        _item(
+            "11 - List saved simulations (REST v2)",
+            _request(
+                method="GET",
+                raw_url="{{baseUrl}}/simulations?page=1&per_page=20",
+                headers=auth_contract_headers,
+                query=[("page", "1"), ("per_page", "20")],
+            ),
+            test_lines=[
+                "pm.test('simulation list returns 200', function () { pm.response.to.have.status(200); });",
+                "var body = pm.response.json();",
+                "pm.test('simulation list includes pagination and items', function () {",
+                "  pm.expect(body.success).to.eql(true);",
+                "  pm.expect(body.data.items).to.be.an('array');",
+                "  pm.expect(body.meta.pagination.total).to.be.at.least(1);",
+                "});",
+            ],
+        ),
+        _item(
+            "12 - Get saved simulation by id (REST v2)",
+            _request(
+                method="GET",
+                raw_url="{{baseUrl}}/simulations/{{genericSimulationId}}",
+                headers=auth_contract_headers,
+            ),
+            test_lines=[
+                "pm.test('simulation get returns 200', function () { pm.response.to.have.status(200); });",
+                "var body = pm.response.json();",
+                "pm.test('simulation get returns requested id', function () {",
+                "  pm.expect(body.success).to.eql(true);",
+                "  pm.expect(body.data.simulation.id).to.eql(pm.collectionVariables.get('genericSimulationId'));",
+                "});",
+            ],
+        ),
+        _item(
+            "13 - Delete saved simulation by id (REST v2)",
+            _request(
+                method="DELETE",
+                raw_url="{{baseUrl}}/simulations/{{genericSimulationId}}",
+                headers=auth_contract_headers,
+            ),
+            test_lines=[
+                "pm.test('simulation delete returns 200', function () { pm.response.to.have.status(200); });",
+                "pm.test('simulation delete canonical success', function () {",
+                "  pm.expect(pm.response.json().success).to.eql(true);",
+                "});",
+            ],
+        ),
     ]
 
     alert_items = [
@@ -1441,7 +1573,7 @@ def build_collection() -> dict[str, Any]:
             "02 - Update alert preference (REST v2)",
             _request(
                 method="PUT",
-                raw_url="{{baseUrl}}/alerts/preferences/system",
+                raw_url="{{baseUrl}}/alerts/preferences/{{alertCategory}}",
                 headers=auth_json_headers,
                 body=_json_body(
                     """
@@ -1458,7 +1590,7 @@ def build_collection() -> dict[str, Any]:
                 "var body = pm.response.json();",
                 "pm.test('alert preference update returns preference payload', function () {",
                 "  pm.expect(body.success).to.eql(true);",
-                "  pm.expect(body.data.preference.category).to.eql('system');",
+                "  pm.expect(body.data.preference.category).to.eql(pm.collectionVariables.get('alertCategory'));",
                 "});",
             ],
         ),
@@ -2039,6 +2171,7 @@ def build_collection() -> dict[str, Any]:
             {"key": "investmentId", "value": ""},
             {"key": "operationId", "value": ""},
             {"key": "simulationId", "value": ""},
+            {"key": "genericSimulationId", "value": ""},
             {"key": "advancedSimulationId", "value": ""},
             {"key": "feeSimulationId", "value": ""},
             {"key": "entitlementId", "value": ""},
@@ -2048,6 +2181,7 @@ def build_collection() -> dict[str, Any]:
             {"key": "invitationId", "value": ""},
             {"key": "subscriptionId", "value": ""},
             {"key": "fakeUuid", "value": "00000000-0000-4000-8000-000000000001"},
+            {"key": "alertCategory", "value": "system"},
             {"key": "nonexistentInvitationToken", "value": ""},
             {"key": "suiteProfile", "value": "full"},
             {"key": "enablePrivilegedFlows", "value": "false"},
