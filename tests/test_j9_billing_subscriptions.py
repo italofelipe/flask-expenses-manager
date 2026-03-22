@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import hashlib
+import hmac
 import uuid
 from typing import Dict
 from unittest.mock import MagicMock
@@ -346,3 +348,66 @@ class TestWebhook:
         body = resp.get_json()
         assert body["data"].get("reason") == "duplicate"
         assert body["data"]["processed"] is False
+
+    def test_webhook_rejects_unsigned_requests_when_explicitly_hardened(
+        self,
+        client,
+        monkeypatch,
+    ) -> None:
+        monkeypatch.delenv("BILLING_WEBHOOK_SECRET", raising=False)
+        monkeypatch.setenv("BILLING_WEBHOOK_ALLOW_UNSIGNED", "false")
+
+        resp = client.post(
+            "/subscriptions/webhook",
+            json={"event": "unknown.event", "subscription_id": "sub_xyz"},
+        )
+
+        assert resp.status_code == 401
+        body = resp.get_json()
+        assert body["success"] is False
+        assert body["error"]["code"] == "UNAUTHORIZED"
+
+    def test_webhook_accepts_valid_signature_when_secret_is_configured(
+        self,
+        client,
+        monkeypatch,
+    ) -> None:
+        secret = "billing-webhook-secret"
+        monkeypatch.setenv("BILLING_WEBHOOK_SECRET", secret)
+        monkeypatch.setenv("BILLING_WEBHOOK_ALLOW_UNSIGNED", "false")
+
+        raw_body = b'{"event":"unknown.event","subscription_id":"sub_xyz"}'
+        signature = hmac.new(secret.encode(), raw_body, hashlib.sha256).hexdigest()
+
+        resp = client.post(
+            "/subscriptions/webhook",
+            data=raw_body,
+            headers={
+                "Content-Type": "application/json",
+                "X-Billing-Signature": signature,
+            },
+        )
+
+        assert resp.status_code == 200
+        body = resp.get_json()
+        assert body["data"]["received"] is True
+        assert body["data"]["processed"] is False
+
+    def test_webhook_rejects_invalid_signature_when_secret_is_configured(
+        self,
+        client,
+        monkeypatch,
+    ) -> None:
+        monkeypatch.setenv("BILLING_WEBHOOK_SECRET", "billing-webhook-secret")
+        monkeypatch.setenv("BILLING_WEBHOOK_ALLOW_UNSIGNED", "false")
+
+        resp = client.post(
+            "/subscriptions/webhook",
+            json={"event": "unknown.event", "subscription_id": "sub_xyz"},
+            headers={"X-Billing-Signature": "invalid-signature"},
+        )
+
+        assert resp.status_code == 401
+        body = resp.get_json()
+        assert body["success"] is False
+        assert body["error"]["code"] == "UNAUTHORIZED"

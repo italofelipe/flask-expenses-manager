@@ -13,6 +13,7 @@ if str(ROOT_DIR) not in sys.path:
 TEST_ENV_OVERRIDES = {
     "SECRET_KEY": "test-secret-key-with-64-chars-minimum-for-jwt-signing-0001",
     "JWT_SECRET_KEY": "test-jwt-secret-key-with-64-chars-minimum-for-signing-0002",
+    "BILLING_WEBHOOK_ALLOW_UNSIGNED": "true",
     "FLASK_DEBUG": "False",
     "FLASK_TESTING": "true",
     "SECURITY_ENFORCE_STRONG_SECRETS": "false",
