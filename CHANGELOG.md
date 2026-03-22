@@ -1,5 +1,20 @@
 # Changelog
 
+## [1.3.0](https://github.com/italofelipe/auraxis-api/compare/v1.2.0...v1.3.0) (2026-03-22)
+
+
+### Features
+
+* **infra:** add alb edge mode for api runtime ([#658](https://github.com/italofelipe/auraxis-api/issues/658)) ([d0cb02d](https://github.com/italofelipe/auraxis-api/commit/d0cb02dd46598ad96ba89a243671ec6a832978e2))
+* **ops:** automate dev host recovery baseline ([#664](https://github.com/italofelipe/auraxis-api/issues/664)) ([7663ee1](https://github.com/italofelipe/auraxis-api/commit/7663ee1ff27e607b7138271cf64164239d3cf197))
+* **ops:** improve deploy and sonar diagnostics ([#665](https://github.com/italofelipe/auraxis-api/issues/665)) ([9588e47](https://github.com/italofelipe/auraxis-api/commit/9588e475ab86b9500b2db8763d9f3c7351e93e8c))
+* **testing:** establish canonical postman e2e suite ([#668](https://github.com/italofelipe/auraxis-api/issues/668)) ([5aebfe2](https://github.com/italofelipe/auraxis-api/commit/5aebfe24000f04bbf0a8fb6eb014c330d1977834))
+
+
+### Bug Fixes
+
+* **deploy:** add dual edge mode for alb cutover ([#662](https://github.com/italofelipe/auraxis-api/issues/662)) ([f53d416](https://github.com/italofelipe/auraxis-api/commit/f53d416636e5cc1b39985e4fa92d753c86e7ec4a))
+
 ## [1.2.0](https://github.com/italofelipe/auraxis-api/compare/v1.1.0...v1.2.0) (2026-03-21)
 
 
