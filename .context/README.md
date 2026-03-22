@@ -12,7 +12,7 @@ Ela nao substitui os documentos oficiais; ela organiza o que ler, em que ordem, 
 5. `.context/05_quality_and_gates.md`
 6. `.context/07_operational_cycle.md`
 7. `TASKS.md` (status e backlog)
-8. `.context/handoffs/` (check for pending handoffs)
+8. `.context/handoffs/` (check only for active pending handoffs; the directory should usually stay almost empty)
 
 ## Invariantes do projeto
 - Backlog, status e progresso: `TASKS.md`.
