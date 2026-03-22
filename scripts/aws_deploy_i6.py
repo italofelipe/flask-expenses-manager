@@ -450,11 +450,45 @@ CONF
   echo "[i6] bootstrapped deploy/nginx/default.tls.conf"
 fi
 
+if [ ! -f "deploy/nginx/default.alb.conf" ]; then
+  mkdir -p deploy/nginx
+  cat > deploy/nginx/default.alb.conf <<'CONF'
+server {{
+    listen 80;
+    server_name __DOMAIN__;
+
+    client_max_body_size 10m;
+
+    location / {{
+        proxy_pass http://web:8000;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Host $host;
+        proxy_set_header X-Forwarded-Port $http_x_forwarded_port;
+        proxy_set_header X-Forwarded-Proto $http_x_forwarded_proto;
+        proxy_set_header Connection "";
+    }}
+}}
+CONF
+  echo "[i6] bootstrapped deploy/nginx/default.alb.conf"
+fi
+
 if [ ! -f "scripts/ensure_tls_runtime.sh" ]; then
   mkdir -p scripts
   cat > scripts/ensure_tls_runtime.sh <<'SH'
 #!/bin/sh
 set -eu
+# Idempotent runtime edge switcher for reverse-proxy.
+# - EDGE_TLS_MODE=alb:
+#   - renders HTTP-only nginx config suitable for ALB TLS termination
+#   - skips local certificate issuance entirely
+# - EDGE_TLS_MODE=instance_tls (default):
+#   - if cert exists for DOMAIN: renders TLS nginx config and recreates reverse-proxy
+#   - if cert does not exist:
+#     - in PROD, optionally requests cert (AUTO_REQUEST_TLS_CERT=true)
+#     - falls back to HTTP nginx config without breaking startup
 COMPOSE_FILE="${{COMPOSE_FILE:-docker-compose.prod.yml}}"
 ENV_FILE="${{ENV_FILE:-.env.prod}}"
 ENV_NAME="${{1:-${{AURAXIS_ENV:-prod}}}}"
@@ -471,6 +505,8 @@ read_env_value() {{
 
 DOMAIN="${{DOMAIN_INPUT:-${{DOMAIN:-$(read_env_value DOMAIN)}}}}"
 CERTBOT_EMAIL="${{CERTBOT_EMAIL:-$(read_env_value CERTBOT_EMAIL)}}"
+EDGE_TLS_MODE="${{EDGE_TLS_MODE:-$(read_env_value EDGE_TLS_MODE)}}"
+EDGE_TLS_MODE="${{EDGE_TLS_MODE:-instance_tls}}"
 
 cert_exists() {{
   CERT_DIR="/etc/letsencrypt/live/${{DOMAIN}}"
@@ -488,6 +524,11 @@ render_http_config() {{
 render_tls_config() {{
   sed "s/__DOMAIN__/${{DOMAIN}}/g" \\
     deploy/nginx/default.tls.conf > deploy/nginx/default.conf
+}}
+
+render_alb_config() {{
+  sed "s/__DOMAIN__/${{DOMAIN}}/g" \\
+    deploy/nginx/default.alb.conf > deploy/nginx/default.conf
 }}
 
 recreate_proxy() {{
@@ -508,6 +549,12 @@ request_certificate() {{
     --agree-tos \
     --non-interactive
 }}
+
+if [ "${{EDGE_TLS_MODE}}" = "alb" ]; then
+  render_alb_config
+  recreate_proxy
+  exit 0
+fi
 
 if cert_exists; then
   render_tls_config

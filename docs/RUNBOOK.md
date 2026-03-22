@@ -63,9 +63,10 @@ Notas:
   - `POST /graphql` com query vazia (espera `VALIDATION_ERROR`)
   - login invalido em REST/GraphQL (nao pode retornar `INTERNAL_ERROR`)
 - O switch de Nginx/TLS é idempotente via `scripts/ensure_tls_runtime.sh`:
-  - usa TLS quando o certificado existe
-  - tenta emitir cert em PROD quando possível
-  - mantém HTTP sem derrubar proxy quando cert ainda não existe
+  - `EDGE_TLS_MODE=instance_tls` usa TLS quando o certificado existe
+  - `EDGE_TLS_MODE=instance_tls` tenta emitir cert em PROD quando possível
+  - `EDGE_TLS_MODE=instance_tls` mantém HTTP sem derrubar proxy quando cert ainda não existe
+  - `EDGE_TLS_MODE=alb` renderiza config HTTP-only para ALB com TLS terminando no ACM
 - O deploy normal (`mode=deploy`) ainda depende de acesso Git remoto no host.
 - O rollback (`mode=rollback`) **não** depende de `git fetch` remoto; usa o commit local salvo no estado.
 - O deploy bloqueia se detectar drift real entre `/opt/auraxis` e `/opt/flask_expenses` para evitar update na copia errada.
@@ -121,6 +122,19 @@ Validacao (dry-run):
 ```bash
 ./scripts/python_exec.sh scripts/aws_tls_renew_i15.py --profile auraxis-admin --region us-east-1 run-once --env prod --dry-run
 ```
+
+## Public Edge (ALB)
+
+Quando a API estiver publicada atras de um ALB publico:
+- usar `EDGE_TLS_MODE=alb` no `.env.prod`
+- manter o listener HTTPS e o certificado no ACM/ALB
+- usar target group HTTP para a instancia (`reverse-proxy` ouvindo em `80`)
+- usar health check em `/healthz`
+
+Nesse modo:
+- o host nao emite nem renova certificados para `api.auraxis.com.br`
+- o `nginx` preserva `X-Forwarded-Proto` e `X-Forwarded-Port` vindos do ALB
+- o cutover de DNS deve apontar `api.auraxis.com.br` para o ALB, nao para EIP
 
 ## Backups PostgreSQL (S3) e Restore Drill
 

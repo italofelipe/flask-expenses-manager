@@ -35,6 +35,7 @@ docker compose -f docker-compose.dev.yml up --build
 - Runs Gunicorn behind Nginx.
 - Exposes app on `localhost:80`.
 - Supports TLS with Certbot + Nginx (`443`) using shared challenge/certificate volumes.
+- Supports an ALB edge mode with TLS termination in ACM/ALB and HTTP-only origin on the instance (`EDGE_TLS_MODE=alb`).
 
 ### Commands
 ```bash
@@ -50,6 +51,20 @@ docker compose -f docker-compose.prod.yml down
 cp deploy/nginx/default.tls.conf deploy/nginx/default.conf
 docker compose --env-file .env.prod -f docker-compose.prod.yml up -d --force-recreate reverse-proxy
 ```
+
+### ALB edge mode
+Use when TLS terminates on an AWS Application Load Balancer instead of on the host:
+
+```bash
+echo 'EDGE_TLS_MODE=alb' >> .env.prod
+docker compose --env-file .env.prod -f docker-compose.prod.yml up -d --force-recreate reverse-proxy
+```
+
+Operational expectations:
+- ACM certificate is attached to the ALB listener
+- target group forwards HTTP to the instance
+- Route 53 points `api.auraxis.com.br` to the ALB
+- host-level Certbot is no longer part of the public edge for that domain
 
 Detailed runbook:
 - `docs/RUNBOOK.md`
