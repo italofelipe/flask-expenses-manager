@@ -1,11 +1,15 @@
 #!/bin/sh
 set -eu
 
-# Idempotent runtime TLS switcher for reverse-proxy.
-# - If cert exists for DOMAIN: renders TLS nginx config and recreates reverse-proxy.
-# - If cert does not exist:
-#   - in PROD, optionally requests cert (AUTO_REQUEST_TLS_CERT=true)
-#   - falls back to HTTP nginx config without breaking startup
+# Idempotent runtime edge switcher for reverse-proxy.
+# - EDGE_TLS_MODE=alb:
+#   - renders HTTP-only nginx config suitable for ALB TLS termination
+#   - skips local certificate issuance entirely
+# - EDGE_TLS_MODE=instance_tls (default):
+#   - if cert exists for DOMAIN: renders TLS nginx config and recreates reverse-proxy
+#   - if cert does not exist:
+#     - in PROD, optionally requests cert (AUTO_REQUEST_TLS_CERT=true)
+#     - falls back to HTTP nginx config without breaking startup
 
 COMPOSE_FILE="${COMPOSE_FILE:-docker-compose.prod.yml}"
 ENV_FILE="${ENV_FILE:-.env.prod}"
@@ -23,13 +27,15 @@ read_env_value() {
 
 DOMAIN="${DOMAIN_INPUT:-${DOMAIN:-$(read_env_value DOMAIN)}}"
 CERTBOT_EMAIL="${CERTBOT_EMAIL:-$(read_env_value CERTBOT_EMAIL)}"
+EDGE_TLS_MODE="${EDGE_TLS_MODE:-$(read_env_value EDGE_TLS_MODE)}"
+EDGE_TLS_MODE="${EDGE_TLS_MODE:-instance_tls}"
 
 if [ -z "${DOMAIN}" ]; then
   echo "[tls] missing DOMAIN (arg/env/$ENV_FILE)."
   exit 2
 fi
 
-if [ ! -f "deploy/nginx/default.tls.conf" ] || [ ! -f "deploy/nginx/default.http.conf" ]; then
+if [ ! -f "deploy/nginx/default.tls.conf" ] || [ ! -f "deploy/nginx/default.http.conf" ] || [ ! -f "deploy/nginx/default.alb.conf" ]; then
   echo "[tls] missing nginx templates in deploy/nginx/."
   exit 3
 fi
@@ -47,6 +53,11 @@ render_http_config() {
 render_tls_config() {
   sed "s/__DOMAIN__/${DOMAIN}/g" deploy/nginx/default.tls.conf > deploy/nginx/default.conf
   echo "[tls] mode=tls domain=${DOMAIN}"
+}
+
+render_alb_config() {
+  sed "s/__DOMAIN__/${DOMAIN}/g" deploy/nginx/default.alb.conf > deploy/nginx/default.conf
+  echo "[tls] mode=alb domain=${DOMAIN}"
 }
 
 recreate_proxy() {
@@ -68,6 +79,12 @@ request_certificate() {
     --agree-tos \
     --non-interactive
 }
+
+if [ "${EDGE_TLS_MODE}" = "alb" ]; then
+  render_alb_config
+  recreate_proxy
+  exit 0
+fi
 
 if cert_exists; then
   render_tls_config
