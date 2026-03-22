@@ -69,7 +69,7 @@ Quando documentos conflitam, a ordem acima é a prioridade.
 | Quality cloud | SonarCloud | A ratings, 0 bugs críticos |
 | Contract test | Schemathesis | 5 exemplos/endpoint |
 | Mutation | Cosmic Ray | 0% survival |
-| API smoke | Postman/Newman | local stack |
+| API release gate | Postman/Newman | smoke + full em local stack |
 
 ---
 
@@ -130,7 +130,8 @@ push/PR
  ├── review-signal [PR only, advisory]
  │
  ├── tests (pytest ≥85% coverage)
- │    ├── api-smoke (Newman — smoke black-box oficial pré-merge)
+ │    ├── api-smoke (Newman — gate oficial rapido de release/pre-merge)
+ │    ├── api-integration (Newman — gate oficial dedicado de release/integracao)
  │    ├── mutation (Cosmic Ray — 0% survival)
  │    └── trivy (FS + image scan)
  │    └── osv-scanner (lockfiles/dependency SCA open source)
@@ -143,6 +144,7 @@ push/PR
 Todos os jobs de `tests` e superiores dependem de `quality` + `secret-scan` passarem primeiro.
 
 O smoke pós-deploy oficial roda apenas no `deploy.yml` via `scripts/http_smoke_check.py`.
+No caminho comum de merge/release, `smoke` + `full` sao os gates oficiais da trilha black-box canonica.
 
 ---
 

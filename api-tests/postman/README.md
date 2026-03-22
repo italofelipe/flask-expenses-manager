@@ -87,7 +87,8 @@ POSTMAN_ADMIN_TOKEN=<token-admin> \
 ```
 
 ## Integracao CI
-- `smoke` continua sendo o gate rapido minimo para saude funcional cross-domain.
-- `full` roda em job dedicado de integracao, com report JUnit separado.
+- `smoke` e o gate oficial rapido de release/pre-merge para saude funcional cross-domain.
+- `full` e o gate oficial dedicado de release/integracao para a superficie canonica nao-privilegiada.
+- merge/release readiness exige `smoke` + `full` verdes; `privileged` continua fora do caminho comum.
 - `privileged` fica em workflow manual separado, porque exige `adminToken` explicito.
 - Todos usam a mesma collection canonica; muda apenas o `suiteProfile`.

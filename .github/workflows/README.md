@@ -14,6 +14,12 @@ Definir pipelines de CI/CD e gates de qualidade, seguranca e deploy.
 - pós-deploy: `deploy.yml` usa `scripts/http_smoke_check.py`
 - nao existe mais workflow paralelo de smoke pos-deploy nem suite legada em `smoke_tests/*`
 
+## Gates oficiais de release (Newman/Postman)
+- `API Release Gate (Postman/Newman Smoke)`: gate rapido obrigatorio de pre-merge para a superficie black-box cross-domain
+- `API Release Gate (Postman/Newman Full)`: gate dedicado obrigatorio de integracao/release para a superficie canonica REST + GraphQL nao-privilegiada
+- `postman-privileged.yml`: workflow manual separado para fluxos privilegiados/admin; nao participa do caminho comum de merge
+- os dois gates oficiais publicam evidencias separadas como artifacts `newman-smoke-report` e `newman-full-report`
+
 ## Sinal de review (Cursor Bugbot)
 - O `ci.yml` inclui o job `Review Signal (Cursor Bugbot)` em PR.
 - O job executa `scripts/pr_review_signal_check.py` em modo `advisory`.
@@ -23,7 +29,7 @@ Definir pipelines de CI/CD e gates de qualidade, seguranca e deploy.
 - `TOKEN_GITHUB_ADMIN`: token com permissao de administracao do repositório para auditoria/sync de ruleset no `governance.yml`.
 
 ## Observabilidade de CI
-- O job `API Smoke (Postman/Newman)` aplica `flask db upgrade` antes da suite Postman para evitar falhas de schema em banco efemero.
+- O job `API Release Gate (Postman/Newman Smoke)` aplica `flask db upgrade` antes da suite Postman para evitar falhas de schema em banco efemero.
 - O runner Newman do CI e local usa dependencias Node versionadas com `npm ci`, evitando dependencia de install global.
 - O job `Dependency Security (OSV-Scanner)` publica `osv-results.json` como artifact para auditoria de vulnerabilidades em lockfiles.
 

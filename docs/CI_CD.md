@@ -43,28 +43,33 @@ Jobs relevantes:
 6. `api-smoke`
 - sobe stack local docker
 - instala dependencias Node versionadas com `npm ci`
-- executa a unica suite oficial Newman pré-merge (`scripts/run_postman_suite.sh`)
-- publica `reports/newman-report.xml`
+- executa o gate oficial rapido de release/pre-merge (`smoke`) via `scripts/run_postman_suite.sh`
+- publica `reports/newman-smoke-report.xml`
 
-7. `schemathesis`
+7. `api-integration`
+- sobe stack local docker isolada para a suite `full`
+- executa o gate oficial dedicado de release/integracao da superficie canonica nao-privilegiada
+- publica `reports/newman-full-report.xml`
+
+8. `schemathesis`
 - contrato OpenAPI com seed deterministico (`HYPOTHESIS_SEED`)
 - execucao centralizada em `scripts/run_schemathesis_contract.sh`
 
-8. `mutation`
+9. `mutation`
 - gate Cosmic Ray (`scripts/mutation_gate.sh`)
 
-9. `trivy`
+10. `trivy`
 - scan de filesystem + imagem Docker
 
-10. `osv-scanner` (obrigatorio)
+11. `osv-scanner` (obrigatorio)
 - scan open source de lockfiles/dependencias versionadas
 - usa a base `OSV.dev` como complemento ao `pip-audit` e ao `dependency-review`
 - publica `reports/security/osv-results.json` como artifact
 
-11. `security-evidence`
+12. `security-evidence`
 - executa `scripts/security_evidence_check.sh`
 
-12. `sonar`
+13. `sonar`
 - scan SonarCloud + quality gate + enforce de ratings A
 
 Notas:
@@ -87,10 +92,12 @@ Controles:
 - rollback automatico em falha
 - smoke checks REST + GraphQL pos-deploy via `scripts/http_smoke_check.py`
 
-Arquitetura canonica de smoke:
-- pré-merge: Newman no job `api-smoke` do `ci.yml`
+Arquitetura canonica de smoke/release gate:
+- pré-merge: Newman roda nos jobs `api-smoke` (`smoke`) e `api-integration` (`full`) do `ci.yml`
 - pós-deploy: smoke deterministico em Python dentro do `deploy.yml`
 - fluxos legados paralelos de smoke foram removidos para evitar drift
+- readiness no caminho comum de merge/release exige os dois gates oficiais (`smoke` + `full`) em verde
+- o perfil `privileged` continua em workflow manual separado, fora do caminho comum
 
 Politica de docs runtime:
 - a documentacao publica oficial da API vive no portal `docs.auraxis.com.br/api/`
