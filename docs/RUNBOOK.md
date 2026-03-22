@@ -203,6 +203,13 @@ Para migracao segura de `HTTPS origin` para `HTTP origin` sem depender de timing
 - so entao trocar o listener do ALB para o target group HTTP
 - depois do cutover estavel, trocar o host para `EDGE_TLS_MODE=alb` e remover a dependencia do certificado local
 
+## Guardrail de custo
+
+Para manter a observabilidade dentro do teto operacional da AWS:
+- reutilizar metricas nativas do EC2/CloudWatch sempre que possivel
+- preferir widgets de Logs Insights usados sob demanda, nao dashboards abertos 24x7
+- criar novos alarmes derivados de log apenas para sinais realmente acionaveis
+
 ## Sonar no CI
 
 O job `SonarQube Cloud` continua bloqueante, mas agora ficou mais explicito quando a falha vem do
