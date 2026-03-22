@@ -1,16 +1,17 @@
 # Steering Guide — auraxis-api
 
-Última atualização: 2026-03-19
+Última atualização: 2026-03-22
 
 ## 1. Fonte de verdade
 
 | Documento | Autoridade |
 |:----------|:-----------|
-| `TASKS.md` | Status, prioridade, rastreabilidade |
+| GitHub Projects v2 | Status, prioridade, execução, progresso |
 | `product.md` | Intenção de produto, escopo funcional |
 | Este arquivo | Modo de execução, quality gates, governança |
 | `.context/` | Workflows operacionais e referência arquitetural |
 | `docs/` | Runbooks, ADRs, segurança, CI/CD |
+| `TASKS.md` | Legado/histórico pontual, sem autoridade operacional |
 
 Quando documentos conflitam, a ordem acima é a prioridade.
 
@@ -20,14 +21,17 @@ Quando documentos conflitam, a ordem acima é a prioridade.
 
 ```
 1. git checkout master && git pull --ff-only origin master
-2. Verificar TASKS.md — status atual e próxima task
-3. Criar branch: git checkout -b tipo/escopo-descricao
+2. Verificar GitHub Projects — status atual, WIP e próxima task
+3. Confirmar issue/card ativo antes de começar a implementação
+4. Criar branch: git checkout -b tipo/escopo-descricao
 4. Implementar — escopo pequeno e isolado
 5. Executar quality gates (ver seção 6)
-6. Atualizar TASKS.md e docs afetados
+6. Atualizar docs afetados e sincronizar GitHub Projects (`Status`, `Progress`, `Commit`, `Updated At`)
 7. Commit granular (Conventional Commit)
 8. git push -u origin <branch>
 ```
+
+`TASKS.md` pode ser consultado apenas como artefato histórico/traceability legado. Ele não governa prioridade, andamento ou source of truth operacional.
 
 ---
 
@@ -156,11 +160,12 @@ O smoke pós-deploy oficial roda apenas no `deploy.yml` via `scripts/http_smoke_
 
 ## 9. Rastreabilidade e documentação
 
-- Toda entrega reflete status/progresso/risco/commit no `TASKS.md`
+- Toda entrega reflete status/progresso/risco/commit no GitHub Projects
 - Decisões de produto em `product.md`
 - Decisões arquiteturais relevantes em `docs/adr/`
 - Débitos técnicos explícitos registrados com trade-off documentado
 - Handoffs em `.context/handoffs/` ao encerrar sessão ou trocar de agente
+- `TASKS.md` é legado e não deve ser usado como autoridade primária de execução
 
 ---
 
@@ -171,7 +176,8 @@ O smoke pós-deploy oficial roda apenas no `deploy.yml` via `scripts/http_smoke_
 - [ ] Sem regressão de contrato REST/GraphQL
 - [ ] ruff format + ruff check + mypy: zero erros
 - [ ] Bandit: nenhum HIGH/CRITICAL
-- [ ] Documentação atualizada (TASKS.md + docs afetados)
+- [ ] Documentação atualizada (docs afetados + contexto necessário)
+- [ ] GitHub Projects sincronizado (`Status`, `Progress`, `Commit`, `Updated At`)
 - [ ] Branch publicada com commits granulares e mensagens claras
 - [ ] Débito técnico registrado se houver trade-off deliberado
 
@@ -204,7 +210,7 @@ Em retomadas de contexto: assumir `estabilização` até validar baseline local 
 Ao concluir cada bloco (conjunto de tasks/feature set):
 1. Propor rodada formal de feedback antes de iniciar próximo bloco
 2. Cobrir: estratégia, execução, riscos, oportunidades, qualidade técnica, governança
-3. Registrar aprendizados em `steering.md`/`TASKS.md`/ADR quando aplicável
+3. Registrar aprendizados em `steering.md`/ADR/contexto quando aplicável
 
 ---
 
