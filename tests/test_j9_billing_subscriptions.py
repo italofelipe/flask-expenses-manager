@@ -367,6 +367,30 @@ class TestWebhook:
         assert body["success"] is False
         assert body["error"]["code"] == "UNAUTHORIZED"
 
+    def test_webhook_rejects_unsigned_requests_outside_local_or_test_env(
+        self,
+        client,
+        monkeypatch,
+    ) -> None:
+        monkeypatch.delenv("BILLING_WEBHOOK_SECRET", raising=False)
+        monkeypatch.setenv("BILLING_WEBHOOK_ALLOW_UNSIGNED", "true")
+        monkeypatch.setenv("APP_ENV", "dev")
+
+        original_testing = client.application.testing
+        client.application.testing = False
+        try:
+            resp = client.post(
+                "/subscriptions/webhook",
+                json={"event": "unknown.event", "subscription_id": "sub_xyz"},
+            )
+        finally:
+            client.application.testing = original_testing
+
+        assert resp.status_code == 401
+        body = resp.get_json()
+        assert body["success"] is False
+        assert body["error"]["code"] == "UNAUTHORIZED"
+
     def test_webhook_accepts_valid_signature_when_secret_is_configured(
         self,
         client,
