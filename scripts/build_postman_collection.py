@@ -2086,7 +2086,58 @@ def build_collection() -> dict[str, Any]:
             ],
         ),
         _item(
-            "04 - GraphQL installment vs cash calculate (public)",
+            "04 - GraphQL forgot password stays neutral",
+            _request(
+                method="POST",
+                raw_url="{{baseUrl}}/graphql",
+                headers=graphql_headers,
+                body=_json_body(
+                    """
+                    {
+                      "query": "mutation ForgotPassword($email: String!) { forgotPassword(email: $email) { message } }",
+                      "variables": {
+                        "email": "unknown-user@email.com"
+                      }
+                    }
+                    """
+                ),
+            ),
+            test_lines=[
+                "pm.test('graphql forgot password returns 200', function () { pm.response.to.have.status(200); });",
+                "var body = pm.response.json();",
+                "pm.test('graphql forgot password stays neutral', function () {",
+                "  pm.expect(body.errors).to.eql(undefined);",
+                "  pm.expect(body.data.forgotPassword.message).to.be.a('string').and.not.empty;",
+                "});",
+            ],
+        ),
+        _item(
+            "05 - GraphQL reset password invalid token is public validation error",
+            _request(
+                method="POST",
+                raw_url="{{baseUrl}}/graphql",
+                headers=graphql_headers,
+                body=_json_body(
+                    """
+                    {
+                      "query": "mutation ResetPassword($token: String!, $newPassword: String!) { resetPassword(token: $token, newPassword: $newPassword) { message } }",
+                      "variables": {
+                        "token": "invalid-token-value-with-sufficient-length-123456",
+                        "newPassword": "NovaSenha@123"
+                      }
+                    }
+                    """
+                ),
+            ),
+            test_lines=[
+                "pm.test('graphql reset invalid token returns 200', function () { pm.response.to.have.status(200); });",
+                "var body = pm.response.json();",
+                "var firstErr = body.errors && body.errors[0] ? body.errors[0] : {};",
+                "pm.test('graphql reset invalid token returns VALIDATION_ERROR', function () { pm.expect(firstErr.extensions.code).to.eql('VALIDATION_ERROR'); });",
+            ],
+        ),
+        _item(
+            "06 - GraphQL installment vs cash calculate (public)",
             _request(
                 method="POST",
                 raw_url="{{baseUrl}}/graphql",
@@ -2106,7 +2157,7 @@ def build_collection() -> dict[str, Any]:
             ],
         ),
         _item(
-            "05 - GraphQL installment vs cash save (auth required)",
+            "07 - GraphQL installment vs cash save (auth required)",
             _request(
                 method="POST",
                 raw_url="{{baseUrl}}/graphql",
@@ -2125,6 +2176,140 @@ def build_collection() -> dict[str, Any]:
                 "pm.test('graphql installment save persists simulation', function () {",
                 "  pm.expect(body.errors).to.eql(undefined);",
                 "  pm.expect(body.data.saveInstallmentVsCashSimulation.simulation.saved).to.eql(true);",
+                "});",
+            ],
+        ),
+        _item(
+            "08 - GraphQL transaction dashboard seed (auth required)",
+            _request(
+                method="POST",
+                raw_url="{{baseUrl}}/graphql",
+                headers=graphql_auth_headers,
+                body=_json_body(
+                    """
+                    {
+                      "query": "mutation SeedExpense($title: String!, $amount: String!, $dueDate: String!) { createTransaction(title: $title, amount: $amount, type: \\"expense\\", dueDate: $dueDate) { items { id title } } }",
+                      "variables": {
+                        "title": "Conta luz {{runSeed}}",
+                        "amount": "150.00",
+                        "dueDate": "{{runToday}}"
+                      }
+                    }
+                    """
+                ),
+            ),
+            test_lines=[
+                "pm.test('graphql transaction seed returns 200', function () { pm.response.to.have.status(200); });",
+                "var body = pm.response.json();",
+                "pm.test('graphql transaction seed creates an item', function () {",
+                "  pm.expect(body.errors).to.eql(undefined);",
+                "  pm.expect(body.data.createTransaction.items[0].id).to.be.a('string').and.not.empty;",
+                "});",
+            ],
+        ),
+        _item(
+            "09 - GraphQL transaction summary and dashboard (auth required)",
+            _request(
+                method="POST",
+                raw_url="{{baseUrl}}/graphql",
+                headers=graphql_auth_headers,
+                body=_json_body(
+                    """
+                    {
+                      "query": "query GraphqlDashboard($month: String!, $initialDate: String!, $finalDate: String!) { transactionSummary(month: $month, page: 1, pageSize: 10) { month pagination { total } } transactionDashboard(month: $month) { month counts { totalTransactions } } transactionDueRange(initialDate: $initialDate, finalDate: $finalDate, page: 1, perPage: 10, orderBy: \\"overdue_first\\") { counts { totalTransactions } pagination { total } } }",
+                      "variables": {
+                        "month": "{{runMonthRef}}",
+                        "initialDate": "{{runYesterday}}",
+                        "finalDate": "{{runToday}}"
+                      }
+                    }
+                    """
+                ),
+            ),
+            test_lines=[
+                "pm.test('graphql dashboard returns 200', function () { pm.response.to.have.status(200); });",
+                "var body = pm.response.json();",
+                "pm.test('graphql dashboard aggregates transaction data', function () {",
+                "  pm.expect(body.errors).to.eql(undefined);",
+                "  pm.expect(body.data.transactionSummary.month).to.eql(pm.collectionVariables.get('runMonthRef'));",
+                "  pm.expect(body.data.transactionDashboard.month).to.eql(pm.collectionVariables.get('runMonthRef'));",
+                "  pm.expect(body.data.transactionDueRange.counts.totalTransactions).to.be.at.least(1);",
+                "});",
+            ],
+        ),
+        _item(
+            "10 - GraphQL wallet create (auth required)",
+            _request(
+                method="POST",
+                raw_url="{{baseUrl}}/graphql",
+                headers=graphql_auth_headers,
+                body=_json_body(
+                    """
+                    {
+                      "query": "mutation AddWalletEntry { addWalletEntry(name: \\"Reserva {{runSeed}}\\", value: 1000, registerDate: \\"{{runToday}}\\", shouldBeOnWallet: true) { item { id name assetClass } } }"
+                    }
+                    """
+                ),
+            ),
+            test_lines=[
+                "pm.test('graphql wallet create returns 200', function () { pm.response.to.have.status(200); });",
+                "var body = pm.response.json();",
+                "var item = body.data.addWalletEntry.item;",
+                "pm.collectionVariables.set('graphqlWalletId', item.id);",
+                "pm.test('graphql wallet create stores investment id', function () {",
+                "  pm.expect(body.errors).to.eql(undefined);",
+                "  pm.expect(item.id).to.be.a('string').and.not.empty;",
+                "});",
+            ],
+        ),
+        _item(
+            "11 - GraphQL wallet list and valuation (auth required)",
+            _request(
+                method="POST",
+                raw_url="{{baseUrl}}/graphql",
+                headers=graphql_auth_headers,
+                body=_json_body(
+                    """
+                    {
+                      "query": "query WalletCoverage($investmentId: UUID!) { walletEntries(page: 1, perPage: 10) { pagination { total } items { id name shouldBeOnWallet } } investmentValuation(investmentId: $investmentId) { investmentId assetClass valuationSource } portfolioValuation { summary { totalInvestments } } }",
+                      "variables": {
+                        "investmentId": "{{graphqlWalletId}}"
+                      }
+                    }
+                    """
+                ),
+            ),
+            test_lines=[
+                "pm.test('graphql wallet coverage returns 200', function () { pm.response.to.have.status(200); });",
+                "var body = pm.response.json();",
+                "pm.test('graphql wallet coverage returns canonical portfolio payload', function () {",
+                "  pm.expect(body.errors).to.eql(undefined);",
+                "  pm.expect(body.data.walletEntries.pagination.total).to.be.at.least(1);",
+                "  pm.expect(body.data.investmentValuation.investmentId).to.eql(pm.collectionVariables.get('graphqlWalletId'));",
+                "  pm.expect(body.data.portfolioValuation.summary.totalInvestments).to.be.at.least(1);",
+                "});",
+            ],
+        ),
+        _item(
+            "12 - GraphQL logout mutation (auth required)",
+            _request(
+                method="POST",
+                raw_url="{{baseUrl}}/graphql",
+                headers=graphql_auth_headers,
+                body=_json_body(
+                    """
+                    {
+                      "query": "mutation Logout { logout { ok message } }"
+                    }
+                    """
+                ),
+            ),
+            test_lines=[
+                "pm.test('graphql logout returns 200', function () { pm.response.to.have.status(200); });",
+                "var body = pm.response.json();",
+                "pm.test('graphql logout confirms success', function () {",
+                "  pm.expect(body.errors).to.eql(undefined);",
+                "  pm.expect(body.data.logout.ok).to.eql(true);",
                 "});",
             ],
         ),
@@ -2180,6 +2365,7 @@ def build_collection() -> dict[str, Any]:
             {"key": "sharedEntryId", "value": ""},
             {"key": "invitationId", "value": ""},
             {"key": "subscriptionId", "value": ""},
+            {"key": "graphqlWalletId", "value": ""},
             {"key": "fakeUuid", "value": "00000000-0000-4000-8000-000000000001"},
             {"key": "alertCategory", "value": "system"},
             {"key": "nonexistentInvitationToken", "value": ""},
