@@ -26,7 +26,7 @@ SMOKE_REQUESTS = {
     "03 - Simulation goal bridge without entitlement returns 403",
     "02 - GraphQL login invalid credentials (safe error)",
     "03 - GraphQL me query (auth required)",
-    "04 - GraphQL installment vs cash calculate (public)",
+    "06 - GraphQL installment vs cash calculate (public)",
     "01 - List alert preferences (REST v2)",
     "01 - Get my subscription (REST v2)",
     "01 - List entitlements (REST v2)",
@@ -96,8 +96,33 @@ def test_postman_collection_covers_installment_vs_cash_rest_and_graphql() -> Non
 
     assert "01 - Installment vs cash calculate (REST public)" in names
     assert "02 - Installment vs cash save (REST auth required)" in names
-    assert "04 - GraphQL installment vs cash calculate (public)" in names
-    assert "05 - GraphQL installment vs cash save (auth required)" in names
+    assert "06 - GraphQL installment vs cash calculate (public)" in names
+    assert "07 - GraphQL installment vs cash save (auth required)" in names
+
+
+def test_postman_collection_covers_canonical_graphql_operations() -> None:
+    items = _flatten_request_items(_load_postman_items())
+    names = {str(item.get("name")) for item in items}
+
+    expected = {
+        "01 - GraphQL empty query (validation error)",
+        "02 - GraphQL login invalid credentials (safe error)",
+        "03 - GraphQL me query (auth required)",
+        "04 - GraphQL forgot password stays neutral",
+        "05 - GraphQL reset password invalid token is public validation error",
+        "06 - GraphQL installment vs cash calculate (public)",
+        "07 - GraphQL installment vs cash save (auth required)",
+        "08 - GraphQL transaction dashboard seed (auth required)",
+        "09 - GraphQL transaction summary and dashboard (auth required)",
+        "10 - GraphQL wallet create (auth required)",
+        "11 - GraphQL wallet list and valuation (auth required)",
+        "12 - GraphQL logout mutation (auth required)",
+    }
+
+    missing = sorted(expected - names)
+    assert not missing, (
+        f"Postman collection missing canonical GraphQL coverage: {missing}"
+    )
 
 
 def test_postman_collection_covers_critical_rest_routes() -> None:
