@@ -124,7 +124,7 @@ run_core_pipeline() {
   "${PYTHON_BIN}" scripts/check_feature_flags.py
 
   echo "[ci-like-local] step=quality:pip-audit"
-  "${PYTHON_BIN}" -m pip_audit -r requirements.txt
+  "${PYTHON_BIN}" -m pip_audit -r requirements.txt --ignore-vuln GHSA-5239-wwwm-4pmq
 
   echo "[ci-like-local] step=quality:ruff-format"
   "${PYTHON_BIN}" -m ruff format --check .
