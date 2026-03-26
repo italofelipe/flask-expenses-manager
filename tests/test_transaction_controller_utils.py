@@ -233,12 +233,18 @@ def test_serialize_transaction_output() -> None:
     transaction.tag_id = uuid4()
     transaction.account_id = uuid4()
     transaction.credit_card_id = uuid4()
+    transaction.source = "bank_import"
+    transaction.external_id = "OFX-123"
+    transaction.bank_name = "itau"
 
     payload = utils.serialize_transaction(transaction)
     assert payload["id"] == str(transaction.id)
     assert payload["amount"] == "100.50"
     assert payload["type"] == "expense"
     assert payload["status"] == "pending"
+    assert payload["source"] == "bank_import"
+    assert payload["external_id"] == "OFX-123"
+    assert payload["bank_name"] == "itau"
     assert payload["start_date"] == "2026-02-01"
     assert payload["end_date"] == "2026-02-28"
     assert payload["created_at"] is not None

@@ -54,6 +54,14 @@ class Transaction(db.Model):
     )
     installment_group_id = db.Column(UUID(as_uuid=True), nullable=True)
     paid_at = db.Column(db.DateTime, nullable=True)
+    source = db.Column(
+        db.String(40),
+        nullable=False,
+        default="manual",
+        server_default="manual",
+    )
+    external_id = db.Column(db.String(120), nullable=True)
+    bank_name = db.Column(db.String(80), nullable=True)
 
     deleted = db.Column(
         db.Boolean, default=False, nullable=False, server_default=db.text("false")
@@ -65,6 +73,13 @@ class Transaction(db.Model):
     tag = db.relationship("Tag", backref="transactions")
     account = db.relationship("Account", backref="transactions")
     credit_card = db.relationship("CreditCard", backref="transactions")
+
+    __table_args__ = (
+        db.UniqueConstraint(
+            "user_id", "external_id", name="uq_transactions_user_external_id"
+        ),
+        db.Index("ix_transactions_user_source", "user_id", "source"),
+    )
 
     def __repr__(self) -> str:
         return (

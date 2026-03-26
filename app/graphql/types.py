@@ -50,6 +50,9 @@ class TransactionTypeObject(graphene.ObjectType):
     credit_card_id = graphene.String()
     status = graphene.String(required=True)
     currency = graphene.String(required=True)
+    source = graphene.String(required=True)
+    external_id = graphene.String()
+    bank_name = graphene.String()
     created_at = graphene.String()
     updated_at = graphene.String()
 

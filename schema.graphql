@@ -346,6 +346,9 @@ type TransactionTypeObject {
   creditCardId: String
   status: String!
   currency: String!
+  source: String!
+  externalId: String
+  bankName: String
   createdAt: String
   updatedAt: String
 }
