@@ -27,7 +27,7 @@ if [[ "$MODE" == "docker" ]]; then
       python -m pip_audit -r requirements.txt --ignore-vuln GHSA-5239-wwwm-4pmq && \
       python -m ruff format --check . && \
       python -m ruff check app tests config run.py run_without_db.py && \
-      python -m mypy app && \
+      python -m mypy --no-incremental app && \
       python -m bandit -r app -lll -iii"
   echo "[quality-local] All quality checks passed (Docker / Python 3.13)."
   exit 0
@@ -39,6 +39,6 @@ echo "[quality-local] Running CI quality pipeline in local environment with ${PY
 "${PYTHON_BIN}" -m pip_audit -r requirements.txt --ignore-vuln GHSA-5239-wwwm-4pmq
 "${PYTHON_BIN}" -m ruff format --check .
 "${PYTHON_BIN}" -m ruff check app tests config run.py run_without_db.py
-"${PYTHON_BIN}" -m mypy app
+"${PYTHON_BIN}" -m mypy --no-incremental app
 "${PYTHON_BIN}" -m bandit -r app -lll -iii
 echo "[quality-local] All quality checks passed (local environment)."

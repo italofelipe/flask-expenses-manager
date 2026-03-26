@@ -133,7 +133,7 @@ run_core_pipeline() {
   "${PYTHON_BIN}" -m ruff check app tests config run.py run_without_db.py
 
   echo "[ci-like-local] step=quality:mypy"
-  "${PYTHON_BIN}" -m mypy app
+  "${PYTHON_BIN}" -m mypy --no-incremental app
 
   echo "[ci-like-local] step=quality:bandit"
   "${PYTHON_BIN}" -m bandit -r app -lll -iii
