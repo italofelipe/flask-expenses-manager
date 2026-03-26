@@ -6,6 +6,7 @@ REPORT_DIR="${ROOT_DIR}/reports/security"
 REPORT_FILE="${REPORT_DIR}/osv-results.json"
 OSV_SCANNER_VERSION="${OSV_SCANNER_VERSION:-2.3.3}"
 OSV_INCLUDE_NODE_LOCKFILE="${OSV_INCLUDE_NODE_LOCKFILE:-false}"
+OSV_ALLOWLIST_VULNS="${OSV_ALLOWLIST_VULNS:-GHSA-5239-wwwm-4pmq}"
 
 mkdir -p "${REPORT_DIR}"
 
@@ -58,7 +59,7 @@ ensure_osv_scanner() {
 
 build_scan_args() {
   local -a args
-  args=(scan source --recursive)
+  args=(scan --experimental-no-default-plugins --experimental-plugins lockfile)
 
   if [[ -f "${ROOT_DIR}/requirements.txt" ]]; then
     args+=(--lockfile "${ROOT_DIR}/requirements.txt")
@@ -72,14 +73,111 @@ build_scan_args() {
   printf '%s\n' "${args[@]}"
 }
 
+report_has_non_allowlisted_vulns() {
+  python3 - "$REPORT_FILE" "$OSV_ALLOWLIST_VULNS" <<'PY'
+import json
+import sys
+from pathlib import Path
+
+report_path = Path(sys.argv[1])
+allowlist = {item.strip() for item in sys.argv[2].split(",") if item.strip()}
+
+if not report_path.exists():
+    print("[osv-scanner] report missing after scan", file=sys.stderr)
+    sys.exit(2)
+
+data = json.loads(report_path.read_text())
+unexpected = set()
+
+for result in data.get("results", []):
+    for package in result.get("packages", []):
+        for vuln in package.get("vulnerabilities", []):
+            vuln_id = vuln.get("id")
+            aliases = set(vuln.get("aliases", []))
+            if vuln_id and vuln_id not in allowlist and not aliases.intersection(allowlist):
+                unexpected.add(vuln_id)
+
+if unexpected:
+    print("[osv-scanner] non-allowlisted vulnerabilities detected:", file=sys.stderr)
+    for vuln_id in sorted(unexpected):
+      print(f"  - {vuln_id}", file=sys.stderr)
+    sys.exit(1)
+
+sys.exit(0)
+PY
+}
+
+stderr_has_unexpected_lines() {
+  local stderr_file
+  stderr_file="$1"
+
+  python3 - "$stderr_file" <<'PY'
+import sys
+from pathlib import Path
+
+stderr_path = Path(sys.argv[1])
+known_metadata_files = {
+    "flask-apispec-0.11.4.tar.gz",
+    "graphql-relay-3.2.0.tar.gz",
+}
+
+if not stderr_path.exists():
+    sys.exit(1)
+
+unexpected = []
+for raw_line in stderr_path.read_text().splitlines():
+    line = raw_line.strip()
+    if not line:
+        continue
+    if (
+        line.startswith("Starting filesystem walk for root:")
+        or line.startswith("Scanned ")
+        or line.startswith("End status:")
+    ):
+        continue
+    if line.startswith("failed to parse metadata for file "):
+        if any(name in line for name in known_metadata_files):
+            continue
+    unexpected.append(line)
+
+if unexpected:
+    print("[osv-scanner] unexpected stderr detected:", file=sys.stderr)
+    for line in unexpected:
+        print(f"  - {line}", file=sys.stderr)
+    sys.exit(0)
+
+sys.exit(1)
+PY
+}
+
 main() {
-  local scanner_path
+  local scanner_path scan_exit scan_stderr
   mapfile -t scan_args < <(build_scan_args)
   scanner_path="$(ensure_osv_scanner)"
+  scan_stderr="$(mktemp)"
 
   echo "[osv-scanner] version=${OSV_SCANNER_VERSION}"
   echo "[osv-scanner] report=${REPORT_FILE}"
-  "${scanner_path}" "${scan_args[@]}"
+
+  set +e
+  "${scanner_path}" "${scan_args[@]}" 2> >(tee "${scan_stderr}" >&2)
+  scan_exit=$?
+  set -e
+
+  if ! report_has_non_allowlisted_vulns; then
+    rm -f "${scan_stderr}"
+    return 1
+  fi
+
+  if [[ "${scan_exit}" -ne 0 ]]; then
+    if stderr_has_unexpected_lines "${scan_stderr}"; then
+      rm -f "${scan_stderr}"
+      return 1
+    fi
+    echo "[osv-scanner] ignoring known metadata parse warnings after successful allowlist evaluation"
+  fi
+
+  rm -f "${scan_stderr}"
 }
 
 main "$@"

@@ -48,7 +48,7 @@ jobs:
         run: python -m ruff check app tests config run.py run_without_db.py
 
       - name: Mypy
-        run: python -m mypy app
+        run: python -m mypy --no-incremental app
 
       - name: Bandit (SAST - high severity gate)
         run: python -m bandit -r app -lll -iii

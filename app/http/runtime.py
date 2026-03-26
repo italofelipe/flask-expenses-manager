@@ -26,7 +26,8 @@ def set_runtime_extension(name: str, value: Any) -> None:
 
 def runtime_logger(name: str = "auraxis.runtime") -> logging.Logger:
     if has_app_context():
-        return current_app.logger
+        logger_name = getattr(current_app.logger, "name", name)
+        return logging.getLogger(str(logger_name))
     return logging.getLogger(name)
 
 

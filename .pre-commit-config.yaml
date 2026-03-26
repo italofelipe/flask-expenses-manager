@@ -30,7 +30,7 @@ repos:
   hooks:
   - id: mypy
     name: mypy
-    entry: scripts/python_tool.sh mypy app
+    entry: scripts/python_tool.sh mypy --no-incremental app
     language: system
     pass_filenames: false
   - id: sonar-local-check

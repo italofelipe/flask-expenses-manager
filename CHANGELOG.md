@@ -1,5 +1,19 @@
 # Changelog
 
+## [1.5.0](https://github.com/italofelipe/auraxis-api/compare/v1.4.0...v1.5.0) (2026-03-26)
+
+
+### Features
+
+* **api:** unify rest errors and add latency baseline ([#700](https://github.com/italofelipe/auraxis-api/issues/700)) ([f3c807d](https://github.com/italofelipe/auraxis-api/commit/f3c807d8ea21957ce984fac022bdf0d4f263e115))
+* **observability:** add low-cost api ops baseline ([#698](https://github.com/italofelipe/auraxis-api/issues/698)) ([062a4af](https://github.com/italofelipe/auraxis-api/commit/062a4af2361cde185972d9542bb498a1d078601a))
+
+
+### Bug Fixes
+
+* **api:** bootstrap operational scripts from repo root ([#702](https://github.com/italofelipe/auraxis-api/issues/702)) ([15303e5](https://github.com/italofelipe/auraxis-api/commit/15303e531f756e1391e674b61e14920bcaa712a0))
+* isolate internal runtime from http middleware ([#706](https://github.com/italofelipe/auraxis-api/issues/706)) ([dba5d4d](https://github.com/italofelipe/auraxis-api/commit/dba5d4d08dc98409898c0df170537d03af90fefa))
+
 ## [1.4.0](https://github.com/italofelipe/auraxis-api/compare/v1.3.0...v1.4.0) (2026-03-22)
 
 
