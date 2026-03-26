@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import logging
-from typing import Any
+from typing import Any, cast
 
 from flask import current_app, has_app_context
 
@@ -26,7 +26,7 @@ def set_runtime_extension(name: str, value: Any) -> None:
 
 def runtime_logger(name: str = "auraxis.runtime") -> logging.Logger:
     if has_app_context():
-        return current_app.logger
+        return cast(logging.Logger, current_app.logger)
     return logging.getLogger(name)
 
 
