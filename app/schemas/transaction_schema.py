@@ -168,6 +168,15 @@ class TransactionResponseSchema(Schema):
         as_string=True, metadata={"description": "Valor da transação"}
     )
     currency = fields.Str(metadata={"description": "Moeda"})
+    source = fields.Str(metadata={"description": "Origem da transação"})
+    external_id = fields.Str(
+        allow_none=True,
+        metadata={"description": "Identificador externo da origem da transação"},
+    )
+    bank_name = fields.Str(
+        allow_none=True,
+        metadata={"description": "Banco associado à origem importada"},
+    )
     status = fields.Str(metadata={"description": "Status da transação"})
     type = fields.Str(metadata={"description": "Tipo da transação"})
     due_date = fields.Date(metadata={"description": "Data de vencimento"})

@@ -709,6 +709,9 @@ def _serialize_transaction(transaction: Transaction) -> dict[str, Any]:
         ),
         "status": transaction.status.value,
         "currency": transaction.currency,
+        "source": transaction.source or "manual",
+        "external_id": transaction.external_id,
+        "bank_name": transaction.bank_name,
         "created_at": (
             transaction.created_at.isoformat() if transaction.created_at else None
         ),
