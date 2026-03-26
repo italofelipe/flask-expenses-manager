@@ -1,11 +1,13 @@
 from __future__ import annotations
 
 from dataclasses import FrozenInstanceError
+from pathlib import Path
 from typing import Any
 
 import pytest
 from flask import Flask, jsonify
 
+from app import create_app
 from app.middleware.cors import (
     CorsPolicy,
     _build_cors_policy_from_env,
@@ -253,3 +255,52 @@ def test_register_cors_rejects_invalid_production_policy(
     app = _build_app()
     with pytest.raises(RuntimeError):
         register_cors(app)
+
+
+def test_create_app_allows_internal_runtime_without_cors_policy(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    monkeypatch.setenv("FLASK_DEBUG", "false")
+    monkeypatch.setenv("FLASK_TESTING", "false")
+    monkeypatch.setenv("AURAXIS_ENV", "production")
+    monkeypatch.setenv("SECURITY_ENFORCE_STRONG_SECRETS", "true")
+    monkeypatch.delenv("CORS_ALLOWED_ORIGINS", raising=False)
+    monkeypatch.setenv(
+        "SECRET_KEY",
+        "prod-secret-key-with-64-chars-minimum-for-runtime-check-0001",
+    )
+    monkeypatch.setenv(
+        "JWT_SECRET_KEY",
+        "prod-jwt-secret-key-with-64-chars-minimum-for-runtime-check-0002",
+    )
+    internal_db_path = tmp_path / "internal-runtime.sqlite3"
+    monkeypatch.setenv("DATABASE_URL", f"sqlite:///{internal_db_path}")
+
+    app = create_app(enable_http_runtime=False)
+
+    assert "cors_policy" not in app.extensions
+
+
+def test_create_app_still_requires_cors_policy_for_http_runtime(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    monkeypatch.setenv("FLASK_DEBUG", "false")
+    monkeypatch.setenv("FLASK_TESTING", "false")
+    monkeypatch.setenv("AURAXIS_ENV", "production")
+    monkeypatch.setenv("SECURITY_ENFORCE_STRONG_SECRETS", "true")
+    monkeypatch.delenv("CORS_ALLOWED_ORIGINS", raising=False)
+    monkeypatch.setenv(
+        "SECRET_KEY",
+        "prod-secret-key-with-64-chars-minimum-for-runtime-check-0001",
+    )
+    monkeypatch.setenv(
+        "JWT_SECRET_KEY",
+        "prod-jwt-secret-key-with-64-chars-minimum-for-runtime-check-0002",
+    )
+    http_db_path = tmp_path / "http-runtime.sqlite3"
+    monkeypatch.setenv("DATABASE_URL", f"sqlite:///{http_db_path}")
+
+    with pytest.raises(RuntimeError, match="CORS_ALLOWED_ORIGINS"):
+        create_app()

@@ -43,7 +43,7 @@ def main() -> int:
     parser = _build_parser()
     args = parser.parse_args()
 
-    app = create_app()
+    app = create_app(enable_http_runtime=False)
     with app.app_context():
         if args.command == "search":
             events = search_audit_events_by_request_id(

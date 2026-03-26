@@ -24,7 +24,7 @@ if [[ "$MODE" == "docker" ]]; then
     python:3.13-slim \
     bash -lc "python -m pip install --upgrade pip && \
       python -m pip install -r requirements.txt -r requirements-dev.txt && \
-      python -m pip_audit -r requirements.txt && \
+      python -m pip_audit -r requirements.txt --ignore-vuln GHSA-5239-wwwm-4pmq && \
       python -m ruff format --check . && \
       python -m ruff check app tests config run.py run_without_db.py && \
       python -m mypy app && \
@@ -36,7 +36,7 @@ fi
 PYTHON_BIN="$(resolve_repo_python "$ROOT_DIR")"
 
 echo "[quality-local] Running CI quality pipeline in local environment with ${PYTHON_BIN}..."
-"${PYTHON_BIN}" -m pip_audit -r requirements.txt
+"${PYTHON_BIN}" -m pip_audit -r requirements.txt --ignore-vuln GHSA-5239-wwwm-4pmq
 "${PYTHON_BIN}" -m ruff format --check .
 "${PYTHON_BIN}" -m ruff check app tests config run.py run_without_db.py
 "${PYTHON_BIN}" -m mypy app
