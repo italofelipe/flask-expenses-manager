@@ -9,14 +9,30 @@ concurrency:
   group: recurrence-job-${{ github.ref }}
   cancel-in-progress: false
 
+permissions:
+  contents: read
+  id-token: write
+  issues: write
+
 jobs:
   generate-recurring-transactions:
     name: Generate Recurring Transactions
     runs-on: ubuntu-latest
+    environment: prod
 
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+
+      - name: Validate required recurrence variables
+        run: |
+          [ -n "${AWS_REGION:-}" ] || { echo "Missing var AWS_REGION"; exit 1; }
+          [ -n "${AWS_ROLE_ARN_PROD:-}" ] || { echo "Missing var AWS_ROLE_ARN_PROD"; exit 1; }
+          [ -n "${AURAXIS_PROD_INSTANCE_ID:-}" ] || { echo "Missing var AURAXIS_PROD_INSTANCE_ID"; exit 1; }
+        env:
+          AWS_REGION: ${{ vars.AWS_REGION }}
+          AWS_ROLE_ARN_PROD: ${{ vars.AWS_ROLE_ARN_PROD }}
+          AURAXIS_PROD_INSTANCE_ID: ${{ vars.AURAXIS_PROD_INSTANCE_ID }}
 
       - name: Setup Python
         uses: actions/setup-python@v5
@@ -30,17 +46,32 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements.txt
 
-      - name: Run recurrence generation script
+      - name: Configure AWS credentials (OIDC)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.AWS_ROLE_ARN_PROD }}
+          aws-region: ${{ vars.AWS_REGION }}
+
+      - name: Run recurrence generation script via SSM
         env:
-          DATABASE_URL: ${{ secrets.RECURRENCE_DATABASE_URL }}
-          SECRET_KEY: ${{ secrets.RECURRENCE_SECRET_KEY }}
-          JWT_SECRET_KEY: ${{ secrets.RECURRENCE_JWT_SECRET_KEY }}
+          AWS_REGION: ${{ vars.AWS_REGION }}
+          PROD_INSTANCE_ID: ${{ vars.AURAXIS_PROD_INSTANCE_ID }}
+          RECURRENCE_DIAGNOSTICS_PATH: ${{ runner.temp }}/recurrence-ssm-diagnostics.json
         run: |
-          if [ -z "${DATABASE_URL}" ]; then
-            echo "RECURRENCE_DATABASE_URL não configurado. Job ignorado."
-            exit 0
-          fi
-          python scripts/generate_recurring_transactions.py
+          python scripts/aws_recurrence_job.py \
+            --profile "" \
+            --region "${AWS_REGION}" \
+            --env prod \
+            --instance-id "${PROD_INSTANCE_ID}" \
+            --diagnostics-json-path "${RECURRENCE_DIAGNOSTICS_PATH}"
+
+      - name: Upload recurrence diagnostics artifact
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: recurrence-ssm-diagnostics
+          path: ${{ runner.temp }}/recurrence-ssm-diagnostics.json
+          if-no-files-found: ignore
 
       - name: Notify failure via GitHub Issue
         if: failure()
@@ -57,13 +88,14 @@ jobs:
               `**Última falha:** ${now}`,
               `**Run:** ${runUrl}`,
               '',
-              'O job agendado de geração de transações recorrentes falhou.',
-              'Verifique os logs do workflow e o estado do banco de dados de produção.',
+              'O job agendado de geração de transações recorrentes falhou via SSM.',
+              'Verifique os logs do workflow, o diagnóstico do comando SSM e o estado da stack de produção.',
               '',
               '### Ações sugeridas',
               '- Revisar logs da execução no link acima',
-              '- Verificar conectividade com `RECURRENCE_DATABASE_URL`',
-              '- Executar `scripts/generate_recurring_transactions.py` manualmente se necessário',
+              '- Revisar o artifact `recurrence-ssm-diagnostics`',
+              '- Verificar o estado de `docker compose` e do container `web` na instância PROD',
+              '- Executar o helper `scripts/aws_recurrence_job.py` manualmente se necessário',
               '',
               '_Issue criada automaticamente pelo GitHub Actions._',
             ].join('\n');

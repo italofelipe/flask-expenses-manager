@@ -1,0 +1,86 @@
+from __future__ import annotations
+
+import json
+import subprocess
+from pathlib import Path
+from typing import Any
+
+import pytest
+
+from scripts import aws_recurrence_job
+
+
+def test_build_script_runs_recurrence_inside_web_service() -> None:
+    script = aws_recurrence_job._build_script(env_name="prod")
+    expected_up = (
+        'docker compose --env-file "$ENV_FILE" -f "$COMPOSE_FILE" up -d db redis'
+    )
+
+    assert 'ENV_FILE=".env.prod"' in script
+    assert 'COMPOSE_FILE="docker-compose.prod.yml"' in script
+    assert expected_up in script
+    assert "HOME=/tmp python -m pip install --user --no-cache-dir" in script
+    assert "PYTHONPATH=/tmp/.local/lib/python3.13/site-packages:/app" in script
+    assert "python scripts/generate_recurring_transactions.py" in script
+    assert "run --rm --no-deps \\" in script
+    assert "--entrypoint sh web -lc \\" in script
+
+
+def test_wait_raises_ssm_command_failed_with_report(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    def fake_run_aws(
+        ctx: Any, args: list[str], *, expect_json: bool = True
+    ) -> dict[str, Any]:
+        return {
+            "Status": "Failed",
+            "StatusDetails": "ExecutionTimedOut",
+            "ResponseCode": 1,
+            "StandardOutputContent": "recurrence stdout",
+            "StandardErrorContent": "recurrence stderr",
+        }
+
+    monkeypatch.setattr(aws_recurrence_job, "_run_aws", fake_run_aws)
+    ctx = aws_recurrence_job.AwsCtx(profile="", region="us-east-1")
+
+    with pytest.raises(aws_recurrence_job.SsmCommandFailed) as exc_info:
+        aws_recurrence_job._wait(ctx, command_id="cmd-123", instance_id="i-prod")
+
+    report = exc_info.value.report
+    assert report["command_id"] == "cmd-123"
+    assert report["instance_id"] == "i-prod"
+    assert report["status"] == "Failed"
+    assert "recurrence stderr" in report["stderr_tail"]
+
+
+def test_write_diagnostics_json_creates_parent_dirs(tmp_path: Path) -> None:
+    target = tmp_path / "nested" / "report.json"
+    payload = {"status": "Success", "command_id": "cmd-123"}
+
+    aws_recurrence_job._write_diagnostics_json(str(target), payload)
+
+    assert json.loads(target.read_text(encoding="utf-8")) == payload
+
+
+def test_run_aws_skips_empty_profile(monkeypatch: pytest.MonkeyPatch) -> None:
+    captured: dict[str, Any] = {}
+
+    def fake_run(
+        cmd: list[str], capture_output: bool, text: bool, check: bool
+    ) -> subprocess.CompletedProcess[str]:
+        captured["cmd"] = cmd
+        return subprocess.CompletedProcess(
+            args=cmd,
+            returncode=0,
+            stdout=json.dumps({"ok": True}),
+            stderr="",
+        )
+
+    monkeypatch.setattr(aws_recurrence_job.subprocess, "run", fake_run)
+    ctx = aws_recurrence_job.AwsCtx(profile="", region="us-east-1")
+
+    data = aws_recurrence_job._run_aws(ctx, ["sts", "get-caller-identity"])
+
+    assert data == {"ok": True}
+    assert "--profile" not in captured["cmd"]
+    assert "--region" in captured["cmd"]

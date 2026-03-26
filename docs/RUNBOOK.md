@@ -303,7 +303,9 @@ Runbooks curtos de incidente:
 3) Recurrence job falhando
 - abrir o workflow `Recurrence Job`
 - seguir o link da issue automatica reaberta/comentada pelo workflow
-- validar `RECURRENCE_DATABASE_URL` e executar `scripts/generate_recurring_transactions.py` manualmente se necessario
+- revisar o artifact `recurrence-ssm-diagnostics`
+- validar o estado de `docker compose` na instancia PROD e do container `web`
+- executar `scripts/aws_recurrence_job.py --profile auraxis-admin --region us-east-1 --env prod --instance-id <instance-id>` manualmente se necessario
 
 Baseline local de latência por rota crítica:
 ```bash
