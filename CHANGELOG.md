@@ -1,5 +1,18 @@
 # Changelog
 
+## [1.6.0](https://github.com/italofelipe/auraxis-api/compare/v1.5.0...v1.6.0) (2026-03-26)
+
+
+### Features
+
+* **j2:** add bank import transaction foundation ([#716](https://github.com/italofelipe/auraxis-api/issues/716)) ([7106379](https://github.com/italofelipe/auraxis-api/commit/71063799d7c04a80d76b7f1f2e76c63418d3cd95))
+* **j2:** add ofx and nubank parsers ([#717](https://github.com/italofelipe/auraxis-api/issues/717)) ([7c28d08](https://github.com/italofelipe/auraxis-api/commit/7c28d087202468da2f83c9bbc601ca865e6b0849))
+
+
+### Bug Fixes
+
+* **ops:** run recurrence job via ssm ([#714](https://github.com/italofelipe/auraxis-api/issues/714)) ([ee26ffe](https://github.com/italofelipe/auraxis-api/commit/ee26ffe2ab47f1405922bd8f9ddee64e09d923f8))
+
 ## [1.5.0](https://github.com/italofelipe/auraxis-api/compare/v1.4.0...v1.5.0) (2026-03-26)
 
 
