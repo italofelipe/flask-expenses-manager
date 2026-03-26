@@ -13,15 +13,17 @@ from scripts import aws_recurrence_job
 def test_build_script_runs_recurrence_inside_web_service() -> None:
     script = aws_recurrence_job._build_script(env_name="prod")
     expected_up = (
-        'docker compose --env-file "$ENV_FILE" -f "$COMPOSE_FILE" up -d db redis web'
+        'docker compose --env-file "$ENV_FILE" -f "$COMPOSE_FILE" up -d db redis'
     )
 
     assert 'ENV_FILE=".env.prod"' in script
     assert 'COMPOSE_FILE="docker-compose.prod.yml"' in script
     assert expected_up in script
+    assert "python -m pip install --disable-pip-version-check --quiet" in script
     assert "PYTHONPATH=/app" in script
     assert "python scripts/generate_recurring_transactions.py" in script
-    assert "exec -T web \\" in script
+    assert "run --rm --no-deps \\" in script
+    assert "--entrypoint sh web -lc \\" in script
 
 
 def test_wait_raises_ssm_command_failed_with_report(

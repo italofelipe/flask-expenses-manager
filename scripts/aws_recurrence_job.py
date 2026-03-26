@@ -259,36 +259,34 @@ if ! docker info >/dev/null 2>&1; then
   exit 5
 fi
 
-docker compose --env-file "$ENV_FILE" -f "$COMPOSE_FILE" up -d db redis web
+docker compose --env-file "$ENV_FILE" -f "$COMPOSE_FILE" up -d db redis
 
-WEB_CID=""
-for _ in $(seq 1 30); do
-  WEB_CID="$(docker compose --env-file "$ENV_FILE" -f "$COMPOSE_FILE" ps -q web)"
-  WEB_STATE="$(
-    docker inspect -f '{{{{.State.Status}}}}' "$WEB_CID" 2>/dev/null || true
-  )"
-  if [ -n "$WEB_CID" ] && [ "$WEB_STATE" = "running" ]; then
-    break
+INSPECT_HEALTH='{{{{if .State.Health}}}}{{{{.State.Health.Status}}}}\
+{{{{else}}}}{{{{.State.Status}}}}{{{{end}}}}'
+
+for SERVICE in db redis; do
+  CID=""
+  for _ in $(seq 1 30); do
+    CID="$(docker compose --env-file "$ENV_FILE" -f "$COMPOSE_FILE" ps -q "$SERVICE")"
+    HEALTH="$(
+      docker inspect -f "$INSPECT_HEALTH" "$CID" 2>/dev/null || true
+    )"
+    if [ -n "$CID" ] && [ "$HEALTH" = "healthy" -o "$HEALTH" = "running" ]; then
+      break
+    fi
+    sleep 2
+  done
+  if [ -z "$CID" ]; then
+    echo "[recurrence] $SERVICE container was not created"
+    exit 6
   fi
-  sleep 2
 done
 
-if [ -z "$WEB_CID" ]; then
-  echo "[recurrence] web container was not created"
-  exit 6
-fi
-
-WEB_STATE="$(
-  docker inspect -f '{{{{.State.Status}}}}' "$WEB_CID" 2>/dev/null || true
-)"
-if [ "$WEB_STATE" != "running" ]; then
-  echo "[recurrence] web container is not running"
-  docker compose --env-file "$ENV_FILE" -f "$COMPOSE_FILE" ps || true
-  exit 7
-fi
-
-docker compose --env-file "$ENV_FILE" -f "$COMPOSE_FILE" exec -T web \\
-  sh -lc 'cd /app && PYTHONPATH=/app python scripts/generate_recurring_transactions.py'
+docker compose --env-file "$ENV_FILE" -f "$COMPOSE_FILE" run --rm --no-deps \\
+  --entrypoint sh web -lc \\
+  'cd /app \\
+   && python -m pip install --disable-pip-version-check --quiet -r requirements.txt \\
+   && PYTHONPATH=/app python scripts/generate_recurring_transactions.py'
 """
 
 
