@@ -285,8 +285,10 @@ done
 docker compose --env-file "$ENV_FILE" -f "$COMPOSE_FILE" run --rm --no-deps \\
   --entrypoint sh web -lc \\
   'cd /app \\
-   && python -m pip install --disable-pip-version-check --quiet -r requirements.txt \\
-   && PYTHONPATH=/app python scripts/generate_recurring_transactions.py'
+   && HOME=/tmp python -m pip install --user --no-cache-dir \\
+        --disable-pip-version-check --quiet -r requirements.txt \\
+   && PYTHONPATH=/tmp/.local/lib/python3.13/site-packages:/app \\
+        python scripts/generate_recurring_transactions.py'
 """
 
 

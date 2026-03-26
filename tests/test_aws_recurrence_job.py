@@ -19,8 +19,8 @@ def test_build_script_runs_recurrence_inside_web_service() -> None:
     assert 'ENV_FILE=".env.prod"' in script
     assert 'COMPOSE_FILE="docker-compose.prod.yml"' in script
     assert expected_up in script
-    assert "python -m pip install --disable-pip-version-check --quiet" in script
-    assert "PYTHONPATH=/app" in script
+    assert "HOME=/tmp python -m pip install --user --no-cache-dir" in script
+    assert "PYTHONPATH=/tmp/.local/lib/python3.13/site-packages:/app" in script
     assert "python scripts/generate_recurring_transactions.py" in script
     assert "run --rm --no-deps \\" in script
     assert "--entrypoint sh web -lc \\" in script
