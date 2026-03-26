@@ -19,6 +19,7 @@ def test_build_script_runs_recurrence_inside_web_service() -> None:
     assert 'ENV_FILE=".env.prod"' in script
     assert 'COMPOSE_FILE="docker-compose.prod.yml"' in script
     assert expected_up in script
+    assert "PYTHONPATH=/app" in script
     assert "python scripts/generate_recurring_transactions.py" in script
     assert "exec -T web \\" in script
 

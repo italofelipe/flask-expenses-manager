@@ -288,7 +288,7 @@ if [ "$WEB_STATE" != "running" ]; then
 fi
 
 docker compose --env-file "$ENV_FILE" -f "$COMPOSE_FILE" exec -T web \\
-  python scripts/generate_recurring_transactions.py
+  sh -lc 'cd /app && PYTHONPATH=/app python scripts/generate_recurring_transactions.py'
 """
 
 
