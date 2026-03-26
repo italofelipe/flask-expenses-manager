@@ -66,7 +66,15 @@ jwt = JWTManager()
 ma = Marshmallow()
 
 
-def create_app() -> Flask:
+def _register_http_runtime(app: Flask) -> None:
+    register_request_context_adapter(app)
+    register_http_observability(app)
+    register_cors(app)
+    register_security_headers(app)
+    register_docs_access_guard(app)
+
+
+def create_app(*, enable_http_runtime: bool = True) -> Flask:
     # Sentry must be initialised before anything else so it can capture
     # startup errors. Safe no-op when SENTRY_DSN is not set.
     init_sentry()
@@ -147,11 +155,8 @@ def create_app() -> Flask:
     register_user_dependencies(app)
     register_transaction_dependencies(app)
     register_goal_dependencies(app)
-    register_request_context_adapter(app)
-    register_http_observability(app)
-    register_cors(app)
-    register_security_headers(app)
-    register_docs_access_guard(app)
+    if enable_http_runtime:
+        _register_http_runtime(app)
     register_audit_trail(app)
     register_audit_retention_commands(app)
     register_integration_metrics_commands(app)
@@ -196,8 +201,9 @@ def create_app() -> Flask:
     from app.middleware.auth_guard import register_auth_guard
     from app.middleware.rate_limit import register_rate_limit_guard
 
-    register_rate_limit_guard(app)
-    register_auth_guard(app)
+    if enable_http_runtime:
+        register_rate_limit_guard(app)
+        register_auth_guard(app)
     register_jwt_callbacks(jwt)
 
     return app

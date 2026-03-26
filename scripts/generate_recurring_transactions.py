@@ -15,7 +15,7 @@ logger = logging.getLogger(__name__)
 
 
 def main() -> None:
-    app = create_app()
+    app = create_app(enable_http_runtime=False)
     with app.app_context():
         created = RecurrenceService.generate_missing_occurrences(
             reference_date=date.today()
