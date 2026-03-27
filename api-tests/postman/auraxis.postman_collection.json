@@ -4393,6 +4393,102 @@
               }
             }
           ]
+        },
+        {
+          "name": "10 - Bank statement preview (REST v2)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{authToken}}"
+              },
+              {
+                "key": "X-API-Contract",
+                "value": "v2"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/bank-statements/preview",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "bank-statements",
+                "preview"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n                      \"bank\": \"nubank\",\n                      \"content\": \"date,title,amount\\n{{runToday}},Mercado,-123.45\\n{{runToday}},Recebimento,5000.00\\n\"\n                    }\n"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('bank statement preview returns 200', function () { pm.response.to.have.status(200); });",
+                  "var body = pm.response.json();",
+                  "var data = body.data || body;",
+                  "pm.test('bank statement preview returns entries', function () { pm.expect(data.entries).to.be.an('array').and.not.empty; });"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "11 - Bank statement confirm selective (REST v2)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{authToken}}"
+              },
+              {
+                "key": "X-API-Contract",
+                "value": "v2"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/bank-statements/confirm",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "bank-statements",
+                "confirm"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n                      \"bank\": \"nubank\",\n                      \"month\": \"{{runMonthRef}}\",\n                      \"mode\": \"selective\",\n                      \"transactions\": [\n                        {\n                          \"external_id\": \"nubank-{{runSeed}}-1\",\n                          \"date\": \"{{runToday}}\",\n                          \"description\": \"Mercado\",\n                          \"amount\": \"-123.45\",\n                          \"transaction_type\": \"expense\",\n                          \"bank_name\": \"nubank\"\n                        }\n                      ]\n                    }\n"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('bank statement confirm returns 201', function () { pm.response.to.have.status(201); });",
+                  "var body = pm.response.json();",
+                  "var data = body.data || body;",
+                  "pm.test('bank statement confirm imports one transaction', function () { pm.expect(data.imported_count).to.eql(1); });"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
         }
       ]
     },

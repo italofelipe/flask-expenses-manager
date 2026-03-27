@@ -11,6 +11,7 @@ from sqlalchemy.pool import NullPool
 
 from app.controllers.alert_controller import alert_bp
 from app.controllers.auth_controller import auth_bp, register_auth_dependencies
+from app.controllers.bank_statement import bank_statement_bp
 from app.controllers.entitlement import (
     entitlement_bp,
     register_entitlement_dependencies,
@@ -173,6 +174,7 @@ def create_app(*, enable_http_runtime: bool = True) -> Flask:
     app.register_blueprint(graphql_bp)
     app.register_blueprint(health_bp)
     app.register_blueprint(alert_bp)
+    app.register_blueprint(bank_statement_bp)
     app.register_blueprint(subscription_bp)
     app.register_blueprint(entitlement_bp)
     app.register_blueprint(simulation_bp)
