@@ -113,6 +113,37 @@ jobs:
             --pr-number "${PR_NUMBER}" \
             --mode advisory
 
+  pr-traceability:
+    name: PR Traceability (Advisory)
+    if: ${{ github.event_name == 'pull_request' }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: read
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+
+      - name: Summarize PR traceability
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: |
+          python scripts/pr_traceability_check.py \
+            --repo "${GITHUB_REPOSITORY}" \
+            --pr-number "${PR_NUMBER}" \
+            pr-summary \
+            --write-summary
+
   tests:
     name: Tests (Pytest + Coverage)
     runs-on: ubuntu-latest

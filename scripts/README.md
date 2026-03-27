@@ -23,6 +23,7 @@ Scripts operacionais e de engenharia para CI/CD, seguranca, deploy, observabilid
 - Executar script Python com o interpreter da repo: `scripts/python_exec.sh <script.py> [args...]`.
 - Executar binário da `.venv` com fallback seguro: `scripts/repo_bin.sh <tool> [args...]`.
 - Antes de push: rodar `scripts/run_ci_like_actions_local.sh`.
+- Para auditoria de merge/release traceability: usar `scripts/pr_traceability_check.py`.
 - Para smoke API pré-merge: `npm ci && scripts/run_postman_suite.sh`.
 - Para gate rapido canonico: `npm run postman:smoke:ci`.
 - Para integracao black-box completa: `npm run postman:full:ci`.
