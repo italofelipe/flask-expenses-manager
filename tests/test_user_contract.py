@@ -4,6 +4,10 @@ from decimal import Decimal
 from typing import Dict
 
 from app.extensions.database import db
+from app.extensions.integration_metrics import (
+    build_http_observability_metrics_payload,
+    reset_metrics_for_tests,
+)
 from app.models.transaction import Transaction, TransactionStatus, TransactionType
 from app.models.user import User
 from app.models.wallet import Wallet
@@ -240,6 +244,10 @@ def test_user_me_v1_legacy_contract(client) -> None:
     assert "user" in body
     assert "transactions" in body
     assert "wallet" in body
+    assert response.headers["Deprecation"] == "true"
+    assert response.headers["X-Auraxis-Successor-Contract"] == "v3"
+    assert response.headers["X-Auraxis-Successor-Endpoint"] == "/user/bootstrap"
+    assert "GET /user/bootstrap" in response.headers["Warning"]
 
 
 def test_user_me_v2_contract_has_meta_pagination(client) -> None:
@@ -256,6 +264,8 @@ def test_user_me_v2_contract_has_meta_pagination(client) -> None:
     assert "transactions" in body["data"]
     assert "wallet" in body["data"]
     assert "pagination" in body["meta"]
+    assert response.headers["Deprecation"] == "true"
+    assert response.headers["Sunset"]
 
 
 def test_user_me_v2_contract_freezes_current_field_sets(client, app) -> None:
@@ -334,6 +344,24 @@ def test_user_me_v3_contract_returns_canonical_context_only(client) -> None:
     assert "monthly_income" not in body["data"]["user"]["financial_profile"]
     assert "transactions" not in body["data"]["user"]
     assert "wallet" not in body["data"]["user"]
+    assert "Deprecation" not in response.headers
+    assert "Sunset" not in response.headers
+
+
+def test_user_me_legacy_contract_emits_deprecation_metrics(client) -> None:
+    reset_metrics_for_tests()
+    token = _register_and_login(client)
+
+    response = client.get(
+        "/user/me?page=1&limit=10",
+        headers=_auth_headers(token, "v2"),
+    )
+
+    assert response.status_code == 200
+
+    payload = build_http_observability_metrics_payload()
+    assert payload["summary"]["user_me_legacy"] >= 1
+    assert payload["summary"]["user_me_legacy_with_collection_semantics"] >= 1
 
 
 def test_user_me_v3_contract_rejects_collection_semantics(client) -> None:

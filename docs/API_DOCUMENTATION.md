@@ -163,6 +163,11 @@ Sem `v3`, mantém o legado:
 - dados do usuário
 - transações paginadas
 - carteira do usuário
+- com headers de deprecação:
+  - `Deprecation: true`
+  - `Sunset: Tue, 30 Jun 2026 23:59:59 GMT`
+  - `X-Auraxis-Successor-Contract: v3`
+  - `X-Auraxis-Successor-Endpoint: /user/bootstrap`
 
 Query params atuais:
 - `page`
@@ -171,6 +176,9 @@ Query params atuais:
 - `month` (`YYYY-MM`)
 - Com `X-API-Contract: v2`, retorna envelope padronizado e paginação em `meta.pagination`.
 - Com `X-API-Contract: v3`, paginação e filtros de coleção deixam de ser aceitos.
+- A recomendação de migração é:
+  - `GET /user/me` com `v3` para contexto autenticado
+  - `GET /user/bootstrap` para bootstrap de home/frontend
 
 ## 3) Transactions
 - `POST /transactions`

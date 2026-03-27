@@ -69,6 +69,11 @@ O que faz:
 Contrato v2:
 - dados em `data.user`, `data.transactions`, `data.wallet`
 - paginação em `meta.pagination`
+- headers de deprecação:
+  - `Deprecation: true`
+  - `Sunset: Tue, 30 Jun 2026 23:59:59 GMT`
+  - `X-Auraxis-Successor-Contract: v3`
+  - `X-Auraxis-Successor-Endpoint: /user/bootstrap`
 
 Contrato v3:
 - dados em `data.user.identity`
@@ -111,7 +116,7 @@ Query params:
 - `PaginatedResponse`
 
 ## Pontos incompletos / melhorias (Fase 0)
-1. o legado de `/user/me` continua carregando acoplamento alto até os consumidores migrarem.
+1. o legado de `/user/me` continua carregando acoplamento alto até os consumidores migrarem, embora agora já esteja em deprecação explícita.
 2. Parse de data manual coexistindo com validação do schema.
 3. Respostas e tratamento de erro ainda sem contrato totalmente uniforme com outros módulos.
 4. a migração dos consumidores para `/user/me` `v3` e `/user/bootstrap` ainda precisa ser concluída.

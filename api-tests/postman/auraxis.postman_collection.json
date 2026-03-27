@@ -288,6 +288,11 @@
                   "  pm.expect(body.success).to.eql(true);",
                   "  pm.expect(body.data.user.email).to.eql(pm.collectionVariables.get('runEmail'));",
                   "});",
+                  "pm.test('me legacy contract emits deprecation headers', function () {",
+                  "  pm.expect(pm.response.headers.get('Deprecation')).to.eql('true');",
+                  "  pm.expect(pm.response.headers.get('X-Auraxis-Successor-Contract')).to.eql('v3');",
+                  "  pm.expect(pm.response.headers.get('X-Auraxis-Successor-Endpoint')).to.eql('/user/bootstrap');",
+                  "});",
                   "pm.collectionVariables.set('userId', body.data.user.id);"
                 ],
                 "type": "text/javascript"
