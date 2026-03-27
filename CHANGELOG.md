@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.8.0](https://github.com/italofelipe/auraxis-api/compare/v1.7.0...v1.8.0) (2026-03-27)
+
+
+### Features
+
+* **transactions:** normalize update semantics and filters ([#749](https://github.com/italofelipe/auraxis-api/issues/749)) ([b3e5794](https://github.com/italofelipe/auraxis-api/commit/b3e5794feb50e1893d875a201029993a36550232))
+* **transactions:** publish canonical collection and detail reads ([#746](https://github.com/italofelipe/auraxis-api/issues/746)) ([d79e81f](https://github.com/italofelipe/auraxis-api/commit/d79e81f946e565f0f37cb56afcafd4327a7873ae))
+
 ## [1.7.0](https://github.com/italofelipe/auraxis-api/compare/v1.6.0...v1.7.0) (2026-03-27)
 
 
