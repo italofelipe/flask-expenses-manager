@@ -13,6 +13,7 @@ from app.utils.typed_decorators import typed_jwt_required as jwt_required
 from app.utils.typed_decorators import typed_use_kwargs as use_kwargs
 
 from .blueprint import user_bp
+from .bootstrap_resource import UserBootstrapResource
 from .contracts import compat_success
 from .helpers import validate_user_token
 from .me_resource import UserMeResource
@@ -81,6 +82,11 @@ def register_user_routes() -> None:
         "/simulate-salary-increase",
         view_func=UserSalarySimulationResource.as_view("simulate_salary_increase"),
         methods=["POST"],
+    )
+    user_bp.add_url_rule(
+        "/bootstrap",
+        view_func=UserBootstrapResource.as_view("bootstrap"),
+        methods=["GET"],
     )
     user_bp.add_url_rule("/me", view_func=UserMeResource.as_view("me"))
     _ROUTES_REGISTERED = True

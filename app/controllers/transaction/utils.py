@@ -22,7 +22,10 @@ from app.services.transaction_reference_authorization_service import (
     TransactionReferenceAuthorizationError,
     enforce_transaction_reference_ownership,
 )
-from app.services.transaction_serialization import serialize_transaction_payload
+from app.services.transaction_serialization import (
+    TransactionPayload,
+    serialize_transaction_payload,
+)
 from app.utils.response_builder import json_response
 
 INVALID_TOKEN_MESSAGE = "Token inválido."
@@ -285,7 +288,7 @@ def _apply_transaction_updates(
         setattr(transaction, field, value)
 
 
-def serialize_transaction(transaction: Transaction) -> dict[str, Any]:
+def serialize_transaction(transaction: Transaction) -> TransactionPayload:
     return serialize_transaction_payload(transaction)
 
 

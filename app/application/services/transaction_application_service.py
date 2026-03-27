@@ -17,7 +17,10 @@ from app.services.transaction_reference_authorization_service import (
     TransactionReferenceAuthorizationError,
     enforce_transaction_reference_ownership,
 )
-from app.services.transaction_serialization import serialize_transaction_payload
+from app.services.transaction_serialization import (
+    TransactionPayload,
+    serialize_transaction_payload,
+)
 from app.utils.datetime_utils import utc_now_compatible_with
 from app.utils.pagination import PaginatedResponse
 
@@ -200,7 +203,7 @@ class TransactionApplicationService:
         self,
         transaction_id: UUID,
         payload: dict[str, Any],
-    ) -> dict[str, Any]:
+    ) -> TransactionPayload:
         transaction = cast(
             Transaction | None,
             Transaction.query.filter_by(id=transaction_id, deleted=False).first(),
@@ -687,5 +690,5 @@ def _apply_transaction_updates(
         setattr(transaction, field, value)
 
 
-def _serialize_transaction(transaction: Transaction) -> dict[str, Any]:
+def _serialize_transaction(transaction: Transaction) -> TransactionPayload:
     return serialize_transaction_payload(transaction)

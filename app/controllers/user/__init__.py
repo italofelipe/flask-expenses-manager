@@ -11,13 +11,14 @@ from .helpers import (
     filter_transactions,
     validate_user_token,
 )
-from .resources import UserMeResource, UserProfileResource
+from .resources import UserBootstrapResource, UserMeResource, UserProfileResource
 
 __all__ = [
     "user_bp",
     "UserDependencies",
     "register_user_dependencies",
     "get_user_dependencies",
+    "UserBootstrapResource",
     "UserProfileResource",
     "UserMeResource",
     "assign_user_profile_fields",

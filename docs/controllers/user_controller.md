@@ -3,7 +3,8 @@
 Pacote: `app/controllers/user/`
 
 ## Responsabilidade
-Gerenciar perfil do usuário autenticado e visão consolidada (`/user/me`) com dados de transações e carteira.
+Gerenciar perfil do usuário autenticado, contrato canônico de contexto (`/user/me`)
+e bootstrap agregado explícito (`/user/bootstrap`) para frontend/home.
 
 ## Blueprint
 - Prefixo: `/user`
@@ -12,6 +13,7 @@ Gerenciar perfil do usuário autenticado e visão consolidada (`/user/me`) com d
 - Header opcional: `X-API-Contract: v2`
 - Sem header: mantém payload legado atual.
 - Com `v2`: retorna envelope padronizado (`success`, `message`, `data`, `error`, `meta`).
+- Com `v3` em `GET /user/me`: retorna apenas o contexto autenticado canônico.
 
 ## Helpers internos
 
@@ -58,13 +60,42 @@ Endpoint: `GET /user/me`
 
 O que faz:
 - Exige JWT e valida `jti` atual.
-- Busca transações paginadas do usuário com filtros opcionais (`status`, `month`).
-- Busca itens da carteira (`Wallet`) do usuário.
-- Retorna um payload consolidado com `user`, `transactions` e `wallet`.
+- Com `v3`, retorna apenas contexto autenticado canônico.
+- Sem `v3`, preserva o legado:
+  - busca transações paginadas com filtros opcionais (`status`, `month`)
+  - busca itens da carteira (`Wallet`)
+  - retorna payload consolidado com `user`, `transactions` e `wallet`
 
 Contrato v2:
 - dados em `data.user`, `data.transactions`, `data.wallet`
 - paginação em `meta.pagination`
+
+Contrato v3:
+- dados em `data.user.identity`
+- dados em `data.user.profile`
+- dados em `data.user.financial_profile`
+- dados em `data.user.investor_profile`
+- dados em `data.user.product_context`
+- não aceita semântica de coleção (`page`, `limit`, `status`, `month`)
+
+## `UserBootstrapResource.get`
+Endpoint: `GET /user/bootstrap`
+
+O que faz:
+- Exige JWT e valida `jti` atual.
+- Constrói agregado explícito para home/frontend.
+- Reaproveita o mesmo core autenticado de `GET /user/me`.
+- Retorna:
+  - `user` em shape canônico
+  - `transactions_preview` com transações recentes
+  - `wallet` com itens e total
+
+Query params:
+- `transactions_limit` (default `10`, max `50`)
+
+Critério de uso:
+- usar quando web/app precisarem reduzir round-trips na home
+- não usar como substituto de `/transactions` e `/wallet` para listagens completas
 
 Query params:
 - `page` (default 1)
@@ -80,13 +111,13 @@ Query params:
 - `PaginatedResponse`
 
 ## Pontos incompletos / melhorias (Fase 0)
-1. `/user/me` mistura muitos dados em um endpoint só (payload grande e acoplado).
+1. o legado de `/user/me` continua carregando acoplamento alto até os consumidores migrarem.
 2. Parse de data manual coexistindo com validação do schema.
 3. Respostas e tratamento de erro ainda sem contrato totalmente uniforme com outros módulos.
-4. Não há endpoint dedicado para leitura simples de perfil sem transações/carteira.
-5. `GET /user/me` mantém acoplamento alto (perfil + transações + carteira em uma rota).
+4. a migração dos consumidores para `/user/me` `v3` e `/user/bootstrap` ainda precisa ser concluída.
+5. o bootstrap continua agregado por desenho e deve permanecer leve para não virar nova coleção canônica.
 
 ## Recomendação de implementação futura (sem alterar comportamento agora)
-- Criar `UserProfileService` e `UserDashboardService` para separar responsabilidades.
-- Aplicar DTOs/serializers de resposta com contrato único.
-- Cobrir filtros de `/user/me` com testes de integração.
+- concluir a migração dos clientes para o contrato canônico de `/user/me`;
+- manter `/user/bootstrap` apenas como agregado leve de tela;
+- evitar reintroduzir filtros/coleções completas no bootstrap.

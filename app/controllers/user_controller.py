@@ -1,6 +1,7 @@
 """User controller compatibility facade."""
 
 from app.controllers.user import (
+    UserBootstrapResource,
     UserDependencies,
     UserMeResource,
     UserProfileResource,
@@ -25,6 +26,7 @@ __all__ = [
     "UserDependencies",
     "register_user_dependencies",
     "get_user_dependencies",
+    "UserBootstrapResource",
     "UserProfileResource",
     "UserMeResource",
     "assign_user_profile_fields",

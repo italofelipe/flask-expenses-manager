@@ -10,9 +10,9 @@
       "listen": "prerequest",
       "script": {
         "exec": [
-          "var smokeRequests = [\"01 - Healthz\", \"02 - Register user (REST v2)\", \"03 - Login user (REST v2)\", \"04 - Login invalid credentials returns safe error\", \"05 - Me (REST v2)\", \"01 - Create transaction (REST v2)\", \"04 - List active transactions (REST v2)\", \"05 - Transaction summary by month (REST v2)\", \"01 - Create goal (REST v2)\", \"02 - List goals (REST v2)\", \"05 - Goal simulate (REST v2)\", \"01 - Create wallet investment (REST v2)\", \"02 - List wallet investments (REST v2)\", \"08 - Create wallet operation (REST v2)\", \"10 - Wallet operation summary (REST v2)\", \"01 - Installment vs cash calculate (REST public)\", \"02 - Installment vs cash save (REST auth required)\", \"03 - Simulation goal bridge without entitlement returns 403\", \"02 - GraphQL login invalid credentials (safe error)\", \"03 - GraphQL me query (auth required)\", \"04 - GraphQL installment vs cash calculate (public)\", \"01 - List alert preferences (REST v2)\", \"01 - Get my subscription (REST v2)\", \"01 - List entitlements (REST v2)\", \"01 - List shared entries by me (REST v2)\", \"01 - CSV upload preview (REST v2)\"];",
+          "var smokeRequests = [\"01 - Healthz\", \"02 - Register user (REST v2)\", \"03 - Login user (REST v2)\", \"04 - Login invalid credentials returns safe error\", \"05 - Me (REST v2)\", \"06 - User bootstrap (REST v2)\", \"01 - Create transaction (REST v2)\", \"04 - List active transactions (REST v2)\", \"05 - Transaction summary by month (REST v2)\", \"01 - Create goal (REST v2)\", \"02 - List goals (REST v2)\", \"05 - Goal simulate (REST v2)\", \"01 - Create wallet investment (REST v2)\", \"02 - List wallet investments (REST v2)\", \"08 - Create wallet operation (REST v2)\", \"10 - Wallet operation summary (REST v2)\", \"01 - Installment vs cash calculate (REST public)\", \"02 - Installment vs cash save (REST auth required)\", \"03 - Simulation goal bridge without entitlement returns 403\", \"02 - GraphQL login invalid credentials (safe error)\", \"03 - GraphQL me query (auth required)\", \"04 - GraphQL installment vs cash calculate (public)\", \"01 - List alert preferences (REST v2)\", \"01 - Get my subscription (REST v2)\", \"01 - List entitlements (REST v2)\", \"01 - List shared entries by me (REST v2)\", \"01 - CSV upload preview (REST v2)\"];",
           "var privilegedOnlyRequests = [\"04 - Grant advanced simulations entitlement (optional admin)\", \"05 - Save advanced simulation for success bridges (optional admin)\", \"06 - Simulation goal bridge success (optional admin)\", \"07 - Save fee simulation for planned expense bridge (optional admin)\", \"08 - Simulation planned expense bridge success (optional admin)\", \"09 - Revoke advanced simulations entitlement (optional admin)\"];",
-          "var privilegedProfileRequests = [\"01 - Healthz\", \"02 - Register user (REST v2)\", \"03 - Login user (REST v2)\", \"05 - Me (REST v2)\", \"01 - Installment vs cash calculate (REST public)\", \"02 - Installment vs cash save (REST auth required)\", \"03 - Simulation goal bridge without entitlement returns 403\", \"04 - Grant advanced simulations entitlement (optional admin)\", \"05 - Save advanced simulation for success bridges (optional admin)\", \"06 - Simulation goal bridge success (optional admin)\", \"07 - Save fee simulation for planned expense bridge (optional admin)\", \"08 - Simulation planned expense bridge success (optional admin)\", \"09 - Revoke advanced simulations entitlement (optional admin)\"];",
+          "var privilegedProfileRequests = [\"01 - Healthz\", \"02 - Register user (REST v2)\", \"03 - Login user (REST v2)\", \"05 - Me (REST v2)\", \"06 - User bootstrap (REST v2)\", \"01 - Installment vs cash calculate (REST public)\", \"02 - Installment vs cash save (REST auth required)\", \"03 - Simulation goal bridge without entitlement returns 403\", \"04 - Grant advanced simulations entitlement (optional admin)\", \"05 - Save advanced simulation for success bridges (optional admin)\", \"06 - Simulation goal bridge success (optional admin)\", \"07 - Save fee simulation for planned expense bridge (optional admin)\", \"08 - Simulation planned expense bridge success (optional admin)\", \"09 - Revoke advanced simulations entitlement (optional admin)\"];",
           "var activeProfile = String(pm.environment.get('suiteProfile') || pm.collectionVariables.get('suiteProfile') || 'full').toLowerCase();",
           "if (!['smoke', 'full', 'privileged'].includes(activeProfile)) {",
           "  throw new Error('Unsupported suiteProfile: ' + activeProfile + '. Use smoke, full or privileged.');",
@@ -296,7 +296,57 @@
           ]
         },
         {
-          "name": "06 - Profile GET (REST v2)",
+          "name": "06 - User bootstrap (REST v2)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{authToken}}"
+              },
+              {
+                "key": "X-API-Contract",
+                "value": "v2"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/user/bootstrap?transactions_limit=5",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "user",
+                "bootstrap"
+              ],
+              "query": [
+                {
+                  "key": "transactions_limit",
+                  "value": "5"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('user bootstrap returns 200', function () { pm.response.to.have.status(200); });",
+                  "var body = pm.response.json();",
+                  "pm.test('user bootstrap returns explicit aggregate', function () {",
+                  "  pm.expect(body.success).to.eql(true);",
+                  "  pm.expect(body.data.user.identity.email).to.eql(pm.collectionVariables.get('runEmail'));",
+                  "  pm.expect(body.data.transactions_preview.items).to.be.an('array');",
+                  "  pm.expect(body.data.wallet.items).to.be.an('array');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "07 - Profile GET (REST v2)",
           "request": {
             "method": "GET",
             "header": [
@@ -338,7 +388,7 @@
           ]
         },
         {
-          "name": "07 - Profile UPDATE (REST v2)",
+          "name": "08 - Profile UPDATE (REST v2)",
           "request": {
             "method": "PUT",
             "header": [
@@ -388,7 +438,7 @@
           ]
         },
         {
-          "name": "08 - Questionnaire GET (REST v2)",
+          "name": "09 - Questionnaire GET (REST v2)",
           "request": {
             "method": "GET",
             "header": [
@@ -430,7 +480,7 @@
           ]
         },
         {
-          "name": "09 - Questionnaire POST valid answers (REST v2)",
+          "name": "10 - Questionnaire POST valid answers (REST v2)",
           "request": {
             "method": "POST",
             "header": [
@@ -481,7 +531,7 @@
           ]
         },
         {
-          "name": "10 - Questionnaire POST invalid answers (REST v2)",
+          "name": "11 - Questionnaire POST invalid answers (REST v2)",
           "request": {
             "method": "POST",
             "header": [
@@ -529,7 +579,7 @@
           ]
         },
         {
-          "name": "11 - Logout (REST v2)",
+          "name": "12 - Logout (REST v2)",
           "request": {
             "method": "POST",
             "header": [
@@ -568,7 +618,7 @@
           ]
         },
         {
-          "name": "12 - Login again after logout (REST v2)",
+          "name": "13 - Login again after logout (REST v2)",
           "request": {
             "method": "POST",
             "header": [
@@ -611,7 +661,7 @@
           ]
         },
         {
-          "name": "13 - Password forgot unknown email (REST v2)",
+          "name": "14 - Password forgot unknown email (REST v2)",
           "request": {
             "method": "POST",
             "header": [
@@ -655,7 +705,7 @@
           ]
         },
         {
-          "name": "14 - Password forgot known email (REST v2)",
+          "name": "15 - Password forgot known email (REST v2)",
           "request": {
             "method": "POST",
             "header": [
@@ -702,7 +752,7 @@
           ]
         },
         {
-          "name": "15 - Password reset invalid token (REST v2)",
+          "name": "16 - Password reset invalid token (REST v2)",
           "request": {
             "method": "POST",
             "header": [
@@ -749,7 +799,7 @@
           ]
         },
         {
-          "name": "16 - Salary increase simulation (REST v2)",
+          "name": "17 - Salary increase simulation (REST v2)",
           "request": {
             "method": "POST",
             "header": [
@@ -1301,7 +1351,108 @@
           ]
         },
         {
-          "name": "11 - Restore transaction by id (REST v2)",
+          "name": "11 - Bank statement preview (REST v2)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{authToken}}"
+              },
+              {
+                "key": "X-API-Contract",
+                "value": "v2"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/bank-statements/preview",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "bank-statements",
+                "preview"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n                      \"bank\": \"nubank\",\n                      \"content\": \"date,title,amount\\n2026-03-14,Supermercado,-123.45\\n2026-03-15,Salario,5000.00\"\n                    }\n"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('bank statement preview returns 200', function () { pm.response.to.have.status(200); });",
+                  "var body = pm.response.json();",
+                  "pm.test('bank statement preview returns entries', function () {",
+                  "  pm.expect(body.success).to.eql(true);",
+                  "  pm.expect(body.data.entries).to.be.an('array').and.not.empty;",
+                  "});",
+                  "pm.collectionVariables.set('bankPreviewEntries', JSON.stringify(body.data.entries));"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "12 - Bank statement confirm (REST v2)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{authToken}}"
+              },
+              {
+                "key": "X-API-Contract",
+                "value": "v2"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/bank-statements/confirm",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "bank-statements",
+                "confirm"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n                      \"bank\": \"nubank\",\n                      \"month\": \"2026-03\",\n                      \"mode\": \"selective\",\n                      \"transactions\": {{bankPreviewEntries}}\n                    }\n"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('bank statement confirm returns 201', function () { pm.response.to.have.status(201); });",
+                  "var body = pm.response.json();",
+                  "pm.test('bank statement confirm returns imported transactions', function () {",
+                  "  pm.expect(body.success).to.eql(true);",
+                  "  pm.expect(body.data.transactions).to.be.an('array');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "13 - Restore transaction by id (REST v2)",
           "request": {
             "method": "PATCH",
             "header": [
@@ -1340,7 +1491,7 @@
           ]
         },
         {
-          "name": "12 - Delete transaction again (REST v2)",
+          "name": "14 - Delete transaction again (REST v2)",
           "request": {
             "method": "DELETE",
             "header": [
@@ -1377,7 +1528,7 @@
           ]
         },
         {
-          "name": "13 - Force delete transaction by id (REST v2)",
+          "name": "15 - Force delete transaction by id (REST v2)",
           "request": {
             "method": "DELETE",
             "header": [
@@ -4388,102 +4539,6 @@
                   "var doc = body.data ? body.data.fiscal_document : body.fiscal_document;",
                   "pm.collectionVariables.set('fiscalDocumentId', doc.id);",
                   "pm.test('fiscal document create returns id', function () { pm.expect(doc.id).to.be.a('string').and.not.empty; });"
-                ],
-                "type": "text/javascript"
-              }
-            }
-          ]
-        },
-        {
-          "name": "10 - Bank statement preview (REST v2)",
-          "request": {
-            "method": "POST",
-            "header": [
-              {
-                "key": "Content-Type",
-                "value": "application/json"
-              },
-              {
-                "key": "Authorization",
-                "value": "Bearer {{authToken}}"
-              },
-              {
-                "key": "X-API-Contract",
-                "value": "v2"
-              }
-            ],
-            "url": {
-              "raw": "{{baseUrl}}/bank-statements/preview",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "bank-statements",
-                "preview"
-              ]
-            },
-            "body": {
-              "mode": "raw",
-              "raw": "{\n                      \"bank\": \"nubank\",\n                      \"content\": \"date,title,amount\\n{{runToday}},Mercado,-123.45\\n{{runToday}},Recebimento,5000.00\\n\"\n                    }\n"
-            }
-          },
-          "event": [
-            {
-              "listen": "test",
-              "script": {
-                "exec": [
-                  "pm.test('bank statement preview returns 200', function () { pm.response.to.have.status(200); });",
-                  "var body = pm.response.json();",
-                  "var data = body.data || body;",
-                  "pm.test('bank statement preview returns entries', function () { pm.expect(data.entries).to.be.an('array').and.not.empty; });"
-                ],
-                "type": "text/javascript"
-              }
-            }
-          ]
-        },
-        {
-          "name": "11 - Bank statement confirm selective (REST v2)",
-          "request": {
-            "method": "POST",
-            "header": [
-              {
-                "key": "Content-Type",
-                "value": "application/json"
-              },
-              {
-                "key": "Authorization",
-                "value": "Bearer {{authToken}}"
-              },
-              {
-                "key": "X-API-Contract",
-                "value": "v2"
-              }
-            ],
-            "url": {
-              "raw": "{{baseUrl}}/bank-statements/confirm",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "bank-statements",
-                "confirm"
-              ]
-            },
-            "body": {
-              "mode": "raw",
-              "raw": "{\n                      \"bank\": \"nubank\",\n                      \"month\": \"{{runMonthRef}}\",\n                      \"mode\": \"selective\",\n                      \"transactions\": [\n                        {\n                          \"external_id\": \"nubank-{{runSeed}}-1\",\n                          \"date\": \"{{runToday}}\",\n                          \"description\": \"Mercado\",\n                          \"amount\": \"-123.45\",\n                          \"transaction_type\": \"expense\",\n                          \"bank_name\": \"nubank\"\n                        }\n                      ]\n                    }\n"
-            }
-          },
-          "event": [
-            {
-              "listen": "test",
-              "script": {
-                "exec": [
-                  "pm.test('bank statement confirm returns 201', function () { pm.response.to.have.status(201); });",
-                  "var body = pm.response.json();",
-                  "var data = body.data || body;",
-                  "pm.test('bank statement confirm imports one transaction', function () { pm.expect(data.imported_count).to.eql(1); });"
                 ],
                 "type": "text/javascript"
               }
