@@ -1,0 +1,43 @@
+{
+  "task_id": "ARC-08-5",
+  "resource": {
+    "method": "GET",
+    "path": "/user/me"
+  },
+  "change_type": "deprecation_governance",
+  "contracts": {
+    "v3": {
+      "status": "canonical",
+      "query_params": [],
+      "collections_in_payload": false
+    },
+    "legacy": {
+      "status": "deprecated",
+      "query_params": ["page", "limit", "status", "month"],
+      "collections_in_payload": true,
+      "response_headers": {
+        "Deprecation": "true",
+        "Sunset": "Tue, 30 Jun 2026 23:59:59 GMT",
+        "X-Auraxis-Successor-Contract": "v3",
+        "X-Auraxis-Successor-Endpoint": "/user/bootstrap"
+      }
+    }
+  },
+  "successors": {
+    "authenticated_context": {
+      "path": "/user/me",
+      "contract": "v3"
+    },
+    "home_bootstrap": {
+      "path": "/user/bootstrap",
+      "contract": "v2"
+    }
+  },
+  "observability": {
+    "metrics": [
+      "http.request.user_me.legacy",
+      "http.request.user_me.legacy.collection_semantics",
+      "http.request.user_me.legacy.no_collection_semantics"
+    ]
+  }
+}
