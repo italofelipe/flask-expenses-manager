@@ -1,0 +1,37 @@
+name: Docs Portal Dispatch
+
+on:
+  push:
+    branches:
+      - master
+    paths:
+      - 'app/**'
+      - 'config/**'
+      - 'migrations/**'
+      - '.github/workflows/docs-portal-dispatch.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  dispatch:
+    name: Trigger platform docs portal refresh
+    runs-on: ubuntu-latest
+    steps:
+      - name: Dispatch docs refresh to auraxis-platform
+        env:
+          GH_TOKEN: ${{ secrets.TOKEN_GITHUB_ADMIN }}
+        run: |
+          if [[ -z "${GH_TOKEN:-}" ]]; then
+            echo "::error::Missing secrets.TOKEN_GITHUB_ADMIN" >&2
+            exit 1
+          fi
+
+          gh api \
+            --method POST \
+            -H "Accept: application/vnd.github+json" \
+            "/repos/italofelipe/auraxis-platform/dispatches" \
+            -f event_type='api_openapi_updated' \
+            -F client_payload[api_ref]="${GITHUB_SHA}" \
+            -F client_payload[source_repository]="${GITHUB_REPOSITORY}" \
+            -F client_payload[source_sha]="${GITHUB_SHA}"
