@@ -13,12 +13,18 @@ from app.controllers.response_contract import (
 )
 from app.controllers.transaction.dependencies import get_transaction_dependencies
 from app.controllers.transaction.utils import _guard_revoked_token
+from app.docs.openapi_helpers import (
+    contract_header_param,
+    json_error_response,
+    json_success_response,
+)
 from app.utils.typed_decorators import typed_doc as doc
 from app.utils.typed_decorators import typed_jwt_required as jwt_required
 
 
 class DashboardOverviewResource(MethodResource):
     @doc(
+        summary="Obter overview mensal do dashboard",
         description=(
             "Contrato canônico do dashboard financeiro do MVP1. "
             "Use esta rota para visão agregada mensal; "
@@ -33,19 +39,65 @@ class DashboardOverviewResource(MethodResource):
                 "in": "query",
                 "type": "string",
                 "required": True,
+                "example": "2026-03",
             },
-            "X-API-Contract": {
-                "in": "header",
-                "description": "Opcional. Envie 'v2' para o contrato padronizado.",
-                "type": "string",
-                "required": False,
-            },
+            **contract_header_param(supported_version="v2"),
         },
         responses={
-            200: {"description": "Overview do dashboard"},
-            400: {"description": "Parâmetro inválido"},
-            401: {"description": "Token inválido"},
-            500: {"description": "Erro interno"},
+            200: json_success_response(
+                description="Overview do dashboard",
+                message="Overview do dashboard calculado com sucesso",
+                data_example={
+                    "month": "2026-03",
+                    "totals": {
+                        "income_total": 5000.0,
+                        "expense_total": 3200.0,
+                        "balance": 1800.0,
+                    },
+                    "counts": {
+                        "total_transactions": 14,
+                        "income_transactions": 4,
+                        "expense_transactions": 10,
+                        "status": {"paid": 9, "pending": 5},
+                    },
+                    "top_categories": {
+                        "expense": [
+                            {
+                                "tag_id": "73c3b094-60bf-45d5-8e32-0f673b2ab4a2",
+                                "category_name": "Moradia",
+                                "total_amount": 1800.0,
+                                "transactions_count": 3,
+                            }
+                        ],
+                        "income": [
+                            {
+                                "tag_id": None,
+                                "category_name": "Receitas",
+                                "total_amount": 5000.0,
+                                "transactions_count": 4,
+                            }
+                        ],
+                    },
+                },
+            ),
+            400: json_error_response(
+                description="Parâmetro inválido",
+                message="Parâmetro 'month' inválido. Use o formato YYYY-MM.",
+                error_code="VALIDATION_ERROR",
+                status_code=400,
+            ),
+            401: json_error_response(
+                description="Token inválido",
+                message="Token revogado",
+                error_code="UNAUTHORIZED",
+                status_code=401,
+            ),
+            500: json_error_response(
+                description="Erro interno",
+                message="Erro ao calcular overview do dashboard",
+                error_code="INTERNAL_ERROR",
+                status_code=500,
+            ),
         },
     )
     @jwt_required()

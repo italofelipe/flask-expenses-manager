@@ -1,8 +1,11 @@
 import os
+from collections.abc import Mapping
+from typing import Any
 
 from apispec import APISpec
 from apispec.ext.marshmallow import MarshmallowPlugin
-from flask import Flask
+from flask import Flask, jsonify
+from flask.typing import ResponseReturnValue
 from flask_apispec import FlaskApiSpec
 from flask_jwt_extended import JWTManager
 from flask_marshmallow import Marshmallow
@@ -66,6 +69,10 @@ from app.models.tag import Tag  # noqa: F401
 
 jwt = JWTManager()
 ma = Marshmallow()
+DOCS_CLASS_REGISTRATION_FALLBACK_ENDPOINTS = {
+    "goal.goal_collection",
+    "simulation.simulation_collection",
+}
 
 
 def _register_http_runtime(app: Flask) -> None:
@@ -74,6 +81,71 @@ def _register_http_runtime(app: Flask) -> None:
     register_cors(app)
     register_security_headers(app)
     register_docs_access_guard(app)
+
+
+def _coerce_openapi_numeric_bound(value: object) -> object:
+    if isinstance(value, str):
+        try:
+            number = float(value)
+        except ValueError:
+            return value
+        return int(number) if number.is_integer() else number
+    return value
+
+
+def _normalize_openapi_numbers(node: object) -> object:
+    numeric_bound_keys = {
+        "minimum",
+        "maximum",
+        "exclusiveMinimum",
+        "exclusiveMaximum",
+        "multipleOf",
+    }
+    if isinstance(node, dict):
+        normalized: dict[str, object] = {}
+        for key, value in node.items():
+            normalized[key] = (
+                _coerce_openapi_numeric_bound(value)
+                if key in numeric_bound_keys
+                else _normalize_openapi_numbers(value)
+            )
+        return normalized
+    if isinstance(node, list):
+        return [_normalize_openapi_numbers(item) for item in node]
+    return node
+
+
+def _register_normalized_swagger_json_route(app: Flask, docs: FlaskApiSpec) -> None:
+    def normalized_swagger_json() -> ResponseReturnValue:
+        return jsonify(_normalize_openapi_numbers(docs.spec.to_dict()))
+
+    for endpoint_name in ("flask-apispec.swagger-json", "flask-apispec.swagger_json"):
+        if endpoint_name in app.view_functions:
+            app.view_functions[endpoint_name] = normalized_swagger_json
+
+
+def _register_documented_endpoints(app: Flask, docs: FlaskApiSpec) -> None:
+    documented_blueprints = {
+        "auth",
+        "user",
+        "transaction",
+        "dashboard",
+        "goal",
+        "wallet",
+        "health",
+        "entitlement",
+        "simulation",
+    }
+    for endpoint, view_func in sorted(app.view_functions.items()):
+        if "." not in endpoint:
+            continue
+        blueprint, endpoint_name = endpoint.split(".", 1)
+        if blueprint not in documented_blueprints:
+            continue
+        docs_target = getattr(view_func, "view_class", view_func)
+        if endpoint in DOCS_CLASS_REGISTRATION_FALLBACK_ENDPOINTS:
+            docs_target = view_func
+        docs.register(docs_target, blueprint=blueprint, endpoint=endpoint_name)
 
 
 def create_app(*, enable_http_runtime: bool = True) -> Flask:
@@ -149,6 +221,7 @@ def create_app(*, enable_http_runtime: bool = True) -> Flask:
     )
 
     docs = FlaskApiSpec(app)
+    _register_normalized_swagger_json_route(app, docs)
 
     # Registra erros globais
     register_error_handlers(app)
@@ -184,24 +257,7 @@ def create_app(*, enable_http_runtime: bool = True) -> Flask:
     app.register_blueprint(fiscal_bp)
 
     # Registra os endpoints documentados no Swagger com base no mapa real de rotas.
-    documented_blueprints = {
-        "auth",
-        "user",
-        "transaction",
-        "dashboard",
-        "goal",
-        "wallet",
-        "health",
-        "entitlement",
-        "simulation",
-    }
-    for endpoint, view_func in sorted(app.view_functions.items()):
-        if "." not in endpoint:
-            continue
-        blueprint, endpoint_name = endpoint.split(".", 1)
-        if blueprint not in documented_blueprints:
-            continue
-        docs.register(view_func, blueprint=blueprint, endpoint=endpoint_name)
+    _register_documented_endpoints(app, docs)
     from app.extensions.jwt_callbacks import register_jwt_callbacks
     from app.middleware.auth_guard import register_auth_guard
     from app.middleware.rate_limit import register_rate_limit_guard

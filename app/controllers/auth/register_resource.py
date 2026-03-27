@@ -5,6 +5,12 @@ from typing import Any
 from flask import Response, current_app
 from flask_apispec.views import MethodResource
 
+from app.docs.openapi_helpers import (
+    contract_header_param,
+    json_error_response,
+    json_request_body,
+    json_success_response,
+)
 from app.extensions.database import db
 from app.models.user import User
 from app.schemas.user_schemas import UserRegistrationSchema
@@ -17,21 +23,57 @@ from .dependencies import get_auth_dependencies
 
 class RegisterResource(MethodResource):
     @doc(
-        description="Cria um novo usuário no sistema",
+        summary="Registrar usuário",
+        description=(
+            "Cria uma nova conta no sistema.\n\n"
+            "Payload:\n"
+            "- `name`, `email` e `password` são obrigatórios\n"
+            "- `investor_profile` é opcional no onboarding inicial\n\n"
+            "Dependendo da política de segurança, conflitos de email podem ser "
+            "neutralizados com uma resposta de aceite para evitar enumeração."
+        ),
         tags=["Autenticação"],
-        params={
-            "X-API-Contract": {
-                "in": "header",
-                "description": "Opcional. Envie 'v2' para o contrato padronizado.",
-                "type": "string",
-                "required": False,
-            }
-        },
+        params=contract_header_param(supported_version="v2"),
+        requestBody=json_request_body(
+            schema=UserRegistrationSchema,
+            description="Dados necessários para criação da conta.",
+            example={
+                "name": "Italo Chagas",
+                "email": "italo@auraxis.com.br",
+                "password": "MinhaSenha@123",
+                "investor_profile": "conservador",
+            },
+        ),
         responses={
-            201: {"description": "Usuário criado com sucesso"},
-            400: {"description": "Erro de validação"},
-            409: {"description": "Email já registrado"},
-            500: {"description": "Erro interno do servidor"},
+            201: json_success_response(
+                description="Usuário criado com sucesso",
+                message="User created successfully",
+                data_example={
+                    "user": {
+                        "id": "4b2ef64b-b35d-4ea2-a6f2-4ef3cfb295f1",
+                        "name": "Italo Chagas",
+                        "email": "italo@auraxis.com.br",
+                    }
+                },
+            ),
+            400: json_error_response(
+                description="Erro de validação",
+                message="Erro de validação",
+                error_code="VALIDATION_ERROR",
+                status_code=400,
+            ),
+            409: json_error_response(
+                description="Email já registrado",
+                message="Email já registrado",
+                error_code="CONFLICT",
+                status_code=409,
+            ),
+            500: json_error_response(
+                description="Erro interno do servidor",
+                message="Failed to create user",
+                error_code="INTERNAL_ERROR",
+                status_code=500,
+            ),
         },
     )
     @use_kwargs(UserRegistrationSchema, location="json")

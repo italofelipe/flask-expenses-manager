@@ -5,6 +5,12 @@ from typing import Any
 from flask import Response, current_app
 from flask_apispec.views import MethodResource
 
+from app.docs.openapi_helpers import (
+    contract_header_param,
+    json_error_response,
+    json_request_body,
+    json_success_response,
+)
 from app.extensions.database import db
 from app.http.request_context import get_request_context
 from app.schemas.auth_schema import AuthSchema
@@ -57,36 +63,72 @@ def _too_many_attempts_response(*, retry_after: int | None) -> Response:
 
 class AuthResource(MethodResource):
     @doc(
-        description="Autenticação de usuário (email ou nome devem ser fornecidos)",
+        summary="Autenticar usuário",
+        description=(
+            "Autentica o usuário com email ou nome e devolve um token JWT.\n\n"
+            "Headers:\n"
+            "- `X-API-Contract`: opcional; `v2` padroniza o envelope.\n\n"
+            "Payload:\n"
+            "- `email` ou `name` devem ser informados\n"
+            "- `password` é obrigatório\n\n"
+            "Resposta:\n"
+            "- `data.token`: JWT para chamadas autenticadas\n"
+            "- `data.user`: dados básicos do usuário autenticado"
+        ),
         tags=["Autenticação"],
-        params={
-            "X-API-Contract": {
-                "in": "header",
-                "description": "Opcional. Envie 'v2' para o contrato padronizado.",
-                "type": "string",
-                "required": False,
-            }
-        },
-        requestBody={
-            "required": True,
-            "content": {
-                "application/json": {
-                    "schema": AuthSchema,
-                    "example": {
-                        "email": "email@email.com",
-                        "password": "<YOUR_PASSWORD>",
-                    },
-                }
+        params=contract_header_param(supported_version="v2"),
+        requestBody=json_request_body(
+            schema=AuthSchema,
+            description="Credenciais para login via email ou nome.",
+            example={
+                "email": "italo@auraxis.com.br",
+                "password": "MinhaSenha@123",
             },
-        },
+        ),
         responses={
-            200: {"description": "Login realizado com sucesso"},
-            400: {"description": "Credenciais ausentes"},
-            401: {"description": "Credenciais inválidas"},
-            503: {
-                "description": "Serviço de autenticação temporariamente indisponível"
-            },
-            500: {"description": "Erro interno ao efetuar login"},
+            200: json_success_response(
+                description="Login realizado com sucesso",
+                message="Login successful",
+                data_example={
+                    "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+                    "user": {
+                        "id": "4b2ef64b-b35d-4ea2-a6f2-4ef3cfb295f1",
+                        "name": "Italo Chagas",
+                        "email": "italo@auraxis.com.br",
+                    },
+                },
+            ),
+            400: json_error_response(
+                description="Credenciais ausentes ou payload inválido",
+                message="Missing credentials",
+                error_code="VALIDATION_ERROR",
+                status_code=400,
+            ),
+            401: json_error_response(
+                description="Credenciais inválidas",
+                message="Invalid credentials",
+                error_code="UNAUTHORIZED",
+                status_code=401,
+            ),
+            429: json_error_response(
+                description="Muitas tentativas de login",
+                message="Too many login attempts. Try again later.",
+                error_code="TOO_MANY_ATTEMPTS",
+                status_code=429,
+                details_example={"retry_after_seconds": 300},
+            ),
+            503: json_error_response(
+                description="Serviço de autenticação temporariamente indisponível",
+                message="Authentication temporarily unavailable. Try again later.",
+                error_code="AUTH_BACKEND_UNAVAILABLE",
+                status_code=503,
+            ),
+            500: json_error_response(
+                description="Erro interno ao efetuar login",
+                message="Login failed",
+                error_code="INTERNAL_ERROR",
+                status_code=500,
+            ),
         },
     )
     @use_kwargs(AuthSchema, location="json")
