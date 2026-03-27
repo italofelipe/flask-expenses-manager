@@ -69,7 +69,11 @@ Jobs relevantes:
 12. `security-evidence`
 - executa `scripts/security_evidence_check.sh`
 
-13. `sonar`
+13. `pr-traceability`
+- resumo advisory de merge/release traceability para PRs
+- explicita se o PR e release, stacked e qual e a base/head real
+
+14. `sonar`
 - scan SonarCloud + quality gate + enforce de ratings A
 
 Notas:
@@ -98,6 +102,17 @@ Arquitetura canonica de smoke/release gate:
 - fluxos legados paralelos de smoke foram removidos para evitar drift
 - readiness no caminho comum de merge/release exige os dois gates oficiais (`smoke` + `full`) em verde
 - o perfil `privileged` continua em workflow manual separado, fora do caminho comum
+
+Traceability adicional:
+- todo `pull_request` publica resumo advisory via `scripts/pr_traceability_check.py`
+- o mesmo script pode ser usado manualmente para verificar absorcao em `master` apos merge:
+
+```bash
+python scripts/pr_traceability_check.py \
+  --repo italofelipe/auraxis-api \
+  --pr-number 720 \
+  master-absorption
+```
 
 Politica de docs runtime:
 - a documentacao publica oficial da API vive no portal `docs.auraxis.com.br/api/`
