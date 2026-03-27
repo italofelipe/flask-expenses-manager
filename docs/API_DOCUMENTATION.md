@@ -99,12 +99,35 @@ Resposta de sucesso:
 - Com `X-API-Contract: v2`, retorna envelope padronizado.
 
 ## 2) User
+- `GET /user/bootstrap`
 - `PUT /user/profile`
 - `GET /user/me`
 
 Contrato de resposta:
 - Padrão legado (default): sem envelope `success/data/meta`.
-- Novo contrato: enviar header `X-API-Contract: v2`.
+- Contrato padronizado: enviar header `X-API-Contract: v2`.
+- Contrato canônico de contexto autenticado: `X-API-Contract: v3` em `GET /user/me`.
+
+### `GET /user/bootstrap`
+Retorna um agregado explícito para bootstrap de home/frontend, sem deformar `/user/me`.
+
+Ownership:
+- `GET /user/me` com `v3`: contexto autenticado canônico
+- `GET /transactions`: coleção canônica de transações
+- `GET /wallet`: coleção canônica de carteira
+- `GET /user/bootstrap`: agregado leve para reduzir round-trips iniciais
+
+Resposta:
+- `user` com shape canônico
+- `transactions_preview` com transações recentes
+- `wallet` com itens e total
+
+Query params:
+- `transactions_limit` (`1-50`, default `10`)
+
+Observações:
+- o bootstrap não aceita filtros de coleção completos;
+- para listagens/filtros reais, usar `/transactions` e `/wallet`.
 
 ### `PUT /user/profile`
 Atualiza perfil financeiro/pessoal do usuário autenticado.
@@ -129,7 +152,14 @@ Erros comuns:
 - `404` usuário não encontrado
 
 ### `GET /user/me`
-Retorna:
+Com `X-API-Contract: v3`, retorna apenas contexto autenticado canônico:
+- `identity`
+- `profile`
+- `financial_profile`
+- `investor_profile`
+- `product_context`
+
+Sem `v3`, mantém o legado:
 - dados do usuário
 - transações paginadas
 - carteira do usuário
@@ -140,6 +170,7 @@ Query params atuais:
 - `status`
 - `month` (`YYYY-MM`)
 - Com `X-API-Contract: v2`, retorna envelope padronizado e paginação em `meta.pagination`.
+- Com `X-API-Contract: v3`, paginação e filtros de coleção deixam de ser aceitos.
 
 ## 3) Transactions
 - `POST /transactions`

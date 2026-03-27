@@ -28,6 +28,7 @@ Create the security inventory required by `S3` as input for remediation tasks in
 | Auth | POST | `/auth/logout` | JWT | Session/token invalidation | API2 |
 | User | PUT | `/user/profile` | JWT | Personal/financial profile update | API1, API3, API5 |
 | User | GET | `/user/me` | JWT | Consolidated user+transactions+wallet view | API1, API3 |
+| User | GET | `/user/bootstrap` | JWT | Explicit home/bootstrap aggregate with user context + recent transactions + wallet snapshot | API1, API3 |
 | Transactions | POST | `/transactions` | JWT | Create transaction(s), installment flows | API4, API6 |
 | Transactions | PUT | `/transactions/{transaction_id}` | JWT | Update transaction | API1, API3 |
 | Transactions | DELETE | `/transactions/{transaction_id}` | JWT | Soft delete transaction | API1, API5 |

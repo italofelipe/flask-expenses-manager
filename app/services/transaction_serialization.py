@@ -1,11 +1,36 @@
 from __future__ import annotations
 
-from typing import Any
+from typing import TypedDict
 
 from app.models.transaction import Transaction
 
 
-def serialize_transaction_payload(transaction: Transaction) -> dict[str, Any]:
+class TransactionPayload(TypedDict):
+    id: str
+    title: str
+    amount: str
+    type: str
+    due_date: str
+    start_date: str | None
+    end_date: str | None
+    description: str | None
+    observation: str | None
+    is_recurring: bool
+    is_installment: bool
+    installment_count: int | None
+    tag_id: str | None
+    account_id: str | None
+    credit_card_id: str | None
+    status: str
+    currency: str
+    source: str
+    external_id: str | None
+    bank_name: str | None
+    created_at: str | None
+    updated_at: str | None
+
+
+def serialize_transaction_payload(transaction: Transaction) -> TransactionPayload:
     return {
         "id": str(transaction.id),
         "title": transaction.title,
@@ -40,4 +65,4 @@ def serialize_transaction_payload(transaction: Transaction) -> dict[str, Any]:
     }
 
 
-__all__ = ["serialize_transaction_payload"]
+__all__ = ["TransactionPayload", "serialize_transaction_payload"]

@@ -1,0 +1,47 @@
+{
+  "task_id": "ARC-08-4",
+  "feature": "user_bootstrap_explicit_aggregate",
+  "rest_endpoint": {
+    "method": "GET",
+    "path": "/user/bootstrap",
+    "auth": true,
+    "query_params": {
+      "transactions_limit": {
+        "type": "integer",
+        "default": 10,
+        "min": 1,
+        "max": 50,
+        "required": false
+      }
+    }
+  },
+  "ownership": {
+    "user_me_v3": "authenticated context only",
+    "transactions": "canonical transaction collection",
+    "wallet": "canonical wallet collection",
+    "user_bootstrap": "lightweight home aggregate"
+  },
+  "contract": {
+    "top_level_keys": ["success", "message", "data"],
+    "data_keys": ["user", "transactions_preview", "wallet"]
+  },
+  "user_payload_source": "same canonical user payload from /user/me v3",
+  "transactions_preview": {
+    "keys": ["items", "returned_items", "limit", "has_more"],
+    "notes": [
+      "items are ordered by due_date desc",
+      "preview is not a canonical list endpoint"
+    ]
+  },
+  "wallet": {
+    "keys": ["items", "total"]
+  },
+  "not_supported": [
+    "page",
+    "limit",
+    "status",
+    "month",
+    "full transaction filtering",
+    "full wallet filtering"
+  ]
+}

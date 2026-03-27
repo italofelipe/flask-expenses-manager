@@ -14,6 +14,7 @@ SMOKE_REQUESTS = [
     "03 - Login user (REST v2)",
     "04 - Login invalid credentials returns safe error",
     "05 - Me (REST v2)",
+    "06 - User bootstrap (REST v2)",
     "01 - Create transaction (REST v2)",
     "04 - List active transactions (REST v2)",
     "05 - Transaction summary by month (REST v2)",
@@ -49,6 +50,7 @@ PRIVILEGED_PROFILE_REQUESTS = [
     "02 - Register user (REST v2)",
     "03 - Login user (REST v2)",
     "05 - Me (REST v2)",
+    "06 - User bootstrap (REST v2)",
     "01 - Installment vs cash calculate (REST public)",
     "02 - Installment vs cash save (REST auth required)",
     "03 - Simulation goal bridge without entitlement returns 403",
@@ -331,7 +333,26 @@ def build_collection() -> dict[str, Any]:
             ],
         ),
         _item(
-            "06 - Profile GET (REST v2)",
+            "06 - User bootstrap (REST v2)",
+            _request(
+                method="GET",
+                raw_url="{{baseUrl}}/user/bootstrap?transactions_limit=5",
+                headers=auth_contract_headers,
+                query=[("transactions_limit", "5")],
+            ),
+            test_lines=[
+                "pm.test('user bootstrap returns 200', function () { pm.response.to.have.status(200); });",
+                "var body = pm.response.json();",
+                "pm.test('user bootstrap returns explicit aggregate', function () {",
+                "  pm.expect(body.success).to.eql(true);",
+                "  pm.expect(body.data.user.identity.email).to.eql(pm.collectionVariables.get('runEmail'));",
+                "  pm.expect(body.data.transactions_preview.items).to.be.an('array');",
+                "  pm.expect(body.data.wallet.items).to.be.an('array');",
+                "});",
+            ],
+        ),
+        _item(
+            "07 - Profile GET (REST v2)",
             _request(
                 method="GET",
                 raw_url="{{baseUrl}}/user/profile",
@@ -347,7 +368,7 @@ def build_collection() -> dict[str, Any]:
             ],
         ),
         _item(
-            "07 - Profile UPDATE (REST v2)",
+            "08 - Profile UPDATE (REST v2)",
             _request(
                 method="PUT",
                 raw_url="{{baseUrl}}/user/profile",
@@ -374,7 +395,7 @@ def build_collection() -> dict[str, Any]:
             ],
         ),
         _item(
-            "08 - Questionnaire GET (REST v2)",
+            "09 - Questionnaire GET (REST v2)",
             _request(
                 method="GET",
                 raw_url="{{baseUrl}}/user/profile/questionnaire",
@@ -389,7 +410,7 @@ def build_collection() -> dict[str, Any]:
             ],
         ),
         _item(
-            "09 - Questionnaire POST valid answers (REST v2)",
+            "10 - Questionnaire POST valid answers (REST v2)",
             _request(
                 method="POST",
                 raw_url="{{baseUrl}}/user/profile/questionnaire",
@@ -412,7 +433,7 @@ def build_collection() -> dict[str, Any]:
             ],
         ),
         _item(
-            "10 - Questionnaire POST invalid answers (REST v2)",
+            "11 - Questionnaire POST invalid answers (REST v2)",
             _request(
                 method="POST",
                 raw_url="{{baseUrl}}/user/profile/questionnaire",
@@ -434,7 +455,7 @@ def build_collection() -> dict[str, Any]:
             ],
         ),
         _item(
-            "11 - Logout (REST v2)",
+            "12 - Logout (REST v2)",
             _request(
                 method="POST",
                 raw_url="{{baseUrl}}/auth/logout",
@@ -447,7 +468,7 @@ def build_collection() -> dict[str, Any]:
             ],
         ),
         _item(
-            "12 - Login again after logout (REST v2)",
+            "13 - Login again after logout (REST v2)",
             _request(
                 method="POST",
                 raw_url="{{baseUrl}}/auth/login",
@@ -468,7 +489,7 @@ def build_collection() -> dict[str, Any]:
             ],
         ),
         _item(
-            "13 - Password forgot unknown email (REST v2)",
+            "14 - Password forgot unknown email (REST v2)",
             _request(
                 method="POST",
                 raw_url="{{baseUrl}}/auth/password/forgot",
@@ -488,7 +509,7 @@ def build_collection() -> dict[str, Any]:
             ],
         ),
         _item(
-            "14 - Password forgot known email (REST v2)",
+            "15 - Password forgot known email (REST v2)",
             _request(
                 method="POST",
                 raw_url="{{baseUrl}}/auth/password/forgot",
@@ -511,7 +532,7 @@ def build_collection() -> dict[str, Any]:
             ],
         ),
         _item(
-            "15 - Password reset invalid token (REST v2)",
+            "16 - Password reset invalid token (REST v2)",
             _request(
                 method="POST",
                 raw_url="{{baseUrl}}/auth/password/reset",
@@ -535,7 +556,7 @@ def build_collection() -> dict[str, Any]:
             ],
         ),
         _item(
-            "16 - Salary increase simulation (REST v2)",
+            "17 - Salary increase simulation (REST v2)",
             _request(
                 method="POST",
                 raw_url="{{baseUrl}}/user/simulate-salary-increase",
@@ -766,7 +787,58 @@ def build_collection() -> dict[str, Any]:
             ],
         ),
         _item(
-            "11 - Restore transaction by id (REST v2)",
+            "11 - Bank statement preview (REST v2)",
+            _request(
+                method="POST",
+                raw_url="{{baseUrl}}/bank-statements/preview",
+                headers=auth_json_headers,
+                body=_json_body(
+                    """
+                    {
+                      "bank": "nubank",
+                      "content": "date,title,amount\\n2026-03-14,Supermercado,-123.45\\n2026-03-15,Salario,5000.00"
+                    }
+                    """
+                ),
+            ),
+            test_lines=[
+                "pm.test('bank statement preview returns 200', function () { pm.response.to.have.status(200); });",
+                "var body = pm.response.json();",
+                "pm.test('bank statement preview returns entries', function () {",
+                "  pm.expect(body.success).to.eql(true);",
+                "  pm.expect(body.data.entries).to.be.an('array').and.not.empty;",
+                "});",
+                "pm.collectionVariables.set('bankPreviewEntries', JSON.stringify(body.data.entries));",
+            ],
+        ),
+        _item(
+            "12 - Bank statement confirm (REST v2)",
+            _request(
+                method="POST",
+                raw_url="{{baseUrl}}/bank-statements/confirm",
+                headers=auth_json_headers,
+                body=_json_body(
+                    """
+                    {
+                      "bank": "nubank",
+                      "month": "2026-03",
+                      "mode": "selective",
+                      "transactions": {{bankPreviewEntries}}
+                    }
+                    """
+                ),
+            ),
+            test_lines=[
+                "pm.test('bank statement confirm returns 201', function () { pm.response.to.have.status(201); });",
+                "var body = pm.response.json();",
+                "pm.test('bank statement confirm returns imported transactions', function () {",
+                "  pm.expect(body.success).to.eql(true);",
+                "  pm.expect(body.data.transactions).to.be.an('array');",
+                "});",
+            ],
+        ),
+        _item(
+            "13 - Restore transaction by id (REST v2)",
             _request(
                 method="PATCH",
                 raw_url="{{baseUrl}}/transactions/restore/{{transactionId}}",
@@ -778,7 +850,7 @@ def build_collection() -> dict[str, Any]:
             ],
         ),
         _item(
-            "12 - Delete transaction again (REST v2)",
+            "14 - Delete transaction again (REST v2)",
             _request(
                 method="DELETE",
                 raw_url="{{baseUrl}}/transactions/{{transactionId}}",
@@ -789,7 +861,7 @@ def build_collection() -> dict[str, Any]:
             ],
         ),
         _item(
-            "13 - Force delete transaction by id (REST v2)",
+            "15 - Force delete transaction by id (REST v2)",
             _request(
                 method="DELETE",
                 raw_url="{{baseUrl}}/transactions/{{transactionId}}/force",

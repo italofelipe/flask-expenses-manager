@@ -3,10 +3,15 @@ from __future__ import annotations
 from dataclasses import asdict
 from typing import TypedDict, cast
 
+from app.application.services.authenticated_user_bootstrap_service import (
+    AuthenticatedUserBootstrap,
+    AuthenticatedUserTransactionsPreview,
+)
 from app.application.services.authenticated_user_context_service import (
     AuthenticatedUserProfile,
     AuthenticatedWalletEntry,
 )
+from app.services.transaction_serialization import TransactionPayload
 
 
 class UserProfilePayload(TypedDict):
@@ -73,6 +78,24 @@ class AuthenticatedUserCanonicalPayload(TypedDict):
     product_context: AuthenticatedUserProductContextPayload
 
 
+class AuthenticatedUserTransactionsPreviewPayload(TypedDict):
+    items: list[TransactionPayload]
+    returned_items: int
+    limit: int
+    has_more: bool
+
+
+class AuthenticatedUserBootstrapWalletPayload(TypedDict):
+    items: list[WalletEntryPayload]
+    total: int
+
+
+class AuthenticatedUserBootstrapPayload(TypedDict):
+    user: AuthenticatedUserCanonicalPayload
+    transactions_preview: AuthenticatedUserTransactionsPreviewPayload
+    wallet: AuthenticatedUserBootstrapWalletPayload
+
+
 class WalletEntryPayload(TypedDict):
     id: str
     name: str
@@ -129,6 +152,33 @@ def to_authenticated_user_canonical_payload(
     }
 
 
+def to_transactions_preview_payload(
+    preview: AuthenticatedUserTransactionsPreview,
+) -> AuthenticatedUserTransactionsPreviewPayload:
+    return {
+        "items": list(preview.items),
+        "returned_items": preview.returned_items,
+        "limit": preview.limit,
+        "has_more": preview.has_more,
+    }
+
+
+def to_authenticated_user_bootstrap_payload(
+    bootstrap: AuthenticatedUserBootstrap,
+) -> AuthenticatedUserBootstrapPayload:
+    wallet_items = to_wallet_payload(bootstrap.wallet_entries)
+    return {
+        "user": to_authenticated_user_canonical_payload(bootstrap.profile),
+        "transactions_preview": to_transactions_preview_payload(
+            bootstrap.transactions_preview
+        ),
+        "wallet": {
+            "items": wallet_items,
+            "total": len(wallet_items),
+        },
+    }
+
+
 def to_wallet_entry_payload(
     wallet_entry: AuthenticatedWalletEntry,
 ) -> WalletEntryPayload:
@@ -143,14 +193,19 @@ def to_wallet_payload(
 
 __all__ = [
     "AuthenticatedUserCanonicalPayload",
+    "AuthenticatedUserBootstrapPayload",
+    "AuthenticatedUserBootstrapWalletPayload",
     "AuthenticatedUserFinancialProfilePayload",
     "AuthenticatedUserIdentityPayload",
     "AuthenticatedUserInvestorProfilePayload",
     "AuthenticatedUserProductContextPayload",
     "AuthenticatedUserProfileDetailsPayload",
+    "AuthenticatedUserTransactionsPreviewPayload",
     "UserProfilePayload",
     "WalletEntryPayload",
+    "to_authenticated_user_bootstrap_payload",
     "to_authenticated_user_canonical_payload",
+    "to_transactions_preview_payload",
     "to_user_profile_payload",
     "to_wallet_entry_payload",
     "to_wallet_payload",
