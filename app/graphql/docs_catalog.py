@@ -73,6 +73,14 @@ GRAPHQL_OPERATION_CATALOG: tuple[GraphQLOperationDoc, ...] = (
         source_module=QUERY_TRANSACTION_MODULE,
     ),
     GraphQLOperationDoc(
+        name="transaction",
+        operation_type="query",
+        domain="transactions",
+        access="auth_required",
+        summary="Retorna uma transação específica do usuário.",
+        source_module=QUERY_TRANSACTION_MODULE,
+    ),
+    GraphQLOperationDoc(
         name="transactionSummary",
         operation_type="query",
         domain="transactions",
@@ -270,6 +278,14 @@ GRAPHQL_OPERATION_CATALOG: tuple[GraphQLOperationDoc, ...] = (
         domain="transactions",
         access="auth_required",
         summary="Realiza soft delete de uma transação do usuário.",
+        source_module=MUTATION_TRANSACTION_MODULE,
+    ),
+    GraphQLOperationDoc(
+        name="updateTransaction",
+        operation_type="mutation",
+        domain="transactions",
+        access="auth_required",
+        summary="Atualiza parcialmente uma transação do usuário.",
         source_module=MUTATION_TRANSACTION_MODULE,
     ),
     GraphQLOperationDoc(

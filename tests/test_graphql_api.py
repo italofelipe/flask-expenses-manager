@@ -308,7 +308,7 @@ def test_graphql_transactions_summary_and_dashboard(client) -> None:
     list_query = """
     query ListTx {
       transactions(page: 1, perPage: 10) {
-        items { title type amount }
+        items { id title type amount }
         pagination { total page perPage }
       }
     }
@@ -387,6 +387,65 @@ def test_graphql_transactions_summary_and_dashboard(client) -> None:
     assert due_payload["counts"]["incomeTransactions"] == 1
     assert due_payload["counts"]["expenseTransactions"] == 2
     assert due_payload["items"][0]["title"] == "Conta atrasada"
+
+    first_transaction_id = list_body["data"]["transactions"]["items"][0]["id"]
+    transaction_query = """
+    query Transaction($transactionId: UUID!) {
+      transaction(transactionId: $transactionId) {
+        id
+        title
+        amount
+        source
+      }
+    }
+    """
+    transaction_response = _graphql(
+        client,
+        transaction_query,
+        {"transactionId": first_transaction_id},
+        token=token,
+    )
+    assert transaction_response.status_code == 200
+    transaction_body = transaction_response.get_json()
+    assert "errors" not in transaction_body
+    assert transaction_body["data"]["transaction"]["id"] == first_transaction_id
+
+    update_mutation = """
+    mutation UpdateTx(
+      $transactionId: UUID!,
+      $title: String!,
+      $status: String!,
+      $paidAt: String!
+    ) {
+      updateTransaction(
+        transactionId: $transactionId,
+        title: $title,
+        status: $status,
+        paidAt: $paidAt
+      ) {
+        message
+        transaction { id title status paidAt }
+      }
+    }
+    """
+    update_response = _graphql(
+        client,
+        update_mutation,
+        {
+            "transactionId": first_transaction_id,
+            "title": "Conta de luz atualizada",
+            "status": "paid",
+            "paidAt": "2026-03-01T10:00:00+00:00",
+        },
+        token=token,
+    )
+    assert update_response.status_code == 200
+    update_body = update_response.get_json()
+    assert "errors" not in update_body
+    assert update_body["data"]["updateTransaction"]["transaction"]["title"] == (
+        "Conta de luz atualizada"
+    )
+    assert update_body["data"]["updateTransaction"]["transaction"]["status"] == "paid"
 
 
 def test_graphql_wallet_and_ticker_queries_mutations(client) -> None:

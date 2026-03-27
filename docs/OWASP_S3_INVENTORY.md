@@ -27,8 +27,9 @@ Create the security inventory required by `S3` as input for remediation tasks in
 | Auth | POST | `/auth/login` | Public | Credential auth / JWT issue | API2, API4 |
 | Auth | POST | `/auth/logout` | JWT | Session/token invalidation | API2 |
 | User | PUT | `/user/profile` | JWT | Personal/financial profile update | API1, API3, API5 |
-| User | GET | `/user/me` | JWT | Consolidated user+transactions+wallet view | API1, API3 |
+| User | GET | `/user/me` | JWT | Authenticated user context | API1, API3 |
 | User | GET | `/user/bootstrap` | JWT | Explicit home/bootstrap aggregate with user context + recent transactions + wallet snapshot | API1, API3 |
+| Dashboard | GET | `/dashboard/overview` | JWT | Canonical financial dashboard overview | API1 |
 | Transactions | POST | `/transactions` | JWT | Create transaction(s), installment flows | API4, API6 |
 | Transactions | PUT | `/transactions/{transaction_id}` | JWT | Update transaction | API1, API3 |
 | Transactions | DELETE | `/transactions/{transaction_id}` | JWT | Soft delete transaction | API1, API5 |
@@ -36,7 +37,7 @@ Create the security inventory required by `S3` as input for remediation tasks in
 | Transactions | GET | `/transactions/deleted` | JWT | List deleted transactions | API1 |
 | Transactions | DELETE | `/transactions/{transaction_id}/force` | JWT | Hard delete transaction | API1, API5 |
 | Transactions | GET | `/transactions/summary` | JWT | Monthly summary | API1 |
-| Transactions | GET | `/transactions/dashboard` | JWT | Monthly dashboard aggregates | API1 |
+| Transactions | GET | `/transactions/dashboard` | JWT | Legacy dashboard compatibility alias | API1 |
 | Transactions | GET | `/transactions/list` | JWT | Active list with filters | API1, API4 |
 | Transactions | GET | `/transactions/expenses` | JWT | Period expense list + metrics | API1, API4 |
 | Wallet | POST | `/wallet` | JWT | Create wallet entry | API1, API3 |
@@ -69,6 +70,7 @@ Create the security inventory required by `S3` as input for remediation tasks in
 |---|---|---|
 | `me` | JWT | API1, API3 |
 | `transactions` | JWT | API1, API4 |
+| `transaction` | JWT | API1 |
 | `transactionSummary` | JWT | API1 |
 | `transactionDashboard` | JWT | API1 |
 | `walletEntries` | JWT | API1 |
@@ -88,6 +90,7 @@ Create the security inventory required by `S3` as input for remediation tasks in
 | `logout` | JWT | API2 |
 | `updateUserProfile` | JWT | API1, API3 |
 | `createTransaction` | JWT | API4, API6 |
+| `updateTransaction` | JWT | API1, API3 |
 | `deleteTransaction` | JWT | API1, API5 |
 | `addWalletEntry` | JWT | API1, API3 |
 | `updateWalletEntry` | JWT | API1, API3 |

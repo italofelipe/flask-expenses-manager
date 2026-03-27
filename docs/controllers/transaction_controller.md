@@ -183,6 +183,8 @@ O que faz:
     - despesas
     - receitas
 - Aceita `month` no formato `YYYY-MM` (obrigatório).
+- É rota de compatibilidade transitória.
+- Sucessor canônico: `GET /dashboard/overview?month=YYYY-MM`.
 
 Contrato:
 - Legado:
@@ -208,6 +210,7 @@ O que faz:
 - `TransactionSchema`
 - `PaginatedResponse`
 - `TransactionAnalyticsService` (agregações de resumo/dashboard)
+- `TransactionQueryService` (boundary compartilhado de leitura REST/GraphQL)
 - JWT callbacks de revogação
 
 ## Pontos incompletos / TODOs (identificados no código)

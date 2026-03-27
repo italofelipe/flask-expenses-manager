@@ -12,6 +12,7 @@ from sqlalchemy.pool import NullPool
 from app.controllers.alert_controller import alert_bp
 from app.controllers.auth_controller import auth_bp, register_auth_dependencies
 from app.controllers.bank_statement import bank_statement_bp
+from app.controllers.dashboard import dashboard_bp
 from app.controllers.entitlement import (
     entitlement_bp,
     register_entitlement_dependencies,
@@ -167,6 +168,7 @@ def create_app(*, enable_http_runtime: bool = True) -> Flask:
 
     # Registra blueprints ANTES dos endpoints no Swagger
     app.register_blueprint(transaction_bp)
+    app.register_blueprint(dashboard_bp)
     app.register_blueprint(goal_bp)
     app.register_blueprint(user_bp)
     app.register_blueprint(auth_bp)
@@ -186,6 +188,7 @@ def create_app(*, enable_http_runtime: bool = True) -> Flask:
         "auth",
         "user",
         "transaction",
+        "dashboard",
         "goal",
         "wallet",
         "health",

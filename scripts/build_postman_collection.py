@@ -18,6 +18,7 @@ SMOKE_REQUESTS = [
     "01 - Create transaction (REST v2)",
     "04 - List active transactions (REST v2)",
     "05 - Transaction summary by month (REST v2)",
+    "06 - Dashboard overview (REST v2)",
     "01 - Create goal (REST v2)",
     "02 - List goals (REST v2)",
     "05 - Goal simulate (REST v2)",
@@ -754,7 +755,25 @@ def build_collection() -> dict[str, Any]:
             ],
         ),
         _item(
-            "06 - Transaction dashboard by month (REST v2)",
+            "06 - Dashboard overview (REST v2)",
+            _request(
+                method="GET",
+                raw_url="{{baseUrl}}/dashboard/overview?month={{runMonthRef}}",
+                headers=auth_contract_headers,
+                query=[("month", "{{runMonthRef}}")],
+            ),
+            test_lines=[
+                "pm.test('dashboard overview returns 200', function () { pm.response.to.have.status(200); });",
+                "var body = pm.response.json();",
+                "pm.test('dashboard includes totals and counts', function () {",
+                "  pm.expect(body.success).to.eql(true);",
+                "  pm.expect(body.data).to.have.property('totals');",
+                "  pm.expect(body.data).to.have.property('counts');",
+                "});",
+            ],
+        ),
+        _item(
+            "06b - Transaction dashboard compatibility (REST v2)",
             _request(
                 method="GET",
                 raw_url="{{baseUrl}}/transactions/dashboard?month={{runMonthRef}}",
@@ -762,12 +781,10 @@ def build_collection() -> dict[str, Any]:
                 query=[("month", "{{runMonthRef}}")],
             ),
             test_lines=[
-                "pm.test('transaction dashboard returns 200', function () { pm.response.to.have.status(200); });",
-                "var body = pm.response.json();",
-                "pm.test('dashboard includes totals and counts', function () {",
-                "  pm.expect(body.success).to.eql(true);",
-                "  pm.expect(body.data).to.have.property('totals');",
-                "  pm.expect(body.data).to.have.property('counts');",
+                "pm.test('transaction dashboard compatibility returns 200', function () { pm.response.to.have.status(200); });",
+                "pm.test('dashboard alias emits deprecation headers', function () {",
+                "  pm.expect(pm.response.headers.get('Deprecation')).to.eql('true');",
+                "  pm.expect(pm.response.headers.get('X-Auraxis-Successor-Endpoint')).to.eql('/dashboard/overview');",
                 "});",
             ],
         ),
@@ -2344,7 +2361,7 @@ def build_collection() -> dict[str, Any]:
             ],
         ),
         _item(
-            "09 - GraphQL transaction summary and dashboard (auth required)",
+            "09 - GraphQL transaction reads and dashboard (auth required)",
             _request(
                 method="POST",
                 raw_url="{{baseUrl}}/graphql",
@@ -2352,7 +2369,7 @@ def build_collection() -> dict[str, Any]:
                 body=_json_body(
                     """
                     {
-                      "query": "query GraphqlDashboard($month: String!, $initialDate: String!, $finalDate: String!) { transactionSummary(month: $month, page: 1, pageSize: 10) { month pagination { total } } transactionDashboard(month: $month) { month counts { totalTransactions } } transactionDueRange(initialDate: $initialDate, finalDate: $finalDate, page: 1, perPage: 10, orderBy: \\"overdue_first\\") { counts { totalTransactions } pagination { total } } }",
+                      "query": "query GraphqlDashboard($month: String!, $initialDate: String!, $finalDate: String!) { transactions(page: 1, perPage: 10) { items { id title } pagination { total } } transactionSummary(month: $month, page: 1, pageSize: 10) { month pagination { total } } transactionDashboard(month: $month) { month counts { totalTransactions } } transactionDueRange(initialDate: $initialDate, finalDate: $finalDate, page: 1, perPage: 10, orderBy: \\"overdue_first\\") { counts { totalTransactions } pagination { total } } }",
                       "variables": {
                         "month": "{{runMonthRef}}",
                         "initialDate": "{{runYesterday}}",
@@ -2367,6 +2384,7 @@ def build_collection() -> dict[str, Any]:
                 "var body = pm.response.json();",
                 "pm.test('graphql dashboard aggregates transaction data', function () {",
                 "  pm.expect(body.errors).to.eql(undefined);",
+                "  pm.expect(body.data.transactions.items[0].id).to.be.a('string').and.not.empty;",
                 "  pm.expect(body.data.transactionSummary.month).to.eql(pm.collectionVariables.get('runMonthRef'));",
                 "  pm.expect(body.data.transactionDashboard.month).to.eql(pm.collectionVariables.get('runMonthRef'));",
                 "  pm.expect(body.data.transactionDueRange.counts.totalTransactions).to.be.at.least(1);",

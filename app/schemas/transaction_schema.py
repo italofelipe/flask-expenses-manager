@@ -157,13 +157,18 @@ class TransactionResponseSchema(Schema):
         name = "TransactionResponse"
 
     id = fields.UUID(metadata={"description": "ID único da transação"})
-    user_id = fields.UUID(metadata={"description": "ID do usuário"})
     title = fields.Str(metadata={"description": "Título da transação"})
-    description = fields.Str(metadata={"description": "Descrição da transação"})
-    observation = fields.Str(metadata={"description": "Observações"})
+    description = fields.Str(
+        allow_none=True,
+        metadata={"description": "Descrição da transação"},
+    )
+    observation = fields.Str(allow_none=True, metadata={"description": "Observações"})
     is_recurring = fields.Bool(metadata={"description": "Se é recorrente"})
     is_installment = fields.Bool(metadata={"description": "Se é parcelada"})
-    installment_count = fields.Int(metadata={"description": "Número de parcelas"})
+    installment_count = fields.Int(
+        allow_none=True,
+        metadata={"description": "Número de parcelas"},
+    )
     amount = fields.Decimal(
         as_string=True, metadata={"description": "Valor da transação"}
     )
@@ -180,17 +185,35 @@ class TransactionResponseSchema(Schema):
     status = fields.Str(metadata={"description": "Status da transação"})
     type = fields.Str(metadata={"description": "Tipo da transação"})
     due_date = fields.Date(metadata={"description": "Data de vencimento"})
-    start_date = fields.Date(metadata={"description": "Data de início"})
-    end_date = fields.Date(metadata={"description": "Data de fim"})
-    tag_id = fields.UUID(metadata={"description": "ID da tag"})
-    account_id = fields.UUID(metadata={"description": "ID da conta"})
-    credit_card_id = fields.UUID(metadata={"description": "ID do cartão de crédito"})
-    installment_group_id = fields.UUID(
-        metadata={"description": "ID do grupo de parcelas"}
+    start_date = fields.Date(
+        allow_none=True,
+        metadata={"description": "Data de início"},
     )
-    paid_at = fields.DateTime(metadata={"description": "Data do pagamento"})
-    created_at = fields.DateTime(metadata={"description": "Data de criação"})
-    updated_at = fields.DateTime(metadata={"description": "Data de atualização"})
+    end_date = fields.Date(
+        allow_none=True,
+        metadata={"description": "Data de fim"},
+    )
+    tag_id = fields.UUID(allow_none=True, metadata={"description": "ID da tag"})
+    account_id = fields.UUID(allow_none=True, metadata={"description": "ID da conta"})
+    credit_card_id = fields.UUID(
+        allow_none=True,
+        metadata={"description": "ID do cartão de crédito"},
+    )
+    installment_group_id = fields.UUID(
+        allow_none=True, metadata={"description": "ID do grupo de parcelas"}
+    )
+    paid_at = fields.DateTime(
+        allow_none=True,
+        metadata={"description": "Data do pagamento"},
+    )
+    created_at = fields.DateTime(
+        allow_none=True,
+        metadata={"description": "Data de criação"},
+    )
+    updated_at = fields.DateTime(
+        allow_none=True,
+        metadata={"description": "Data de atualização"},
+    )
 
 
 class TransactionListSchema(Schema):

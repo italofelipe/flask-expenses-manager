@@ -43,7 +43,6 @@ from .utils import (
     _parse_optional_uuid,
     _parse_positive_int,
     _resolve_transaction_ordering,
-    serialize_transaction,
 )
 
 # Keep symbol available as monkeypatch target for legacy tests.
@@ -186,8 +185,8 @@ def _build_active_list_response(user_uuid: UUID) -> Response:
         return range_error
 
     dependencies = get_transaction_dependencies()
-    service = dependencies.transaction_application_service_factory(user_uuid)
-    result = service.get_active_transactions(
+    query_service = dependencies.transaction_query_service_factory(user_uuid)
+    result = query_service.get_active_transactions(
         page=params["page"],
         per_page=params["per_page"],
         transaction_type=params["transaction_type"],
@@ -220,8 +219,8 @@ def _build_transaction_detail_response(
     transaction_id: UUID,
 ) -> Response:
     dependencies = get_transaction_dependencies()
-    service = dependencies.transaction_application_service_factory(user_uuid)
-    serialized = service.get_transaction(transaction_id)
+    query_service = dependencies.transaction_query_service_factory(user_uuid)
+    serialized = query_service.get_transaction(transaction_id)
     return _compat_success(
         legacy_payload={"transaction": serialized},
         status_code=200,
@@ -342,6 +341,14 @@ def _deprecated_expense_alias_response(response: Response) -> Response:
     )
 
 
+def _deprecated_dashboard_alias_response(response: Response) -> Response:
+    return _apply_deprecation_headers(
+        response,
+        successor_endpoint="/dashboard/overview",
+        successor_method="GET",
+    )
+
+
 class TransactionCollectionResource(MethodResource):
     @doc(**TRANSACTION_ACTIVE_LIST_DOC)
     @jwt_required()
@@ -368,11 +375,11 @@ class TransactionSummaryResource(MethodResource):
         try:
             page, per_page = _parse_summary_pagination()
             dependencies = get_transaction_dependencies()
-            service = dependencies.transaction_application_service_factory(user_uuid)
-            result = service.get_month_summary(
+            query_service = dependencies.transaction_query_service_factory(user_uuid)
+            result = query_service.get_month_summary(
                 month=str(request.args.get("month", "")),
                 page=page,
-                page_size=per_page,
+                per_page=per_page,
             )
             paginated = result["paginated"]
 
@@ -432,36 +439,38 @@ class TransactionMonthlyDashboardResource(MethodResource):
         user_uuid = current_user_id()
         try:
             dependencies = get_transaction_dependencies()
-            service = dependencies.transaction_application_service_factory(user_uuid)
-            result = service.get_month_dashboard(
+            query_service = dependencies.transaction_query_service_factory(user_uuid)
+            result = query_service.get_dashboard_overview(
                 month=str(request.args.get("month", "")),
             )
 
-            return _compat_success(
-                legacy_payload={
-                    "month": result["month"],
-                    "income_total": result["income_total"],
-                    "expense_total": result["expense_total"],
-                    "balance": result["balance"],
-                    "counts": result["counts"],
-                    "top_expense_categories": result["top_expense_categories"],
-                    "top_income_categories": result["top_income_categories"],
-                },
-                status_code=200,
-                message="Dashboard mensal calculado com sucesso",
-                data={
-                    "month": result["month"],
-                    "totals": {
+            return _deprecated_dashboard_alias_response(
+                _compat_success(
+                    legacy_payload={
+                        "month": result["month"],
                         "income_total": result["income_total"],
                         "expense_total": result["expense_total"],
                         "balance": result["balance"],
+                        "counts": result["counts"],
+                        "top_expense_categories": result["top_expense_categories"],
+                        "top_income_categories": result["top_income_categories"],
                     },
-                    "counts": result["counts"],
-                    "top_categories": {
-                        "expense": result["top_expense_categories"],
-                        "income": result["top_income_categories"],
+                    status_code=200,
+                    message="Dashboard mensal calculado com sucesso",
+                    data={
+                        "month": result["month"],
+                        "totals": {
+                            "income_total": result["income_total"],
+                            "expense_total": result["expense_total"],
+                            "balance": result["balance"],
+                        },
+                        "counts": result["counts"],
+                        "top_categories": {
+                            "expense": result["top_expense_categories"],
+                            "income": result["top_income_categories"],
+                        },
                     },
-                },
+                )
             )
         except TransactionApplicationError as exc:
             return _compat_error(
@@ -569,44 +578,23 @@ class TransactionExpensePeriodResource(MethodResource):
             order_by = params["order_by"]
             order = params["order"]
             ordering_clause = _resolve_transaction_ordering(order_by, order)
-
-            base_query = Transaction.query.filter_by(user_id=user_uuid, deleted=False)
-            if start_date:
-                base_query = base_query.filter(Transaction.due_date >= start_date)
-            if end_date:
-                base_query = base_query.filter(Transaction.due_date <= end_date)
-
-            total_transactions = base_query.count()
-            income_transactions = base_query.filter(
-                Transaction.type == TransactionType.INCOME
-            ).count()
-            expense_transactions = base_query.filter(
-                Transaction.type == TransactionType.EXPENSE
-            ).count()
-
-            expenses_query = base_query.filter(
-                Transaction.type == TransactionType.EXPENSE
+            dependencies = get_transaction_dependencies()
+            query_service = dependencies.transaction_query_service_factory(user_uuid)
+            result = query_service.get_expense_period(
+                start_date=start_date,
+                end_date=end_date,
+                page=page,
+                per_page=per_page,
+                ordering_clause=ordering_clause,
             )
-            total_expenses = expense_transactions
-            pages = (total_expenses + per_page - 1) // per_page if total_expenses else 0
-            expenses = (
-                expenses_query.order_by(ordering_clause)
-                .offset((page - 1) * per_page)
-                .limit(per_page)
-                .all()
-            )
-            serialized_expenses = [serialize_transaction(item) for item in expenses]
-
-            counts_payload = {
-                "total_transactions": total_transactions,
-                "income_transactions": income_transactions,
-                "expense_transactions": expense_transactions,
-            }
+            serialized_expenses = result["expenses"]
+            counts_payload = result["counts"]
+            pagination = result["pagination"]
 
             response = _compat_success(
                 legacy_payload={
                     "expenses": serialized_expenses,
-                    "total": total_expenses,
+                    "total": pagination["total"],
                     "page": page,
                     "per_page": per_page,
                     "counts": counts_payload,
@@ -616,10 +604,10 @@ class TransactionExpensePeriodResource(MethodResource):
                 data={"expenses": serialized_expenses, "counts": counts_payload},
                 meta={
                     "pagination": {
-                        "total": total_expenses,
+                        "total": pagination["total"],
                         "page": page,
                         "per_page": per_page,
-                        "pages": pages,
+                        "pages": pagination["pages"],
                     }
                 },
             )
@@ -651,10 +639,9 @@ class TransactionDeletedResource(MethodResource):
 
         user_uuid = current_user_id()
         try:
-            transactions = Transaction.query.filter_by(
-                user_id=user_uuid, deleted=True
-            ).all()
-            serialized = [serialize_transaction(item) for item in transactions]
+            dependencies = get_transaction_dependencies()
+            query_service = dependencies.transaction_query_service_factory(user_uuid)
+            serialized = query_service.list_deleted_transactions()
             return _compat_success(
                 legacy_payload={"deleted_transactions": serialized},
                 status_code=200,
@@ -683,8 +670,8 @@ class TransactionDuePeriodResource(MethodResource):
             params = _parse_due_range_params()
 
             dependencies = get_transaction_dependencies()
-            service = dependencies.transaction_application_service_factory(user_uuid)
-            result = service.get_due_transactions(
+            query_service = dependencies.transaction_query_service_factory(user_uuid)
+            result = query_service.get_due_transactions(
                 start_date=params["start_date"],
                 end_date=params["end_date"],
                 page=params["page"],

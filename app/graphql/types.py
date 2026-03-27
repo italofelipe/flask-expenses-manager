@@ -53,6 +53,8 @@ class TransactionTypeObject(graphene.ObjectType):
     source = graphene.String(required=True)
     external_id = graphene.String()
     bank_name = graphene.String()
+    installment_group_id = graphene.String()
+    paid_at = graphene.String()
     created_at = graphene.String()
     updated_at = graphene.String()
 
