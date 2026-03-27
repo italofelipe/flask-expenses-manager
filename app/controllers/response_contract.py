@@ -11,7 +11,13 @@ from app.http import (
     runtime_debug_or_testing,
     serialize_error_contract,
 )
-from app.utils.api_contract import CONTRACT_HEADER, CONTRACT_V2, is_v2_contract_request
+from app.utils.api_contract import (
+    CONTRACT_HEADER,
+    CONTRACT_V2,
+    CONTRACT_V3,
+    is_v2_contract_request,
+    is_v3_contract_request,
+)
 from app.utils.response_builder import (
     SENSITIVE_DATA_FIELDS,
     json_response,
@@ -48,6 +54,14 @@ def is_v2_contract() -> bool:
     return is_v2_contract_request()
 
 
+def is_v3_contract() -> bool:
+    return is_v3_contract_request()
+
+
+def is_standard_contract() -> bool:
+    return is_v2_contract() or is_v3_contract()
+
+
 def compat_success_response(
     *,
     legacy_payload: dict[str, Any],
@@ -57,7 +71,7 @@ def compat_success_response(
     meta: dict[str, Any] | None = None,
 ) -> Response:
     payload = legacy_payload
-    if is_v2_contract():
+    if is_standard_contract():
         payload = success_payload(message=message, data=data, meta=meta)
     return json_response(payload, status_code=status_code)
 
@@ -71,7 +85,7 @@ def compat_error_response(
     details: dict[str, Any] | None = None,
 ) -> Response:
     payload = legacy_payload
-    if is_v2_contract():
+    if is_standard_contract():
         return flask_error_response(
             ErrorContract(
                 message=message,
@@ -95,7 +109,7 @@ def compat_success_tuple(
     meta: dict[str, Any] | None = None,
 ) -> tuple[dict[str, Any], int]:
     payload = legacy_payload
-    if is_v2_contract():
+    if is_standard_contract():
         payload = success_payload(message=message, data=data, meta=meta)
     return payload, status_code
 
@@ -109,7 +123,7 @@ def compat_error_tuple(
     details: dict[str, Any] | None = None,
 ) -> tuple[dict[str, Any], int]:
     payload = legacy_payload
-    if is_v2_contract():
+    if is_standard_contract():
         payload = serialize_error_contract(
             ErrorContract(
                 message=message,
@@ -150,8 +164,11 @@ def response_from_contract_error(error: ResponseContractError) -> Response:
 __all__ = [
     "CONTRACT_HEADER",
     "CONTRACT_V2",
+    "CONTRACT_V3",
     "ResponseContractError",
+    "is_standard_contract",
     "is_v2_contract",
+    "is_v3_contract",
     "compat_success_response",
     "compat_error_response",
     "compat_success_tuple",

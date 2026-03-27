@@ -1,12 +1,15 @@
 from __future__ import annotations
 
 from app.controllers.response_contract import (
+    CONTRACT_V3,
     ResponseContractError,
     compat_error_response,
     compat_error_tuple,
     compat_success_response,
     compat_success_tuple,
+    is_standard_contract,
     is_v2_contract,
+    is_v3_contract,
     response_from_contract_error,
 )
 
@@ -34,6 +37,8 @@ def test_contract_detection_and_response_compatibility(app) -> None:
 
     with app.test_request_context("/health", headers={"X-API-Contract": "v2"}):
         assert is_v2_contract() is True
+        assert is_v3_contract() is False
+        assert is_standard_contract() is True
         v2_success = compat_success_response(
             legacy_payload={"message": "legacy"},
             status_code=200,
@@ -52,6 +57,28 @@ def test_contract_detection_and_response_compatibility(app) -> None:
     assert v2_success.get_json()["data"] == {"id": 1}
     assert v2_error.get_json()["success"] is False
     assert v2_error.get_json()["error"]["details"] == {"field": "name"}
+
+    with app.test_request_context("/health", headers={"X-API-Contract": CONTRACT_V3}):
+        assert is_v2_contract() is False
+        assert is_v3_contract() is True
+        assert is_standard_contract() is True
+        v3_success = compat_success_response(
+            legacy_payload={"message": "legacy"},
+            status_code=200,
+            message="ok",
+            data={"id": 2},
+        )
+        v3_error = compat_error_response(
+            legacy_payload={"error": "legacy"},
+            status_code=400,
+            message="boom",
+            error_code="VALIDATION_ERROR",
+        )
+
+    assert v3_success.get_json()["success"] is True
+    assert v3_success.get_json()["data"] == {"id": 2}
+    assert v3_error.get_json()["success"] is False
+    assert v3_error.get_json()["error"]["code"] == "VALIDATION_ERROR"
 
 
 def test_contract_tuple_and_error_class(app) -> None:

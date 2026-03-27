@@ -1,0 +1,75 @@
+{
+  "task_id": "ARC-08-3",
+  "feature": "user_me_canonical_contract",
+  "rest_endpoint": {
+    "method": "GET",
+    "path": "/user/me",
+    "auth": true,
+    "contract_header": {
+      "name": "X-API-Contract",
+      "legacy_versions": ["v1", "v2"],
+      "canonical_version": "v3"
+    }
+  },
+  "v3_behavior": {
+    "responsibility": [
+      "authenticated_user_identity",
+      "authenticated_user_profile",
+      "authenticated_user_financial_profile",
+      "authenticated_user_investor_profile",
+      "authenticated_user_product_context"
+    ],
+    "does_not_include": ["transactions", "wallet", "pagination", "filters"],
+    "rejects_query_params": ["page", "limit", "status", "month"],
+    "canonical_income_field": "monthly_income_net"
+  },
+  "contracts": {
+    "v1": {
+      "top_level_keys": ["user", "transactions", "wallet"]
+    },
+    "v2": {
+      "top_level_keys": ["success", "message", "data", "meta"],
+      "data_keys": ["user", "transactions", "wallet"],
+      "meta_keys": ["pagination"]
+    },
+    "v3": {
+      "top_level_keys": ["success", "message", "data"],
+      "data_keys": ["user"],
+      "user_keys": [
+        "identity",
+        "profile",
+        "financial_profile",
+        "investor_profile",
+        "product_context"
+      ]
+    }
+  },
+  "v3_payload": {
+    "identity": ["id", "name", "email"],
+    "profile": ["gender", "birth_date", "state_uf", "occupation"],
+    "financial_profile": [
+      "monthly_income_net",
+      "monthly_expenses",
+      "net_worth",
+      "initial_investment",
+      "monthly_investment",
+      "investment_goal_date"
+    ],
+    "investor_profile": [
+      "declared",
+      "suggested",
+      "quiz_score",
+      "taxonomy_version",
+      "financial_objectives"
+    ],
+    "product_context": ["entitlements_version"]
+  },
+  "graphql_alignment": {
+    "query": "me",
+    "status": "aligned_on_shared_core",
+    "notes": [
+      "GraphQL remains authenticated-context-only",
+      "GraphQL does not expose transactions or wallet on me"
+    ]
+  }
+}

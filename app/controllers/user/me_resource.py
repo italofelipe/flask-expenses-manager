@@ -10,17 +10,27 @@ from app.application.services.authenticated_user_context_service import (
 )
 from app.auth import get_active_auth_context
 from app.models.transaction import Transaction
+from app.services.authenticated_user_payloads import (
+    to_authenticated_user_canonical_payload,
+)
 from app.utils.pagination import PaginatedResponse
+from app.utils.response_builder import json_response, success_payload
 from app.utils.typed_decorators import typed_doc as doc
 from app.utils.typed_decorators import typed_jwt_required as jwt_required
 
-from .contracts import compat_success
+from .contracts import compat_success, is_v3_contract_request
 from .helpers import (
     _validation_error_response,
     filter_transactions,
     validate_user_token,
 )
 from .presenters import to_user_profile_payload, to_wallet_payload
+
+COLLECTION_QUERY_PARAMS = ("page", "limit", "status", "month")
+
+
+def _has_collection_semantics() -> bool:
+    return any(request.args.get(field) is not None for field in COLLECTION_QUERY_PARAMS)
 
 
 def _parse_positive_int_compat(
@@ -45,7 +55,11 @@ def _parse_positive_int_compat(
 class UserMeResource(MethodResource):
     @doc(
         description=(
-            "Retorna os dados do usuário autenticado e suas transações paginadas.\n\n"
+            "Retorna o contexto do usuário autenticado.\n\n"
+            "Contrato canônico (`X-API-Contract: v3`): retorna apenas identidade, "
+            "perfil, perfil financeiro, perfil investidor e contexto de produto.\n\n"
+            "Contratos legados (`v1`/`v2`): mantêm transações paginadas e carteira.\n\n"
+            "Filtros legados disponíveis apenas em `v1`/`v2`:\n"
             "Filtros disponíveis:\n"
             "- page: número da página\n"
             "- limit: itens por página\n"
@@ -64,7 +78,10 @@ class UserMeResource(MethodResource):
             "month": {"description": "Mês no formato YYYY-MM", "type": "string"},
             "X-API-Contract": {
                 "in": "header",
-                "description": "Opcional. Envie 'v2' para o contrato padronizado.",
+                "description": (
+                    "Opcional. `v2` mantém shape legado padronizado; `v3` "
+                    "publica o contrato canônico sem coleções."
+                ),
                 "type": "string",
                 "required": False,
             },
@@ -81,6 +98,31 @@ class UserMeResource(MethodResource):
         if isinstance(user_or_response, Response):
             return user_or_response
         user = user_or_response
+
+        context_service = AuthenticatedUserContextService.with_defaults()
+        authenticated_user_context = context_service.build_context(user)
+
+        if is_v3_contract_request():
+            if _has_collection_semantics():
+                return _validation_error_response(
+                    exc=ValueError("collection semantics not supported"),
+                    fallback_message=(
+                        "O contrato canônico de '/user/me' não aceita paginação "
+                        "nem filtros de coleção. Use '/transactions' ou o "
+                        "bootstrap dedicado."
+                    ),
+                )
+            return json_response(
+                success_payload(
+                    message="Contexto autenticado retornado com sucesso",
+                    data={
+                        "user": to_authenticated_user_canonical_payload(
+                            authenticated_user_context.profile
+                        )
+                    },
+                ),
+                status_code=200,
+            )
 
         try:
             page = _parse_positive_int_compat(
@@ -137,8 +179,6 @@ class UserMeResource(MethodResource):
             transactions, pagination.total, pagination.page, pagination.per_page
         )
 
-        context_service = AuthenticatedUserContextService.with_defaults()
-        authenticated_user_context = context_service.build_context(user)
         user_data = to_user_profile_payload(authenticated_user_context.profile)
         wallet_data = to_wallet_payload(authenticated_user_context.wallet_entries)
         legacy_payload = {
