@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from collections.abc import Callable
 from typing import Any
 from uuid import UUID
 
@@ -166,7 +167,7 @@ def _apply_active_list_optional_filters(
     return query
 
 
-def _build_active_list_response(*, user_uuid: UUID) -> Response:
+def _build_active_list_response(user_uuid: UUID) -> Response:
     params = _parse_active_list_query_params()
     range_error = _active_list_date_range_error(
         start_date=params["start_date"],
@@ -220,66 +221,75 @@ def _build_transaction_detail_response(
     )
 
 
+def _handle_transaction_request(
+    *,
+    builder: Callable[[UUID], Response],
+    internal_error_message: str,
+    log_context: str,
+    validation_error_message: str | None = None,
+) -> Response:
+    token_error = _guard_revoked_token()
+    if token_error is not None:
+        return token_error
+
+    user_uuid = current_user_id()
+    try:
+        return builder(user_uuid)
+    except TransactionApplicationError as exc:
+        return _compat_error(
+            legacy_payload={"error": exc.message, "details": exc.details},
+            status_code=exc.status_code,
+            message=exc.message,
+            error_code=exc.code,
+            details=exc.details,
+        )
+    except ValueError as exc:
+        if validation_error_message is None:
+            raise
+        return _validation_error_response(
+            exc=exc,
+            fallback_message=validation_error_message,
+        )
+    except Exception:
+        db.session.rollback()
+        return _internal_error_response(
+            message=internal_error_message,
+            log_context=log_context,
+        )
+
+
+def _handle_active_transactions_request() -> Response:
+    return _handle_transaction_request(
+        builder=_build_active_list_response,
+        internal_error_message="Erro ao buscar transações ativas",
+        log_context="transaction.list_active_failed",
+        validation_error_message="Parâmetros de listagem inválidos.",
+    )
+
+
+def _handle_transaction_detail_request(*, transaction_id: UUID) -> Response:
+    return _handle_transaction_request(
+        builder=lambda user_uuid: _build_transaction_detail_response(
+            user_uuid=user_uuid,
+            transaction_id=transaction_id,
+        ),
+        internal_error_message="Erro ao buscar detalhe da transação",
+        log_context="transaction.detail_failed",
+    )
+
+
 class TransactionCollectionResource(MethodResource):
     @doc(**TRANSACTION_ACTIVE_LIST_DOC)
     @jwt_required()
     def get(self) -> Response:
-        token_error = _guard_revoked_token()
-        if token_error is not None:
-            return token_error
-
-        user_uuid = current_user_id()
-        try:
-            return _build_active_list_response(user_uuid=user_uuid)
-        except TransactionApplicationError as exc:
-            return _compat_error(
-                legacy_payload={"error": exc.message, "details": exc.details},
-                status_code=exc.status_code,
-                message=exc.message,
-                error_code=exc.code,
-                details=exc.details,
-            )
-        except ValueError as exc:
-            return _validation_error_response(
-                exc=exc,
-                fallback_message="Parâmetros de listagem inválidos.",
-            )
-        except Exception:
-            db.session.rollback()
-            return _internal_error_response(
-                message="Erro ao buscar transações ativas",
-                log_context="transaction.list_active_failed",
-            )
+        return _handle_active_transactions_request()
 
 
 class TransactionDetailResource(MethodResource):
     @doc(**TRANSACTION_DETAIL_DOC)
     @jwt_required()
     def get(self, transaction_id: UUID) -> Response:
-        token_error = _guard_revoked_token()
-        if token_error is not None:
-            return token_error
-
-        user_uuid = current_user_id()
-        try:
-            return _build_transaction_detail_response(
-                user_uuid=user_uuid,
-                transaction_id=transaction_id,
-            )
-        except TransactionApplicationError as exc:
-            return _compat_error(
-                legacy_payload={"error": exc.message, "details": exc.details},
-                status_code=exc.status_code,
-                message=exc.message,
-                error_code=exc.code,
-                details=exc.details,
-            )
-        except Exception:
-            db.session.rollback()
-            return _internal_error_response(
-                message="Erro ao buscar detalhe da transação",
-                log_context="transaction.detail_failed",
-            )
+        return _handle_transaction_detail_request(transaction_id=transaction_id)
 
 
 class TransactionSummaryResource(MethodResource):
@@ -707,32 +717,7 @@ class TransactionListActiveResource(MethodResource):
     @doc(**TRANSACTION_ACTIVE_LIST_LEGACY_DOC)
     @jwt_required()
     def get(self) -> Response:
-        token_error = _guard_revoked_token()
-        if token_error is not None:
-            return token_error
-
-        user_uuid = current_user_id()
-        try:
-            return _build_active_list_response(user_uuid=user_uuid)
-        except TransactionApplicationError as exc:
-            return _compat_error(
-                legacy_payload={"error": exc.message, "details": exc.details},
-                status_code=exc.status_code,
-                message=exc.message,
-                error_code=exc.code,
-                details=exc.details,
-            )
-        except ValueError as exc:
-            return _validation_error_response(
-                exc=exc,
-                fallback_message="Parâmetros de listagem inválidos.",
-            )
-        except Exception:
-            db.session.rollback()
-            return _internal_error_response(
-                message="Erro ao buscar transações ativas",
-                log_context="transaction.list_active_failed",
-            )
+        return _handle_active_transactions_request()
 
 
 __all__ = [

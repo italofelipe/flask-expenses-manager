@@ -45,6 +45,7 @@ _MUTABLE_TRANSACTION_FIELDS = frozenset(
         "paid_at",
     }
 )
+_TRANSACTION_NOT_FOUND_MESSAGE = "Transação não encontrada."
 
 
 @dataclass(frozen=True)
@@ -210,7 +211,7 @@ class TransactionApplicationService:
         )
         if transaction is None:
             raise TransactionApplicationError(
-                message="Transação não encontrada.",
+                message=_TRANSACTION_NOT_FOUND_MESSAGE,
                 code="NOT_FOUND",
                 status_code=404,
             )
@@ -280,7 +281,7 @@ class TransactionApplicationService:
         )
         if transaction is None:
             raise TransactionApplicationError(
-                message="Transação não encontrada.",
+                message=_TRANSACTION_NOT_FOUND_MESSAGE,
                 code="NOT_FOUND",
                 status_code=404,
             )
@@ -306,7 +307,7 @@ class TransactionApplicationService:
         )
         if transaction is None:
             raise TransactionApplicationError(
-                message="Transação não encontrada.",
+                message=_TRANSACTION_NOT_FOUND_MESSAGE,
                 code="NOT_FOUND",
                 status_code=404,
             )

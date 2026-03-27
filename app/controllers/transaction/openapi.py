@@ -6,6 +6,7 @@ TAG_TRANSACTIONS = "Transações"
 ERROR_TOKEN_INVALIDO = "Token inválido"
 ERROR_INTERNO = "Erro interno"
 ERROR_TRANSACAO_NAO_ENCONTRADA = "Transação não encontrada"
+ERROR_SEM_PERMISSAO = "Sem permissão"
 DESC_NUMERO_PAGINA = "Número da página"
 DESC_ITENS_POR_PAGINA = "Itens por página"
 DESC_DATA_INICIAL = "Data inicial (YYYY-MM-DD)"
@@ -47,7 +48,7 @@ TRANSACTION_UPDATE_DOC = {
         200: {"description": "Transação atualizada"},
         400: {"description": "Erro de validação"},
         401: {"description": ERROR_TOKEN_INVALIDO},
-        403: {"description": "Sem permissão"},
+        403: {"description": ERROR_SEM_PERMISSAO},
         404: {"description": ERROR_TRANSACAO_NAO_ENCONTRADA},
         500: {"description": ERROR_INTERNO},
     },
@@ -61,7 +62,7 @@ TRANSACTION_SOFT_DELETE_DOC = {
     "responses": {
         200: {"description": "Transação deletada"},
         401: {"description": ERROR_TOKEN_INVALIDO},
-        403: {"description": "Sem permissão"},
+        403: {"description": ERROR_SEM_PERMISSAO},
         404: {"description": ERROR_TRANSACAO_NAO_ENCONTRADA},
         500: {"description": ERROR_INTERNO},
     },
@@ -134,7 +135,7 @@ TRANSACTION_DETAIL_DOC = {
     "responses": {
         200: {"description": "Detalhe da transação"},
         401: {"description": ERROR_TOKEN_INVALIDO},
-        403: {"description": "Sem permissão"},
+        403: {"description": ERROR_SEM_PERMISSAO},
         404: {"description": ERROR_TRANSACAO_NAO_ENCONTRADA},
         500: {"description": ERROR_INTERNO},
     },
