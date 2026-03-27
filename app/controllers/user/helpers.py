@@ -9,6 +9,9 @@ from sqlalchemy import extract
 from sqlalchemy.orm.query import Query
 
 from app.application.errors import PublicValidationError
+from app.application.services.authenticated_user_context_service import (
+    AuthenticatedUserContextService,
+)
 from app.application.services.public_error_mapper_service import (
     map_validation_exception,
 )
@@ -18,40 +21,12 @@ from app.models.transaction import Transaction
 from app.models.user import User
 
 from .contracts import compat_error
+from .presenters import to_user_profile_payload
 
 
-def _serialize_user_profile(user: User) -> dict[str, Any]:
-    monthly_income = float(user.monthly_income) if user.monthly_income else None
-    return {
-        "id": str(user.id),
-        "name": user.name,
-        "email": user.email,
-        "gender": user.gender,
-        "birth_date": str(user.birth_date) if user.birth_date else None,
-        "monthly_income": monthly_income,
-        "monthly_income_net": monthly_income,
-        "net_worth": float(user.net_worth) if user.net_worth else None,
-        "monthly_expenses": (
-            float(user.monthly_expenses) if user.monthly_expenses else None
-        ),
-        "initial_investment": (
-            float(user.initial_investment) if user.initial_investment else None
-        ),
-        "monthly_investment": (
-            float(user.monthly_investment) if user.monthly_investment else None
-        ),
-        "investment_goal_date": (
-            str(user.investment_goal_date) if user.investment_goal_date else None
-        ),
-        "state_uf": user.state_uf,
-        "occupation": user.occupation,
-        "investor_profile": user.investor_profile,
-        "financial_objectives": user.financial_objectives,
-        # B11: quiz-derived suggestion fields for comparison with declared profile
-        "investor_profile_suggested": user.investor_profile_suggested,
-        "profile_quiz_score": user.profile_quiz_score,
-        "taxonomy_version": user.taxonomy_version,
-    }
+def _serialize_user_profile(user: User) -> dict[str, object | None]:
+    profile = AuthenticatedUserContextService.with_defaults().build_profile(user)
+    return dict(to_user_profile_payload(profile))
 
 
 def assign_user_profile_fields(

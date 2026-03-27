@@ -4,6 +4,13 @@ from datetime import date, datetime
 from typing import Any, cast
 from uuid import UUID
 
+from app.application.services.authenticated_user_context_service import (
+    AuthenticatedUserContextService,
+)
+from app.graphql.authenticated_user_presenters import (
+    AuthenticatedUserGraphQLPayload,
+    to_authenticated_user_graphql_payload,
+)
 from app.graphql.errors import (
     GRAPHQL_ERROR_CODE_FORBIDDEN,
     GRAPHQL_ERROR_CODE_NOT_FOUND,
@@ -80,32 +87,9 @@ def _wallet_to_graphql_payload(wallet: Wallet) -> dict[str, Any]:
     return payload
 
 
-def _user_to_graphql_payload(user: User) -> dict[str, Any]:
-    monthly_income = _to_float_or_none(user.monthly_income)
-    return {
-        "id": str(user.id),
-        "name": user.name,
-        "email": user.email,
-        "gender": user.gender,
-        "birth_date": user.birth_date.isoformat() if user.birth_date else None,
-        "monthly_income": monthly_income,
-        "monthly_income_net": monthly_income,
-        "net_worth": _to_float_or_none(user.net_worth),
-        "monthly_expenses": _to_float_or_none(user.monthly_expenses),
-        "initial_investment": _to_float_or_none(user.initial_investment),
-        "monthly_investment": _to_float_or_none(user.monthly_investment),
-        "investment_goal_date": (
-            user.investment_goal_date.isoformat() if user.investment_goal_date else None
-        ),
-        "state_uf": user.state_uf,
-        "occupation": user.occupation,
-        "investor_profile": user.investor_profile,
-        "financial_objectives": user.financial_objectives,
-        # B11: quiz-derived suggestion fields
-        "investor_profile_suggested": user.investor_profile_suggested,
-        "profile_quiz_score": user.profile_quiz_score,
-        "taxonomy_version": user.taxonomy_version,
-    }
+def _user_to_graphql_payload(user: User) -> AuthenticatedUserGraphQLPayload:
+    profile = AuthenticatedUserContextService.with_defaults().build_profile(user)
+    return to_authenticated_user_graphql_payload(profile)
 
 
 def _user_basic_auth_payload(user: User) -> dict[str, str]:

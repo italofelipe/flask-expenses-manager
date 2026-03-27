@@ -5,6 +5,9 @@ from typing import Any, cast
 from flask import Response, request
 from flask_apispec.views import MethodResource
 
+from app.application.services.authenticated_user_context_service import (
+    AuthenticatedUserContextService,
+)
 from app.auth import get_active_auth_context
 from app.models.transaction import Transaction
 from app.utils.pagination import PaginatedResponse
@@ -12,13 +15,12 @@ from app.utils.typed_decorators import typed_doc as doc
 from app.utils.typed_decorators import typed_jwt_required as jwt_required
 
 from .contracts import compat_success
-from .dependencies import get_user_dependencies
 from .helpers import (
-    _serialize_user_profile,
     _validation_error_response,
     filter_transactions,
     validate_user_token,
 )
+from .presenters import to_user_profile_payload, to_wallet_payload
 
 
 def _parse_positive_int_compat(
@@ -135,34 +137,10 @@ class UserMeResource(MethodResource):
             transactions, pagination.total, pagination.page, pagination.per_page
         )
 
-        dependencies = get_user_dependencies()
-        wallet_items = dependencies.list_wallet_entries_by_user_id(user.id)
-        wallet_data = [
-            {
-                "id": str(w.id),
-                "name": w.name,
-                "value": float(w.value) if w.value is not None else None,
-                "estimated_value_on_create_date": (
-                    float(w.estimated_value_on_create_date)
-                    if w.estimated_value_on_create_date is not None
-                    else None
-                ),
-                "ticker": w.ticker,
-                "quantity": w.quantity,
-                "asset_class": w.asset_class,
-                "annual_rate": (
-                    float(w.annual_rate) if w.annual_rate is not None else None
-                ),
-                "target_withdraw_date": (
-                    str(w.target_withdraw_date) if w.target_withdraw_date else None
-                ),
-                "register_date": str(w.register_date),
-                "should_be_on_wallet": w.should_be_on_wallet,
-            }
-            for w in wallet_items
-        ]
-
-        user_data = _serialize_user_profile(user)
+        context_service = AuthenticatedUserContextService.with_defaults()
+        authenticated_user_context = context_service.build_context(user)
+        user_data = to_user_profile_payload(authenticated_user_context.profile)
+        wallet_data = to_wallet_payload(authenticated_user_context.wallet_entries)
         legacy_payload = {
             "user": user_data,
             "transactions": paginated_transactions,
