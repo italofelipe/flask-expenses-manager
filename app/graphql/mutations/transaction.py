@@ -91,3 +91,48 @@ class DeleteTransactionMutation(graphene.Mutation):
         return DeleteTransactionMutation(
             ok=True, message="Transação deletada com sucesso (soft delete)."
         )
+
+
+class UpdateTransactionMutation(graphene.Mutation):
+    class Arguments:
+        transaction_id = graphene.UUID(required=True)
+        title = graphene.String()
+        amount = graphene.String()
+        type = graphene.String()
+        due_date = graphene.String()
+        description = graphene.String()
+        observation = graphene.String()
+        is_recurring = graphene.Boolean()
+        is_installment = graphene.Boolean()
+        installment_count = graphene.Int()
+        currency = graphene.String()
+        status = graphene.String()
+        start_date = graphene.String()
+        end_date = graphene.String()
+        tag_id = graphene.UUID()
+        account_id = graphene.UUID()
+        credit_card_id = graphene.UUID()
+        paid_at = graphene.String()
+
+    transaction = graphene.Field(TransactionTypeObject, required=True)
+    message = graphene.String(required=True)
+
+    def mutate(
+        self,
+        info: graphene.ResolveInfo,
+        transaction_id: UUID,
+        **kwargs: Any,
+    ) -> "UpdateTransactionMutation":
+        user = get_current_user_required()
+        service = TransactionApplicationService.with_defaults(UUID(str(user.id)))
+        try:
+            transaction = service.update_transaction(transaction_id, dict(kwargs))
+        except TransactionApplicationError as exc:
+            raise build_public_graphql_error(
+                exc.message,
+                code=to_public_graphql_code(exc.code),
+            ) from exc
+        return UpdateTransactionMutation(
+            message="Transação atualizada com sucesso",
+            transaction=TransactionTypeObject(**transaction),
+        )

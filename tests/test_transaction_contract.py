@@ -168,7 +168,7 @@ def test_transaction_summary_missing_month_v2_contract(client) -> None:
     assert body["error"]["code"] == "VALIDATION_ERROR"
 
 
-def test_transaction_dashboard_v2_contract(client) -> None:
+def test_dashboard_overview_v2_contract(client) -> None:
     token = _register_and_login(client)
     month_ref = date.today().strftime("%Y-%m")
 
@@ -222,7 +222,7 @@ def test_transaction_dashboard_v2_contract(client) -> None:
         assert created.status_code == 201
 
     response = client.get(
-        f"/transactions/dashboard?month={month_ref}",
+        f"/dashboard/overview?month={month_ref}",
         headers=_auth_headers(token, "v2"),
     )
 
@@ -260,6 +260,8 @@ def test_transaction_dashboard_legacy_contract(client) -> None:
     )
 
     assert response.status_code == 200
+    assert response.headers["Deprecation"] == "true"
+    assert response.headers["X-Auraxis-Successor-Endpoint"] == "/dashboard/overview"
     body = response.get_json()
     assert "success" not in body
     assert body["month"] == month_ref
@@ -275,7 +277,7 @@ def test_transaction_dashboard_invalid_month_v2_contract(client) -> None:
     token = _register_and_login(client)
 
     response = client.get(
-        "/transactions/dashboard?month=2026-13",
+        "/dashboard/overview?month=2026-13",
         headers=_auth_headers(token, "v2"),
     )
 

@@ -182,15 +182,17 @@ Query params atuais:
 
 ## 3) Transactions
 - `POST /transactions`
-- `PUT /transactions/{transaction_id}`
+- `PATCH /transactions/{transaction_id}`
+- `PUT /transactions/{transaction_id}` (compatibilidade transitória)
 - `DELETE /transactions/{transaction_id}`
 - `PATCH /transactions/restore/{transaction_id}`
 - `GET /transactions/deleted`
 - `DELETE /transactions/{transaction_id}/force`
+- `GET /dashboard/overview?month=YYYY-MM`
 - `GET /transactions/summary?month=YYYY-MM`
-- `GET /transactions/dashboard?month=YYYY-MM`
+- `GET /transactions/dashboard?month=YYYY-MM` (compatibilidade transitória)
 - `GET /transactions/list`
-- `GET /transactions/expenses`
+- `GET /transactions/expenses` (compatibilidade transitória)
 - `GET /transactions/due-range`
 
 Contrato de resposta:
@@ -213,14 +215,19 @@ Suporta:
   - simples em `data.transaction`
   - parcelada em `data.transactions`
 
-### `PUT /transactions/{transaction_id}`
-Atualiza campos da transação.
+### `PATCH /transactions/{transaction_id}`
+Atualiza parcialmente os campos da transação.
 
 Regra específica implementada:
 - Se `status=paid`, exige `paid_at`.
 - `paid_at` não pode ser no futuro.
 - Recorrência mantém consistência de intervalo (`start_date <= end_date`) e de `due_date` dentro do período quando `is_recurring=true`.
 - Com `X-API-Contract: v2`, retorna envelope padronizado.
+
+### `PUT /transactions/{transaction_id}`
+Compatibilidade transitória para update parcial.
+- emite headers de deprecação
+- sucessor canônico: `PATCH /transactions/{transaction_id}`
 
 ### `DELETE /transactions/{transaction_id}`
 Soft delete (`deleted=true`).
@@ -242,6 +249,15 @@ Remove definitivamente uma transação já soft-deleted.
 Calcula total mensal de receitas e despesas e retorna transações do mês.
 - Com `X-API-Contract: v2`, itens em `data.items` e paginação em `meta.pagination`.
 
+### `GET /dashboard/overview?month=YYYY-MM`
+Read model canônico do dashboard financeiro do MVP1.
+
+Com `X-API-Contract: v2`:
+- mês em `data.month`
+- totais em `data.totals`
+- contagens em `data.counts`
+- categorias em `data.top_categories`
+
 ### `GET /transactions/dashboard?month=YYYY-MM`
 Retorna um dashboard mensal consolidado com foco em visão executiva:
 - totais de receita, despesa e saldo (`income_total`, `expense_total`, `balance`)
@@ -254,6 +270,8 @@ Com `X-API-Contract: v2`:
 - totais em `data.totals`
 - contagens em `data.counts`
 - categorias em `data.top_categories`
+- compatibilidade transitória com headers de deprecação
+- sucessor canônico: `GET /dashboard/overview?month=YYYY-MM`
 
 ### `GET /transactions/list`
 Lista transações ativas do usuário.
@@ -267,6 +285,10 @@ Lista transações ativas do usuário.
 
 ### `GET /transactions/expenses`
 Lista despesas por período (`due_date`) com métricas agregadas do período.
+
+Compatibilidade transitória:
+- sucessor canônico: `GET /transactions?type=expense&start_date=...&end_date=...`
+- a rota responde com headers de deprecação
 
 Regras:
 - É obrigatório enviar ao menos um parâmetro: `startDate` ou `finalDate`.

@@ -30,6 +30,7 @@ from app.graphql.mutations.ticker import AddTickerMutation, DeleteTickerMutation
 from app.graphql.mutations.transaction import (
     CreateTransactionMutation,
     DeleteTransactionMutation,
+    UpdateTransactionMutation,
 )
 from app.graphql.mutations.wallet import (
     AddWalletEntryMutation,
@@ -46,6 +47,7 @@ class Mutation(graphene.ObjectType):
     reset_password = ResetPasswordMutation.Field()
     update_user_profile = UpdateUserProfileMutation.Field()
     create_transaction = CreateTransactionMutation.Field()
+    update_transaction = UpdateTransactionMutation.Field()
     delete_transaction = DeleteTransactionMutation.Field()
     create_goal = CreateGoalMutation.Field()
     update_goal = UpdateGoalMutation.Field()

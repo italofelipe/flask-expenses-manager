@@ -26,11 +26,16 @@ class TransactionPayload(TypedDict):
     source: str
     external_id: str | None
     bank_name: str | None
+    installment_group_id: str | None
+    paid_at: str | None
     created_at: str | None
     updated_at: str | None
 
 
 def serialize_transaction_payload(transaction: Transaction) -> TransactionPayload:
+    installment_group_id = getattr(transaction, "installment_group_id", None)
+    paid_at = getattr(transaction, "paid_at", None)
+
     return {
         "id": str(transaction.id),
         "title": transaction.title,
@@ -56,6 +61,10 @@ def serialize_transaction_payload(transaction: Transaction) -> TransactionPayloa
         "source": transaction.source or "manual",
         "external_id": transaction.external_id,
         "bank_name": transaction.bank_name,
+        "installment_group_id": (
+            str(installment_group_id) if installment_group_id is not None else None
+        ),
+        "paid_at": paid_at.isoformat() if paid_at is not None else None,
         "created_at": (
             transaction.created_at.isoformat() if transaction.created_at else None
         ),

@@ -17,6 +17,7 @@ type Query {
   transactionSummary(month: String!, page: Int = 1, pageSize: Int = 10): TransactionSummaryPayloadType
   transactionDashboard(month: String!): TransactionDashboardPayloadType
   transactionDueRange(initialDate: String, finalDate: String, page: Int = 1, perPage: Int = 10, orderBy: String = "overdue_first"): TransactionDueRangePayloadType
+  transaction(transactionId: UUID!): TransactionTypeObject
   me: UserType
 }
 
@@ -349,6 +350,8 @@ type TransactionTypeObject {
   source: String!
   externalId: String
   bankName: String
+  installmentGroupId: String
+  paidAt: String
   createdAt: String
   updatedAt: String
 }
@@ -443,6 +446,7 @@ type Mutation {
   resetPassword(newPassword: String!, token: String!): AuthPayloadType
   updateUserProfile(birthDate: String, financialObjectives: String, gender: String, initialInvestment: Float, investmentGoalDate: String, investorProfile: String, investorProfileSuggested: String, monthlyExpenses: Float, monthlyIncome: Float, monthlyIncomeNet: Float, monthlyInvestment: Float, netWorth: Float, occupation: String, profileQuizScore: Int, stateUf: String, taxonomyVersion: String): UpdateUserProfileMutation
   createTransaction(accountId: UUID, amount: String!, creditCardId: UUID, currency: String = "BRL", description: String, dueDate: String!, endDate: String, installmentCount: Int, isInstallment: Boolean = false, isRecurring: Boolean = false, observation: String, startDate: String, status: String = "pending", tagId: UUID, title: String!, type: String!): CreateTransactionMutation
+  updateTransaction(accountId: UUID, amount: String, creditCardId: UUID, currency: String, description: String, dueDate: String, endDate: String, installmentCount: Int, isInstallment: Boolean, isRecurring: Boolean, observation: String, paidAt: String, startDate: String, status: String, tagId: UUID, title: String, transactionId: UUID!, type: String): UpdateTransactionMutation
   deleteTransaction(transactionId: UUID!): DeleteTransactionMutation
   createGoal(category: String, currentAmount: String, description: String, priority: Int, status: String, targetAmount: String!, targetDate: String, title: String!): CreateGoalMutation
   updateGoal(category: String, currentAmount: String, description: String, goalId: UUID!, priority: Int, status: String, targetAmount: String, targetDate: String, title: String): UpdateGoalMutation
@@ -478,6 +482,11 @@ type UpdateUserProfileMutation {
 
 type CreateTransactionMutation {
   items: [TransactionTypeObject]!
+  message: String!
+}
+
+type UpdateTransactionMutation {
+  transaction: TransactionTypeObject!
   message: String!
 }
 

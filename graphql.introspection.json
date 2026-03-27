@@ -977,6 +977,35 @@
               }
             },
             {
+              "args": [
+                {
+                  "defaultValue": null,
+                  "deprecationReason": null,
+                  "description": null,
+                  "isDeprecated": false,
+                  "name": "transactionId",
+                  "type": {
+                    "kind": "NON_NULL",
+                    "name": null,
+                    "ofType": {
+                      "kind": "SCALAR",
+                      "name": "UUID",
+                      "ofType": null
+                    }
+                  }
+                }
+              ],
+              "deprecationReason": null,
+              "description": null,
+              "isDeprecated": false,
+              "name": "transaction",
+              "type": {
+                "kind": "OBJECT",
+                "name": "TransactionTypeObject",
+                "ofType": null
+              }
+            },
+            {
               "args": [],
               "deprecationReason": null,
               "description": null,
@@ -4915,6 +4944,30 @@
               "deprecationReason": null,
               "description": null,
               "isDeprecated": false,
+              "name": "installmentGroupId",
+              "type": {
+                "kind": "SCALAR",
+                "name": "String",
+                "ofType": null
+              }
+            },
+            {
+              "args": [],
+              "deprecationReason": null,
+              "description": null,
+              "isDeprecated": false,
+              "name": "paidAt",
+              "type": {
+                "kind": "SCALAR",
+                "name": "String",
+                "ofType": null
+              }
+            },
+            {
+              "args": [],
+              "deprecationReason": null,
+              "description": null,
+              "isDeprecated": false,
               "name": "createdAt",
               "type": {
                 "kind": "SCALAR",
@@ -6481,6 +6534,239 @@
               "type": {
                 "kind": "OBJECT",
                 "name": "CreateTransactionMutation",
+                "ofType": null
+              }
+            },
+            {
+              "args": [
+                {
+                  "defaultValue": null,
+                  "deprecationReason": null,
+                  "description": null,
+                  "isDeprecated": false,
+                  "name": "accountId",
+                  "type": {
+                    "kind": "SCALAR",
+                    "name": "UUID",
+                    "ofType": null
+                  }
+                },
+                {
+                  "defaultValue": null,
+                  "deprecationReason": null,
+                  "description": null,
+                  "isDeprecated": false,
+                  "name": "amount",
+                  "type": {
+                    "kind": "SCALAR",
+                    "name": "String",
+                    "ofType": null
+                  }
+                },
+                {
+                  "defaultValue": null,
+                  "deprecationReason": null,
+                  "description": null,
+                  "isDeprecated": false,
+                  "name": "creditCardId",
+                  "type": {
+                    "kind": "SCALAR",
+                    "name": "UUID",
+                    "ofType": null
+                  }
+                },
+                {
+                  "defaultValue": null,
+                  "deprecationReason": null,
+                  "description": null,
+                  "isDeprecated": false,
+                  "name": "currency",
+                  "type": {
+                    "kind": "SCALAR",
+                    "name": "String",
+                    "ofType": null
+                  }
+                },
+                {
+                  "defaultValue": null,
+                  "deprecationReason": null,
+                  "description": null,
+                  "isDeprecated": false,
+                  "name": "description",
+                  "type": {
+                    "kind": "SCALAR",
+                    "name": "String",
+                    "ofType": null
+                  }
+                },
+                {
+                  "defaultValue": null,
+                  "deprecationReason": null,
+                  "description": null,
+                  "isDeprecated": false,
+                  "name": "dueDate",
+                  "type": {
+                    "kind": "SCALAR",
+                    "name": "String",
+                    "ofType": null
+                  }
+                },
+                {
+                  "defaultValue": null,
+                  "deprecationReason": null,
+                  "description": null,
+                  "isDeprecated": false,
+                  "name": "endDate",
+                  "type": {
+                    "kind": "SCALAR",
+                    "name": "String",
+                    "ofType": null
+                  }
+                },
+                {
+                  "defaultValue": null,
+                  "deprecationReason": null,
+                  "description": null,
+                  "isDeprecated": false,
+                  "name": "installmentCount",
+                  "type": {
+                    "kind": "SCALAR",
+                    "name": "Int",
+                    "ofType": null
+                  }
+                },
+                {
+                  "defaultValue": null,
+                  "deprecationReason": null,
+                  "description": null,
+                  "isDeprecated": false,
+                  "name": "isInstallment",
+                  "type": {
+                    "kind": "SCALAR",
+                    "name": "Boolean",
+                    "ofType": null
+                  }
+                },
+                {
+                  "defaultValue": null,
+                  "deprecationReason": null,
+                  "description": null,
+                  "isDeprecated": false,
+                  "name": "isRecurring",
+                  "type": {
+                    "kind": "SCALAR",
+                    "name": "Boolean",
+                    "ofType": null
+                  }
+                },
+                {
+                  "defaultValue": null,
+                  "deprecationReason": null,
+                  "description": null,
+                  "isDeprecated": false,
+                  "name": "observation",
+                  "type": {
+                    "kind": "SCALAR",
+                    "name": "String",
+                    "ofType": null
+                  }
+                },
+                {
+                  "defaultValue": null,
+                  "deprecationReason": null,
+                  "description": null,
+                  "isDeprecated": false,
+                  "name": "paidAt",
+                  "type": {
+                    "kind": "SCALAR",
+                    "name": "String",
+                    "ofType": null
+                  }
+                },
+                {
+                  "defaultValue": null,
+                  "deprecationReason": null,
+                  "description": null,
+                  "isDeprecated": false,
+                  "name": "startDate",
+                  "type": {
+                    "kind": "SCALAR",
+                    "name": "String",
+                    "ofType": null
+                  }
+                },
+                {
+                  "defaultValue": null,
+                  "deprecationReason": null,
+                  "description": null,
+                  "isDeprecated": false,
+                  "name": "status",
+                  "type": {
+                    "kind": "SCALAR",
+                    "name": "String",
+                    "ofType": null
+                  }
+                },
+                {
+                  "defaultValue": null,
+                  "deprecationReason": null,
+                  "description": null,
+                  "isDeprecated": false,
+                  "name": "tagId",
+                  "type": {
+                    "kind": "SCALAR",
+                    "name": "UUID",
+                    "ofType": null
+                  }
+                },
+                {
+                  "defaultValue": null,
+                  "deprecationReason": null,
+                  "description": null,
+                  "isDeprecated": false,
+                  "name": "title",
+                  "type": {
+                    "kind": "SCALAR",
+                    "name": "String",
+                    "ofType": null
+                  }
+                },
+                {
+                  "defaultValue": null,
+                  "deprecationReason": null,
+                  "description": null,
+                  "isDeprecated": false,
+                  "name": "transactionId",
+                  "type": {
+                    "kind": "NON_NULL",
+                    "name": null,
+                    "ofType": {
+                      "kind": "SCALAR",
+                      "name": "UUID",
+                      "ofType": null
+                    }
+                  }
+                },
+                {
+                  "defaultValue": null,
+                  "deprecationReason": null,
+                  "description": null,
+                  "isDeprecated": false,
+                  "name": "type",
+                  "type": {
+                    "kind": "SCALAR",
+                    "name": "String",
+                    "ofType": null
+                  }
+                }
+              ],
+              "deprecationReason": null,
+              "description": null,
+              "isDeprecated": false,
+              "name": "updateTransaction",
+              "type": {
+                "kind": "OBJECT",
+                "name": "UpdateTransactionMutation",
                 "ofType": null
               }
             },
@@ -8165,6 +8451,50 @@
           "interfaces": [],
           "kind": "OBJECT",
           "name": "CreateTransactionMutation",
+          "possibleTypes": null,
+          "specifiedByURL": null
+        },
+        {
+          "description": null,
+          "enumValues": null,
+          "fields": [
+            {
+              "args": [],
+              "deprecationReason": null,
+              "description": null,
+              "isDeprecated": false,
+              "name": "transaction",
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "OBJECT",
+                  "name": "TransactionTypeObject",
+                  "ofType": null
+                }
+              }
+            },
+            {
+              "args": [],
+              "deprecationReason": null,
+              "description": null,
+              "isDeprecated": false,
+              "name": "message",
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "SCALAR",
+                  "name": "String",
+                  "ofType": null
+                }
+              }
+            }
+          ],
+          "inputFields": null,
+          "interfaces": [],
+          "kind": "OBJECT",
+          "name": "UpdateTransactionMutation",
           "possibleTypes": null,
           "specifiedByURL": null
         },

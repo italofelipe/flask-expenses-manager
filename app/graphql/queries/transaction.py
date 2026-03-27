@@ -4,15 +4,13 @@ import graphene
 
 from app.application.services.transaction_application_service import (
     TransactionApplicationError,
-    TransactionApplicationService,
 )
+from app.application.services.transaction_query_service import TransactionQueryService
 from app.graphql.auth import get_current_user_required
 from app.graphql.errors import build_public_graphql_error, to_public_graphql_code
-from app.graphql.queries.common import paginate, serialize_transaction_items
+from app.graphql.queries.common import paginate
 from app.graphql.schema_utils import (
-    _apply_due_date_range_filter,
-    _apply_status_filter,
-    _apply_type_filter,
+    _parse_optional_date,
     _validate_pagination_values,
 )
 from app.graphql.types import (
@@ -28,7 +26,6 @@ from app.graphql.types import (
     TransactionSummaryPayloadType,
     TransactionTypeObject,
 )
-from app.models.transaction import Transaction
 
 
 class TransactionQueryMixin:
@@ -59,6 +56,10 @@ class TransactionQueryMixin:
         per_page=graphene.Int(default_value=10),
         order_by=graphene.String(default_value="overdue_first"),
     )
+    transaction = graphene.Field(
+        TransactionTypeObject,
+        transaction_id=graphene.UUID(required=True),
+    )
 
     def resolve_transactions(
         self,
@@ -72,22 +73,47 @@ class TransactionQueryMixin:
     ) -> TransactionListPayloadType:
         _validate_pagination_values(page, per_page)
         user = get_current_user_required()
-        query = Transaction.query.filter_by(user_id=user.id, deleted=False)
-        query = _apply_type_filter(query, type)
-        query = _apply_status_filter(query, status)
-        query = _apply_due_date_range_filter(query, start_date, end_date)
-
-        total = query.count()
-        items = (
-            query.order_by(Transaction.due_date.desc(), Transaction.created_at.desc())
-            .offset((page - 1) * per_page)
-            .limit(per_page)
-            .all()
+        query_service = TransactionQueryService.with_defaults(user.id)
+        result = query_service.get_active_transactions(
+            page=page,
+            per_page=per_page,
+            transaction_type=type,
+            status=status,
+            start_date=_parse_optional_date(start_date, "start_date"),
+            end_date=_parse_optional_date(end_date, "end_date"),
+            tag_id=None,
+            account_id=None,
+            credit_card_id=None,
         )
+        pagination = result["pagination"]
         return TransactionListPayloadType(
-            items=serialize_transaction_items(items),
-            pagination=paginate(total=total, page=page, per_page=per_page),
+            items=[
+                TransactionTypeObject(**item)
+                for item in result["items"]
+                if isinstance(item, dict)
+            ],
+            pagination=paginate(
+                total=int(pagination["total"]),
+                page=int(pagination["page"]),
+                per_page=int(pagination["per_page"]),
+            ),
         )
+
+    def resolve_transaction(
+        self,
+        _info: graphene.ResolveInfo,
+        transaction_id: graphene.UUID,
+    ) -> TransactionTypeObject:
+        user = get_current_user_required()
+        query_service = TransactionQueryService.with_defaults(user.id)
+        try:
+            item = query_service.get_transaction(transaction_id)
+        except TransactionApplicationError as exc:
+            raise build_public_graphql_error(
+                exc.message,
+                code=to_public_graphql_code(exc.code),
+            ) from exc
+        return TransactionTypeObject(**item)
 
     def resolve_transaction_summary(
         self,
@@ -98,12 +124,12 @@ class TransactionQueryMixin:
     ) -> TransactionSummaryPayloadType:
         _validate_pagination_values(page, page_size)
         user = get_current_user_required()
-        service = TransactionApplicationService.with_defaults(user.id)
+        query_service = TransactionQueryService.with_defaults(user.id)
         try:
-            result = service.get_month_summary(
+            result = query_service.get_month_summary(
                 month=month,
                 page=page,
-                page_size=page_size,
+                per_page=page_size,
             )
         except TransactionApplicationError as exc:
             raise build_public_graphql_error(
@@ -132,9 +158,9 @@ class TransactionQueryMixin:
         self, _info: graphene.ResolveInfo, month: str
     ) -> TransactionDashboardPayloadType:
         user = get_current_user_required()
-        service = TransactionApplicationService.with_defaults(user.id)
+        query_service = TransactionQueryService.with_defaults(user.id)
         try:
-            result = service.get_month_dashboard(month=month)
+            result = query_service.get_dashboard_overview(month=month)
         except TransactionApplicationError as exc:
             raise build_public_graphql_error(
                 exc.message,
@@ -185,9 +211,9 @@ class TransactionQueryMixin:
     ) -> TransactionDueRangePayloadType:
         _validate_pagination_values(page, per_page)
         user = get_current_user_required()
-        service = TransactionApplicationService.with_defaults(user.id)
+        query_service = TransactionQueryService.with_defaults(user.id)
         try:
-            result = service.get_due_transactions(
+            result = query_service.get_due_transactions(
                 start_date=initial_date,
                 end_date=final_date,
                 page=page,

@@ -9,6 +9,10 @@ from flask import Flask, current_app
 from app.application.services.transaction_application_service import (
     TransactionApplicationService,
 )
+from app.application.services.transaction_query_service import (
+    TransactionQueryDependencies,
+    TransactionQueryService,
+)
 from app.services.transaction_analytics_service import TransactionAnalyticsService
 
 TRANSACTION_DEPENDENCIES_EXTENSION_KEY = "transaction_dependencies"
@@ -22,6 +26,7 @@ class TransactionDependencies:
     transaction_application_service_factory: Callable[
         [UUID], TransactionApplicationService
     ]
+    transaction_query_service_factory: Callable[[UUID], TransactionQueryService]
 
 
 def _analytics_service_factory(user_id: UUID) -> TransactionAnalyticsService:
@@ -46,11 +51,23 @@ def _default_dependencies() -> TransactionDependencies:
             analytics_service_factory=_analytics_service_factory,
         )
 
+    def _transaction_query_service_factory(user_id: UUID) -> TransactionQueryService:
+        return TransactionQueryService(
+            user_id=user_id,
+            dependencies=TransactionQueryDependencies(
+                transaction_application_service_factory=(
+                    _transaction_application_service_factory
+                ),
+                analytics_service_factory=_analytics_service_factory,
+            ),
+        )
+
     return TransactionDependencies(
         analytics_service_factory=_analytics_service_factory,
         transaction_application_service_factory=(
             _transaction_application_service_factory
         ),
+        transaction_query_service_factory=_transaction_query_service_factory,
     )
 
 
