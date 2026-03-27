@@ -125,6 +125,12 @@ Uso recomendado:
 - emitir o snapshot de latência logo depois
 - comparar `p50/p95` com o budget antes de fechar blocos sensíveis de performance
 
+Governança operacional:
+- o arquivo canônico dos budgets agora é `config/http_latency_budgets.json`
+- o CI comum executa `scripts/http_latency_budget_gate.py` no job `api-smoke`
+- o workflow local `scripts/run_ci_like_actions_local.sh --local --with-postman` também roda esse gate
+- a evidência oficial fica em `reports/performance/http-latency-budget.json`
+
 ## Observações
 - A suite não depende de `.env.test`.
 - Cada teste roda com schema limpo (`create_all`/`drop_all`).

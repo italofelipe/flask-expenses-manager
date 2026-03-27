@@ -178,6 +178,10 @@ run_core_pipeline() {
     echo "[ci-like-local] step=tests:postman-smoke"
     bash scripts/run_postman_suite.sh \
       api-tests/postman/environments/local.postman_environment.json
+    echo "[ci-like-local] step=tests:http-latency-budget"
+    "${PYTHON_BIN}" scripts/http_latency_budget_gate.py \
+      --base-url "${API_BASE_URL:-http://localhost:3333}" \
+      --samples 3
   else
     echo "[ci-like-local] step=tests:postman-smoke skipped (use --with-postman)"
   fi
