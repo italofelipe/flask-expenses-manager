@@ -17,6 +17,21 @@ def _metric_suffix(value: str) -> str:
     return normalized or "unknown"
 
 
+def _record_graphql_http_metrics(
+    *, operation_name: str | None, root_fields: tuple[str, ...]
+) -> None:
+    if operation_name or root_fields:
+        increment_metric("http.request.graphql")
+    if operation_name:
+        increment_metric(
+            f"http.request.graphql.operation.{_metric_suffix(operation_name)}"
+        )
+    for root_field in root_fields:
+        increment_metric(
+            f"http.request.graphql.root_field.{_metric_suffix(root_field)}"
+        )
+
+
 def register_http_observability(app: Flask) -> None:
     @app.before_request
     def _mark_request_start() -> None:
@@ -50,11 +65,10 @@ def register_http_observability(app: Flask) -> None:
             increment_metric("http.request.trace.present")
         else:
             increment_metric("http.request.trace.absent")
-        if envelope.graphql_operation_name:
-            increment_metric("http.request.graphql")
-            increment_metric(
-                f"http.request.graphql.operation.{_metric_suffix(envelope.graphql_operation_name)}"
-            )
+        _record_graphql_http_metrics(
+            operation_name=envelope.graphql_operation_name,
+            root_fields=envelope.graphql_root_fields,
+        )
         if envelope.auth_subject:
             increment_metric("http.request.authenticated")
         else:

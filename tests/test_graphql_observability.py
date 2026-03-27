@@ -78,7 +78,8 @@ def test_graphql_metrics_record_domain_and_cost_for_accepted_query(client: Any) 
 
     http_payload = build_http_observability_metrics_payload()
     assert http_payload["summary"]["graphql_requests"] >= 1
-    assert metrics["http.request.graphql.operation.me"] >= 1
+    http_metrics = snapshot_metrics(prefix="http.request.")
+    assert http_metrics["http.request.graphql.root_field.me"] >= 1
 
 
 def test_graphql_metrics_record_security_violations(client: Any) -> None:
