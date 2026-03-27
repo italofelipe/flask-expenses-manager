@@ -91,8 +91,10 @@ check_contains "app/controllers/auth/dependencies.py" "generate_password_hash" "
 } >>"${REPORT_FILE}"
 
 check_exists ".gitleaks.toml" "Gitleaks config is versioned in repository"
+check_exists "config/security_exception_allowlist.json" "Canonical security exception allowlist is versioned"
 check_contains ".github/workflows/ci.yml" "name: Dependency Security \(OSV-Scanner\)" "OSV-Scanner dependency scan job configured"
 check_contains ".github/workflows/ci.yml" "bash scripts/run_osv_scanner\.sh" "OSV-Scanner is executed through the canonical script"
+check_contains ".github/workflows/ci.yml" "security_exception_governance\.py check" "CI validates security exception governance before dependency scanning"
 check_contains ".github/workflows/ci.yml" "name: Container Security \(Trivy\)" "Trivy container/filesystem scan job configured"
 
 if command -v rg >/dev/null 2>&1; then

@@ -123,8 +123,11 @@ run_core_pipeline() {
   echo "[ci-like-local] step=flags:hygiene"
   "${PYTHON_BIN}" scripts/check_feature_flags.py
 
+  echo "[ci-like-local] step=security:exception-governance"
+  python3 scripts/security_exception_governance.py check
+
   echo "[ci-like-local] step=quality:pip-audit"
-  "${PYTHON_BIN}" -m pip_audit -r requirements.txt --ignore-vuln GHSA-5239-wwwm-4pmq
+  "${PYTHON_BIN}" -m pip_audit -r requirements.txt $(python3 scripts/security_exception_governance.py pip-audit-args)
 
   echo "[ci-like-local] step=quality:ruff-format"
   "${PYTHON_BIN}" -m ruff format --check .

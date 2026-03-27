@@ -38,8 +38,13 @@ jobs:
           python -m pip install --upgrade pip
           python -m pip install -r requirements.txt -r requirements-dev.txt
 
+      - name: Security exception governance
+        run: python3 scripts/security_exception_governance.py check
+
       - name: Dependency vulnerability scan
-        run: python -m pip_audit -r requirements.txt --ignore-vuln GHSA-5239-wwwm-4pmq
+        run: |
+          python -m pip_audit -r requirements.txt \
+            $(python3 scripts/security_exception_governance.py pip-audit-args)
 
       - name: Ruff format (check)
         run: python -m ruff format --check .

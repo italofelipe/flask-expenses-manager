@@ -6,7 +6,10 @@ REPORT_DIR="${ROOT_DIR}/reports/security"
 REPORT_FILE="${REPORT_DIR}/osv-results.json"
 OSV_SCANNER_VERSION="${OSV_SCANNER_VERSION:-2.3.3}"
 OSV_INCLUDE_NODE_LOCKFILE="${OSV_INCLUDE_NODE_LOCKFILE:-false}"
-OSV_ALLOWLIST_VULNS="${OSV_ALLOWLIST_VULNS:-GHSA-5239-wwwm-4pmq}"
+DEFAULT_OSV_ALLOWLIST_VULNS="$(
+  python3 "${ROOT_DIR}/scripts/security_exception_governance.py" osv-allowlist
+)"
+OSV_ALLOWLIST_VULNS="${OSV_ALLOWLIST_VULNS:-${DEFAULT_OSV_ALLOWLIST_VULNS}}"
 
 mkdir -p "${REPORT_DIR}"
 
@@ -152,6 +155,7 @@ PY
 
 main() {
   local scanner_path scan_exit scan_stderr
+  python3 "${ROOT_DIR}/scripts/security_exception_governance.py" check
   mapfile -t scan_args < <(build_scan_args)
   scanner_path="$(ensure_osv_scanner)"
   scan_stderr="$(mktemp)"
