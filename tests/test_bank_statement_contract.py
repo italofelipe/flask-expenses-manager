@@ -146,6 +146,29 @@ def test_bank_statement_preview_v2_contract_marks_duplicates(client) -> None:
     assert body["data"]["entries"][0]["is_duplicate"] is True
 
 
+def test_bank_statement_preview_accepts_json_content(client) -> None:
+    token = _register_and_login(client, prefix="bank-preview-json")
+
+    response = client.post(
+        "/bank-statements/preview",
+        json={
+            "bank": "nubank",
+            "content": (
+                "date,title,amount\n"
+                "2026-03-14,Supermercado,-123.45\n"
+                "2026-03-15,Salario,5000.00\n"
+            ),
+        },
+        headers=_auth(token, "v2"),
+    )
+
+    assert response.status_code == 200
+    body = response.get_json()
+    assert body["success"] is True
+    assert body["data"]["bank_name"] == "nubank"
+    assert len(body["data"]["entries"]) == 2
+
+
 def test_bank_statement_confirm_selective_persists_transactions(client) -> None:
     token = _register_and_login(client, prefix="bank-confirm")
 

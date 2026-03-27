@@ -41,6 +41,24 @@ def _decode_uploaded_text() -> str:
     raise ValueError("Uploaded file must be a text-based OFX or CSV")
 
 
+def _extract_preview_request() -> tuple[str, str]:
+    bank_name = ""
+    if request.is_json:
+        payload = request.get_json(silent=True) or {}
+        bank_name = str(payload.get("bank", "")).strip()
+        content = str(payload.get("content", ""))
+        if not bank_name:
+            raise ValueError("Field 'bank' is required")
+        if not content.strip():
+            raise ValueError("Field 'content' is required")
+        return bank_name, content
+
+    bank_name = (request.form.get("bank") or "").strip()
+    if not bank_name:
+        raise ValueError("Field 'bank' is required")
+    return bank_name, _decode_uploaded_text()
+
+
 def _serialize_preview(preview: BankImportPreview) -> dict[str, Any]:
     entries = [
         {
@@ -80,17 +98,8 @@ def _serialize_confirmation(result: BankImportConfirmation) -> dict[str, Any]:
 
 @jwt_required()
 def preview_bank_statement() -> tuple[dict[str, Any], int]:
-    bank_name = (request.form.get("bank") or "").strip()
-    if not bank_name:
-        return compat_error_tuple(
-            legacy_payload={"error": "Field 'bank' is required"},
-            status_code=400,
-            message="Field 'bank' is required",
-            error_code="MISSING_BANK",
-        )
-
     try:
-        content = _decode_uploaded_text()
+        bank_name, content = _extract_preview_request()
         preview = _build_service().build_preview(content=content, bank_name=bank_name)
     except ValueError as exc:
         return compat_error_tuple(
