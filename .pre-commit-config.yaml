@@ -47,7 +47,7 @@ repos:
     stages: [pre-push]
   - id: pip-audit
     name: pip-audit (dependencies)
-    entry: scripts/python_tool.sh pip_audit -r requirements.txt --ignore-vuln GHSA-5239-wwwm-4pmq
+    entry: bash -lc 'python3 scripts/security_exception_governance.py check && scripts/python_tool.sh pip_audit -r requirements.txt $(python3 scripts/security_exception_governance.py pip-audit-args)'
     language: system
     pass_filenames: false
     stages: [pre-push]

@@ -66,6 +66,11 @@ Jobs relevantes:
 - usa a base `OSV.dev` como complemento ao `pip-audit` e ao `dependency-review`
 - publica `reports/security/osv-results.json` como artifact
 
+Governanca de excecoes de seguranca:
+- excecoes canonicas vivem em `config/security_exception_allowlist.json`
+- `pip-audit` e `OSV-Scanner` consomem a mesma fonte de verdade
+- `scripts/security_exception_governance.py check` roda antes dos scans para evitar drift, ignores sem justificativa e allowlists nao rastreaveis
+
 12. `security-evidence`
 - executa `scripts/security_evidence_check.sh`
 
@@ -188,6 +193,10 @@ Hooks:
 - `mypy`
 - `sonar-local-check` (opt-in local; `enforce` em CI ou com override)
 - pre-push: `security-evidence`, `pip-audit`
+
+Governanca de excecoes:
+- hooks locais usam a mesma allowlist canonica do CI
+- excecao nova so entra pelo inventario versionado com `owner`, `reviewed_at` e `justification`
 
 Política do `sonar-local-check`:
 - Local (default): `AURAXIS_ENABLE_LOCAL_SONAR=false` (skip não bloqueante para evitar latência alta no fluxo diário).
