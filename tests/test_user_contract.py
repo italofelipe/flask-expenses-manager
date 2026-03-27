@@ -61,6 +61,33 @@ USER_FIELDS = {
     "taxonomy_version",
 }
 
+CANONICAL_USER_KEYS = {
+    "identity",
+    "profile",
+    "financial_profile",
+    "investor_profile",
+    "product_context",
+}
+
+IDENTITY_FIELDS = {"id", "name", "email"}
+PROFILE_FIELDS = {"gender", "birth_date", "state_uf", "occupation"}
+FINANCIAL_PROFILE_FIELDS = {
+    "monthly_income_net",
+    "monthly_expenses",
+    "net_worth",
+    "initial_investment",
+    "monthly_investment",
+    "investment_goal_date",
+}
+INVESTOR_PROFILE_FIELDS = {
+    "declared",
+    "suggested",
+    "quiz_score",
+    "taxonomy_version",
+    "financial_objectives",
+}
+PRODUCT_CONTEXT_FIELDS = {"entitlements_version"}
+
 TRANSACTION_ITEM_FIELDS = {
     "id",
     "title",
@@ -278,6 +305,52 @@ def test_user_me_invalid_status_v2_contract(client) -> None:
     body = response.get_json()
     assert body["success"] is False
     assert body["error"]["code"] == "VALIDATION_ERROR"
+
+
+def test_user_me_v3_contract_returns_canonical_context_only(client) -> None:
+    token = _register_and_login(client)
+    response = client.get(
+        "/user/me",
+        headers=_auth_headers(token, "v3"),
+    )
+
+    assert response.status_code == 200
+    body = response.get_json()
+    assert body["success"] is True
+    assert body["message"] == "Contexto autenticado retornado com sucesso"
+    assert "meta" not in body
+    assert set(body["data"].keys()) == {"user"}
+    assert set(body["data"]["user"].keys()) == CANONICAL_USER_KEYS
+    assert set(body["data"]["user"]["identity"].keys()) == IDENTITY_FIELDS
+    assert set(body["data"]["user"]["profile"].keys()) == PROFILE_FIELDS
+    assert (
+        set(body["data"]["user"]["financial_profile"].keys())
+        == FINANCIAL_PROFILE_FIELDS
+    )
+    assert (
+        set(body["data"]["user"]["investor_profile"].keys()) == INVESTOR_PROFILE_FIELDS
+    )
+    assert set(body["data"]["user"]["product_context"].keys()) == PRODUCT_CONTEXT_FIELDS
+    assert "monthly_income" not in body["data"]["user"]["financial_profile"]
+    assert "transactions" not in body["data"]["user"]
+    assert "wallet" not in body["data"]["user"]
+
+
+def test_user_me_v3_contract_rejects_collection_semantics(client) -> None:
+    token = _register_and_login(client)
+    response = client.get(
+        "/user/me?page=1&limit=10",
+        headers=_auth_headers(token, "v3"),
+    )
+
+    assert response.status_code == 400
+    body = response.get_json()
+    assert body["success"] is False
+    assert body["error"]["code"] == "VALIDATION_ERROR"
+    assert body["message"] == (
+        "O contrato canônico de '/user/me' não aceita paginação nem filtros de "
+        "coleção. Use '/transactions' ou o bootstrap dedicado."
+    )
 
 
 def test_user_me_masks_unexpected_value_error(client, monkeypatch) -> None:

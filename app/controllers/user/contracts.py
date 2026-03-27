@@ -9,6 +9,7 @@ from app.controllers.response_contract import (
     compat_success_response,
     is_v2_contract,
 )
+from app.utils.api_contract import is_v3_contract_request
 
 
 def compat_success(
@@ -47,6 +48,7 @@ def compat_error(
 
 __all__ = [
     "is_v2_contract",
+    "is_v3_contract_request",
     "compat_success",
     "compat_error",
 ]
