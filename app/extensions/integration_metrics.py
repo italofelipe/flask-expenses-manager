@@ -1,24 +1,48 @@
 from __future__ import annotations
 
+import json
 import threading
 from collections import Counter
 from math import ceil
+from pathlib import Path
 from typing import Any
 
 _lock = threading.Lock()
 _counters: Counter[str] = Counter()
 _samples: dict[str, list[int]] = {}
-_HTTP_LATENCY_BUDGETS: dict[str, dict[str, Any]] = {
-    "health.healthz": {"budget_ms": 100, "method": "GET", "path": "/healthz"},
-    "auth.authresource": {"budget_ms": 250, "method": "POST", "path": "/auth/login"},
-    "user.me": {"budget_ms": 250, "method": "GET", "path": "/users/me"},
-    "graphql.execute_graphql": {
-        "budget_ms": 400,
-        "method": "POST",
-        "path": "/graphql",
-    },
-}
 _MAX_SAMPLES_PER_METRIC = 200
+_HTTP_LATENCY_BUDGETS_FILE = (
+    Path(__file__).resolve().parents[2] / "config" / "http_latency_budgets.json"
+)
+
+
+def _load_http_latency_budgets() -> dict[str, dict[str, Any]]:
+    payload = json.loads(_HTTP_LATENCY_BUDGETS_FILE.read_text(encoding="utf-8"))
+    routes = payload.get("routes", [])
+    if not isinstance(routes, list):
+        raise ValueError("http latency budget config must define a routes list")
+
+    budgets: dict[str, dict[str, Any]] = {}
+    for route in routes:
+        if not isinstance(route, dict):
+            continue
+        name = str(route.get("name") or "").strip()
+        method = str(route.get("method") or "").strip().upper()
+        path = str(route.get("path") or "").strip()
+        budget_ms = int(route.get("budget_ms") or 0)
+        scenario = str(route.get("scenario") or "").strip()
+        if not name or not method or not path or budget_ms <= 0:
+            raise ValueError("invalid route entry in http latency budget config")
+        budgets[name] = {
+            "method": method,
+            "path": path,
+            "budget_ms": budget_ms,
+            "scenario": scenario,
+        }
+    return budgets
+
+
+_HTTP_LATENCY_BUDGETS = _load_http_latency_budgets()
 
 
 def increment_metric(name: str, amount: int = 1) -> None:

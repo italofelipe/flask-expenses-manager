@@ -1,0 +1,33 @@
+{
+  "version": 1,
+  "routes": [
+    {
+      "name": "health.healthz",
+      "method": "GET",
+      "path": "/healthz",
+      "budget_ms": 100,
+      "scenario": "healthz"
+    },
+    {
+      "name": "auth.login",
+      "method": "POST",
+      "path": "/auth/login",
+      "budget_ms": 250,
+      "scenario": "login"
+    },
+    {
+      "name": "user.me",
+      "method": "GET",
+      "path": "/user/me",
+      "budget_ms": 250,
+      "scenario": "me"
+    },
+    {
+      "name": "graphql.me",
+      "method": "POST",
+      "path": "/graphql",
+      "budget_ms": 400,
+      "scenario": "graphql_me"
+    }
+  ]
+}

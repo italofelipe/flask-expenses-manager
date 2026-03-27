@@ -239,6 +239,12 @@ jobs:
       - name: Run Postman smoke suite
         run: npm run postman:smoke:ci
 
+      - name: Enforce HTTP latency budget
+        run: |
+          python3 scripts/http_latency_budget_gate.py \
+            --base-url http://localhost:3333 \
+            --samples 3
+
       - name: Summarize smoke release gate
         if: always()
         run: |
@@ -258,6 +264,13 @@ jobs:
         with:
           name: newman-smoke-report
           path: reports/newman-smoke-report.xml
+
+      - name: Upload latency budget report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: http-latency-budget-report
+          path: reports/performance/http-latency-budget.json
 
       - name: Dump stack logs on failure
         if: failure()

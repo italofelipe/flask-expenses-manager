@@ -98,6 +98,7 @@ Controles:
 
 Arquitetura canonica de smoke/release gate:
 - pré-merge: Newman roda nos jobs `api-smoke` (`smoke`) e `api-integration` (`full`) do `ci.yml`
+- pré-merge: `api-smoke` tambem executa `scripts/http_latency_budget_gate.py`
 - pós-deploy: smoke deterministico em Python dentro do `deploy.yml`
 - fluxos legados paralelos de smoke foram removidos para evitar drift
 - readiness no caminho comum de merge/release exige os dois gates oficiais (`smoke` + `full`) em verde
@@ -112,6 +113,17 @@ python scripts/pr_traceability_check.py \
   --repo italofelipe/auraxis-api \
   --pr-number 720 \
   master-absorption
+```
+
+### Governanca de performance
+
+- budgets canonicos vivem em `config/http_latency_budgets.json`
+- o CI publica `reports/performance/http-latency-budget.json` como artifact
+- o mesmo gate pode ser executado localmente com stack ja subida:
+
+```bash
+API_BASE_URL=http://localhost:3333 \
+bash scripts/run_ci_like_actions_local.sh --local --with-postman
 ```
 
 Politica de docs runtime:
