@@ -87,7 +87,8 @@ _NORMALIZED_SPEC = _load_normalized_openapi_spec()
 _RAW_SCHEMA = schemathesis.openapi.from_dict(_NORMALIZED_SPEC, app=_APP)
 SCHEMA = _RAW_SCHEMA.include(
     path_regex=(
-        r"^/auth/(login|register)$|^/transactions/list$|^/transactions/summary$|"
+        r"^/auth/(login|register)$|^/transactions(?:/[^/]+)?$|"
+        r"^/transactions/list$|^/transactions/summary$|"
         r"^/transactions/expenses$|^/transactions/due-range$"
     )
 )

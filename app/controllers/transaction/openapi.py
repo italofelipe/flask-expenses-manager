@@ -6,6 +6,7 @@ TAG_TRANSACTIONS = "Transações"
 ERROR_TOKEN_INVALIDO = "Token inválido"
 ERROR_INTERNO = "Erro interno"
 ERROR_TRANSACAO_NAO_ENCONTRADA = "Transação não encontrada"
+ERROR_SEM_PERMISSAO = "Sem permissão"
 DESC_NUMERO_PAGINA = "Número da página"
 DESC_ITENS_POR_PAGINA = "Itens por página"
 DESC_DATA_INICIAL = "Data inicial (YYYY-MM-DD)"
@@ -47,7 +48,7 @@ TRANSACTION_UPDATE_DOC = {
         200: {"description": "Transação atualizada"},
         400: {"description": "Erro de validação"},
         401: {"description": ERROR_TOKEN_INVALIDO},
-        403: {"description": "Sem permissão"},
+        403: {"description": ERROR_SEM_PERMISSAO},
         404: {"description": ERROR_TRANSACAO_NAO_ENCONTRADA},
         500: {"description": ERROR_INTERNO},
     },
@@ -61,7 +62,7 @@ TRANSACTION_SOFT_DELETE_DOC = {
     "responses": {
         200: {"description": "Transação deletada"},
         401: {"description": ERROR_TOKEN_INVALIDO},
-        403: {"description": "Sem permissão"},
+        403: {"description": ERROR_SEM_PERMISSAO},
         404: {"description": ERROR_TRANSACAO_NAO_ENCONTRADA},
         500: {"description": ERROR_INTERNO},
     },
@@ -93,7 +94,7 @@ TRANSACTION_DELETED_LIST_DOC = {
 }
 
 TRANSACTION_ACTIVE_LIST_DOC = {
-    "description": "Lista transações ativas com filtros e paginação.",
+    "description": "Lista canônica de transações ativas com filtros e paginação.",
     "tags": [TAG_TRANSACTIONS],
     "security": [{"BearerAuth": []}],
     "params": {
@@ -114,6 +115,28 @@ TRANSACTION_ACTIVE_LIST_DOC = {
     "responses": {
         200: {"description": "Lista de transações"},
         401: {"description": ERROR_TOKEN_INVALIDO},
+        500: {"description": ERROR_INTERNO},
+    },
+}
+
+TRANSACTION_ACTIVE_LIST_LEGACY_DOC = {
+    **TRANSACTION_ACTIVE_LIST_DOC,
+    "description": (
+        "Compatibilidade transitória para listagem de transações ativas. "
+        "Prefira GET /transactions."
+    ),
+}
+
+TRANSACTION_DETAIL_DOC = {
+    "description": "Retorna o detalhe canônico de uma transação do usuário.",
+    "tags": [TAG_TRANSACTIONS],
+    "security": [{"BearerAuth": []}],
+    "params": {**TRANSACTION_ID_PARAM, **CONTRACT_HEADER_PARAM},
+    "responses": {
+        200: {"description": "Detalhe da transação"},
+        401: {"description": ERROR_TOKEN_INVALIDO},
+        403: {"description": ERROR_SEM_PERMISSAO},
+        404: {"description": ERROR_TRANSACAO_NAO_ENCONTRADA},
         500: {"description": ERROR_INTERNO},
     },
 }

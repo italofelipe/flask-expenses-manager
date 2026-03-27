@@ -2,7 +2,9 @@ from __future__ import annotations
 
 from .blueprint import transaction_bp
 from .report_resources import (
+    TransactionCollectionResource,
     TransactionDeletedResource,
+    TransactionDetailResource,
     TransactionDuePeriodResource,
     TransactionExpensePeriodResource,
     TransactionForceDeleteResource,
@@ -14,6 +16,7 @@ from .report_resources import (
 from .resources import TransactionResource
 
 _ROUTES_REGISTERED = False
+_TRANSACTION_ID_ROUTE = "/<uuid:transaction_id>"
 
 
 def register_transaction_routes() -> None:
@@ -24,15 +27,27 @@ def register_transaction_routes() -> None:
         return
 
     transaction_bp.add_url_rule(
-        "", view_func=TransactionResource.as_view("transactionresource")
+        "",
+        view_func=TransactionCollectionResource.as_view("transaction_list_canonical"),
+        methods=["GET"],
     )
     transaction_bp.add_url_rule(
-        "/<uuid:transaction_id>",
+        "",
+        view_func=TransactionResource.as_view("transactionresource"),
+        methods=["POST"],
+    )
+    transaction_bp.add_url_rule(
+        _TRANSACTION_ID_ROUTE,
+        view_func=TransactionDetailResource.as_view("transaction_detail"),
+        methods=["GET"],
+    )
+    transaction_bp.add_url_rule(
+        _TRANSACTION_ID_ROUTE,
         view_func=TransactionResource.as_view("transactionupdate"),
         methods=["PUT"],
     )
     transaction_bp.add_url_rule(
-        "/<uuid:transaction_id>",
+        _TRANSACTION_ID_ROUTE,
         view_func=TransactionResource.as_view("transactiondelete"),
         methods=["DELETE"],
     )

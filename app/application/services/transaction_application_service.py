@@ -45,6 +45,7 @@ _MUTABLE_TRANSACTION_FIELDS = frozenset(
         "paid_at",
     }
 )
+_TRANSACTION_NOT_FOUND_MESSAGE = "Transação não encontrada."
 
 
 @dataclass(frozen=True)
@@ -210,7 +211,7 @@ class TransactionApplicationService:
         )
         if transaction is None:
             raise TransactionApplicationError(
-                message="Transação não encontrada.",
+                message=_TRANSACTION_NOT_FOUND_MESSAGE,
                 code="NOT_FOUND",
                 status_code=404,
             )
@@ -280,7 +281,7 @@ class TransactionApplicationService:
         )
         if transaction is None:
             raise TransactionApplicationError(
-                message="Transação não encontrada.",
+                message=_TRANSACTION_NOT_FOUND_MESSAGE,
                 code="NOT_FOUND",
                 status_code=404,
             )
@@ -298,6 +299,80 @@ class TransactionApplicationService:
         except Exception:
             db.session.rollback()
             raise
+
+    def get_transaction(self, transaction_id: UUID) -> TransactionPayload:
+        transaction = cast(
+            Transaction | None,
+            Transaction.query.filter_by(id=transaction_id, deleted=False).first(),
+        )
+        if transaction is None:
+            raise TransactionApplicationError(
+                message=_TRANSACTION_NOT_FOUND_MESSAGE,
+                code="NOT_FOUND",
+                status_code=404,
+            )
+
+        if str(transaction.user_id) != str(self._user_id):
+            raise TransactionApplicationError(
+                message="Você não tem permissão para visualizar esta transação.",
+                code="FORBIDDEN",
+                status_code=403,
+            )
+
+        return _serialize_transaction(transaction)
+
+    def get_active_transactions(
+        self,
+        *,
+        page: int,
+        per_page: int,
+        transaction_type: str | None,
+        status: str | None,
+        start_date: date | None,
+        end_date: date | None,
+        tag_id: UUID | None,
+        account_id: UUID | None,
+        credit_card_id: UUID | None,
+    ) -> dict[str, Any]:
+        query = Transaction.query.filter_by(user_id=self._user_id, deleted=False)
+
+        if transaction_type:
+            query = query.filter(
+                Transaction.type == self._normalize_transaction_type(transaction_type)
+            )
+        if status:
+            query = query.filter(
+                Transaction.status == self._normalize_transaction_status(status)
+            )
+        if start_date:
+            query = query.filter(Transaction.due_date >= start_date)
+        if end_date:
+            query = query.filter(Transaction.due_date <= end_date)
+        if tag_id:
+            query = query.filter(Transaction.tag_id == tag_id)
+        if account_id:
+            query = query.filter(Transaction.account_id == account_id)
+        if credit_card_id:
+            query = query.filter(Transaction.credit_card_id == credit_card_id)
+
+        total = query.count()
+        pages = (total + per_page - 1) // per_page if total else 0
+        transactions = (
+            query.order_by(Transaction.due_date.desc(), Transaction.created_at.desc())
+            .offset((page - 1) * per_page)
+            .limit(per_page)
+            .all()
+        )
+
+        return {
+            "items": [_serialize_transaction(item) for item in transactions],
+            "pagination": {
+                "total": total,
+                "page": page,
+                "per_page": per_page,
+                "pages": pages,
+            },
+        }
 
     def get_month_summary(
         self,

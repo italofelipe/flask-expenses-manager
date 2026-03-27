@@ -58,6 +58,8 @@ def test_transaction_endpoints_return_401_when_token_is_revoked(
 
     scenarios = [
         ("POST", "/transactions", _transaction_payload()),
+        ("GET", "/transactions", None),
+        ("GET", f"/transactions/{transaction_id}", None),
         ("PUT", f"/transactions/{transaction_id}", {"title": "novo título"}),
         ("DELETE", f"/transactions/{transaction_id}", None),
         ("PATCH", f"/transactions/restore/{transaction_id}", None),
@@ -120,14 +122,14 @@ def test_transaction_list_rejects_invalid_type_and_page(client) -> None:
     token = _register_and_login(client, "invalid-list-filters")
 
     invalid_type = client.get(
-        "/transactions/list?type=invalid",
+        "/transactions?type=invalid",
         headers=_auth_headers(token),
     )
     assert invalid_type.status_code == 400
     assert invalid_type.get_json()["error"]["code"] == "VALIDATION_ERROR"
 
     invalid_page = client.get(
-        "/transactions/list?page=abc",
+        "/transactions?page=abc",
         headers=_auth_headers(token),
     )
     assert invalid_page.status_code == 400

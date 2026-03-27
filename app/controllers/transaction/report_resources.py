@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from collections.abc import Callable
 from typing import Any
 from uuid import UUID
 
@@ -22,8 +23,10 @@ from app.utils.typed_decorators import typed_jwt_required as jwt_required
 from .dependencies import get_transaction_dependencies
 from .openapi import (
     TRANSACTION_ACTIVE_LIST_DOC,
+    TRANSACTION_ACTIVE_LIST_LEGACY_DOC,
     TRANSACTION_DASHBOARD_DOC,
     TRANSACTION_DELETED_LIST_DOC,
+    TRANSACTION_DETAIL_DOC,
     TRANSACTION_DUE_PERIOD_DOC,
     TRANSACTION_EXPENSE_PERIOD_DOC,
     TRANSACTION_FORCE_DELETE_DOC,
@@ -162,6 +165,131 @@ def _apply_active_list_optional_filters(
     if credit_card_id:
         query = query.filter(Transaction.credit_card_id == credit_card_id)
     return query
+
+
+def _build_active_list_response(user_uuid: UUID) -> Response:
+    params = _parse_active_list_query_params()
+    range_error = _active_list_date_range_error(
+        start_date=params["start_date"],
+        end_date=params["end_date"],
+    )
+    if range_error is not None:
+        return range_error
+
+    dependencies = get_transaction_dependencies()
+    service = dependencies.transaction_application_service_factory(user_uuid)
+    result = service.get_active_transactions(
+        page=params["page"],
+        per_page=params["per_page"],
+        transaction_type=params["transaction_type"],
+        status=params["status"],
+        start_date=params["start_date"],
+        end_date=params["end_date"],
+        tag_id=params["tag_id"],
+        account_id=params["account_id"],
+        credit_card_id=params["credit_card_id"],
+    )
+    pagination = result["pagination"]
+    serialized = result["items"]
+    return _compat_success(
+        legacy_payload={
+            "transactions": serialized,
+            "total": pagination["total"],
+            "page": pagination["page"],
+            "per_page": pagination["per_page"],
+        },
+        status_code=200,
+        message="Lista de transações ativas",
+        data={"transactions": serialized},
+        meta={"pagination": pagination},
+    )
+
+
+def _build_transaction_detail_response(
+    *,
+    user_uuid: UUID,
+    transaction_id: UUID,
+) -> Response:
+    dependencies = get_transaction_dependencies()
+    service = dependencies.transaction_application_service_factory(user_uuid)
+    serialized = service.get_transaction(transaction_id)
+    return _compat_success(
+        legacy_payload={"transaction": serialized},
+        status_code=200,
+        message="Detalhe da transação carregado com sucesso",
+        data={"transaction": serialized},
+    )
+
+
+def _handle_transaction_request(
+    *,
+    builder: Callable[[UUID], Response],
+    internal_error_message: str,
+    log_context: str,
+    validation_error_message: str | None = None,
+) -> Response:
+    token_error = _guard_revoked_token()
+    if token_error is not None:
+        return token_error
+
+    user_uuid = current_user_id()
+    try:
+        return builder(user_uuid)
+    except TransactionApplicationError as exc:
+        return _compat_error(
+            legacy_payload={"error": exc.message, "details": exc.details},
+            status_code=exc.status_code,
+            message=exc.message,
+            error_code=exc.code,
+            details=exc.details,
+        )
+    except ValueError as exc:
+        if validation_error_message is None:
+            raise
+        return _validation_error_response(
+            exc=exc,
+            fallback_message=validation_error_message,
+        )
+    except Exception:
+        db.session.rollback()
+        return _internal_error_response(
+            message=internal_error_message,
+            log_context=log_context,
+        )
+
+
+def _handle_active_transactions_request() -> Response:
+    return _handle_transaction_request(
+        builder=_build_active_list_response,
+        internal_error_message="Erro ao buscar transações ativas",
+        log_context="transaction.list_active_failed",
+        validation_error_message="Parâmetros de listagem inválidos.",
+    )
+
+
+def _handle_transaction_detail_request(*, transaction_id: UUID) -> Response:
+    return _handle_transaction_request(
+        builder=lambda user_uuid: _build_transaction_detail_response(
+            user_uuid=user_uuid,
+            transaction_id=transaction_id,
+        ),
+        internal_error_message="Erro ao buscar detalhe da transação",
+        log_context="transaction.detail_failed",
+    )
+
+
+class TransactionCollectionResource(MethodResource):
+    @doc(**TRANSACTION_ACTIVE_LIST_DOC)
+    @jwt_required()
+    def get(self) -> Response:
+        return _handle_active_transactions_request()
+
+
+class TransactionDetailResource(MethodResource):
+    @doc(**TRANSACTION_DETAIL_DOC)
+    @jwt_required()
+    def get(self, transaction_id: UUID) -> Response:
+        return _handle_transaction_detail_request(transaction_id=transaction_id)
 
 
 class TransactionSummaryResource(MethodResource):
@@ -586,92 +714,15 @@ class TransactionRestoreResource(MethodResource):
 
 
 class TransactionListActiveResource(MethodResource):
-    @doc(**TRANSACTION_ACTIVE_LIST_DOC)
+    @doc(**TRANSACTION_ACTIVE_LIST_LEGACY_DOC)
     @jwt_required()
-    def get(self) -> Response:  # noqa: C901
-        token_error = _guard_revoked_token()
-        if token_error is not None:
-            return token_error
-
-        user_uuid = current_user_id()
-        try:
-            params = _parse_active_list_query_params()
-            range_error = _active_list_date_range_error(
-                start_date=params["start_date"],
-                end_date=params["end_date"],
-            )
-            if range_error is not None:
-                return range_error
-
-            query = Transaction.query.filter_by(user_id=user_uuid, deleted=False)
-
-            query, type_error = _apply_active_list_type_filter(
-                query, params["transaction_type"]
-            )
-            if type_error is not None:
-                return type_error
-
-            query, status_error = _apply_active_list_status_filter(
-                query, params["status"]
-            )
-            if status_error is not None:
-                return status_error
-
-            query = _apply_active_list_optional_filters(
-                query,
-                start_date=params["start_date"],
-                end_date=params["end_date"],
-                tag_id=params["tag_id"],
-                account_id=params["account_id"],
-                credit_card_id=params["credit_card_id"],
-            )
-
-            total = query.count()
-            per_page = params["per_page"]
-            page = params["page"]
-            pages = (total + per_page - 1) // per_page if total else 0
-            transactions = (
-                query.order_by(
-                    Transaction.due_date.desc(), Transaction.created_at.desc()
-                )
-                .offset((page - 1) * per_page)
-                .limit(per_page)
-                .all()
-            )
-            serialized = [serialize_transaction(item) for item in transactions]
-            return _compat_success(
-                legacy_payload={
-                    "transactions": serialized,
-                    "total": total,
-                    "page": page,
-                    "per_page": per_page,
-                },
-                status_code=200,
-                message="Lista de transações ativas",
-                data={"transactions": serialized},
-                meta={
-                    "pagination": {
-                        "total": total,
-                        "page": page,
-                        "per_page": per_page,
-                        "pages": pages,
-                    }
-                },
-            )
-        except ValueError as exc:
-            return _validation_error_response(
-                exc=exc,
-                fallback_message="Parâmetros de listagem inválidos.",
-            )
-        except Exception:
-            db.session.rollback()
-            return _internal_error_response(
-                message="Erro ao buscar transações ativas",
-                log_context="transaction.list_active_failed",
-            )
+    def get(self) -> Response:
+        return _handle_active_transactions_request()
 
 
 __all__ = [
+    "TransactionCollectionResource",
+    "TransactionDetailResource",
     "TransactionSummaryResource",
     "TransactionMonthlyDashboardResource",
     "TransactionForceDeleteResource",
