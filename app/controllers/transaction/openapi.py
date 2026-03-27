@@ -17,6 +17,7 @@ ERROR_TOKEN_INVALIDO = "Token revogado"
 ERROR_INTERNO = "Erro interno"
 ERROR_TRANSACAO_NAO_ENCONTRADA = "Transação não encontrada"
 ERROR_SEM_PERMISSAO = "Sem permissão"
+ERROR_VALIDACAO = "Erro de validação"
 DESC_NUMERO_PAGINA = "Número da página"
 DESC_ITENS_POR_PAGINA = "Itens por página"
 DESC_DATA_INICIAL = "Data inicial (YYYY-MM-DD)"
@@ -95,8 +96,8 @@ TRANSACTION_CREATE_DOC = {
             data_example={"transaction": TRANSACTION_EXAMPLE},
         ),
         400: json_error_response(
-            description="Erro de validação",
-            message="Erro de validação",
+            description=ERROR_VALIDACAO,
+            message=ERROR_VALIDACAO,
             error_code="VALIDATION_ERROR",
             status_code=400,
         ),
@@ -136,8 +137,8 @@ TRANSACTION_UPDATE_PATCH_DOC = {
             data_example={"transaction": {**TRANSACTION_EXAMPLE, "status": "paid"}},
         ),
         400: json_error_response(
-            description="Erro de validação",
-            message="Erro de validação",
+            description=ERROR_VALIDACAO,
+            message=ERROR_VALIDACAO,
             error_code="VALIDATION_ERROR",
             status_code=400,
         ),

@@ -6,6 +6,7 @@ from typing import Literal
 ContractVersion = Literal["v2", "v3", "v2_or_v3"]
 JsonObject = dict[str, object]
 OpenAPIDict = dict[str, object]
+APPLICATION_JSON = "application/json"
 
 CONTRACT_HEADER_NAME = "X-API-Contract"
 REQUEST_ID_HEADER_NAME = "X-Request-ID"
@@ -111,7 +112,7 @@ def json_request_body(
         payload["description"] = description
     return {
         "required": required,
-        "content": {"application/json": payload},
+        "content": {APPLICATION_JSON: payload},
     }
 
 
@@ -150,7 +151,7 @@ def json_success_response(
     response: OpenAPIDict = {
         "description": description,
         "content": {
-            "application/json": {
+            APPLICATION_JSON: {
                 "schema": {
                     "type": "object",
                     "required": ["message", "data"],
@@ -186,7 +187,7 @@ def json_error_response(
     response: OpenAPIDict = {
         "description": description,
         "content": {
-            "application/json": {
+            APPLICATION_JSON: {
                 "schema": {
                     "type": "object",
                     "required": ["message", "code"],
