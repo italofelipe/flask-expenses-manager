@@ -165,8 +165,15 @@ def build_http_observability_metrics_payload() -> dict[str, Any]:
             "duration_ms_total": metrics.get("http.request.duration_ms_total", 0),
             "anonymous": metrics.get("http.request.anonymous", 0),
             "authenticated": metrics.get("http.request.authenticated", 0),
+            "errors": metrics.get("http.request.error", 0),
             "flask_requests": metrics.get("http.request.framework.flask", 0),
             "fastapi_requests": metrics.get("http.request.framework.fastapi", 0),
+            "trace_present": metrics.get("http.request.trace.present", 0),
+            "trace_absent": metrics.get("http.request.trace.absent", 0),
+            "status_2xx": metrics.get("http.request.status_class.2xx", 0),
+            "status_4xx": metrics.get("http.request.status_class.4xx", 0),
+            "status_5xx": metrics.get("http.request.status_class.5xx", 0),
+            "graphql_requests": metrics.get("http.request.graphql", 0),
         },
     }
 

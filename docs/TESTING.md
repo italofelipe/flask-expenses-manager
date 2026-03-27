@@ -138,3 +138,8 @@ Governança operacional:
 - Newman e Postman sao a trilha oficial de validacao black-box da API; o smoke pós-deploy oficial continua em `scripts/http_smoke_check.py`.
 - No caminho comum de CI, a evidencia oficial de release da trilha black-box e publicada como artifacts separados: `newman-smoke-report` e `newman-full-report`.
 - O environment `prod` deve ser usado apenas com total consciencia de que a collection cria dados de teste reais via registro/login e recursos associados.
+- O baseline de observabilidade HTTP/GraphQL deve preservar regressao de correlacao:
+  - `request_id` sempre presente;
+  - `trace_id` quando informado pelo caller/proxy;
+  - `status_class` + `is_error` no log estruturado;
+  - `graphql_operation` + `graphql_root_fields` quando o request passar por `/graphql`.
