@@ -1,8 +1,11 @@
 import os
+from collections.abc import Mapping
+from typing import Any
 
 from apispec import APISpec
 from apispec.ext.marshmallow import MarshmallowPlugin
-from flask import Flask
+from flask import Flask, jsonify
+from flask.typing import ResponseReturnValue
 from flask_apispec import FlaskApiSpec
 from flask_jwt_extended import JWTManager
 from flask_marshmallow import Marshmallow
@@ -78,6 +81,47 @@ def _register_http_runtime(app: Flask) -> None:
     register_cors(app)
     register_security_headers(app)
     register_docs_access_guard(app)
+
+
+def _coerce_openapi_numeric_bound(value: object) -> object:
+    if isinstance(value, str):
+        try:
+            number = float(value)
+        except ValueError:
+            return value
+        return int(number) if number.is_integer() else number
+    return value
+
+
+def _normalize_openapi_numbers(node: object) -> object:
+    numeric_bound_keys = {
+        "minimum",
+        "maximum",
+        "exclusiveMinimum",
+        "exclusiveMaximum",
+        "multipleOf",
+    }
+    if isinstance(node, dict):
+        normalized: dict[str, object] = {}
+        for key, value in node.items():
+            normalized[key] = (
+                _coerce_openapi_numeric_bound(value)
+                if key in numeric_bound_keys
+                else _normalize_openapi_numbers(value)
+            )
+        return normalized
+    if isinstance(node, list):
+        return [_normalize_openapi_numbers(item) for item in node]
+    return node
+
+
+def _register_normalized_swagger_json_route(app: Flask, docs: FlaskApiSpec) -> None:
+    def normalized_swagger_json() -> ResponseReturnValue:
+        return jsonify(_normalize_openapi_numbers(docs.spec.to_dict()))
+
+    for endpoint_name in ("flask-apispec.swagger-json", "flask-apispec.swagger_json"):
+        if endpoint_name in app.view_functions:
+            app.view_functions[endpoint_name] = normalized_swagger_json
 
 
 def _register_documented_endpoints(app: Flask, docs: FlaskApiSpec) -> None:
@@ -177,6 +221,7 @@ def create_app(*, enable_http_runtime: bool = True) -> Flask:
     )
 
     docs = FlaskApiSpec(app)
+    _register_normalized_swagger_json_route(app, docs)
 
     # Registra erros globais
     register_error_handlers(app)
