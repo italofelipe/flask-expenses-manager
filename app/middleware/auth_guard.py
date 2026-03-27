@@ -1,6 +1,7 @@
 from flask import Flask, current_app, request
 from flask.typing import ResponseReturnValue
 from flask_jwt_extended.exceptions import JWTExtendedException
+from jwt.exceptions import PyJWTError
 
 from app.auth import AuthContextError, get_active_auth_context
 from app.extensions.jwt_callbacks import _jwt_error_response
@@ -41,7 +42,7 @@ def register_auth_guard(app: Flask) -> None:
 
         try:
             get_active_auth_context()
-        except (JWTExtendedException, AuthContextError):
+        except (JWTExtendedException, PyJWTError, AuthContextError):
             return _jwt_error_response(
                 "Token inválido ou ausente",
                 code="UNAUTHORIZED",

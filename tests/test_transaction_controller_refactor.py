@@ -94,6 +94,21 @@ def test_transaction_endpoints_return_401_when_token_is_revoked(
         assert payload["error"]["code"] == "UNAUTHORIZED"
 
 
+def test_transaction_collection_returns_401_for_malformed_bearer_token(client) -> None:
+    response = client.get(
+        "/transactions",
+        headers={
+            "Authorization": "Bearer malformed-token",
+            "X-API-Contract": "v2",
+        },
+    )
+
+    assert response.status_code == 401
+    payload = response.get_json()
+    assert payload["success"] is False
+    assert payload["error"]["code"] == "UNAUTHORIZED"
+
+
 def test_transaction_installment_create_handles_internal_error(
     client, monkeypatch
 ) -> None:
