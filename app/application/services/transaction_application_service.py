@@ -46,6 +46,12 @@ _MUTABLE_TRANSACTION_FIELDS = frozenset(
     }
 )
 _TRANSACTION_NOT_FOUND_MESSAGE = "Transação não encontrada."
+_START_END_DATE_REQUIRED_MESSAGE = (
+    "Informe ao menos um parâmetro: 'start_date' ou 'end_date'."
+)
+_START_END_DATE_ORDER_MESSAGE = (
+    "Parâmetro 'start_date' não pode ser maior que 'end_date'."
+)
 
 
 @dataclass(frozen=True)
@@ -455,17 +461,13 @@ class TransactionApplicationService:
             required=False,
         )
         if not parsed_start_date and not parsed_end_date:
-            raise _validation_error(
-                "Informe ao menos um parâmetro: 'start_date' ou 'end_date'."
-            )
+            raise _validation_error(_START_END_DATE_REQUIRED_MESSAGE)
         if (
             parsed_start_date
             and parsed_end_date
             and parsed_start_date > parsed_end_date
         ):
-            raise _validation_error(
-                "Parâmetro 'start_date' não pode ser maior que 'end_date'."
-            )
+            raise _validation_error(_START_END_DATE_ORDER_MESSAGE)
 
         normalized_order = str(order_by or "overdue_first").strip().lower()
         order_clauses = _resolve_due_ordering(normalized_order)
@@ -729,7 +731,7 @@ def _validate_recurring_payload(
 ) -> str | None:
     if not is_recurring:
         if start_date and end_date and start_date > end_date:
-            return "Parâmetro 'start_date' não pode ser maior que 'end_date'."
+            return _START_END_DATE_ORDER_MESSAGE
         return None
 
     if not start_date or not end_date:
@@ -739,7 +741,7 @@ def _validate_recurring_payload(
         )
 
     if start_date > end_date:
-        return "Parâmetro 'start_date' não pode ser maior que 'end_date'."
+        return _START_END_DATE_ORDER_MESSAGE
 
     if due_date is None:
         return "Transações recorrentes exigem 'due_date' no formato YYYY-MM-DD."
