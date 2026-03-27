@@ -34,6 +34,7 @@ from .openapi import (
     TRANSACTION_SUMMARY_DOC,
 )
 from .utils import (
+    _apply_deprecation_headers,
     _compat_error,
     _compat_success,
     _guard_revoked_token,
@@ -62,6 +63,14 @@ def _validation_error_response(
         error_code=mapped_error.code,
         details=mapped_error.details,
     )
+
+
+def _first_query_value(*names: str) -> str | None:
+    for name in names:
+        value = request.args.get(name)
+        if value is not None:
+            return str(value)
+    return None
 
 
 def _parse_active_list_query_params() -> dict[str, Any]:
@@ -278,6 +287,61 @@ def _handle_transaction_detail_request(*, transaction_id: UUID) -> Response:
     )
 
 
+def _parse_summary_pagination() -> tuple[int, int]:
+    page = _parse_positive_int(request.args.get("page"), default=1, field_name="page")
+    per_page = _parse_positive_int(
+        _first_query_value("per_page", "page_size"),
+        default=10,
+        field_name="per_page",
+    )
+    return page, per_page
+
+
+def _parse_expense_period_params() -> dict[str, Any]:
+    start_date = _parse_optional_date(
+        _first_query_value("start_date", "startDate"),
+        "start_date",
+    )
+    end_date = _parse_optional_date(
+        _first_query_value("end_date", "finalDate"),
+        "end_date",
+    )
+    return {
+        "start_date": start_date,
+        "end_date": end_date,
+        "page": _parse_positive_int(
+            request.args.get("page"), default=1, field_name="page"
+        ),
+        "per_page": _parse_positive_int(
+            request.args.get("per_page"), default=10, field_name="per_page"
+        ),
+        "order_by": str(request.args.get("order_by", "due_date")).strip().lower(),
+        "order": str(request.args.get("order", "desc")).strip().lower(),
+    }
+
+
+def _parse_due_range_params() -> dict[str, Any]:
+    return {
+        "start_date": _first_query_value("start_date", "initialDate"),
+        "end_date": _first_query_value("end_date", "finalDate"),
+        "page": _parse_positive_int(
+            request.args.get("page"), default=1, field_name="page"
+        ),
+        "per_page": _parse_positive_int(
+            request.args.get("per_page"), default=10, field_name="per_page"
+        ),
+        "order_by": str(request.args.get("order_by", "overdue_first")).strip().lower(),
+    }
+
+
+def _deprecated_expense_alias_response(response: Response) -> Response:
+    return _apply_deprecation_headers(
+        response,
+        successor_endpoint="/transactions?type=expense",
+        successor_method="GET",
+    )
+
+
 class TransactionCollectionResource(MethodResource):
     @doc(**TRANSACTION_ACTIVE_LIST_DOC)
     @jwt_required()
@@ -302,12 +366,13 @@ class TransactionSummaryResource(MethodResource):
 
         user_uuid = current_user_id()
         try:
+            page, per_page = _parse_summary_pagination()
             dependencies = get_transaction_dependencies()
             service = dependencies.transaction_application_service_factory(user_uuid)
             result = service.get_month_summary(
                 month=str(request.args.get("month", "")),
-                page=int(request.args.get("page", 1)),
-                page_size=int(request.args.get("page_size", 10)),
+                page=page,
+                page_size=per_page,
             )
             paginated = result["paginated"]
 
@@ -470,49 +535,46 @@ class TransactionExpensePeriodResource(MethodResource):
         user_uuid = current_user_id()
 
         try:
-            start_date = _parse_optional_date(
-                request.args.get("startDate"), "startDate"
-            )
-            final_date = _parse_optional_date(
-                request.args.get("finalDate"), "finalDate"
-            )
-            if not start_date and not final_date:
+            params = _parse_expense_period_params()
+            start_date = params["start_date"]
+            end_date = params["end_date"]
+            if not start_date and not end_date:
                 missing_date_error = (
-                    "Informe ao menos um parâmetro: 'startDate' ou 'finalDate'."
+                    "Informe ao menos um parâmetro: 'start_date' ou 'end_date'."
                 )
-                return _compat_error(
-                    legacy_payload={"error": missing_date_error},
-                    status_code=400,
-                    message=missing_date_error,
-                    error_code="VALIDATION_ERROR",
+                return _deprecated_expense_alias_response(
+                    _compat_error(
+                        legacy_payload={"error": missing_date_error},
+                        status_code=400,
+                        message=missing_date_error,
+                        error_code="VALIDATION_ERROR",
+                    )
                 )
 
-            if start_date and final_date and start_date > final_date:
+            if start_date and end_date and start_date > end_date:
                 invalid_range_error = (
-                    "Parâmetro 'startDate' não pode ser maior que 'finalDate'."
+                    "Parâmetro 'start_date' não pode ser maior que 'end_date'."
                 )
-                return _compat_error(
-                    legacy_payload={"error": invalid_range_error},
-                    status_code=400,
-                    message=invalid_range_error,
-                    error_code="VALIDATION_ERROR",
+                return _deprecated_expense_alias_response(
+                    _compat_error(
+                        legacy_payload={"error": invalid_range_error},
+                        status_code=400,
+                        message=invalid_range_error,
+                        error_code="VALIDATION_ERROR",
+                    )
                 )
 
-            page = _parse_positive_int(
-                request.args.get("page"), default=1, field_name="page"
-            )
-            per_page = _parse_positive_int(
-                request.args.get("per_page"), default=10, field_name="per_page"
-            )
-            order_by = str(request.args.get("order_by", "due_date")).strip().lower()
-            order = str(request.args.get("order", "desc")).strip().lower()
+            page = params["page"]
+            per_page = params["per_page"]
+            order_by = params["order_by"]
+            order = params["order"]
             ordering_clause = _resolve_transaction_ordering(order_by, order)
 
             base_query = Transaction.query.filter_by(user_id=user_uuid, deleted=False)
             if start_date:
                 base_query = base_query.filter(Transaction.due_date >= start_date)
-            if final_date:
-                base_query = base_query.filter(Transaction.due_date <= final_date)
+            if end_date:
+                base_query = base_query.filter(Transaction.due_date <= end_date)
 
             total_transactions = base_query.count()
             income_transactions = base_query.filter(
@@ -541,7 +603,7 @@ class TransactionExpensePeriodResource(MethodResource):
                 "expense_transactions": expense_transactions,
             }
 
-            return _compat_success(
+            response = _compat_success(
                 legacy_payload={
                     "expenses": serialized_expenses,
                     "total": total_expenses,
@@ -561,16 +623,21 @@ class TransactionExpensePeriodResource(MethodResource):
                     }
                 },
             )
+            return _deprecated_expense_alias_response(response)
         except ValueError as exc:
-            return _validation_error_response(
-                exc=exc,
-                fallback_message="Parâmetros de período inválidos.",
+            return _deprecated_expense_alias_response(
+                _validation_error_response(
+                    exc=exc,
+                    fallback_message="Parâmetros de período inválidos.",
+                )
             )
         except Exception:
             db.session.rollback()
-            return _internal_error_response(
-                message="Erro ao buscar despesas por período",
-                log_context="transaction.expenses_period_failed",
+            return _deprecated_expense_alias_response(
+                _internal_error_response(
+                    message="Erro ao buscar despesas por período",
+                    log_context="transaction.expenses_period_failed",
+                )
             )
 
 
@@ -613,24 +680,16 @@ class TransactionDuePeriodResource(MethodResource):
 
         user_uuid = current_user_id()
         try:
-            page = _parse_positive_int(
-                request.args.get("page"), default=1, field_name="page"
-            )
-            per_page = _parse_positive_int(
-                request.args.get("per_page"), default=10, field_name="per_page"
-            )
-            order_by = (
-                str(request.args.get("order_by", "overdue_first")).strip().lower()
-            )
+            params = _parse_due_range_params()
 
             dependencies = get_transaction_dependencies()
             service = dependencies.transaction_application_service_factory(user_uuid)
             result = service.get_due_transactions(
-                initial_date=request.args.get("initialDate"),
-                final_date=request.args.get("finalDate"),
-                page=page,
-                per_page=per_page,
-                order_by=order_by,
+                start_date=params["start_date"],
+                end_date=params["end_date"],
+                page=params["page"],
+                per_page=params["per_page"],
+                order_by=params["order_by"],
             )
             pagination = result["pagination"]
             counts = result["counts"]

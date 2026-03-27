@@ -60,6 +60,7 @@ def test_transaction_endpoints_return_401_when_token_is_revoked(
         ("POST", "/transactions", _transaction_payload()),
         ("GET", "/transactions", None),
         ("GET", f"/transactions/{transaction_id}", None),
+        ("PATCH", f"/transactions/{transaction_id}", {"title": "novo título patch"}),
         ("PUT", f"/transactions/{transaction_id}", {"title": "novo título"}),
         ("DELETE", f"/transactions/{transaction_id}", None),
         ("PATCH", f"/transactions/restore/{transaction_id}", None),
@@ -72,10 +73,10 @@ def test_transaction_endpoints_return_401_when_token_is_revoked(
             None,
         ),
         ("DELETE", f"/transactions/{transaction_id}/force", None),
-        ("GET", f"/transactions/expenses?finalDate={date.today().isoformat()}", None),
+        ("GET", f"/transactions/expenses?end_date={date.today().isoformat()}", None),
         (
             "GET",
-            f"/transactions/due-range?finalDate={date.today().isoformat()}",
+            f"/transactions/due-range?end_date={date.today().isoformat()}",
             None,
         ),
     ]
@@ -140,14 +141,14 @@ def test_transaction_expenses_rejects_invalid_order_and_period(client) -> None:
     token = _register_and_login(client, "invalid-expense-order")
 
     invalid_period = client.get(
-        "/transactions/expenses?startDate=2026-02-11&finalDate=2026-02-10",
+        "/transactions/expenses?start_date=2026-02-11&end_date=2026-02-10",
         headers=_auth_headers(token),
     )
     assert invalid_period.status_code == 400
     assert invalid_period.get_json()["error"]["code"] == "VALIDATION_ERROR"
 
     invalid_order = client.get(
-        f"/transactions/expenses?finalDate={date.today().isoformat()}&order_by=invalid",
+        f"/transactions/expenses?end_date={date.today().isoformat()}&order_by=invalid",
         headers=_auth_headers(token),
     )
     assert invalid_order.status_code == 400
@@ -166,7 +167,7 @@ def test_transaction_expenses_masks_unexpected_value_error(client, monkeypatch) 
     )
 
     response = client.get(
-        f"/transactions/expenses?finalDate={date.today().isoformat()}",
+        f"/transactions/expenses?end_date={date.today().isoformat()}",
         headers=_auth_headers(token),
     )
 

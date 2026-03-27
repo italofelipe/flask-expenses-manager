@@ -617,9 +617,9 @@ def build_collection() -> dict[str, Any]:
             ],
         ),
         _item(
-            "02 - Update transaction by id (REST v2)",
+            "02 - Patch transaction by id (REST v2)",
             _request(
-                method="PUT",
+                method="PATCH",
                 raw_url="{{baseUrl}}/transactions/{{transactionId}}",
                 headers=auth_json_headers,
                 body=_json_body(
@@ -632,11 +632,33 @@ def build_collection() -> dict[str, Any]:
                 ),
             ),
             test_lines=[
-                "pm.test('transaction update returns 200', function () { pm.response.to.have.status(200); });",
+                "pm.test('transaction patch returns 200', function () { pm.response.to.have.status(200); });",
                 "var body = pm.response.json();",
-                "pm.test('transaction update reflects new title', function () {",
+                "pm.test('transaction patch reflects new title', function () {",
                 "  pm.expect(body.success).to.eql(true);",
                 "  pm.expect(body.data.transaction.title).to.include('ajustada');",
+                "});",
+            ],
+        ),
+        _item(
+            "02b - Put transaction by id compatibility (REST v2)",
+            _request(
+                method="PUT",
+                raw_url="{{baseUrl}}/transactions/{{transactionId}}",
+                headers=auth_json_headers,
+                body=_json_body(
+                    """
+                    {
+                      "description": "Compat update {{runSeed}}"
+                    }
+                    """
+                ),
+            ),
+            test_lines=[
+                "pm.test('transaction put compatibility returns 200', function () { pm.response.to.have.status(200); });",
+                "pm.test('transaction put compatibility emits deprecation headers', function () {",
+                "  pm.expect(pm.response.headers.get('Deprecation')).to.eql('true');",
+                "  pm.expect(pm.response.headers.get('X-Auraxis-Successor-Method')).to.eql('PATCH');",
                 "});",
             ],
         ),
@@ -753,11 +775,11 @@ def build_collection() -> dict[str, Any]:
             "07 - Transaction expenses by period (REST v2)",
             _request(
                 method="GET",
-                raw_url="{{baseUrl}}/transactions/expenses?startDate={{runYesterday}}&finalDate={{runTomorrow}}&page=1&per_page=20",
+                raw_url="{{baseUrl}}/transactions/expenses?start_date={{runYesterday}}&end_date={{runTomorrow}}&page=1&per_page=20",
                 headers=auth_contract_headers,
                 query=[
-                    ("startDate", "{{runYesterday}}"),
-                    ("finalDate", "{{runTomorrow}}"),
+                    ("start_date", "{{runYesterday}}"),
+                    ("end_date", "{{runTomorrow}}"),
                     ("page", "1"),
                     ("per_page", "20"),
                 ],
@@ -770,17 +792,21 @@ def build_collection() -> dict[str, Any]:
                 "  pm.expect(body.data.expenses).to.be.an('array');",
                 "  pm.expect(body.meta.pagination).to.be.an('object');",
                 "});",
+                "pm.test('expenses alias emits deprecation headers', function () {",
+                "  pm.expect(pm.response.headers.get('Deprecation')).to.eql('true');",
+                "  pm.expect(pm.response.headers.get('X-Auraxis-Successor-Endpoint')).to.eql('/transactions?type=expense');",
+                "});",
             ],
         ),
         _item(
             "08 - Transaction due range (REST v2)",
             _request(
                 method="GET",
-                raw_url="{{baseUrl}}/transactions/due-range?initialDate={{runYesterday}}&finalDate={{runIn30Days}}&page=1&per_page=20",
+                raw_url="{{baseUrl}}/transactions/due-range?start_date={{runYesterday}}&end_date={{runIn30Days}}&page=1&per_page=20",
                 headers=auth_contract_headers,
                 query=[
-                    ("initialDate", "{{runYesterday}}"),
-                    ("finalDate", "{{runIn30Days}}"),
+                    ("start_date", "{{runYesterday}}"),
+                    ("end_date", "{{runIn30Days}}"),
                     ("page", "1"),
                     ("per_page", "20"),
                 ],
