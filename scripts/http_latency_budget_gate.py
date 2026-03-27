@@ -205,7 +205,7 @@ def _build_report(
     route_samples["auth.login"].append(first_login_ms)
 
     for _ in range(max(samples - 1, 0)):
-        _, login_ms = _login_user(
+        token, login_ms = _login_user(
             base_url,
             email=email,
             password=password,

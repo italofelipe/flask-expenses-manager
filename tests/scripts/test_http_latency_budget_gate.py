@@ -121,3 +121,52 @@ def test_build_report_fails_budget_when_p95_regresses(monkeypatch) -> None:
 
     assert payload["all_within_budget"] is False
     assert payload["routes"]["auth.login"]["within_budget"] is False
+
+
+def test_build_report_uses_latest_login_token_for_authenticated_routes(
+    monkeypatch,
+) -> None:
+    module = _load_module()
+
+    monkeypatch.setattr(
+        module,
+        "_register_user",
+        lambda *args, **kwargs: ("user@example.com", "PerfGate123!"),
+    )
+
+    login_results = iter(
+        [
+            ("token-initial", 120),
+            ("token-rotated-1", 140),
+            ("token-final", 160),
+        ]
+    )
+    monkeypatch.setattr(
+        module,
+        "_login_user",
+        lambda *args, **kwargs: next(login_results),
+    )
+    monkeypatch.setattr(module, "_measure_health", lambda *args, **kwargs: 20)
+
+    captured_tokens: list[str] = []
+
+    def _measure_me(*args, **kwargs):
+        captured_tokens.append(kwargs["token"])
+        return 100
+
+    def _measure_graphql_me(*args, **kwargs):
+        captured_tokens.append(kwargs["token"])
+        return 200
+
+    monkeypatch.setattr(module, "_measure_me", _measure_me)
+    monkeypatch.setattr(module, "_measure_graphql_me", _measure_graphql_me)
+
+    module._build_report(
+        module._load_config(Path("config/http_latency_budgets.json")),
+        samples=3,
+        base_url="http://localhost:3333",
+        timeout=15,
+    )
+
+    assert captured_tokens
+    assert set(captured_tokens) == {"token-final"}
