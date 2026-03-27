@@ -33,6 +33,9 @@ class TransactionPayload(TypedDict):
 
 
 def serialize_transaction_payload(transaction: Transaction) -> TransactionPayload:
+    installment_group_id = getattr(transaction, "installment_group_id", None)
+    paid_at = getattr(transaction, "paid_at", None)
+
     return {
         "id": str(transaction.id),
         "title": transaction.title,
@@ -59,11 +62,9 @@ def serialize_transaction_payload(transaction: Transaction) -> TransactionPayloa
         "external_id": transaction.external_id,
         "bank_name": transaction.bank_name,
         "installment_group_id": (
-            str(transaction.installment_group_id)
-            if transaction.installment_group_id
-            else None
+            str(installment_group_id) if installment_group_id is not None else None
         ),
-        "paid_at": transaction.paid_at.isoformat() if transaction.paid_at else None,
+        "paid_at": paid_at.isoformat() if paid_at is not None else None,
         "created_at": (
             transaction.created_at.isoformat() if transaction.created_at else None
         ),
