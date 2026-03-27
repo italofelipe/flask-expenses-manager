@@ -8,6 +8,12 @@ from flask_apispec.views import MethodResource
 from app.application.services.password_reset_service import (
     PASSWORD_RESET_NEUTRAL_MESSAGE,
 )
+from app.docs.openapi_helpers import (
+    contract_header_param,
+    json_error_response,
+    json_request_body,
+    json_success_response,
+)
 from app.http.request_context import get_request_context
 from app.schemas.auth_schema import ForgotPasswordSchema
 from app.utils.typed_decorators import typed_doc as doc
@@ -32,35 +38,42 @@ def _build_password_reset_context(*, dependencies: Any, email: str) -> Any:
 
 class ForgotPasswordResource(MethodResource):
     @doc(
+        summary="Solicitar recuperação de senha",
         description=(
             "Solicita recuperação de senha por link. A resposta é sempre neutra "
             "para evitar enumeração de contas."
         ),
         tags=["Autenticação"],
-        params={
-            "X-API-Contract": {
-                "in": "header",
-                "description": "Opcional. Envie 'v2' para o contrato padronizado.",
-                "type": "string",
-                "required": False,
-            }
-        },
-        requestBody={
-            "required": True,
-            "content": {
-                "application/json": {
-                    "schema": ForgotPasswordSchema,
-                    "example": {"email": "email@email.com"},
-                }
-            },
-        },
+        params=contract_header_param(supported_version="v2"),
+        requestBody=json_request_body(
+            schema=ForgotPasswordSchema,
+            example={"email": "italo@auraxis.com.br"},
+            description="Email da conta que deseja recuperar acesso.",
+        ),
         responses={
-            200: {"description": "Solicitação recebida com resposta neutra"},
-            400: {"description": "Erro de validação"},
-            503: {
-                "description": "Serviço de autenticação temporariamente indisponível"
-            },
-            500: {"description": "Erro interno ao solicitar recuperação"},
+            200: json_success_response(
+                description="Solicitação recebida com resposta neutra",
+                message=PASSWORD_RESET_NEUTRAL_MESSAGE,
+                data_example={},
+            ),
+            400: json_error_response(
+                description="Erro de validação",
+                message="Dados inválidos",
+                error_code="VALIDATION_ERROR",
+                status_code=400,
+            ),
+            503: json_error_response(
+                description="Serviço de autenticação temporariamente indisponível",
+                message="Authentication temporarily unavailable. Try again later.",
+                error_code="AUTH_BACKEND_UNAVAILABLE",
+                status_code=503,
+            ),
+            500: json_error_response(
+                description="Erro interno ao solicitar recuperação",
+                message="Password reset request failed",
+                error_code="INTERNAL_ERROR",
+                status_code=500,
+            ),
         },
     )
     @use_kwargs(ForgotPasswordSchema, location="json")

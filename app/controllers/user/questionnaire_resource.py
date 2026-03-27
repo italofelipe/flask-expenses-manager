@@ -31,6 +31,12 @@ from app.application.services.user_profile_service import (
     get_questionnaire,
 )
 from app.auth import get_active_auth_context
+from app.docs.openapi_helpers import (
+    contract_header_param,
+    json_error_response,
+    json_request_body,
+    json_success_response,
+)
 from app.extensions.database import db
 from app.schemas.user_schemas import QuestionnaireAnswerSchema
 from app.utils.typed_decorators import typed_doc as doc
@@ -42,6 +48,7 @@ from .helpers import validate_user_token
 
 class UserQuestionnaireResource(MethodResource):
     @doc(
+        summary="Listar questionário de perfil de investidor",
         description=(
             "Retorna as 5 perguntas do questionário de perfil de investidor.\n\n"
             "Cada pergunta contém 3 opções com pontuações de 1 a 3.\n"
@@ -49,9 +56,30 @@ class UserQuestionnaireResource(MethodResource):
         ),
         tags=["Usuário"],
         security=[{"BearerAuth": []}],
+        params=contract_header_param(supported_version="v2"),
         responses={
-            200: {"description": "Lista de perguntas retornada com sucesso"},
-            401: {"description": "Token inválido, expirado ou revogado"},
+            200: json_success_response(
+                description="Lista de perguntas retornada com sucesso",
+                message="Questionário retornado com sucesso",
+                data_example={
+                    "questions": [
+                        {
+                            "question": "Qual é o seu principal objetivo ao investir?",
+                            "options": [
+                                {"text": "Preservar capital", "points": 1},
+                                {"text": "Crescer com equilíbrio", "points": 2},
+                                {"text": "Maximizar retorno", "points": 3},
+                            ],
+                        }
+                    ]
+                },
+            ),
+            401: json_error_response(
+                description="Token inválido, expirado ou revogado",
+                message="Token revogado",
+                error_code="UNAUTHORIZED",
+                status_code=401,
+            ),
         },
     )
     @jwt_required()
@@ -71,6 +99,7 @@ class UserQuestionnaireResource(MethodResource):
         )
 
     @doc(
+        summary="Responder questionário de perfil de investidor",
         description=(
             "Submete as respostas do questionário e classifica"
             " o perfil de investidor.\n\n"
@@ -84,11 +113,40 @@ class UserQuestionnaireResource(MethodResource):
         ),
         tags=["Usuário"],
         security=[{"BearerAuth": []}],
+        params=contract_header_param(supported_version="v2"),
+        requestBody=json_request_body(
+            schema=QuestionnaireAnswerSchema,
+            description="Lista de 5 respostas, cada uma entre 1 e 3 pontos.",
+            example={"answers": [1, 2, 2, 3, 1]},
+        ),
         responses={
-            200: {"description": "Perfil sugerido calculado e persistido"},
-            400: {"description": "Número de respostas inválido"},
-            401: {"description": "Token inválido, expirado ou revogado"},
-            422: {"description": "Payload inválido: pontuação ou campo ausente"},
+            200: json_success_response(
+                description="Perfil sugerido calculado e persistido",
+                message="Perfil sugerido calculado com sucesso",
+                data_example={
+                    "suggested_profile": "explorador",
+                    "score": 9,
+                },
+            ),
+            400: json_error_response(
+                description="Número de respostas inválido",
+                message="O questionário exige exatamente 5 respostas.",
+                error_code="INVALID_ANSWER_COUNT",
+                status_code=400,
+            ),
+            401: json_error_response(
+                description="Token inválido, expirado ou revogado",
+                message="Token revogado",
+                error_code="UNAUTHORIZED",
+                status_code=401,
+            ),
+            422: json_error_response(
+                description="Payload inválido",
+                message="Dados inválidos",
+                error_code="VALIDATION_ERROR",
+                status_code=422,
+                details_example={"answers": ["Missing data for required field."]},
+            ),
         },
     )
     @jwt_required()

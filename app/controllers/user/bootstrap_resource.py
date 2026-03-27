@@ -11,6 +11,11 @@ from app.application.services.authenticated_user_bootstrap_service import (
     AuthenticatedUserBootstrapService,
 )
 from app.auth import get_active_auth_context
+from app.docs.openapi_helpers import (
+    contract_header_param,
+    json_error_response,
+    json_success_response,
+)
 from app.services.authenticated_user_payloads import (
     to_authenticated_user_bootstrap_payload,
 )
@@ -40,6 +45,7 @@ def _parse_transactions_limit(raw_value: str | None) -> int:
 
 class UserBootstrapResource(MethodResource):
     @doc(
+        summary="Obter bootstrap da home do usuário",
         description=(
             "Retorna o bootstrap explícito da home do usuário autenticado.\n\n"
             "Ownership:\n"
@@ -61,20 +67,61 @@ class UserBootstrapResource(MethodResource):
                 "type": "integer",
                 "required": False,
             },
-            "X-API-Contract": {
-                "in": "header",
-                "description": (
-                    "Opcional. Recomendado enviar `v2` ou `v3` para envelope "
+            **contract_header_param(
+                supported_version="v2_or_v3",
+                description=(
+                    "Opcional. Recomendado enviar `v2` ou `v3` para o envelope "
                     "padronizado."
                 ),
-                "type": "string",
-                "required": False,
-            },
+            ),
         },
         responses={
-            200: {"description": "Bootstrap retornado com sucesso"},
-            400: {"description": "Erro de validação"},
-            401: {"description": "Token inválido ou expirado"},
+            200: json_success_response(
+                description="Bootstrap retornado com sucesso",
+                message="Bootstrap do usuário retornado com sucesso",
+                data_example={
+                    "profile": {
+                        "id": "4b2ef64b-b35d-4ea2-a6f2-4ef3cfb295f1",
+                        "name": "Italo",
+                        "email": "italo@email.com",
+                    },
+                    "wallet_entries": [
+                        {
+                            "id": "wallet-1",
+                            "name": "Caixa",
+                            "value": 100.0,
+                            "quantity": 1,
+                            "asset_class": "cash",
+                        }
+                    ],
+                    "transactions_preview": {
+                        "items": [
+                            {
+                                "id": "cfef66a6-a148-49db-a72f-cc63b6080cf8",
+                                "title": "Conta de luz",
+                                "amount": "150.00",
+                                "type": "expense",
+                                "status": "pending",
+                            }
+                        ],
+                        "limit": 5,
+                        "returned_items": 1,
+                        "has_more": False,
+                    },
+                },
+            ),
+            400: json_error_response(
+                description="Erro de validação",
+                message="Parâmetros do bootstrap inválidos.",
+                error_code="VALIDATION_ERROR",
+                status_code=400,
+            ),
+            401: json_error_response(
+                description="Token inválido ou expirado",
+                message="Token revogado",
+                error_code="UNAUTHORIZED",
+                status_code=401,
+            ),
         },
     )
     @jwt_required()

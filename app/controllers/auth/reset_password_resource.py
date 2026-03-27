@@ -5,6 +5,12 @@ from typing import Any
 from flask import Response, current_app
 from flask_apispec.views import MethodResource
 
+from app.docs.openapi_helpers import (
+    contract_header_param,
+    json_error_response,
+    json_request_body,
+    json_success_response,
+)
 from app.schemas.auth_schema import ResetPasswordSchema
 from app.utils.typed_decorators import typed_doc as doc
 from app.utils.typed_decorators import typed_use_kwargs as use_kwargs
@@ -15,34 +21,38 @@ from .dependencies import get_auth_dependencies
 
 class ResetPasswordResource(MethodResource):
     @doc(
+        summary="Redefinir senha",
         description=(
             "Redefine a senha de um usuário a partir de um token de recuperação."
         ),
         tags=["Autenticação"],
-        params={
-            "X-API-Contract": {
-                "in": "header",
-                "description": "Opcional. Envie 'v2' para o contrato padronizado.",
-                "type": "string",
-                "required": False,
-            }
-        },
-        requestBody={
-            "required": True,
-            "content": {
-                "application/json": {
-                    "schema": ResetPasswordSchema,
-                    "example": {
-                        "token": "G9Q7zJ6lQ4Vwm6dXj6nQjzH8QqfUuBqbMTe4PmS7p8Q",
-                        "new_password": "NovaSenha@123",
-                    },
-                }
+        params=contract_header_param(supported_version="v2"),
+        requestBody=json_request_body(
+            schema=ResetPasswordSchema,
+            description="Token de recuperação e nova senha válida.",
+            example={
+                "token": "G9Q7zJ6lQ4Vwm6dXj6nQjzH8QqfUuBqbMTe4PmS7p8Q",
+                "new_password": "NovaSenha@123",
             },
-        },
+        ),
         responses={
-            200: {"description": "Senha redefinida com sucesso"},
-            400: {"description": "Token inválido/expirado ou payload inválido"},
-            500: {"description": "Erro interno ao redefinir senha"},
+            200: json_success_response(
+                description="Senha redefinida com sucesso",
+                message="Password updated successfully",
+                data_example={},
+            ),
+            400: json_error_response(
+                description="Token inválido, expirado ou payload inválido",
+                message="Token inválido ou expirado",
+                error_code="VALIDATION_ERROR",
+                status_code=400,
+            ),
+            500: json_error_response(
+                description="Erro interno ao redefinir senha",
+                message="Password reset failed",
+                error_code="INTERNAL_ERROR",
+                status_code=500,
+            ),
         },
     )
     @use_kwargs(ResetPasswordSchema, location="json")
