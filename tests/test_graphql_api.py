@@ -7,6 +7,7 @@ from app.application.services.password_reset_service import (
     PASSWORD_RESET_NEUTRAL_MESSAGE,
     PASSWORD_RESET_SUCCESS_MESSAGE,
 )
+from app.graphql.types import UserType
 
 
 def _graphql(
@@ -90,6 +91,20 @@ def test_graphql_register_login_and_me(client) -> None:
     body = response.get_json()
     assert "errors" not in body
     assert body["data"]["me"]["email"] == "graphql-user@email.com"
+
+
+def test_graphql_me_remains_user_context_only(client) -> None:
+    token = _register_and_login_graphql(client)
+
+    response = _graphql(
+        client, "query Me { me { id name email monthlyIncome } }", token=token
+    )
+    assert response.status_code == 200
+    body = response.get_json()
+    assert "errors" not in body
+    assert body["data"]["me"]["email"] == "graphql-user@email.com"
+    assert "wallet" not in UserType._meta.fields
+    assert "transactions" not in UserType._meta.fields
 
 
 def test_graphql_forgot_password_is_neutral(client) -> None:

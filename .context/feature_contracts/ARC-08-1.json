@@ -1,0 +1,113 @@
+{
+  "task_id": "ARC-08-1",
+  "feature": "user_me_legacy_contract_freeze",
+  "rest_endpoint": {
+    "method": "GET",
+    "path": "/user/me",
+    "auth": true,
+    "query_params": {
+      "page": {
+        "type": "integer",
+        "default": 1,
+        "min": 1,
+        "max": 10000
+      },
+      "limit": {
+        "type": "integer",
+        "default": 10,
+        "min": 1,
+        "max": 100
+      },
+      "status": {
+        "type": "string",
+        "enum": ["paid", "pending", "cancelled", "postponed", "overdue"],
+        "required": false
+      },
+      "month": {
+        "type": "string",
+        "format": "YYYY-MM",
+        "required": false
+      }
+    }
+  },
+  "legacy_behavior": {
+    "responsibility": [
+      "user_profile",
+      "paginated_transactions",
+      "full_wallet_list"
+    ],
+    "known_oddities": [
+      "pagination applies only to transactions",
+      "wallet is returned as a full list even when page/limit are present",
+      "monthly_income mirrors monthly_income_net for backward compatibility"
+    ]
+  },
+  "contracts": {
+    "v1": {
+      "top_level_keys": ["user", "transactions", "wallet"]
+    },
+    "v2": {
+      "top_level_keys": ["success", "message", "data", "meta"],
+      "data_keys": ["user", "transactions", "wallet"],
+      "meta_keys": ["pagination"]
+    }
+  },
+  "user_fields": [
+    "id",
+    "name",
+    "email",
+    "gender",
+    "birth_date",
+    "monthly_income",
+    "monthly_income_net",
+    "net_worth",
+    "monthly_expenses",
+    "initial_investment",
+    "monthly_investment",
+    "investment_goal_date",
+    "state_uf",
+    "occupation",
+    "investor_profile",
+    "financial_objectives",
+    "investor_profile_suggested",
+    "profile_quiz_score",
+    "taxonomy_version"
+  ],
+  "transaction_item_fields": [
+    "id",
+    "title",
+    "amount",
+    "type",
+    "due_date",
+    "status",
+    "description",
+    "observation",
+    "is_recurring",
+    "is_installment",
+    "installment_count",
+    "tag_id",
+    "account_id",
+    "credit_card_id",
+    "currency",
+    "created_at",
+    "updated_at"
+  ],
+  "wallet_item_fields": [
+    "id",
+    "name",
+    "value",
+    "estimated_value_on_create_date",
+    "ticker",
+    "quantity",
+    "asset_class",
+    "annual_rate",
+    "target_withdraw_date",
+    "register_date",
+    "should_be_on_wallet"
+  ],
+  "graphql_baseline": {
+    "query": "me",
+    "responsibility": "authenticated_user_context_only",
+    "does_not_include": ["transactions", "wallet"]
+  }
+}
