@@ -1011,6 +1011,100 @@
               }
             ],
             "url": {
+              "raw": "{{baseUrl}}/transactions?page=1&per_page=20",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "transactions"
+              ],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "1"
+                },
+                {
+                  "key": "per_page",
+                  "value": "20"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('transaction list returns 200', function () { pm.response.to.have.status(200); });",
+                  "var body = pm.response.json();",
+                  "pm.test('transaction list returns pagination', function () {",
+                  "  pm.expect(body.success).to.eql(true);",
+                  "  pm.expect(body.meta.pagination.total).to.be.at.least(1);",
+                  "  pm.expect(body.data.transactions).to.be.an('array');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "04b - Get transaction by id (REST v2)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{authToken}}"
+              },
+              {
+                "key": "X-API-Contract",
+                "value": "v2"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/transactions/{{transactionId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "transactions",
+                "{{transactionId}}"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('transaction detail returns 200', function () { pm.response.to.have.status(200); });",
+                  "var body = pm.response.json();",
+                  "pm.test('transaction detail returns canonical transaction payload', function () {",
+                  "  pm.expect(body.success).to.eql(true);",
+                  "  pm.expect(body.data.transaction.id).to.eql(pm.collectionVariables.get('transactionId'));",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "04c - List active transactions legacy alias (REST v2)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{authToken}}"
+              },
+              {
+                "key": "X-API-Contract",
+                "value": "v2"
+              }
+            ],
+            "url": {
               "raw": "{{baseUrl}}/transactions/list?page=1&per_page=20",
               "host": [
                 "{{baseUrl}}"
@@ -1036,11 +1130,10 @@
               "listen": "test",
               "script": {
                 "exec": [
-                  "pm.test('transaction list returns 200', function () { pm.response.to.have.status(200); });",
+                  "pm.test('transaction list legacy alias returns 200', function () { pm.response.to.have.status(200); });",
                   "var body = pm.response.json();",
-                  "pm.test('transaction list returns pagination', function () {",
+                  "pm.test('transaction list legacy alias mirrors canonical payload', function () {",
                   "  pm.expect(body.success).to.eql(true);",
-                  "  pm.expect(body.meta.pagination.total).to.be.at.least(1);",
                   "  pm.expect(body.data.transactions).to.be.an('array');",
                   "});"
                 ],

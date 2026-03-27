@@ -93,7 +93,7 @@ TRANSACTION_DELETED_LIST_DOC = {
 }
 
 TRANSACTION_ACTIVE_LIST_DOC = {
-    "description": "Lista transações ativas com filtros e paginação.",
+    "description": "Lista canônica de transações ativas com filtros e paginação.",
     "tags": [TAG_TRANSACTIONS],
     "security": [{"BearerAuth": []}],
     "params": {
@@ -114,6 +114,28 @@ TRANSACTION_ACTIVE_LIST_DOC = {
     "responses": {
         200: {"description": "Lista de transações"},
         401: {"description": ERROR_TOKEN_INVALIDO},
+        500: {"description": ERROR_INTERNO},
+    },
+}
+
+TRANSACTION_ACTIVE_LIST_LEGACY_DOC = {
+    **TRANSACTION_ACTIVE_LIST_DOC,
+    "description": (
+        "Compatibilidade transitória para listagem de transações ativas. "
+        "Prefira GET /transactions."
+    ),
+}
+
+TRANSACTION_DETAIL_DOC = {
+    "description": "Retorna o detalhe canônico de uma transação do usuário.",
+    "tags": [TAG_TRANSACTIONS],
+    "security": [{"BearerAuth": []}],
+    "params": {**TRANSACTION_ID_PARAM, **CONTRACT_HEADER_PARAM},
+    "responses": {
+        200: {"description": "Detalhe da transação"},
+        401: {"description": ERROR_TOKEN_INVALIDO},
+        403: {"description": "Sem permissão"},
+        404: {"description": ERROR_TRANSACAO_NAO_ENCONTRADA},
         500: {"description": ERROR_INTERNO},
     },
 }

@@ -96,7 +96,7 @@ def test_transaction_list_and_summary_v2_contract(client) -> None:
     assert create_response.status_code == 201
 
     list_response = client.get(
-        "/transactions/list",
+        "/transactions",
         headers=_auth_headers(token, "v2"),
     )
     assert list_response.status_code == 200
@@ -330,7 +330,7 @@ def test_transaction_list_filters_and_pagination_v2_contract(client) -> None:
 
     response = client.get(
         (
-            "/transactions/list?page=1&per_page=1&type=income&status=pending"
+            "/transactions?page=1&per_page=1&type=income&status=pending"
             f"&start_date={today.isoformat()}"
             f"&end_date={(today + timedelta(days=2)).isoformat()}"
         ),
@@ -358,7 +358,7 @@ def test_transaction_list_legacy_contract_with_pagination(client) -> None:
     assert create_response.status_code == 201
 
     response = client.get(
-        "/transactions/list?page=1&per_page=1",
+        "/transactions?page=1&per_page=1",
         headers=_auth_headers(token),
     )
 
@@ -375,7 +375,7 @@ def test_transaction_list_invalid_status_v2_contract(client) -> None:
     token = _register_and_login(client)
 
     response = client.get(
-        "/transactions/list?status=invalid-status",
+        "/transactions?status=invalid-status",
         headers=_auth_headers(token, "v2"),
     )
 
@@ -383,6 +383,88 @@ def test_transaction_list_invalid_status_v2_contract(client) -> None:
     body = response.get_json()
     assert body["success"] is False
     assert body["error"]["code"] == "VALIDATION_ERROR"
+
+
+def test_transaction_list_legacy_alias_remains_available(client) -> None:
+    token = _register_and_login(client)
+
+    create_response = client.post(
+        "/transactions",
+        json=_transaction_payload(title="Alias legado"),
+        headers=_auth_headers(token, "v2"),
+    )
+    assert create_response.status_code == 201
+
+    response = client.get(
+        "/transactions/list?page=1&per_page=1",
+        headers=_auth_headers(token, "v2"),
+    )
+
+    assert response.status_code == 200
+    body = response.get_json()
+    assert body["success"] is True
+    assert body["meta"]["pagination"]["page"] == 1
+    assert len(body["data"]["transactions"]) == 1
+
+
+def test_transaction_detail_v2_contract(client) -> None:
+    token = _register_and_login(client)
+
+    created = client.post(
+        "/transactions",
+        json=_transaction_payload(title="Detalhe canônico"),
+        headers=_auth_headers(token, "v2"),
+    )
+    assert created.status_code == 201
+    transaction_id = created.get_json()["data"]["transaction"][0]["id"]
+
+    response = client.get(
+        f"/transactions/{transaction_id}",
+        headers=_auth_headers(token, "v2"),
+    )
+
+    assert response.status_code == 200
+    body = response.get_json()
+    assert body["success"] is True
+    assert body["data"]["transaction"]["id"] == transaction_id
+    assert body["data"]["transaction"]["title"] == "Detalhe canônico"
+
+
+def test_transaction_detail_legacy_contract(client) -> None:
+    token = _register_and_login(client)
+
+    created = client.post(
+        "/transactions",
+        json=_transaction_payload(title="Detalhe legado"),
+        headers=_auth_headers(token),
+    )
+    assert created.status_code == 201
+    transaction_id = created.get_json()["transaction"][0]["id"]
+
+    response = client.get(
+        f"/transactions/{transaction_id}",
+        headers=_auth_headers(token),
+    )
+
+    assert response.status_code == 200
+    body = response.get_json()
+    assert "success" not in body
+    assert body["transaction"]["id"] == transaction_id
+    assert body["transaction"]["title"] == "Detalhe legado"
+
+
+def test_transaction_detail_not_found_v2_contract(client) -> None:
+    token = _register_and_login(client)
+
+    response = client.get(
+        f"/transactions/{uuid.uuid4()}",
+        headers=_auth_headers(token, "v2"),
+    )
+
+    assert response.status_code == 404
+    body = response.get_json()
+    assert body["success"] is False
+    assert body["error"]["code"] == "NOT_FOUND"
 
 
 def test_transaction_expenses_requires_period_parameter_v2_contract(client) -> None:

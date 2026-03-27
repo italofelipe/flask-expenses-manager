@@ -151,7 +151,9 @@ def test_postman_collection_covers_critical_rest_routes() -> None:
         ("GET", "/user/profile/questionnaire"),
         ("POST", "/user/profile/questionnaire"),
         ("POST", "/user/simulate-salary-increase"),
+        ("GET", "/transactions"),
         ("POST", "/transactions"),
+        ("GET", "/transactions/{param}"),
         ("PUT", "/transactions/{param}"),
         ("DELETE", "/transactions/{param}"),
         ("GET", "/transactions/list"),
@@ -287,10 +289,6 @@ def test_postman_collection_covers_registered_rest_routes(app: Any) -> None:
         )
         for item in _flatten_request_items(_load_postman_items())
     }
-    allowed_gaps = {
-        ("PUT", "/transactions"),
-        ("DELETE", "/transactions"),
-    }
     missing: list[tuple[str, str, str]] = []
 
     with app.app_context():
@@ -307,8 +305,6 @@ def test_postman_collection_covers_registered_rest_routes(app: Any) -> None:
                 m for m in rule.methods if m not in {"HEAD", "OPTIONS"}
             ):
                 route_key = (method, normalized_rule)
-                if route_key in allowed_gaps:
-                    continue
                 if route_key not in covered:
                     missing.append((method, normalized_rule, rule.endpoint))
 

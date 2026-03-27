@@ -661,7 +661,7 @@ def build_collection() -> dict[str, Any]:
             "04 - List active transactions (REST v2)",
             _request(
                 method="GET",
-                raw_url="{{baseUrl}}/transactions/list?page=1&per_page=20",
+                raw_url="{{baseUrl}}/transactions?page=1&per_page=20",
                 headers=auth_contract_headers,
                 query=[("page", "1"), ("per_page", "20")],
             ),
@@ -671,6 +671,39 @@ def build_collection() -> dict[str, Any]:
                 "pm.test('transaction list returns pagination', function () {",
                 "  pm.expect(body.success).to.eql(true);",
                 "  pm.expect(body.meta.pagination.total).to.be.at.least(1);",
+                "  pm.expect(body.data.transactions).to.be.an('array');",
+                "});",
+            ],
+        ),
+        _item(
+            "04b - Get transaction by id (REST v2)",
+            _request(
+                method="GET",
+                raw_url="{{baseUrl}}/transactions/{{transactionId}}",
+                headers=auth_contract_headers,
+            ),
+            test_lines=[
+                "pm.test('transaction detail returns 200', function () { pm.response.to.have.status(200); });",
+                "var body = pm.response.json();",
+                "pm.test('transaction detail returns canonical transaction payload', function () {",
+                "  pm.expect(body.success).to.eql(true);",
+                "  pm.expect(body.data.transaction.id).to.eql(pm.collectionVariables.get('transactionId'));",
+                "});",
+            ],
+        ),
+        _item(
+            "04c - List active transactions legacy alias (REST v2)",
+            _request(
+                method="GET",
+                raw_url="{{baseUrl}}/transactions/list?page=1&per_page=20",
+                headers=auth_contract_headers,
+                query=[("page", "1"), ("per_page", "20")],
+            ),
+            test_lines=[
+                "pm.test('transaction list legacy alias returns 200', function () { pm.response.to.have.status(200); });",
+                "var body = pm.response.json();",
+                "pm.test('transaction list legacy alias mirrors canonical payload', function () {",
+                "  pm.expect(body.success).to.eql(true);",
                 "  pm.expect(body.data.transactions).to.be.an('array');",
                 "});",
             ],
