@@ -18,6 +18,14 @@
   {
     "access": "auth_required",
     "domain": "transactions",
+    "name": "transaction",
+    "operation_type": "query",
+    "source_module": "app.graphql.queries.transaction",
+    "summary": "Retorna uma transação específica do usuário."
+  },
+  {
+    "access": "auth_required",
+    "domain": "transactions",
     "name": "transactionSummary",
     "operation_type": "query",
     "source_module": "app.graphql.queries.transaction",
@@ -214,6 +222,14 @@
     "operation_type": "mutation",
     "source_module": "app.graphql.mutations.transaction",
     "summary": "Realiza soft delete de uma transação do usuário."
+  },
+  {
+    "access": "auth_required",
+    "domain": "transactions",
+    "name": "updateTransaction",
+    "operation_type": "mutation",
+    "source_module": "app.graphql.mutations.transaction",
+    "summary": "Atualiza parcialmente uma transação do usuário."
   },
   {
     "access": "auth_required",
