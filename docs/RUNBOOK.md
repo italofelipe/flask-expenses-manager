@@ -210,6 +210,22 @@ Para manter a observabilidade dentro do teto operacional da AWS:
 - preferir widgets de Logs Insights usados sob demanda, nao dashboards abertos 24x7
 - criar novos alarmes derivados de log apenas para sinais realmente acionaveis
 
+## Correlacao operacional HTTP / GraphQL
+
+O baseline atual de observabilidade da API foi desenhado para diagnostico barato e rapido:
+- todo request deve carregar `request_id` no log e no header `X-Request-Id`
+- quando houver header de tracing (`X-Trace-Id`, `traceparent` ou `X-Request-Id` de entrada), o log HTTP preserva esse eixo como `trace_id`
+- logs HTTP agora incluem `status_class`, `is_error` e metadados leves de GraphQL (`graphql_operation`, `graphql_root_fields`) quando aplicavel
+- a trilha de metricas `http.request.*` passa a resumir:
+  - classe de status (`2xx`, `4xx`, `5xx`)
+  - requests com e sem `trace_id`
+  - requests GraphQL correlacionados
+
+Uso recomendado:
+- investigar incidentes primeiro por `request_id`
+- quando existir `trace_id` vindo do edge/proxy/cliente, usar esse valor como eixo secundario de correlacao
+- para GraphQL, cruzar `request_id` + `graphql_operation` + `graphql_root_fields` antes de abrir analise mais profunda
+
 ## Sonar no CI
 
 O job `SonarQube Cloud` continua bloqueante, mas agora ficou mais explicito quando a falha vem do

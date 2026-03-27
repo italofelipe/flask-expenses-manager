@@ -2,7 +2,11 @@ from __future__ import annotations
 
 from typing import Any
 
-from app.extensions.integration_metrics import reset_metrics_for_tests, snapshot_metrics
+from app.extensions.integration_metrics import (
+    build_http_observability_metrics_payload,
+    reset_metrics_for_tests,
+    snapshot_metrics,
+)
 from app.graphql.security import GRAPHQL_DEPTH_LIMIT_EXCEEDED, GraphQLSecurityPolicy
 
 
@@ -71,6 +75,10 @@ def test_graphql_metrics_record_domain_and_cost_for_accepted_query(client: Any) 
     assert metrics["graphql.request.depth_total"] >= 1
     assert metrics["graphql.request.complexity_total"] >= 1
     assert metrics["graphql.domain.user.complexity_total"] >= 1
+
+    http_payload = build_http_observability_metrics_payload()
+    assert http_payload["summary"]["graphql_requests"] >= 1
+    assert metrics["http.request.graphql.operation.me"] >= 1
 
 
 def test_graphql_metrics_record_security_violations(client: Any) -> None:

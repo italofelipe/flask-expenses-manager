@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from flask import current_app, request
+from flask import current_app, g, request
 
 from app.application.services.public_error_mapper_service import (
     map_validation_exception,
@@ -168,6 +168,7 @@ def _domain_from_root_field(root_field: str) -> str:
 
 
 def _record_graphql_query_metrics(metrics: GraphQLQueryMetrics) -> None:
+    g.graphql_root_fields = metrics.root_fields
     increment_metric("graphql.request.accepted")
     increment_metric("graphql.request.query_bytes_total", amount=metrics.query_bytes)
     increment_metric(
@@ -254,6 +255,8 @@ def _enforce_graphql_policies(
 
 def execute_graphql() -> tuple[dict[str, Any], int]:
     increment_metric("graphql.request.total")
+    g.graphql_operation_name = None
+    g.graphql_root_fields = ()
     try:
         parsed_payload = parse_graphql_payload(request.get_json(silent=True))
     except ValueError as exc:
@@ -270,6 +273,7 @@ def execute_graphql() -> tuple[dict[str, Any], int]:
             status_code=mapped_error.status_code,
         )
     query, parsed_variables, parsed_operation_name = parsed_payload
+    g.graphql_operation_name = parsed_operation_name
     policy_error = _enforce_graphql_policies(
         query=query,
         parsed_variables=parsed_variables,

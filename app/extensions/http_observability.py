@@ -36,11 +36,25 @@ def register_http_observability(app: Flask) -> None:
         increment_metric(
             f"http.request.route.{_metric_suffix(envelope.route)}",
         )
+        increment_metric(
+            f"http.request.status_class.{_metric_suffix(envelope.status_class)}",
+        )
         increment_metric("http.request.duration_ms_total", amount=envelope.duration_ms)
         record_metric_sample(
             f"http.route.duration_ms.{envelope.route}",
             envelope.duration_ms,
         )
+        if envelope.is_error:
+            increment_metric("http.request.error")
+        if envelope.trace_id:
+            increment_metric("http.request.trace.present")
+        else:
+            increment_metric("http.request.trace.absent")
+        if envelope.graphql_operation_name:
+            increment_metric("http.request.graphql")
+            increment_metric(
+                f"http.request.graphql.operation.{_metric_suffix(envelope.graphql_operation_name)}"
+            )
         if envelope.auth_subject:
             increment_metric("http.request.authenticated")
         else:
