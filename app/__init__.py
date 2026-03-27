@@ -66,6 +66,10 @@ from app.models.tag import Tag  # noqa: F401
 
 jwt = JWTManager()
 ma = Marshmallow()
+DOCS_CLASS_REGISTRATION_FALLBACK_ENDPOINTS = {
+    "goal.goal_collection",
+    "simulation.simulation_collection",
+}
 
 
 def _register_http_runtime(app: Flask) -> None:
@@ -74,6 +78,30 @@ def _register_http_runtime(app: Flask) -> None:
     register_cors(app)
     register_security_headers(app)
     register_docs_access_guard(app)
+
+
+def _register_documented_endpoints(app: Flask, docs: FlaskApiSpec) -> None:
+    documented_blueprints = {
+        "auth",
+        "user",
+        "transaction",
+        "dashboard",
+        "goal",
+        "wallet",
+        "health",
+        "entitlement",
+        "simulation",
+    }
+    for endpoint, view_func in sorted(app.view_functions.items()):
+        if "." not in endpoint:
+            continue
+        blueprint, endpoint_name = endpoint.split(".", 1)
+        if blueprint not in documented_blueprints:
+            continue
+        docs_target = getattr(view_func, "view_class", view_func)
+        if endpoint in DOCS_CLASS_REGISTRATION_FALLBACK_ENDPOINTS:
+            docs_target = view_func
+        docs.register(docs_target, blueprint=blueprint, endpoint=endpoint_name)
 
 
 def create_app(*, enable_http_runtime: bool = True) -> Flask:
@@ -184,24 +212,7 @@ def create_app(*, enable_http_runtime: bool = True) -> Flask:
     app.register_blueprint(fiscal_bp)
 
     # Registra os endpoints documentados no Swagger com base no mapa real de rotas.
-    documented_blueprints = {
-        "auth",
-        "user",
-        "transaction",
-        "dashboard",
-        "goal",
-        "wallet",
-        "health",
-        "entitlement",
-        "simulation",
-    }
-    for endpoint, view_func in sorted(app.view_functions.items()):
-        if "." not in endpoint:
-            continue
-        blueprint, endpoint_name = endpoint.split(".", 1)
-        if blueprint not in documented_blueprints:
-            continue
-        docs.register(view_func, blueprint=blueprint, endpoint=endpoint_name)
+    _register_documented_endpoints(app, docs)
     from app.extensions.jwt_callbacks import register_jwt_callbacks
     from app.middleware.auth_guard import register_auth_guard
     from app.middleware.rate_limit import register_rate_limit_guard

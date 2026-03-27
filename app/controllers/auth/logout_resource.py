@@ -4,6 +4,10 @@ from flask import Response
 from flask_apispec.views import MethodResource
 
 from app.auth import current_user_id
+from app.docs.openapi_helpers import (
+    contract_header_param,
+    json_success_response,
+)
 from app.extensions.database import db
 from app.utils.typed_decorators import typed_doc as doc
 from app.utils.typed_decorators import typed_jwt_required as jwt_required
@@ -14,19 +18,21 @@ from .dependencies import get_auth_dependencies
 
 class LogoutResource(MethodResource):
     @doc(
-        description="Revoga o token JWT atual (logout do usuário)",
+        summary="Revogar sessão atual",
+        description=(
+            "Revoga o JWT atual do usuário autenticado.\n\n"
+            "Depois dessa chamada, o token utilizado deixa de ser aceito nas "
+            "rotas protegidas."
+        ),
         tags=["Autenticação"],
         security=[{"BearerAuth": []}],
-        params={
-            "X-API-Contract": {
-                "in": "header",
-                "description": "Opcional. Envie 'v2' para o contrato padronizado.",
-                "type": "string",
-                "required": False,
-            }
-        },
+        params=contract_header_param(supported_version="v2"),
         responses={
-            200: {"description": "Logout realizado com sucesso"},
+            200: json_success_response(
+                description="Logout realizado com sucesso",
+                message="Logout successful",
+                data_example={},
+            ),
         },
     )
     @jwt_required()

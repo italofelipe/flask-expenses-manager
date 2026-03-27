@@ -8,6 +8,12 @@ from flask_apispec.views import MethodResource
 
 from app.application.services.user_profile_service import update_user_profile
 from app.auth import get_active_auth_context
+from app.docs.openapi_helpers import (
+    contract_header_param,
+    json_error_response,
+    json_request_body,
+    json_success_response,
+)
 from app.extensions.database import db
 from app.http.request_context import current_request_id
 from app.schemas.user_schemas import UserProfileSchema
@@ -22,24 +28,40 @@ from .helpers import _serialize_user_profile
 
 class UserProfileResource(MethodResource):
     @doc(
+        summary="Obter perfil reduzido do usuário",
         description=(
             "Retorna o perfil reduzido do usuário autenticado "
             "(sem transações e sem carteira)."
         ),
         tags=["Usuário"],
         security=[{"BearerAuth": []}],
-        params={
-            "X-API-Contract": {
-                "in": "header",
-                "description": "Opcional. Envie 'v2' para o contrato padronizado.",
-                "type": "string",
-                "required": False,
-            }
-        },
+        params=contract_header_param(supported_version="v2"),
         responses={
-            200: {"description": "Perfil retornado com sucesso"},
-            401: {"description": "Token revogado"},
-            404: {"description": "Usuário não encontrado"},
+            200: json_success_response(
+                description="Perfil retornado com sucesso",
+                message="Perfil retornado com sucesso",
+                data_example={
+                    "user": {
+                        "id": "4b2ef64b-b35d-4ea2-a6f2-4ef3cfb295f1",
+                        "name": "Italo Chagas",
+                        "email": "italo@auraxis.com.br",
+                        "monthly_income_net": "5000.00",
+                        "investor_profile": "conservador",
+                    }
+                },
+            ),
+            401: json_error_response(
+                description="Token revogado",
+                message="Token revogado",
+                error_code="UNAUTHORIZED",
+                status_code=401,
+            ),
+            404: json_error_response(
+                description="Usuário não encontrado",
+                message="Usuário não encontrado",
+                error_code="NOT_FOUND",
+                status_code=404,
+            ),
         },
     )
     @jwt_required()
@@ -59,6 +81,7 @@ class UserProfileResource(MethodResource):
         )
 
     @doc(
+        summary="Atualizar perfil do usuário",
         description=(
             "Atualiza o perfil do usuário autenticado.\n\n"
             "Campos aceitos:\n"
@@ -86,20 +109,58 @@ class UserProfileResource(MethodResource):
         ),
         tags=["Usuário"],
         security=[{"BearerAuth": []}],
-        params={
-            "X-API-Contract": {
-                "in": "header",
-                "description": "Opcional. Envie 'v2' para o contrato padronizado.",
-                "type": "string",
-                "required": False,
-            }
-        },
+        params=contract_header_param(supported_version="v2"),
+        requestBody=json_request_body(
+            schema=UserProfileSchema,
+            description="Campos parciais do perfil financeiro e investidor.",
+            example={
+                "gender": "masculino",
+                "birth_date": "1990-05-15",
+                "monthly_income_net": "5000.00",
+                "monthly_expenses": "2000.00",
+                "net_worth": "100000.00",
+                "investor_profile": "conservador",
+                "state_uf": "SP",
+                "occupation": "Founder",
+            },
+        ),
         responses={
-            200: {"description": "Perfil atualizado com sucesso"},
-            400: {"description": "Erro de validação"},
-            401: {"description": "Token revogado"},
-            404: {"description": "Usuário não encontrado"},
-            500: {"description": "Erro ao atualizar perfil"},
+            200: json_success_response(
+                description="Perfil atualizado com sucesso",
+                message="Perfil atualizado com sucesso",
+                data_example={
+                    "user": {
+                        "id": "4b2ef64b-b35d-4ea2-a6f2-4ef3cfb295f1",
+                        "monthly_income_net": "5000.00",
+                        "monthly_expenses": "2000.00",
+                        "investor_profile": "conservador",
+                    }
+                },
+            ),
+            400: json_error_response(
+                description="Erro de validação",
+                message="Erro de validação",
+                error_code="VALIDATION_ERROR",
+                status_code=400,
+            ),
+            401: json_error_response(
+                description="Token revogado",
+                message="Token revogado",
+                error_code="UNAUTHORIZED",
+                status_code=401,
+            ),
+            404: json_error_response(
+                description="Usuário não encontrado",
+                message="Usuário não encontrado",
+                error_code="NOT_FOUND",
+                status_code=404,
+            ),
+            500: json_error_response(
+                description="Erro ao atualizar perfil",
+                message="Erro ao atualizar perfil",
+                error_code="INTERNAL_ERROR",
+                status_code=500,
+            ),
         },
     )
     @jwt_required()

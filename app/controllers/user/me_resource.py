@@ -9,6 +9,11 @@ from app.application.services.authenticated_user_context_service import (
     AuthenticatedUserContextService,
 )
 from app.auth import get_active_auth_context
+from app.docs.openapi_helpers import (
+    contract_header_param,
+    json_error_response,
+    json_success_response,
+)
 from app.extensions.integration_metrics import increment_metric
 from app.models.transaction import Transaction
 from app.services.authenticated_user_payloads import (
@@ -79,23 +84,16 @@ def _parse_positive_int_compat(
 
 class UserMeResource(MethodResource):
     @doc(
+        summary="Obter contexto do usuário autenticado",
         description=(
             "Retorna o contexto do usuário autenticado.\n\n"
-            "Contrato canônico (`X-API-Contract: v3`): retorna apenas identidade, "
-            "perfil, perfil financeiro, perfil investidor e contexto de produto.\n\n"
-            "Contratos legados (`v1`/`v2`): mantêm transações paginadas e carteira, "
-            "mas estão em deprecação controlada.\n"
-            "Headers de deprecação: `Deprecation: true`, `Sunset: "
-            f"{USER_ME_LEGACY_SUNSET}`.\n\n"
-            "Filtros legados disponíveis apenas em `v1`/`v2`:\n"
-            "Filtros disponíveis:\n"
-            "- page: número da página\n"
-            "- limit: itens por página\n"
-            "- status: status da transação (paid, pending, cancelled, postponed)\n"
-            "- month: filtra transações pelo mês (YYYY-MM)\n\n"
-            "Exemplo de resposta:\n"
-            """{\n  'user': { 'id': '...', 'name': '...', ... },\n
-            'transactions': { 'items': [...], 'total': 10, ... }\n}"""
+            "Uso recomendado:\n"
+            "- `X-API-Contract: v3` para o contrato canônico e leve\n"
+            "- `/user/bootstrap` para agregado da home\n"
+            "- `/transactions` para coleção paginada e filtros\n\n"
+            "Legado:\n"
+            "- `v1`/`v2` ainda aceitam paginação e filtros de coleção\n"
+            "- respostas legadas enviam headers de deprecação e sunset"
         ),
         tags=["Usuário"],
         security=[{"BearerAuth": []}],
@@ -104,19 +102,56 @@ class UserMeResource(MethodResource):
             "limit": {"description": "Itens por página", "type": "integer"},
             "status": {"description": "Status da transação", "type": "string"},
             "month": {"description": "Mês no formato YYYY-MM", "type": "string"},
-            "X-API-Contract": {
-                "in": "header",
-                "description": (
-                    "Opcional. `v2` mantém shape legado padronizado; `v3` "
+            **contract_header_param(
+                supported_version="v2_or_v3",
+                description=(
+                    "Opcional. `v2` mantém o shape legado padronizado; `v3` "
                     "publica o contrato canônico sem coleções."
                 ),
-                "type": "string",
-                "required": False,
-            },
+            ),
         },
         responses={
-            200: {"description": "Dados do usuário e transações paginadas"},
-            401: {"description": "Token inválido ou expirado"},
+            200: json_success_response(
+                description="Contexto autenticado retornado com sucesso",
+                message="Contexto autenticado retornado com sucesso",
+                data_example={
+                    "user": {
+                        "identity": {
+                            "id": "4b2ef64b-b35d-4ea2-a6f2-4ef3cfb295f1",
+                            "name": "Italo Chagas",
+                            "email": "italo@auraxis.com.br",
+                        },
+                        "profile": {
+                            "gender": "outro",
+                            "birth_date": "1990-01-01",
+                            "state_uf": "SP",
+                            "occupation": "Founder",
+                        },
+                        "financial_profile": {
+                            "monthly_income_net": 1000.0,
+                            "monthly_expenses": 500.0,
+                            "net_worth": 2000.0,
+                            "initial_investment": 200.0,
+                            "monthly_investment": 100.0,
+                            "investment_goal_date": "2026-12-31",
+                        },
+                        "investor_profile": {
+                            "declared": "conservador",
+                            "suggested": "moderado",
+                            "quiz_score": 8,
+                            "taxonomy_version": "2026.1",
+                            "financial_objectives": "crescer",
+                        },
+                        "product_context": {"entitlements_version": 3},
+                    }
+                },
+            ),
+            401: json_error_response(
+                description="Token inválido, expirado ou revogado",
+                message="Token revogado",
+                error_code="UNAUTHORIZED",
+                status_code=401,
+            ),
         },
     )
     @jwt_required()
