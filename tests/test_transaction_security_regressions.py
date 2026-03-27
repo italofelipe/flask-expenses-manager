@@ -86,7 +86,7 @@ def test_transaction_update_rejects_foreign_account_reference(client) -> None:
         db.session.commit()
         foreign_account_id = str(foreign_account.id)
 
-    response = client.put(
+    response = client.patch(
         f"/transactions/{transaction_id}",
         headers=_auth_headers(owner_token),
         json={"account_id": foreign_account_id},

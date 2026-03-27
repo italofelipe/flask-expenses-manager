@@ -71,7 +71,7 @@ def test_transaction_update_requires_paid_at_when_paid(client) -> None:
     )
     transaction_id = created.get_json()["data"]["transaction"][0]["id"]
 
-    response = client.put(
+    response = client.patch(
         f"/transactions/{transaction_id}",
         headers=_auth_headers(token, "v2"),
         json={"status": "paid"},
@@ -92,7 +92,7 @@ def test_transaction_update_paid_at_without_paid_status(client) -> None:
     )
     transaction_id = created.get_json()["data"]["transaction"][0]["id"]
 
-    response = client.put(
+    response = client.patch(
         f"/transactions/{transaction_id}",
         headers=_auth_headers(token, "v2"),
         json={"status": "pending", "paid_at": datetime.now(UTC).isoformat()},
@@ -112,7 +112,7 @@ def test_transaction_update_paid_at_future_returns_400(client) -> None:
     transaction_id = created.get_json()["data"]["transaction"][0]["id"]
     future_paid_at = (datetime.now(UTC) + timedelta(days=2)).isoformat()
 
-    response = client.put(
+    response = client.patch(
         f"/transactions/{transaction_id}",
         headers=_auth_headers(token, "v2"),
         json={"status": "paid", "paid_at": future_paid_at},
@@ -126,7 +126,7 @@ def test_transaction_update_not_found_v2(client) -> None:
     token = _register_and_login(client, "update-not-found")
     missing_id = uuid.uuid4()
 
-    response = client.put(
+    response = client.patch(
         f"/transactions/{missing_id}",
         headers=_auth_headers(token, "v2"),
         json={"title": "novo"},
@@ -147,7 +147,7 @@ def test_transaction_update_forbidden_v2(client) -> None:
     )
     transaction_id = created.get_json()["data"]["transaction"][0]["id"]
 
-    response = client.put(
+    response = client.patch(
         f"/transactions/{transaction_id}",
         headers=_auth_headers(other_token, "v2"),
         json={"title": "hack"},
@@ -279,7 +279,7 @@ def test_transaction_update_recurring_invalid_date_range(client) -> None:
     assert created.status_code == 201
     transaction_id = created.get_json()["data"]["transaction"][0]["id"]
 
-    response = client.put(
+    response = client.patch(
         f"/transactions/{transaction_id}",
         headers=_auth_headers(token, "v2"),
         json={
@@ -292,3 +292,25 @@ def test_transaction_update_recurring_invalid_date_range(client) -> None:
     body = response.get_json()
     assert body["success"] is False
     assert body["error"]["code"] == "VALIDATION_ERROR"
+
+
+def test_transaction_put_compatibility_emits_deprecation_headers(client) -> None:
+    token = _register_and_login(client, "put-compat")
+    created = client.post(
+        "/transactions",
+        headers=_auth_headers(token, "v2"),
+        json=_transaction_payload(),
+    )
+    assert created.status_code == 201
+    transaction_id = created.get_json()["data"]["transaction"][0]["id"]
+
+    response = client.put(
+        f"/transactions/{transaction_id}",
+        headers=_auth_headers(token, "v2"),
+        json={"title": "Compatibilidade PUT"},
+    )
+
+    assert response.status_code == 200
+    assert response.headers["Deprecation"] == "true"
+    assert response.headers["X-Auraxis-Successor-Method"] == "PATCH"
+    assert response.get_json()["data"]["transaction"]["title"] == "Compatibilidade PUT"

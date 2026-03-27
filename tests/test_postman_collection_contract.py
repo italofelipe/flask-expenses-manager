@@ -154,6 +154,7 @@ def test_postman_collection_covers_critical_rest_routes() -> None:
         ("GET", "/transactions"),
         ("POST", "/transactions"),
         ("GET", "/transactions/{param}"),
+        ("PATCH", "/transactions/{param}"),
         ("PUT", "/transactions/{param}"),
         ("DELETE", "/transactions/{param}"),
         ("GET", "/transactions/list"),

@@ -46,6 +46,12 @@ _MUTABLE_TRANSACTION_FIELDS = frozenset(
     }
 )
 _TRANSACTION_NOT_FOUND_MESSAGE = "Transação não encontrada."
+_START_END_DATE_REQUIRED_MESSAGE = (
+    "Informe ao menos um parâmetro: 'start_date' ou 'end_date'."
+)
+_START_END_DATE_ORDER_MESSAGE = (
+    "Parâmetro 'start_date' não pode ser maior que 'end_date'."
+)
 
 
 @dataclass(frozen=True)
@@ -438,43 +444,39 @@ class TransactionApplicationService:
     def get_due_transactions(
         self,
         *,
-        initial_date: str | date | None,
-        final_date: str | date | None,
+        start_date: str | date | None,
+        end_date: str | date | None,
         page: int,
         per_page: int,
         order_by: str = "overdue_first",
     ) -> dict[str, Any]:
-        parsed_initial_date = self._coerce_date(
-            initial_date,
-            field_name="initialDate",
+        parsed_start_date = self._coerce_date(
+            start_date,
+            field_name="start_date",
             required=False,
         )
-        parsed_final_date = self._coerce_date(
-            final_date,
-            field_name="finalDate",
+        parsed_end_date = self._coerce_date(
+            end_date,
+            field_name="end_date",
             required=False,
         )
-        if not parsed_initial_date and not parsed_final_date:
-            raise _validation_error(
-                "Informe ao menos um parâmetro: 'initialDate' ou 'finalDate'."
-            )
+        if not parsed_start_date and not parsed_end_date:
+            raise _validation_error(_START_END_DATE_REQUIRED_MESSAGE)
         if (
-            parsed_initial_date
-            and parsed_final_date
-            and parsed_initial_date > parsed_final_date
+            parsed_start_date
+            and parsed_end_date
+            and parsed_start_date > parsed_end_date
         ):
-            raise _validation_error(
-                "Parâmetro 'initialDate' não pode ser maior que 'finalDate'."
-            )
+            raise _validation_error(_START_END_DATE_ORDER_MESSAGE)
 
         normalized_order = str(order_by or "overdue_first").strip().lower()
         order_clauses = _resolve_due_ordering(normalized_order)
 
         base_query = Transaction.query.filter_by(user_id=self._user_id, deleted=False)
-        if parsed_initial_date:
-            base_query = base_query.filter(Transaction.due_date >= parsed_initial_date)
-        if parsed_final_date:
-            base_query = base_query.filter(Transaction.due_date <= parsed_final_date)
+        if parsed_start_date:
+            base_query = base_query.filter(Transaction.due_date >= parsed_start_date)
+        if parsed_end_date:
+            base_query = base_query.filter(Transaction.due_date <= parsed_end_date)
 
         total_transactions = base_query.count()
         income_transactions = base_query.filter(
@@ -729,7 +731,7 @@ def _validate_recurring_payload(
 ) -> str | None:
     if not is_recurring:
         if start_date and end_date and start_date > end_date:
-            return "Parâmetro 'start_date' não pode ser maior que 'end_date'."
+            return _START_END_DATE_ORDER_MESSAGE
         return None
 
     if not start_date or not end_date:
@@ -739,7 +741,7 @@ def _validate_recurring_payload(
         )
 
     if start_date > end_date:
-        return "Parâmetro 'start_date' não pode ser maior que 'end_date'."
+        return _START_END_DATE_ORDER_MESSAGE
 
     if due_date is None:
         return "Transações recorrentes exigem 'due_date' no formato YYYY-MM-DD."

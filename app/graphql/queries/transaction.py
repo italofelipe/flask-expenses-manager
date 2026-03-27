@@ -188,8 +188,8 @@ class TransactionQueryMixin:
         service = TransactionApplicationService.with_defaults(user.id)
         try:
             result = service.get_due_transactions(
-                initial_date=initial_date,
-                final_date=final_date,
+                start_date=initial_date,
+                end_date=final_date,
                 page=page,
                 per_page=per_page,
                 order_by=order_by,

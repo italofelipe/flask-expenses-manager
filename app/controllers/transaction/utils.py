@@ -29,6 +29,7 @@ from app.services.transaction_serialization import (
 from app.utils.response_builder import json_response
 
 INVALID_TOKEN_MESSAGE = "Token inválido."
+DEFAULT_DEPRECATION_SUNSET = "Tue, 30 Jun 2026 23:59:59 GMT"
 MUTABLE_TRANSACTION_FIELDS = frozenset(
     {
         "title",
@@ -250,6 +251,20 @@ def _internal_error_response(*, message: str, log_context: str) -> Response:
         message=message,
         error_code="INTERNAL_ERROR",
     )
+
+
+def _apply_deprecation_headers(
+    response: Response,
+    *,
+    successor_endpoint: str,
+    successor_method: str,
+    sunset: str = DEFAULT_DEPRECATION_SUNSET,
+) -> Response:
+    response.headers["Deprecation"] = "true"
+    response.headers["Sunset"] = sunset
+    response.headers["X-Auraxis-Successor-Endpoint"] = successor_endpoint
+    response.headers["X-Auraxis-Successor-Method"] = successor_method
+    return response
 
 
 def _enforce_transaction_reference_ownership_or_error(

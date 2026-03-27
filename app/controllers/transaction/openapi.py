@@ -39,8 +39,8 @@ TRANSACTION_CREATE_DOC = {
     },
 }
 
-TRANSACTION_UPDATE_DOC = {
-    "description": "Atualiza uma transação existente.",
+TRANSACTION_UPDATE_PATCH_DOC = {
+    "description": "Atualiza parcialmente uma transação existente (contrato canônico).",
     "tags": [TAG_TRANSACTIONS],
     "security": [{"BearerAuth": []}],
     "params": {**TRANSACTION_ID_PARAM, **CONTRACT_HEADER_PARAM},
@@ -53,6 +53,15 @@ TRANSACTION_UPDATE_DOC = {
         500: {"description": ERROR_INTERNO},
     },
 }
+
+TRANSACTION_UPDATE_PUT_COMPAT_DOC = {
+    **TRANSACTION_UPDATE_PATCH_DOC,
+    "description": (
+        "Compatibilidade transitória para update parcial. "
+        "Prefira PATCH /transactions/{transaction_id}."
+    ),
+}
+TRANSACTION_UPDATE_DOC = TRANSACTION_UPDATE_PATCH_DOC
 
 TRANSACTION_SOFT_DELETE_DOC = {
     "description": "Realiza soft delete de uma transação.",
@@ -151,6 +160,13 @@ TRANSACTION_SUMMARY_DOC = {
             "in": "query",
             "type": "string",
         },
+        "page": {"description": DESC_NUMERO_PAGINA, "type": "integer"},
+        "per_page": {
+            "description": (
+                f"{DESC_ITENS_POR_PAGINA}. Aceita 'page_size' temporariamente."
+            ),
+            "type": "integer",
+        },
         **CONTRACT_HEADER_PARAM,
     },
     "responses": {
@@ -195,12 +211,21 @@ TRANSACTION_FORCE_DELETE_DOC = {
 }
 
 TRANSACTION_EXPENSE_PERIOD_DOC = {
-    "description": "Lista despesas por período com paginação e contadores.",
+    "description": (
+        "Compatibilidade transitória para despesas por período. "
+        "Prefira GET /transactions?type=expense com start_date/end_date."
+    ),
     "tags": [TAG_TRANSACTIONS],
     "security": [{"BearerAuth": []}],
     "params": {
-        "startDate": {"description": DESC_DATA_INICIAL, "type": "string"},
-        "finalDate": {"description": DESC_DATA_FINAL, "type": "string"},
+        "start_date": {
+            "description": f"{DESC_DATA_INICIAL}. Aceita 'startDate' temporariamente.",
+            "type": "string",
+        },
+        "end_date": {
+            "description": f"{DESC_DATA_FINAL}. Aceita 'finalDate' temporariamente.",
+            "type": "string",
+        },
         "page": {"description": DESC_NUMERO_PAGINA, "type": "integer"},
         "per_page": {"description": DESC_ITENS_POR_PAGINA, "type": "integer"},
         "order_by": {
@@ -226,8 +251,16 @@ TRANSACTION_DUE_PERIOD_DOC = {
     "tags": [TAG_TRANSACTIONS],
     "security": [{"BearerAuth": []}],
     "params": {
-        "initialDate": {"description": DESC_DATA_INICIAL, "type": "string"},
-        "finalDate": {"description": DESC_DATA_FINAL, "type": "string"},
+        "start_date": {
+            "description": (
+                f"{DESC_DATA_INICIAL}. Aceita 'initialDate' temporariamente."
+            ),
+            "type": "string",
+        },
+        "end_date": {
+            "description": f"{DESC_DATA_FINAL}. Aceita 'finalDate' temporariamente.",
+            "type": "string",
+        },
         "page": {"description": DESC_NUMERO_PAGINA, "type": "integer"},
         "per_page": {"description": DESC_ITENS_POR_PAGINA, "type": "integer"},
         "order_by": {

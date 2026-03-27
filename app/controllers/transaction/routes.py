@@ -48,6 +48,11 @@ def register_transaction_routes() -> None:
     )
     transaction_bp.add_url_rule(
         _TRANSACTION_ID_ROUTE,
+        view_func=TransactionResource.as_view("transactionpatch"),
+        methods=["PATCH"],
+    )
+    transaction_bp.add_url_rule(
+        _TRANSACTION_ID_ROUTE,
         view_func=TransactionResource.as_view("transactiondelete"),
         methods=["DELETE"],
     )

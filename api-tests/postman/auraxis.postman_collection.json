@@ -908,9 +908,9 @@
           ]
         },
         {
-          "name": "02 - Update transaction by id (REST v2)",
+          "name": "02 - Patch transaction by id (REST v2)",
           "request": {
-            "method": "PUT",
+            "method": "PATCH",
             "header": [
               {
                 "key": "Content-Type",
@@ -945,11 +945,60 @@
               "listen": "test",
               "script": {
                 "exec": [
-                  "pm.test('transaction update returns 200', function () { pm.response.to.have.status(200); });",
+                  "pm.test('transaction patch returns 200', function () { pm.response.to.have.status(200); });",
                   "var body = pm.response.json();",
-                  "pm.test('transaction update reflects new title', function () {",
+                  "pm.test('transaction patch reflects new title', function () {",
                   "  pm.expect(body.success).to.eql(true);",
                   "  pm.expect(body.data.transaction.title).to.include('ajustada');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "02b - Put transaction by id compatibility (REST v2)",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{authToken}}"
+              },
+              {
+                "key": "X-API-Contract",
+                "value": "v2"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/transactions/{{transactionId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "transactions",
+                "{{transactionId}}"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n                      \"description\": \"Compat update {{runSeed}}\"\n                    }\n"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('transaction put compatibility returns 200', function () { pm.response.to.have.status(200); });",
+                  "pm.test('transaction put compatibility emits deprecation headers', function () {",
+                  "  pm.expect(pm.response.headers.get('Deprecation')).to.eql('true');",
+                  "  pm.expect(pm.response.headers.get('X-Auraxis-Successor-Method')).to.eql('PATCH');",
                   "});"
                 ],
                 "type": "text/javascript"
@@ -1260,7 +1309,7 @@
               }
             ],
             "url": {
-              "raw": "{{baseUrl}}/transactions/expenses?startDate={{runYesterday}}&finalDate={{runTomorrow}}&page=1&per_page=20",
+              "raw": "{{baseUrl}}/transactions/expenses?start_date={{runYesterday}}&end_date={{runTomorrow}}&page=1&per_page=20",
               "host": [
                 "{{baseUrl}}"
               ],
@@ -1270,11 +1319,11 @@
               ],
               "query": [
                 {
-                  "key": "startDate",
+                  "key": "start_date",
                   "value": "{{runYesterday}}"
                 },
                 {
-                  "key": "finalDate",
+                  "key": "end_date",
                   "value": "{{runTomorrow}}"
                 },
                 {
@@ -1299,6 +1348,10 @@
                   "  pm.expect(body.success).to.eql(true);",
                   "  pm.expect(body.data.expenses).to.be.an('array');",
                   "  pm.expect(body.meta.pagination).to.be.an('object');",
+                  "});",
+                  "pm.test('expenses alias emits deprecation headers', function () {",
+                  "  pm.expect(pm.response.headers.get('Deprecation')).to.eql('true');",
+                  "  pm.expect(pm.response.headers.get('X-Auraxis-Successor-Endpoint')).to.eql('/transactions?type=expense');",
                   "});"
                 ],
                 "type": "text/javascript"
@@ -1321,7 +1374,7 @@
               }
             ],
             "url": {
-              "raw": "{{baseUrl}}/transactions/due-range?initialDate={{runYesterday}}&finalDate={{runIn30Days}}&page=1&per_page=20",
+              "raw": "{{baseUrl}}/transactions/due-range?start_date={{runYesterday}}&end_date={{runIn30Days}}&page=1&per_page=20",
               "host": [
                 "{{baseUrl}}"
               ],
@@ -1331,11 +1384,11 @@
               ],
               "query": [
                 {
-                  "key": "initialDate",
+                  "key": "start_date",
                   "value": "{{runYesterday}}"
                 },
                 {
-                  "key": "finalDate",
+                  "key": "end_date",
                   "value": "{{runIn30Days}}"
                 },
                 {

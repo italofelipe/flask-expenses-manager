@@ -17,8 +17,9 @@ from app.utils.typed_decorators import typed_jwt_required as jwt_required
 from app.utils.typed_decorators import typed_use_kwargs as use_kwargs
 
 from .dependencies import get_transaction_dependencies
-from .openapi import TRANSACTION_UPDATE_DOC
+from .openapi import TRANSACTION_UPDATE_PATCH_DOC, TRANSACTION_UPDATE_PUT_COMPAT_DOC
 from .utils import (
+    _apply_deprecation_headers,
     _compat_error,
     _compat_success,
     _guard_revoked_token,
@@ -27,12 +28,11 @@ from .utils import (
 
 
 class TransactionUpdateMixin:
-    """PUT behavior for transaction updates with ownership + validation guards."""
+    """PATCH/PUT behavior for transaction updates with ownership guards."""
 
-    @doc(**TRANSACTION_UPDATE_DOC)
-    @jwt_required()
-    @use_kwargs(TransactionSchema(partial=True), location="json")
-    def put(self, transaction_id: UUID, **kwargs: Any) -> Response:
+    def _update_transaction(
+        self, transaction_id: UUID, payload: dict[str, Any]
+    ) -> Response:
         token_error = _guard_revoked_token()
         if token_error is not None:
             return token_error
@@ -41,7 +41,7 @@ class TransactionUpdateMixin:
         dependencies = get_transaction_dependencies()
         service = dependencies.transaction_application_service_factory(user_uuid)
         try:
-            updated_data = service.update_transaction(transaction_id, kwargs)
+            updated_data = service.update_transaction(transaction_id, payload)
         except TransactionApplicationError as exc:
             return _compat_error(
                 legacy_payload={"error": exc.message, "details": exc.details},
@@ -64,4 +64,21 @@ class TransactionUpdateMixin:
             status_code=200,
             message="Transação atualizada com sucesso",
             data={"transaction": updated_data},
+        )
+
+    @doc(**TRANSACTION_UPDATE_PATCH_DOC)
+    @jwt_required()
+    @use_kwargs(TransactionSchema(partial=True), location="json")
+    def patch(self, transaction_id: UUID, **kwargs: Any) -> Response:
+        return self._update_transaction(transaction_id, kwargs)
+
+    @doc(**TRANSACTION_UPDATE_PUT_COMPAT_DOC)
+    @jwt_required()
+    @use_kwargs(TransactionSchema(partial=True), location="json")
+    def put(self, transaction_id: UUID, **kwargs: Any) -> Response:
+        response = self._update_transaction(transaction_id, kwargs)
+        return _apply_deprecation_headers(
+            response,
+            successor_endpoint="/transactions/{transaction_id}",
+            successor_method="PATCH",
         )

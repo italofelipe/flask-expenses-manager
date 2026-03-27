@@ -107,7 +107,7 @@ def test_transaction_list_and_summary_v2_contract(client) -> None:
 
     month_ref = date.today().strftime("%Y-%m")
     summary_response = client.get(
-        f"/transactions/summary?month={month_ref}",
+        f"/transactions/summary?month={month_ref}&page=1&per_page=5",
         headers=_auth_headers(token, "v2"),
     )
     assert summary_response.status_code == 200
@@ -116,6 +116,42 @@ def test_transaction_list_and_summary_v2_contract(client) -> None:
     assert "income_total" in summary_body["data"]
     assert "expense_total" in summary_body["data"]
     assert "pagination" in summary_body["meta"]
+
+
+def test_transaction_patch_is_canonical_and_put_is_compatibility_v2_contract(
+    client,
+) -> None:
+    token = _register_and_login(client)
+    created = client.post(
+        "/transactions",
+        json=_transaction_payload(),
+        headers=_auth_headers(token, "v2"),
+    )
+    assert created.status_code == 201
+    transaction_id = created.get_json()["data"]["transaction"][0]["id"]
+
+    patch_response = client.patch(
+        f"/transactions/{transaction_id}",
+        json={"title": "Conta de luz patch"},
+        headers=_auth_headers(token, "v2"),
+    )
+    assert patch_response.status_code == 200
+    patch_body = patch_response.get_json()
+    assert patch_body["success"] is True
+    assert patch_body["data"]["transaction"]["title"] == "Conta de luz patch"
+    assert patch_response.headers.get("Deprecation") is None
+
+    put_response = client.put(
+        f"/transactions/{transaction_id}",
+        json={"description": "Compatibilidade PUT"},
+        headers=_auth_headers(token, "v2"),
+    )
+    assert put_response.status_code == 200
+    assert put_response.headers["Deprecation"] == "true"
+    assert put_response.headers["X-Auraxis-Successor-Method"] == "PATCH"
+    put_body = put_response.get_json()
+    assert put_body["success"] is True
+    assert put_body["data"]["transaction"]["description"] == "Compatibilidade PUT"
 
 
 def test_transaction_summary_missing_month_v2_contract(client) -> None:
@@ -522,8 +558,8 @@ def test_transaction_expenses_period_with_counts_and_pagination_v2_contract(
 
     response = client.get(
         (
-            f"/transactions/expenses?startDate={today.isoformat()}"
-            f"&finalDate={(today + timedelta(days=1)).isoformat()}"
+            f"/transactions/expenses?start_date={today.isoformat()}"
+            f"&end_date={(today + timedelta(days=1)).isoformat()}"
             "&page=1&per_page=1&order_by=amount&order=asc"
         ),
         headers=_auth_headers(token, "v2"),
@@ -540,6 +576,10 @@ def test_transaction_expenses_period_with_counts_and_pagination_v2_contract(
     assert body["data"]["counts"]["total_transactions"] == 3
     assert body["data"]["counts"]["income_transactions"] == 1
     assert body["data"]["counts"]["expense_transactions"] == 2
+    assert response.headers["Deprecation"] == "true"
+    assert (
+        response.headers["X-Auraxis-Successor-Endpoint"] == "/transactions?type=expense"
+    )
 
 
 def test_transaction_expenses_legacy_contract(client) -> None:
@@ -626,8 +666,8 @@ def test_transaction_due_range_with_unified_sorting_v2_contract(client) -> None:
 
     upcoming_first_response = client.get(
         (
-            f"/transactions/due-range?initialDate={overdue_day}"
-            f"&finalDate={upcoming_day}&order_by=upcoming_first&page=1&per_page=10"
+            f"/transactions/due-range?start_date={overdue_day}"
+            f"&end_date={upcoming_day}&order_by=upcoming_first&page=1&per_page=10"
         ),
         headers=_auth_headers(token, "v2"),
     )
@@ -642,8 +682,8 @@ def test_transaction_due_range_with_unified_sorting_v2_contract(client) -> None:
 
     overdue_first_response = client.get(
         (
-            f"/transactions/due-range?initialDate={overdue_day}"
-            f"&finalDate={upcoming_day}&order_by=overdue_first&page=1&per_page=10"
+            f"/transactions/due-range?start_date={overdue_day}"
+            f"&end_date={upcoming_day}&order_by=overdue_first&page=1&per_page=10"
         ),
         headers=_auth_headers(token, "v2"),
     )

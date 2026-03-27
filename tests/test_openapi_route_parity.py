@@ -73,7 +73,7 @@ def test_openapi_methods_match_main_routes(client) -> None:
         "/user/bootstrap": {"get"},
         "/user/profile": {"get", "put"},
         "/transactions": {"get", "post"},
-        "/transactions/{transaction_id}": {"get", "put", "delete"},
+        "/transactions/{transaction_id}": {"get", "put", "patch", "delete"},
         "/transactions/{transaction_id}/force": {"delete"},
         "/transactions/restore/{transaction_id}": {"patch"},
         "/transactions/due-range": {"get"},
