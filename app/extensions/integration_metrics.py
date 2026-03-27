@@ -174,6 +174,15 @@ def build_http_observability_metrics_payload() -> dict[str, Any]:
             "status_4xx": metrics.get("http.request.status_class.4xx", 0),
             "status_5xx": metrics.get("http.request.status_class.5xx", 0),
             "graphql_requests": metrics.get("http.request.graphql", 0),
+            "user_me_legacy": metrics.get("http.request.user_me.legacy", 0),
+            "user_me_legacy_with_collection_semantics": metrics.get(
+                "http.request.user_me.legacy.collection_semantics",
+                0,
+            ),
+            "user_me_legacy_without_collection_semantics": metrics.get(
+                "http.request.user_me.legacy.no_collection_semantics",
+                0,
+            ),
         },
     }
 

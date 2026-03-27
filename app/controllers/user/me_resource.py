@@ -9,6 +9,7 @@ from app.application.services.authenticated_user_context_service import (
     AuthenticatedUserContextService,
 )
 from app.auth import get_active_auth_context
+from app.extensions.integration_metrics import increment_metric
 from app.models.transaction import Transaction
 from app.services.authenticated_user_payloads import (
     to_authenticated_user_canonical_payload,
@@ -27,10 +28,34 @@ from .helpers import (
 from .presenters import to_user_profile_payload, to_wallet_payload
 
 COLLECTION_QUERY_PARAMS = ("page", "limit", "status", "month")
+USER_ME_LEGACY_SUNSET = "Tue, 30 Jun 2026 23:59:59 GMT"
+USER_ME_LEGACY_WARNING = (
+    '299 - "/user/me legacy contract is deprecated; migrate to '
+    'X-API-Contract: v3 or GET /user/bootstrap"'
+)
 
 
 def _has_collection_semantics() -> bool:
     return any(request.args.get(field) is not None for field in COLLECTION_QUERY_PARAMS)
+
+
+def _apply_legacy_contract_deprecation_headers(
+    response: Response,
+    *,
+    has_collection_semantics: bool,
+) -> Response:
+    increment_metric("http.request.user_me.legacy")
+    if has_collection_semantics:
+        increment_metric("http.request.user_me.legacy.collection_semantics")
+    else:
+        increment_metric("http.request.user_me.legacy.no_collection_semantics")
+
+    response.headers["Deprecation"] = "true"
+    response.headers["Sunset"] = USER_ME_LEGACY_SUNSET
+    response.headers["Warning"] = USER_ME_LEGACY_WARNING
+    response.headers["X-Auraxis-Successor-Contract"] = "v3"
+    response.headers["X-Auraxis-Successor-Endpoint"] = "/user/bootstrap"
+    return response
 
 
 def _parse_positive_int_compat(
@@ -58,7 +83,10 @@ class UserMeResource(MethodResource):
             "Retorna o contexto do usuário autenticado.\n\n"
             "Contrato canônico (`X-API-Contract: v3`): retorna apenas identidade, "
             "perfil, perfil financeiro, perfil investidor e contexto de produto.\n\n"
-            "Contratos legados (`v1`/`v2`): mantêm transações paginadas e carteira.\n\n"
+            "Contratos legados (`v1`/`v2`): mantêm transações paginadas e carteira, "
+            "mas estão em deprecação controlada.\n"
+            "Headers de deprecação: `Deprecation: true`, `Sunset: "
+            f"{USER_ME_LEGACY_SUNSET}`.\n\n"
             "Filtros legados disponíveis apenas em `v1`/`v2`:\n"
             "Filtros disponíveis:\n"
             "- page: número da página\n"
@@ -142,6 +170,7 @@ class UserMeResource(MethodResource):
                 exc=exc,
                 fallback_message="Parâmetros de paginação inválidos.",
             )
+        has_collection_semantics = _has_collection_semantics()
         status = request.args.get("status")
         month = request.args.get("month")
 
@@ -186,7 +215,7 @@ class UserMeResource(MethodResource):
             "transactions": paginated_transactions,
             "wallet": wallet_data,
         }
-        return compat_success(
+        response = compat_success(
             legacy_payload=legacy_payload,
             status_code=200,
             message="Dados do usuário retornados com sucesso",
@@ -209,4 +238,8 @@ class UserMeResource(MethodResource):
                     "has_next_page": paginated_transactions["has_next_page"],
                 }
             },
+        )
+        return _apply_legacy_contract_deprecation_headers(
+            response,
+            has_collection_semantics=has_collection_semantics,
         )
