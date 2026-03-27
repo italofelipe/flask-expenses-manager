@@ -1,5 +1,17 @@
 # Changelog
 
+## [1.7.0](https://github.com/italofelipe/auraxis-api/compare/v1.6.0...v1.7.0) (2026-03-27)
+
+
+### Features
+
+* **gov:** add pr traceability checks ([#722](https://github.com/italofelipe/auraxis-api/issues/722)) ([cb7896e](https://github.com/italofelipe/auraxis-api/commit/cb7896e9bb492fa8a759426eae34893f9ec372c5))
+* **j2:** complete bank statement import flow ([#720](https://github.com/italofelipe/auraxis-api/issues/720)) ([6ffaab3](https://github.com/italofelipe/auraxis-api/commit/6ffaab3fcb81b21db0c7663536b38b03a4110aff))
+* **obs:** enrich lightweight request correlation ([#726](https://github.com/italofelipe/auraxis-api/issues/726)) ([458c595](https://github.com/italofelipe/auraxis-api/commit/458c59582b784e71aa1ef0427d7607b306708ed5))
+* **perf:** add latency budget governance gate ([#724](https://github.com/italofelipe/auraxis-api/issues/724)) ([21ad839](https://github.com/italofelipe/auraxis-api/commit/21ad839cf937334e0dc5a0ad58cbf391981aba3f))
+* **user:** add explicit bootstrap endpoint ([#738](https://github.com/italofelipe/auraxis-api/issues/738)) ([5fa4b39](https://github.com/italofelipe/auraxis-api/commit/5fa4b39262d75d2cd6f79822883d5a12a9911dd5))
+* **user:** publish canonical me contract ([#737](https://github.com/italofelipe/auraxis-api/issues/737)) ([2fc0c21](https://github.com/italofelipe/auraxis-api/commit/2fc0c2133e9cbdf3f5098e9553d8885da84dcbe9))
+
 ## [1.6.0](https://github.com/italofelipe/auraxis-api/compare/v1.5.0...v1.6.0) (2026-03-26)
 
 
