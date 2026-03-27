@@ -192,7 +192,7 @@ jobs:
     runs-on: ubuntu-latest
     needs: tests
     env:
-      DOCKER_CONFIG: ${{ runner.temp }}/docker-public
+      DOCKER_CONFIG: /tmp/docker-public
 
     steps:
       - name: Checkout
@@ -301,7 +301,7 @@ jobs:
     runs-on: ubuntu-latest
     needs: api-smoke
     env:
-      DOCKER_CONFIG: ${{ runner.temp }}/docker-public
+      DOCKER_CONFIG: /tmp/docker-public
 
     steps:
       - name: Checkout
@@ -455,7 +455,7 @@ jobs:
     runs-on: ubuntu-latest
     needs: tests
     env:
-      DOCKER_CONFIG: ${{ runner.temp }}/docker-public
+      DOCKER_CONFIG: /tmp/docker-public
 
     steps:
       - name: Checkout
