@@ -8,6 +8,7 @@ Scripts operacionais e de engenharia para CI/CD, seguranca, deploy, observabilid
 - Seguranca: evidencias, hardening, auditoria e enforce.
 - AWS/operacao: deploy via SSM, backups, patching, monitoramento.
 - Testes de API: execucao da suite Newman canonica e smoke HTTP pós-deploy.
+- Supply chain da esteira: build/export/load de imagens canonicas reutilizadas entre gates.
 - Governanca GitHub: auditoria/sincronizacao de ruleset de branch protegida.
 
 ## Padroes obrigatorios
@@ -29,6 +30,7 @@ Scripts operacionais e de engenharia para CI/CD, seguranca, deploy, observabilid
 - Para gate rapido canonico: `npm run postman:smoke:ci`.
 - Para integracao black-box completa: `npm run postman:full:ci`.
 - Para smoke HTTP pós-deploy (REST + GraphQL): `scripts/python_exec.sh scripts/http_smoke_check.py --base-url <url> --env-name <dev|prod>`.
+- Para build/export/load da imagem canonica do CI: `bash scripts/ci_image_artifact.sh`.
 - Para contrato OpenAPI determinístico: `bash scripts/run_schemathesis_contract.sh`.
 - Para sinal de review Cursor Bugbot: `scripts/python_exec.sh scripts/pr_review_signal_check.py --repo <owner/repo> --pr-number <numero> --mode advisory`.
 - Para governanca de branch: `scripts/python_exec.sh scripts/github_ruleset_manager.py --owner <owner> --repo <repo> --mode audit`.

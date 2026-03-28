@@ -40,26 +40,30 @@ Jobs relevantes:
 - `pytest` (sem marker schemathesis)
 - cobertura minima obrigatoria `85%`
 
-6. `api-smoke`
+6. `ci-runtime-images`
+- constroi uma vez as imagens canonicas `auraxis-ci-dev:${GITHUB_SHA}` e `auraxis-ci-prod:${GITHUB_SHA}`
+- publica artifacts efemeros para reuso nos gates seguintes
+
+7. `api-smoke`
 - sobe stack local docker
 - instala dependencias Node versionadas com `npm ci`
 - executa o gate oficial rapido de release/pre-merge (`smoke`) via `scripts/run_postman_suite.sh`
 - publica `reports/newman-smoke-report.xml`
 
-7. `api-integration`
+8. `api-integration`
 - sobe stack local docker isolada para a suite `full`
 - executa o gate oficial dedicado de release/integracao da superficie canonica nao-privilegiada
 - publica `reports/newman-full-report.xml`
 
-8. `schemathesis`
+9. `schemathesis`
 - contrato OpenAPI com seed deterministico (`HYPOTHESIS_SEED`)
 - execucao centralizada em `scripts/run_schemathesis_contract.sh`
 
-9. `mutation`
+10. `mutation`
 - gate Cosmic Ray (`scripts/mutation_gate.sh`)
 
-10. `trivy`
-- scan de filesystem + imagem Docker
+11. `trivy`
+- scan de filesystem + imagem Docker reutilizando a imagem canonica ja construida
 
 11. `osv-scanner` (obrigatorio)
 - scan open source de lockfiles/dependencias versionadas
@@ -102,7 +106,8 @@ Controles:
 - smoke checks REST + GraphQL pos-deploy via `scripts/http_smoke_check.py`
 
 Arquitetura canonica de smoke/release gate:
-- pré-merge: Newman roda nos jobs `api-smoke` (`smoke`) e `api-integration` (`full`) do `ci.yml`
+- pré-merge: `ci-runtime-images` constrói a imagem uma vez e distribui artifacts efêmeros
+- pré-merge: Newman roda nos jobs `api-smoke` (`smoke`) e `api-integration` (`full`) do `ci.yml`, ambos reutilizando a mesma imagem canônica
 - pré-merge: `api-smoke` tambem executa `scripts/http_latency_budget_gate.py`
 - pós-deploy: smoke deterministico em Python dentro do `deploy.yml`
 - fluxos legados paralelos de smoke foram removidos para evitar drift

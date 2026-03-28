@@ -49,10 +49,11 @@ pre-commit run --all-files
 | `dependency-review` | — (PR only) | ✅ Sim (PRs) | Dependências com vulnerabilidades HIGH+ |
 | `review-signal` | — (PR only) | ❌ Não (advisory) | Cursor Bugbot — sinal de revisão |
 | `tests` | `quality`, `secret-scan` | ✅ Sim | pytest ≥ 85% coverage + artifacts |
-| `api-smoke` | `tests` | ✅ Sim | Newman — única smoke suite black-box pré-merge em stack local docker |
+| `ci-runtime-images` | `quality`, `secret-scan` | ✅ Sim | build único das imagens canônicas do CI + artifacts efêmeros para reuso |
+| `api-smoke` | `tests`, `ci-runtime-images` | ✅ Sim | Newman — única smoke suite black-box pré-merge em stack local docker usando imagem já construída |
 | `schemathesis` | `quality`, `secret-scan` | ✅ Sim | Contract reliability (5 exemplos/endpoint) |
 | `mutation` | `tests` | ✅ Sim | Cosmic Ray — 0% survival |
-| `trivy` | `tests` | ✅ Sim | FS scan + image scan (HIGH+CRITICAL) |
+| `trivy` | `tests`, `ci-runtime-images` | ✅ Sim | FS scan + image scan (HIGH+CRITICAL) consumindo a imagem canônica já construída |
 | `snyk` | `tests`, `trivy` | ✅ Sim (se habilitado) | Dep scan + container scan (HIGH+) |
 | `security-evidence` | `tests`, `schemathesis` | ✅ Sim | Evidências de segurança para auditoria |
 | `sonar` | `tests`, `schemathesis`, `mutation`, `trivy`, `security-evidence` | ✅ Sim | Quality gate A ratings + 0 critical bugs |
@@ -70,7 +71,9 @@ push/PR
                                               ▼
                                tests (needs: quality + secret-scan)
                                 │         │         │
-                         api-smoke    mutation    trivy
+                     ci-runtime-images
+                       │          │
+                  api-smoke   mutation    trivy
                                               │
                                            snyk [se ENABLE_SNYK=true]
                                               │
@@ -187,3 +190,9 @@ Quality Gate requerido:
 | Sonar quality gate fail | Rating abaixo de A | Ver detalhe no painel SonarCloud |
 | Cosmic Ray survivors | Lógica não coberta por assert | Adicionar asserções mais fortes nos testes |
 | api-smoke falhou | Stack não inicializou ou registry público oscilou | Verificar logs: `docker compose logs web db redis`; conferir pull/build usando os mirrors `public.ecr.aws/docker/library/*` |
+
+### Supply chain canônica da suíte
+
+- As imagens base críticas (`python`, `postgres`, `redis`) usam os mirrors `public.ecr.aws/docker/library/*`.
+- O job `ci-runtime-images` constrói uma vez as imagens `auraxis-ci-dev:${GITHUB_SHA}` e `auraxis-ci-prod:${GITHUB_SHA}`.
+- `api-smoke`, `api-integration` e `trivy` baixam artifacts efêmeros e reutilizam essas imagens, evitando rebuild redundante nos gates críticos.
