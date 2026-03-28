@@ -43,6 +43,39 @@ def test_parse_and_pagination_helpers() -> None:
         schema_utils._validate_pagination_values(1, 200)
 
 
+def test_graphql_new_contract_alias_helpers() -> None:
+    generated_uuid = uuid4()
+
+    assert schema_utils._parse_optional_uuid(generated_uuid, "tag_id") == generated_uuid
+    assert (
+        schema_utils._parse_optional_uuid(str(generated_uuid), "tag_id")
+        == generated_uuid
+    )
+    assert schema_utils._parse_optional_uuid("", "tag_id") is None
+    assert schema_utils._parse_optional_uuid(None, "tag_id") is None
+
+    with pytest.raises(GraphQLError) as invalid_uuid:
+        schema_utils._parse_optional_uuid("invalid-uuid", "tag_id")
+    assert "UUID válido" in str(invalid_uuid.value)
+
+    assert schema_utils._resolve_per_page(per_page=15, legacy_page_size=30) == 15
+    assert schema_utils._resolve_per_page(per_page=None, legacy_page_size=30) == 30
+    assert schema_utils._resolve_per_page(per_page=None, legacy_page_size=None) == 10
+
+    assert schema_utils._resolve_date_range_aliases(
+        start_date="2026-02-10",
+        end_date="2026-02-20",
+        legacy_initial_date="2026-01-01",
+        legacy_final_date="2026-01-31",
+    ) == ("2026-02-10", "2026-02-20")
+    assert schema_utils._resolve_date_range_aliases(
+        start_date=None,
+        end_date=None,
+        legacy_initial_date="2026-01-01",
+        legacy_final_date="2026-01-31",
+    ) == ("2026-01-01", "2026-01-31")
+
+
 def test_user_and_wallet_payload_serialization(app) -> None:
     with app.app_context():
         user = _create_user(name="user-graphql", email="user-graphql@email.com")
