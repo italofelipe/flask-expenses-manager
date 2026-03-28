@@ -62,8 +62,9 @@ def test_dashboard_graphql_ownership_is_explicit_in_catalog() -> None:
     assert catalog["dashboardOverview"].source_module == "app.graphql.queries.dashboard"
     assert catalog["transactionDashboard"].domain == "dashboard"
     assert catalog["transactionDashboard"].source_module == (
-        "app.graphql.queries.transaction"
+        "app.graphql.queries.dashboard"
     )
+    assert catalog["transactionDashboard"].legacy_alias_of == "dashboardOverview"
 
 
 def test_committed_graphql_docs_match_runtime_bundle() -> None:
