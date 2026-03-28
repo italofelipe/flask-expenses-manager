@@ -38,6 +38,41 @@ def _parse_optional_date(value: str | None, field_name: str) -> date | None:
         ) from exc
 
 
+def _parse_optional_uuid(value: str | UUID | None, field_name: str) -> UUID | None:
+    if value in (None, ""):
+        return None
+    if isinstance(value, UUID):
+        return value
+    try:
+        return UUID(str(value))
+    except (TypeError, ValueError) as exc:
+        raise build_public_graphql_error(
+            f"Parâmetro '{field_name}' inválido. Informe um UUID válido.",
+            code=GRAPHQL_ERROR_CODE_VALIDATION,
+        ) from exc
+
+
+def _resolve_per_page(
+    *,
+    per_page: int | None,
+    legacy_page_size: int | None,
+) -> int:
+    return per_page if per_page is not None else legacy_page_size or 10
+
+
+def _resolve_date_range_aliases(
+    *,
+    start_date: str | None,
+    end_date: str | None,
+    legacy_initial_date: str | None,
+    legacy_final_date: str | None,
+) -> tuple[str | None, str | None]:
+    return (
+        start_date if start_date is not None else legacy_initial_date,
+        end_date if end_date is not None else legacy_final_date,
+    )
+
+
 def _parse_month(month: str) -> tuple[int, int]:
     try:
         year, month_number = map(int, month.split("-"))
