@@ -9,6 +9,9 @@
 ## Gates locais (antes de todo commit)
 
 ```bash
+# 0. Higiene estrutural
+python3 scripts/repo_hygiene_check.py
+
 # 1. Formatação + linting + import-sort (Ruff unificado)
 ruff format .
 ruff check app tests config run.py run_without_db.py
@@ -30,6 +33,7 @@ pre-commit run --all-files
 | `ruff format` | zero diffs | ✅ Sim |
 | `ruff check` | zero warnings | ✅ Sim |
 | `mypy` | zero errors (strict) | ✅ Sim |
+| `repo_hygiene_check.py` | 0 arquivos acidentais do tipo `foo 2.py` | ✅ Sim |
 | `pytest --cov-fail-under` | ≥ 85% | ✅ Sim |
 | `bandit -lll -iii` | 0 HIGH/CRITICAL | ✅ Sim |
 | `gitleaks` (pre-commit) | 0 segredos detectados | ✅ Sim |
@@ -40,7 +44,7 @@ pre-commit run --all-files
 
 | Job | Dependências | Bloqueia merge? | Descrição |
 |:----|:-------------|:----------------|:----------|
-| `quality` | — | ✅ Sim | ruff format + ruff check + mypy + bandit + pip-audit |
+| `quality` | — | ✅ Sim | repo hygiene + ruff format + ruff check + mypy + bandit + pip-audit |
 | `secret-scan` | `quality` | ✅ Sim | Gitleaks — detect --source . |
 | `dependency-review` | — (PR only) | ✅ Sim (PRs) | Dependências com vulnerabilidades HIGH+ |
 | `review-signal` | — (PR only) | ❌ Não (advisory) | Cursor Bugbot — sinal de revisão |
@@ -174,6 +178,7 @@ Quality Gate requerido:
 | Problema | Causa provável | Solução |
 |:---------|:---------------|:--------|
 | `ruff format` diff em CI | Arquivo não formatado localmente | Rodar `ruff format .` antes de commitar |
+| `repo_hygiene_check` falhou | Arquivo duplicado acidental no workspace (`foo 2.py`) | Remover/renomear o artefato local antes do commit |
 | `mypy` error em CI | Type annotation faltando ou errada | Rodar `mypy app` localmente |
 | Coverage < 85% | Nova lógica sem teste | Escrever testes para o código adicionado |
 | Gitleaks detectou segredo | Credencial em código | Remover + rotar a credencial imediatamente |
