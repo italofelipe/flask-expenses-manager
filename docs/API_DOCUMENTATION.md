@@ -438,7 +438,8 @@ Retorna a valorização consolidada da carteira:
 
 ### `GET /wallet/valuation/history`
 Retorna evolução diária da carteira por período:
-- query params opcionais: `startDate`, `finalDate` (`YYYY-MM-DD`)
+- query params canônicos: `start_date`, `end_date` (`YYYY-MM-DD`)
+- aliases legados observáveis: `startDate`, `finalDate`
 - sem parâmetros: usa janela padrão dos últimos 30 dias
 - resumo agregado:
   - `total_buy_amount`
@@ -453,9 +454,14 @@ Retorna evolução diária da carteira por período:
   - `total_current_value_estimate`
   - `total_profit_loss_estimate`
 
+### `PATCH /wallet/{investment_id}`
+Atualiza item da carteira parcialmente e salva histórico quando `quantity` ou `value` mudam.
+- Contrato canônico para update parcial.
+
 ### `PUT /wallet/{investment_id}`
-Atualiza item da carteira e salva histórico quando `quantity` ou `value` mudam.
+Alias legado para atualização parcial da carteira.
 - Com `X-API-Contract: v2`, retorna envelope padronizado.
+- O método canônico é `PATCH /wallet/{investment_id}`.
 
 ### `DELETE /wallet/{investment_id}`
 Remove item da carteira.
@@ -465,7 +471,8 @@ Remove item da carteira.
 - `GET /goals`
 - `POST /goals`
 - `GET /goals/{goal_id}`
-- `PUT /goals/{goal_id}`
+- `PATCH /goals/{goal_id}`
+- `PUT /goals/{goal_id}` (alias legado)
 - `DELETE /goals/{goal_id}`
 - `GET /goals/{goal_id}/plan`
 - `POST /goals/simulate`
@@ -473,6 +480,7 @@ Remove item da carteira.
 Contrato de resposta:
 - Padrão legado (default): sem envelope `success/data/meta`.
 - Novo contrato: enviar header `X-API-Contract: v2`.
+- Atualização canônica de meta: `PATCH /goals/{goal_id}`.
 
 Objetivo do domínio:
 - Gerenciar metas financeiras do usuário.
