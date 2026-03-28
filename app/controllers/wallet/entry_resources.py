@@ -23,6 +23,7 @@ from .dependencies import get_wallet_dependencies
 
 WALLET_UPDATE_SUCCESSOR_ENDPOINT = "/wallet/{investment_id}"
 WALLET_UPDATE_SUCCESSOR_METHOD = "PATCH"
+WALLET_UPDATE_SUCCESS_MESSAGE = "Investimento atualizado com sucesso"
 
 
 @wallet_bp.route("", methods=["POST"])
@@ -293,11 +294,11 @@ def patch_wallet_entry(investment_id: UUID) -> tuple[dict[str, Any], int]:
 
     return compat_success(
         legacy_payload={
-            "message": "Investimento atualizado com sucesso",
+            "message": WALLET_UPDATE_SUCCESS_MESSAGE,
             "investment": investment_data,
         },
         status_code=200,
-        message="Investimento atualizado com sucesso",
+        message=WALLET_UPDATE_SUCCESS_MESSAGE,
         data={"investment": investment_data},
     )
 
@@ -321,7 +322,7 @@ def patch_wallet_entry(investment_id: UUID) -> tuple[dict[str, Any], int]:
     },
     responses={
         200: {
-            "description": "Investimento atualizado com sucesso",
+            "description": WALLET_UPDATE_SUCCESS_MESSAGE,
             "headers": deprecated_headers_doc(
                 successor_endpoint=WALLET_UPDATE_SUCCESSOR_ENDPOINT,
                 successor_method=WALLET_UPDATE_SUCCESSOR_METHOD,
@@ -344,11 +345,11 @@ def update_wallet_entry(investment_id: UUID) -> Response | tuple[dict[str, Any],
 
     return compat_success_deprecated(
         legacy_payload={
-            "message": "Investimento atualizado com sucesso",
+            "message": WALLET_UPDATE_SUCCESS_MESSAGE,
             "investment": investment_data,
         },
         status_code=200,
-        message="Investimento atualizado com sucesso",
+        message=WALLET_UPDATE_SUCCESS_MESSAGE,
         data={"investment": investment_data},
         successor_endpoint=WALLET_UPDATE_SUCCESSOR_ENDPOINT,
         successor_method=WALLET_UPDATE_SUCCESSOR_METHOD,
