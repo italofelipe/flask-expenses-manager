@@ -10,6 +10,7 @@ from app.application.services.transaction_application_service import (
 )
 from app.application.services.transaction_query_service import TransactionQueryService
 from app.graphql.auth import get_current_user_required
+from app.graphql.dashboard_payloads import build_dashboard_overview_payload
 from app.graphql.errors import build_public_graphql_error, to_public_graphql_code
 from app.graphql.queries.common import paginate
 from app.graphql.schema_utils import (
@@ -20,11 +21,6 @@ from app.graphql.schema_utils import (
     _validate_pagination_values,
 )
 from app.graphql.types import (
-    DashboardCategoriesType,
-    DashboardCategoryType,
-    DashboardCountsType,
-    DashboardStatusCountsType,
-    DashboardTotalsType,
     TransactionDashboardPayloadType,
     TransactionDueCountsType,
     TransactionDueRangePayloadType,
@@ -60,6 +56,7 @@ class TransactionQueryMixin:
     transaction_dashboard = graphene.Field(
         TransactionDashboardPayloadType,
         month=graphene.String(required=True),
+        deprecation_reason="Use dashboardOverview.",
     )
     transaction_due_range = graphene.Field(
         TransactionDueRangePayloadType,
@@ -196,38 +193,7 @@ class TransactionQueryMixin:
                 code=to_public_graphql_code(exc.code),
             ) from exc
 
-        return TransactionDashboardPayloadType(
-            month=str(result["month"]),
-            totals=DashboardTotalsType(
-                income_total=float(result["income_total"]),
-                expense_total=float(result["expense_total"]),
-                balance=float(result["balance"]),
-            ),
-            counts=DashboardCountsType(
-                total_transactions=int(result["counts"]["total_transactions"]),
-                income_transactions=int(result["counts"]["income_transactions"]),
-                expense_transactions=int(result["counts"]["expense_transactions"]),
-                status=DashboardStatusCountsType(
-                    paid=int(result["counts"]["status"]["paid"]),
-                    pending=int(result["counts"]["status"]["pending"]),
-                    cancelled=int(result["counts"]["status"]["cancelled"]),
-                    postponed=int(result["counts"]["status"]["postponed"]),
-                    overdue=int(result["counts"]["status"]["overdue"]),
-                ),
-            ),
-            top_categories=DashboardCategoriesType(
-                expense=[
-                    DashboardCategoryType(**item)
-                    for item in result["top_expense_categories"]
-                    if isinstance(item, dict)
-                ],
-                income=[
-                    DashboardCategoryType(**item)
-                    for item in result["top_income_categories"]
-                    if isinstance(item, dict)
-                ],
-            ),
-        )
+        return build_dashboard_overview_payload(result)
 
     def resolve_transaction_due_range(
         self,

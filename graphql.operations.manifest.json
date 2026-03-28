@@ -9,6 +9,14 @@
   },
   {
     "access": "auth_required",
+    "domain": "dashboard",
+    "name": "dashboardOverview",
+    "operation_type": "query",
+    "source_module": "app.graphql.queries.dashboard",
+    "summary": "Retorna o read model canônico do dashboard financeiro mensal."
+  },
+  {
+    "access": "auth_required",
     "domain": "transactions",
     "name": "transactions",
     "operation_type": "query",
@@ -37,7 +45,7 @@
     "name": "transactionDashboard",
     "operation_type": "query",
     "source_module": "app.graphql.queries.transaction",
-    "summary": "Entrega visão consolidada mensal de receitas, despesas e categorias."
+    "summary": "Compatibilidade transitória do dashboard mensal; prefira dashboardOverview."
   },
   {
     "access": "auth_required",
