@@ -2274,7 +2274,7 @@ def build_collection() -> dict[str, Any]:
                 body=_json_body(
                     """
                     {
-                      "query": "mutation Login($email: String, $password: String!) { login(email: $email, password: $password) { token message } }",
+                      "query": "mutation Login($email: String!, $password: String!) { login(email: $email, password: $password) { token message } }",
                       "variables": {
                         "email": "{{runEmail}}",
                         "password": "{{testPasswordWrong}}"

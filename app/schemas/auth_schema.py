@@ -1,10 +1,8 @@
 from marshmallow import (
     Schema,
-    ValidationError,
     fields,
     pre_load,
     validate,
-    validates_schema,
 )
 
 from app.schemas.sanitization import sanitize_string_fields
@@ -13,18 +11,11 @@ from app.schemas.sanitization import sanitize_string_fields
 class AuthSchema(Schema):
     """Schema para autenticação de usuários"""
 
-    email = fields.String(
-        load_default=None,
+    email = fields.Email(
+        required=True,
         metadata={
             "description": "Endereço de email do usuário (identificador canônico)",
             "example": "joao.silva@email.com",
-        },
-    )
-    name = fields.String(
-        load_default=None,
-        metadata={
-            "description": "Nome do usuário (compatibilidade transitória; use email)",
-            "example": "João Silva",
         },
     )
     password = fields.String(
@@ -37,15 +28,10 @@ class AuthSchema(Schema):
 
     @pre_load
     def sanitize_input(self, data: object, **kwargs: object) -> object:
-        sanitized = sanitize_string_fields(data, {"email", "name"})
+        sanitized = sanitize_string_fields(data, {"email"})
         if isinstance(sanitized, dict) and isinstance(sanitized.get("email"), str):
             sanitized["email"] = str(sanitized["email"]).lower()
         return sanitized
-
-    @validates_schema
-    def validate_identity(self, data: dict[str, str], **kwargs: object) -> None:
-        if not data.get("email") and not data.get("name"):
-            raise ValidationError("Either 'email' or legacy 'name' must be provided.")
 
 
 class AuthSuccessResponseSchema(Schema):

@@ -169,8 +169,7 @@ class RegisterUserMutation(graphene.Mutation):
 
 class LoginMutation(graphene.Mutation):
     class Arguments:
-        email = graphene.String()
-        name = graphene.String()
+        email = graphene.String(required=True)
         password = graphene.String(required=True)
 
     Output = AuthPayloadType
@@ -178,25 +177,23 @@ class LoginMutation(graphene.Mutation):
     def mutate(
         self,
         info: graphene.ResolveInfo,
+        email: str,
         password: str,
-        email: str | None = None,
-        name: str | None = None,
     ) -> AuthPayloadType:
         auth_policy = get_auth_security_policy()
-        if not (email or name):
-            raise _public_graphql_error(
-                "Missing credentials",
-                code=GRAPHQL_ERROR_CODE_VALIDATION,
+        try:
+            identity = resolve_login_identity(
+                email=email,
+                find_user_by_email=lambda value: User.query.filter_by(
+                    email=value
+                ).first(),
             )
-
-        identity = resolve_login_identity(
-            email=email,
-            name=name,
-            find_user_by_email=lambda value: User.query.filter_by(email=value).first(),
-            find_user_by_name=lambda value: User.query.filter_by(name=value).first(),
-        )
-        identifier = "name_legacy" if identity.uses_legacy_name_identifier else "email"
-        increment_metric(f"auth.login.identifier.graphql.{identifier}")
+        except ValueError as exc:
+            raise _public_graphql_error(
+                str(exc),
+                code=GRAPHQL_ERROR_CODE_VALIDATION,
+            ) from exc
+        increment_metric("auth.login.identifier.graphql.email")
         request_obj = cast(dict[str, Any], info.context).get("request")
         headers = request_obj.headers if request_obj is not None else {}
         login_context = build_login_attempt_context(

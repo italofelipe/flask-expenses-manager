@@ -195,7 +195,7 @@ def _check_rest_invalid_login(base_url: str, timeout: int) -> None:
 def _check_graphql_invalid_login(base_url: str, timeout: int) -> None:
     url = _build_url(base_url, "/graphql")
     mutation = (
-        "mutation Login($email: String, $password: String!) { "
+        "mutation Login($email: String!, $password: String!) { "
         "login(email: $email, password: $password) { token message } }"
     )
     result = _request_json(

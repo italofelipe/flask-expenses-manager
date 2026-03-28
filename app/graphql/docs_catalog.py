@@ -242,7 +242,7 @@ GRAPHQL_OPERATION_CATALOG: tuple[GraphQLOperationDoc, ...] = (
         operation_type="mutation",
         domain="auth",
         access="public",
-        summary="Autentica um usuário e retorna token JWT.",
+        summary="Autentica um usuário por email e retorna token JWT.",
         source_module=MUTATION_AUTH_MODULE,
     ),
     GraphQLOperationDoc(

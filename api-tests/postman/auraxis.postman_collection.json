@@ -4954,7 +4954,7 @@
             },
             "body": {
               "mode": "raw",
-              "raw": "{\n                      \"query\": \"mutation Login($email: String, $password: String!) { login(email: $email, password: $password) { token message } }\",\n                      \"variables\": {\n                        \"email\": \"{{runEmail}}\",\n                        \"password\": \"{{testPasswordWrong}}\"\n                      }\n                    }\n"
+              "raw": "{\n                      \"query\": \"mutation Login($email: String!, $password: String!) { login(email: $email, password: $password) { token message } }\",\n                      \"variables\": {\n                        \"email\": \"{{runEmail}}\",\n                        \"password\": \"{{testPasswordWrong}}\"\n                      }\n                    }\n"
             }
           },
           "event": [

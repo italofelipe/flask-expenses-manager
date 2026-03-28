@@ -181,7 +181,7 @@
     "name": "login",
     "operation_type": "mutation",
     "source_module": "app.graphql.mutations.auth",
-    "summary": "Autentica um usuário e retorna token JWT."
+    "summary": "Autentica um usuário por email e retorna token JWT."
   },
   {
     "access": "auth_required",
