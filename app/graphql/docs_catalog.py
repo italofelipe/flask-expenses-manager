@@ -101,7 +101,7 @@ GRAPHQL_OPERATION_CATALOG: tuple[GraphQLOperationDoc, ...] = (
     GraphQLOperationDoc(
         name="transactionDashboard",
         operation_type="query",
-        domain="transactions",
+        domain="dashboard",
         access="auth_required",
         summary=(
             "Compatibilidade transitória do dashboard mensal; "

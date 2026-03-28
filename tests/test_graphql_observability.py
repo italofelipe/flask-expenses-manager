@@ -82,6 +82,42 @@ def test_graphql_metrics_record_domain_and_cost_for_accepted_query(client: Any) 
     assert http_metrics["http.request.graphql.root_field.me"] >= 1
 
 
+def test_graphql_metrics_treat_dashboard_alias_and_canonical_as_dashboard_domain(
+    client: Any,
+) -> None:
+    token = _register_and_login(client, "dashboard")
+
+    reset_metrics_for_tests()
+    response = _graphql(
+        client,
+        """
+        query DashboardMetrics($month: String!) {
+          dashboardOverview(month: $month) {
+            month
+          }
+          transactionDashboard(month: $month) {
+            month
+          }
+        }
+        """,
+        {"month": "2026-03"},
+        token=token,
+    )
+    assert response.status_code == 200
+    body = response.get_json()
+    assert "errors" not in body
+
+    metrics = snapshot_metrics(prefix="graphql.")
+    assert metrics["graphql.field.dashboardoverview.requests"] == 1
+    assert metrics["graphql.field.transactiondashboard.requests"] == 1
+    assert metrics["graphql.domain.dashboard.requests"] == 1
+    assert metrics.get("graphql.domain.transaction.requests", 0) == 0
+
+    http_metrics = snapshot_metrics(prefix="http.request.")
+    assert http_metrics["http.request.graphql.root_field.dashboardoverview"] >= 1
+    assert http_metrics["http.request.graphql.root_field.transactiondashboard"] >= 1
+
+
 def test_graphql_metrics_record_security_violations(client: Any) -> None:
     token = _register_and_login(client, "security")
     with client.application.app_context():
