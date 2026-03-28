@@ -33,7 +33,7 @@ def test_register_with_weak_password_returns_400(client) -> None:
     assert "errors" in body
 
 
-def test_login_with_name_and_logout_success(client) -> None:
+def test_login_with_email_and_logout_success(client) -> None:
     suffix = uuid.uuid4().hex[:8]
     payload = _register_payload(suffix)
     register = client.post("/auth/register", json=payload)
@@ -42,7 +42,7 @@ def test_login_with_name_and_logout_success(client) -> None:
     login = client.post(
         "/auth/login",
         json={
-            "name": payload["name"],
+            "email": payload["email"],
             "password": payload["password"],
         },
     )
