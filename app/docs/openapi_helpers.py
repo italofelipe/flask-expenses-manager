@@ -16,6 +16,7 @@ WARNING_HEADER_NAME = "Warning"
 SUCCESSOR_ENDPOINT_HEADER_NAME = "X-Auraxis-Successor-Endpoint"
 SUCCESSOR_METHOD_HEADER_NAME = "X-Auraxis-Successor-Method"
 SUCCESSOR_CONTRACT_HEADER_NAME = "X-Auraxis-Successor-Contract"
+SUCCESSOR_FIELD_HEADER_NAME = "X-Auraxis-Successor-Field"
 LEGACY_SUNSET_EXAMPLE = "Tue, 30 Jun 2026 23:59:59 GMT"
 
 
@@ -56,9 +57,10 @@ def request_id_header_doc() -> OpenAPIDict:
 
 def deprecated_headers_doc(
     *,
-    successor_endpoint: str,
+    successor_endpoint: str | None = None,
     successor_method: str | None = None,
     successor_contract: str | None = None,
+    successor_field: str | None = None,
     warning: str | None = None,
     sunset: str = LEGACY_SUNSET_EXAMPLE,
 ) -> OpenAPIDict:
@@ -73,12 +75,13 @@ def deprecated_headers_doc(
             "schema": {"type": "string"},
             "example": sunset,
         },
-        SUCCESSOR_ENDPOINT_HEADER_NAME: {
+    }
+    if successor_endpoint is not None:
+        headers[SUCCESSOR_ENDPOINT_HEADER_NAME] = {
             "description": "Endpoint sucessor recomendado.",
             "schema": {"type": "string"},
             "example": successor_endpoint,
-        },
-    }
+        }
     if successor_method is not None:
         headers[SUCCESSOR_METHOD_HEADER_NAME] = {
             "description": "Método HTTP recomendado para a superfície sucessora.",
@@ -90,6 +93,12 @@ def deprecated_headers_doc(
             "description": "Versão contratual recomendada para a migração.",
             "schema": {"type": "string"},
             "example": successor_contract,
+        }
+    if successor_field is not None:
+        headers[SUCCESSOR_FIELD_HEADER_NAME] = {
+            "description": "Campo recomendado para a migração do payload.",
+            "schema": {"type": "string"},
+            "example": successor_field,
         }
     if warning is not None:
         headers[WARNING_HEADER_NAME] = {
@@ -218,6 +227,7 @@ def json_error_response(
 __all__ = [
     "CONTRACT_HEADER_NAME",
     "LEGACY_SUNSET_EXAMPLE",
+    "SUCCESSOR_FIELD_HEADER_NAME",
     "contract_header_param",
     "deprecated_headers_doc",
     "error_envelope_example",

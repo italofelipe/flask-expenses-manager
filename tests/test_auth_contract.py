@@ -6,6 +6,7 @@ from app.application.services.password_reset_service import (
     PASSWORD_RESET_NEUTRAL_MESSAGE,
     PASSWORD_RESET_SUCCESS_MESSAGE,
 )
+from app.extensions.integration_metrics import snapshot_metrics
 
 
 def _register_payload(suffix: str, password: str = "StrongPass@123") -> Dict[str, str]:
@@ -96,6 +97,51 @@ def test_auth_login_v2_contract(client) -> None:
     assert body["success"] is True
     assert "token" in body["data"]
     assert "user" in body["data"]
+    assert "Deprecation" not in response.headers
+    assert "X-Auraxis-Successor-Field" not in response.headers
+
+
+def test_auth_login_by_legacy_name_emits_deprecation_headers_and_metric(client) -> None:
+    suffix = uuid.uuid4().hex[:8]
+    payload = _register_payload(suffix)
+    register = client.post("/auth/register", json=payload)
+    assert register.status_code == 201
+
+    response = client.post(
+        "/auth/login",
+        headers=_v2_headers(),
+        json={"name": payload["name"], "password": payload["password"]},
+    )
+
+    assert response.status_code == 200
+    body = response.get_json()
+    assert body["success"] is True
+    assert response.headers["Deprecation"] == "true"
+    assert response.headers["X-Auraxis-Successor-Field"] == "email"
+    assert response.headers["Sunset"]
+
+    metrics = snapshot_metrics(prefix="auth.login.identifier.")
+    assert metrics["auth.login.identifier.rest.name_legacy"] >= 1
+
+
+def test_auth_login_invalid_legacy_name_still_emits_deprecation_headers(client) -> None:
+    suffix = uuid.uuid4().hex[:8]
+    payload = _register_payload(suffix)
+    register = client.post("/auth/register", json=payload)
+    assert register.status_code == 201
+
+    response = client.post(
+        "/auth/login",
+        headers=_v2_headers(),
+        json={"name": payload["name"], "password": "WrongPass@123"},
+    )
+
+    assert response.status_code == 401
+    body = response.get_json()
+    assert body["success"] is False
+    assert body["error"]["code"] == "UNAUTHORIZED"
+    assert response.headers["Deprecation"] == "true"
+    assert response.headers["X-Auraxis-Successor-Field"] == "email"
 
 
 def test_auth_login_invalid_credentials_v2_contract(client) -> None:

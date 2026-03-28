@@ -36,6 +36,9 @@ def test_openapi_docs_cover_mvp1_core_examples_and_headers(client) -> None:
     assert isinstance(responses, dict)
     assert "example" in responses["200"]["content"]["application/json"]
     assert "example" in responses["401"]["content"]["application/json"]
+    login_headers = responses["200"]["headers"]
+    assert "Deprecation" in login_headers
+    assert "X-Auraxis-Successor-Field" in login_headers
 
     user_me = _operation(paths, "/user/me", "get")
     params = user_me["parameters"]
