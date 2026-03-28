@@ -222,7 +222,18 @@ jobs:
           docker logout https://index.docker.io/v1/ || true
 
       - name: Boot local stack for smoke tests
-        run: docker compose up -d --build db redis web
+        run: |
+          for attempt in 1 2 3; do
+            if docker compose up -d --build db redis web; then
+              echo "Local smoke stack booted on attempt ${attempt}."
+              exit 0
+            fi
+            echo "Smoke stack boot failed on attempt ${attempt}; retrying..." >&2
+            docker compose down -v --remove-orphans || true
+            sleep $((attempt * 5))
+          done
+          echo "Failed to boot local smoke stack after retries." >&2
+          exit 1
 
       - name: Apply database migrations for smoke tests
         run: |
@@ -331,7 +342,18 @@ jobs:
           docker logout https://index.docker.io/v1/ || true
 
       - name: Boot local stack for integration tests
-        run: docker compose up -d --build db redis web
+        run: |
+          for attempt in 1 2 3; do
+            if docker compose up -d --build db redis web; then
+              echo "Local integration stack booted on attempt ${attempt}."
+              exit 0
+            fi
+            echo "Integration stack boot failed on attempt ${attempt}; retrying..." >&2
+            docker compose down -v --remove-orphans || true
+            sleep $((attempt * 5))
+          done
+          echo "Failed to boot local integration stack after retries." >&2
+          exit 1
 
       - name: Apply database migrations for integration tests
         run: |
@@ -484,7 +506,16 @@ jobs:
 
       - name: Build image for scan
         run: |
-          docker build -f Dockerfile.prod -t auraxis-ci:${{ github.sha }} .
+          for attempt in 1 2 3; do
+            if docker build -f Dockerfile.prod -t auraxis-ci:${{ github.sha }} .; then
+              echo "Container image built for scan on attempt ${attempt}."
+              exit 0
+            fi
+            echo "Container image build failed on attempt ${attempt}; retrying..." >&2
+            sleep $((attempt * 5))
+          done
+          echo "Failed to build container image for Trivy after retries." >&2
+          exit 1
 
       - name: Trivy image scan
         uses: aquasecurity/trivy-action@0.35.0

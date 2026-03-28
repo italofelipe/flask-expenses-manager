@@ -1,4 +1,5 @@
-FROM python:3.13.2-alpine
+ARG PYTHON_BASE_IMAGE=public.ecr.aws/docker/library/python:3.13.2-alpine
+FROM ${PYTHON_BASE_IMAGE}
 
 WORKDIR /app
 

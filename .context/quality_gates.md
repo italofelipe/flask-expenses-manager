@@ -186,4 +186,4 @@ Quality Gate requerido:
 | Schemathesis 5xx | Bug na API ou schema incorreto | Verificar o endpoint identificado |
 | Sonar quality gate fail | Rating abaixo de A | Ver detalhe no painel SonarCloud |
 | Cosmic Ray survivors | Lógica não coberta por assert | Adicionar asserções mais fortes nos testes |
-| api-smoke falhou | Stack não inicializou | Verificar logs: `docker compose logs web db redis` |
+| api-smoke falhou | Stack não inicializou ou registry público oscilou | Verificar logs: `docker compose logs web db redis`; conferir pull/build usando os mirrors `public.ecr.aws/docker/library/*` |
