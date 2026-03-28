@@ -4,6 +4,9 @@ import uuid
 from datetime import date, timedelta
 from decimal import Decimal
 
+from app.application.services.authenticated_user_bootstrap_service import (
+    DEFAULT_BOOTSTRAP_WALLET_LIMIT,
+)
 from app.extensions.database import db
 from app.models.transaction import Transaction, TransactionStatus, TransactionType
 from app.models.user import User
@@ -104,6 +107,44 @@ def test_user_bootstrap_v2_contract_returns_aggregated_payload(client, app) -> N
     assert len(body["data"]["transactions_preview"]["items"]) == 2
     assert body["data"]["wallet"]["total"] == 1
     assert len(body["data"]["wallet"]["items"]) == 1
+    assert body["data"]["wallet"]["returned_items"] == 1
+    assert body["data"]["wallet"]["limit"] == DEFAULT_BOOTSTRAP_WALLET_LIMIT
+    assert body["data"]["wallet"]["has_more"] is False
+
+
+def test_user_bootstrap_wallet_payload_is_preview_only(client, app) -> None:
+    token = _register_and_login(client)
+    me_response = client.get("/user/me", headers=_auth_headers(token))
+    assert me_response.status_code == 200
+    email = me_response.get_json()["user"]["email"]
+
+    with app.app_context():
+        user = User.query.filter_by(email=email).first()
+        assert user is not None
+        wallet_entries = [
+            Wallet(
+                user_id=user.id,
+                name=f"Reserva {index}",
+                value=Decimal("1500.00"),
+                estimated_value_on_create_date=Decimal("1500.00"),
+                quantity=1,
+                should_be_on_wallet=True,
+                register_date=date.today() - timedelta(days=index),
+            )
+            for index in range(DEFAULT_BOOTSTRAP_WALLET_LIMIT + 2)
+        ]
+        db.session.add_all(wallet_entries)
+        db.session.commit()
+
+    response = client.get("/user/bootstrap", headers=_auth_headers(token, "v2"))
+
+    assert response.status_code == 200
+    body = response.get_json()
+    assert body["data"]["wallet"]["total"] == DEFAULT_BOOTSTRAP_WALLET_LIMIT + 2
+    assert body["data"]["wallet"]["returned_items"] == DEFAULT_BOOTSTRAP_WALLET_LIMIT
+    assert body["data"]["wallet"]["limit"] == DEFAULT_BOOTSTRAP_WALLET_LIMIT
+    assert body["data"]["wallet"]["has_more"] is True
+    assert len(body["data"]["wallet"]["items"]) == DEFAULT_BOOTSTRAP_WALLET_LIMIT
 
 
 def test_user_bootstrap_invalid_limit_returns_validation_error(client) -> None:

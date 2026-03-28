@@ -119,6 +119,12 @@ class AuthenticatedUserContextService:
         self, user_id: UUID
     ) -> tuple[AuthenticatedWalletEntry, ...]:
         wallet_entries = self._dependencies.list_wallet_entries_by_user_id(user_id)
+        return self.build_wallet_entries_snapshot(wallet_entries)
+
+    def build_wallet_entries_snapshot(
+        self,
+        wallet_entries: Sequence[Wallet],
+    ) -> tuple[AuthenticatedWalletEntry, ...]:
         return tuple(self._build_wallet_entry(entry) for entry in wallet_entries)
 
     def build_context(self, user: User) -> AuthenticatedUserContext:

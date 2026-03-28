@@ -48,6 +48,12 @@ def test_openapi_docs_cover_mvp1_core_examples_and_headers(client) -> None:
 
     bootstrap = _operation(paths, "/user/bootstrap", "get")
     assert "example" in bootstrap["responses"]["200"]["content"]["application/json"]
+    bootstrap_example = bootstrap["responses"]["200"]["content"]["application/json"][
+        "example"
+    ]
+    assert bootstrap_example["data"]["wallet"]["limit"] >= 1
+    assert "returned_items" in bootstrap_example["data"]["wallet"]
+    assert "has_more" in bootstrap_example["data"]["wallet"]
 
     dashboard = _operation(paths, "/dashboard/overview", "get")
     assert "example" in dashboard["responses"]["200"]["content"]["application/json"]

@@ -6,6 +6,7 @@ from typing import TypedDict, cast
 from app.application.services.authenticated_user_bootstrap_service import (
     AuthenticatedUserBootstrap,
     AuthenticatedUserTransactionsPreview,
+    AuthenticatedUserWalletPreview,
 )
 from app.application.services.authenticated_user_context_service import (
     AuthenticatedUserProfile,
@@ -88,6 +89,9 @@ class AuthenticatedUserTransactionsPreviewPayload(TypedDict):
 class AuthenticatedUserBootstrapWalletPayload(TypedDict):
     items: list[WalletEntryPayload]
     total: int
+    returned_items: int
+    limit: int
+    has_more: bool
 
 
 class AuthenticatedUserBootstrapPayload(TypedDict):
@@ -166,16 +170,26 @@ def to_transactions_preview_payload(
 def to_authenticated_user_bootstrap_payload(
     bootstrap: AuthenticatedUserBootstrap,
 ) -> AuthenticatedUserBootstrapPayload:
-    wallet_items = to_wallet_payload(bootstrap.wallet_entries)
+    wallet_preview = to_wallet_preview_payload(bootstrap.wallet_preview)
     return {
         "user": to_authenticated_user_canonical_payload(bootstrap.profile),
         "transactions_preview": to_transactions_preview_payload(
             bootstrap.transactions_preview
         ),
-        "wallet": {
-            "items": wallet_items,
-            "total": len(wallet_items),
-        },
+        "wallet": wallet_preview,
+    }
+
+
+def to_wallet_preview_payload(
+    preview: AuthenticatedUserWalletPreview,
+) -> AuthenticatedUserBootstrapWalletPayload:
+    wallet_items = to_wallet_payload(preview.items)
+    return {
+        "items": wallet_items,
+        "total": preview.total,
+        "returned_items": preview.returned_items,
+        "limit": preview.limit,
+        "has_more": preview.has_more,
     }
 
 
@@ -209,4 +223,5 @@ __all__ = [
     "to_user_profile_payload",
     "to_wallet_entry_payload",
     "to_wallet_payload",
+    "to_wallet_preview_payload",
 ]
