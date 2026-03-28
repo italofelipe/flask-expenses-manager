@@ -98,7 +98,7 @@ def test_goal_crud_v2_contract(client) -> None:
     assert get_body["success"] is True
     assert get_body["data"]["goal"]["id"] == goal_id
 
-    update_response = client.put(
+    update_response = client.patch(
         f"/goals/{goal_id}",
         json={"current_amount": "5000.00", "status": "paused"},
         headers=_auth_headers(token, "v2"),
@@ -156,6 +156,28 @@ def test_goal_list_invalid_status_returns_validation_error(client) -> None:
     body = response.get_json()
     assert body["success"] is False
     assert body["error"]["code"] == "VALIDATION_ERROR"
+
+
+def test_goal_put_alias_emits_deprecation_headers(client) -> None:
+    token = _register_and_login(client, prefix="goal-put-compat")
+    create_response = client.post(
+        "/goals",
+        json=_goal_payload(),
+        headers=_auth_headers(token, "v2"),
+    )
+    assert create_response.status_code == 201
+    goal_id = create_response.get_json()["data"]["goal"]["id"]
+
+    response = client.put(
+        f"/goals/{goal_id}",
+        json={"status": "paused"},
+        headers=_auth_headers(token, "v2"),
+    )
+
+    assert response.status_code == 200
+    assert response.headers["Deprecation"] == "true"
+    assert response.headers["X-Auraxis-Successor-Endpoint"] == "/goals/{goal_id}"
+    assert response.headers["X-Auraxis-Successor-Method"] == "PATCH"
 
 
 def test_goal_plan_and_simulation_v2_contract(client) -> None:

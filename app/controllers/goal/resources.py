@@ -9,12 +9,51 @@ from marshmallow import fields
 
 from app.application.services.goal_application_service import GoalApplicationError
 from app.auth import current_user_id
+from app.controllers.response_contract import compat_success_response_deprecated
+from app.docs.openapi_helpers import deprecated_headers_doc
 from app.utils.typed_decorators import typed_doc as doc
 from app.utils.typed_decorators import typed_jwt_required as jwt_required
 from app.utils.typed_decorators import typed_use_kwargs as use_kwargs
 
 from .contracts import compat_success, goal_application_error_response
 from .dependencies import get_goal_dependencies
+
+GOAL_UPDATE_SUCCESS_MESSAGE = "Meta atualizada com sucesso"
+GOAL_UPDATE_SUCCESSOR_ENDPOINT = "/goals/{goal_id}"
+GOAL_UPDATE_SUCCESSOR_METHOD = "PATCH"
+
+
+def _update_goal_data(goal_id: UUID, payload: dict[str, Any]) -> dict[str, Any]:
+    user_id = current_user_id()
+    dependencies = get_goal_dependencies()
+    service = dependencies.goal_application_service_factory(user_id)
+    return service.update_goal(goal_id, payload)
+
+
+def _goal_update_response(
+    goal_data: dict[str, Any],
+    *,
+    deprecated: bool,
+) -> Any:
+    legacy_payload = {
+        "message": GOAL_UPDATE_SUCCESS_MESSAGE,
+        "goal": goal_data,
+    }
+    if deprecated:
+        return compat_success_response_deprecated(
+            legacy_payload=legacy_payload,
+            status_code=200,
+            message=GOAL_UPDATE_SUCCESS_MESSAGE,
+            data={"goal": goal_data},
+            successor_endpoint=GOAL_UPDATE_SUCCESSOR_ENDPOINT,
+            successor_method=GOAL_UPDATE_SUCCESSOR_METHOD,
+        )
+    return compat_success(
+        legacy_payload=legacy_payload,
+        status_code=200,
+        message=GOAL_UPDATE_SUCCESS_MESSAGE,
+        data={"goal": goal_data},
+    )
 
 
 class GoalCollectionResource(MethodResource):
@@ -142,12 +181,21 @@ class GoalResource(MethodResource):
         )
 
     @doc(
-        description="Atualiza uma meta específica do usuário autenticado.",
+        description=(
+            "Alias legado para atualização de metas. Use `PATCH /goals/{goal_id}` "
+            "como contrato canônico para update parcial."
+        ),
         tags=["Metas"],
         security=[{"BearerAuth": []}],
         params={"goal_id": {"in": "path", "type": "string", "required": True}},
         responses={
-            200: {"description": "Meta atualizada"},
+            200: {
+                "description": "Meta atualizada via compatibilidade legada",
+                "headers": deprecated_headers_doc(
+                    successor_endpoint=GOAL_UPDATE_SUCCESSOR_ENDPOINT,
+                    successor_method=GOAL_UPDATE_SUCCESSOR_METHOD,
+                ),
+            },
             400: {"description": "Dados inválidos"},
             401: {"description": "Token inválido"},
             403: {"description": "Sem permissão"},
@@ -156,24 +204,13 @@ class GoalResource(MethodResource):
     )
     @jwt_required()
     def put(self, goal_id: UUID) -> Any:
-        user_id = current_user_id()
         payload = request.get_json() or {}
-        dependencies = get_goal_dependencies()
-        service = dependencies.goal_application_service_factory(user_id)
         try:
-            goal_data = service.update_goal(goal_id, payload)
+            goal_data = _update_goal_data(goal_id, payload)
         except GoalApplicationError as exc:
             return goal_application_error_response(exc)
 
-        return compat_success(
-            legacy_payload={
-                "message": "Meta atualizada com sucesso",
-                "goal": goal_data,
-            },
-            status_code=200,
-            message="Meta atualizada com sucesso",
-            data={"goal": goal_data},
-        )
+        return _goal_update_response(goal_data, deprecated=True)
 
     @doc(
         description="Atualiza parcialmente uma meta específica do usuário autenticado.",
@@ -190,24 +227,13 @@ class GoalResource(MethodResource):
     )
     @jwt_required()
     def patch(self, goal_id: UUID) -> Any:
-        user_id = current_user_id()
         payload = request.get_json() or {}
-        dependencies = get_goal_dependencies()
-        service = dependencies.goal_application_service_factory(user_id)
         try:
-            goal_data = service.update_goal(goal_id, payload)
+            goal_data = _update_goal_data(goal_id, payload)
         except GoalApplicationError as exc:
             return goal_application_error_response(exc)
 
-        return compat_success(
-            legacy_payload={
-                "message": "Meta atualizada com sucesso",
-                "goal": goal_data,
-            },
-            status_code=200,
-            message="Meta atualizada com sucesso",
-            data={"goal": goal_data},
-        )
+        return _goal_update_response(goal_data, deprecated=False)
 
     @doc(
         description="Remove uma meta específica do usuário autenticado.",

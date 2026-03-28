@@ -3,6 +3,7 @@ from __future__ import annotations
 from .blueprint import simulation_bp
 from .installment_vs_cash_resources import (
     InstallmentVsCashCalculationResource,
+    InstallmentVsCashCanonicalResource,
     InstallmentVsCashSaveResource,
     SimulationGoalBridgeResource,
     SimulationPlannedExpenseBridgeResource,
@@ -31,6 +32,13 @@ def register_simulation_routes() -> None:
         "/installment-vs-cash/calculate",
         view_func=InstallmentVsCashCalculationResource.as_view(
             "installment_vs_cash_calculation"
+        ),
+        methods=["POST"],
+    )
+    simulation_bp.add_url_rule(
+        "/installment-vs-cash",
+        view_func=InstallmentVsCashCanonicalResource.as_view(
+            "installment_vs_cash_collection"
         ),
         methods=["POST"],
     )

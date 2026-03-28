@@ -87,7 +87,7 @@ def test_installment_vs_cash_calculate_supports_v2_contract(client) -> None:
 
 def test_installment_vs_cash_save_requires_auth(client) -> None:
     response = client.post(
-        "/simulations/installment-vs-cash/save",
+        "/simulations/installment-vs-cash",
         json=_payload(),
     )
 
@@ -97,7 +97,7 @@ def test_installment_vs_cash_save_requires_auth(client) -> None:
 def test_installment_vs_cash_save_persists_simulation(client) -> None:
     token, _email = _register_and_login(client, prefix="installment-save")
     response = client.post(
-        "/simulations/installment-vs-cash/save",
+        "/simulations/installment-vs-cash",
         json=_payload(scenario_label="Geladeira"),
         headers=_auth(token),
     )
@@ -109,10 +109,26 @@ def test_installment_vs_cash_save_persists_simulation(client) -> None:
     assert body["simulation"]["inputs"]["scenario_label"] == "Geladeira"
 
 
+def test_installment_vs_cash_save_alias_emits_deprecation_headers(client) -> None:
+    token, _email = _register_and_login(client, prefix="installment-save-compat")
+    response = client.post(
+        "/simulations/installment-vs-cash/save",
+        json=_payload(scenario_label="Compat"),
+        headers=_auth(token, v2=True),
+    )
+
+    assert response.status_code == 201
+    assert response.headers["Deprecation"] == "true"
+    assert response.headers["X-Auraxis-Successor-Endpoint"] == (
+        "/simulations/installment-vs-cash"
+    )
+    assert response.headers["X-Auraxis-Successor-Method"] == "POST"
+
+
 def test_installment_vs_cash_goal_bridge_requires_entitlement(client) -> None:
     token, _email = _register_and_login(client, prefix="installment-goal-noent")
     save_response = client.post(
-        "/simulations/installment-vs-cash/save",
+        "/simulations/installment-vs-cash",
         json=_payload(),
         headers=_auth(token),
     )
@@ -133,7 +149,7 @@ def test_installment_vs_cash_goal_bridge_creates_goal_and_links_simulation(
     token, email = _register_and_login(client, prefix="installment-goal")
     _grant_advanced_simulations(client, email)
     save_response = client.post(
-        "/simulations/installment-vs-cash/save",
+        "/simulations/installment-vs-cash",
         json=_payload(),
         headers=_auth(token),
     )
@@ -158,7 +174,7 @@ def test_installment_vs_cash_planned_expense_bridge_creates_installments_and_fee
     token, email = _register_and_login(client, prefix="installment-expense")
     _grant_advanced_simulations(client, email)
     save_response = client.post(
-        "/simulations/installment-vs-cash/save",
+        "/simulations/installment-vs-cash",
         json=_payload(fees_enabled=True, fees_upfront="60.00"),
         headers=_auth(token),
     )
