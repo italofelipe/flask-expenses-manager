@@ -5,9 +5,12 @@ from datetime import date
 from typing import Any, Callable, TypedDict, cast
 from uuid import UUID
 
+from sqlalchemy import case, func
+
 from app.application.services.transaction_application_service import (
     TransactionApplicationService,
 )
+from app.extensions.database import db
 from app.models.transaction import Transaction, TransactionType
 from app.services.transaction_analytics_service import TransactionAnalyticsService
 from app.services.transaction_serialization import (
@@ -197,19 +200,16 @@ class TransactionQueryService:
         per_page: int,
         ordering_clause: Any,
     ) -> TransactionExpensePeriodResult:
-        base_query = Transaction.query.filter_by(user_id=self._user_id, deleted=False)
-        if start_date is not None:
-            base_query = base_query.filter(Transaction.due_date >= start_date)
-        if end_date is not None:
-            base_query = base_query.filter(Transaction.due_date <= end_date)
-
-        total_transactions = base_query.count()
-        income_transactions = base_query.filter(
-            Transaction.type == TransactionType.INCOME
-        ).count()
-        expense_transactions = base_query.filter(
-            Transaction.type == TransactionType.EXPENSE
-        ).count()
+        base_query = self._build_period_query(
+            start_date=start_date,
+            end_date=end_date,
+        )
+        total_transactions, income_transactions, expense_transactions = (
+            self._build_period_counts(
+                start_date=start_date,
+                end_date=end_date,
+            )
+        )
 
         expenses_query = base_query.filter(Transaction.type == TransactionType.EXPENSE)
         total_expenses = expense_transactions
@@ -222,10 +222,7 @@ class TransactionQueryService:
         )
 
         return {
-            "expenses": [
-                self._application_service().get_transaction(item.id)
-                for item in expenses
-            ],
+            "expenses": [serialize_transaction_payload(item) for item in expenses],
             "counts": {
                 "total_transactions": total_transactions,
                 "income_transactions": income_transactions,
@@ -245,6 +242,51 @@ class TransactionQueryService:
             deleted=True,
         ).all()
         return [serialize_transaction_payload(item) for item in deleted_transactions]
+
+    def _build_period_query(
+        self,
+        *,
+        start_date: date | None,
+        end_date: date | None,
+    ) -> Any:
+        query = Transaction.query.filter_by(user_id=self._user_id, deleted=False)
+        if start_date is not None:
+            query = query.filter(Transaction.due_date >= start_date)
+        if end_date is not None:
+            query = query.filter(Transaction.due_date <= end_date)
+        return query
+
+    def _build_period_counts(
+        self,
+        *,
+        start_date: date | None,
+        end_date: date | None,
+    ) -> tuple[int, int, int]:
+        counts_query = db.session.query(
+            func.count(Transaction.id).label("total_transactions"),
+            func.coalesce(
+                func.sum(
+                    case((Transaction.type == TransactionType.INCOME, 1), else_=0)
+                ),
+                0,
+            ).label("income_transactions"),
+            func.coalesce(
+                func.sum(
+                    case((Transaction.type == TransactionType.EXPENSE, 1), else_=0)
+                ),
+                0,
+            ).label("expense_transactions"),
+        ).filter(Transaction.user_id == self._user_id, Transaction.deleted.is_(False))
+        if start_date is not None:
+            counts_query = counts_query.filter(Transaction.due_date >= start_date)
+        if end_date is not None:
+            counts_query = counts_query.filter(Transaction.due_date <= end_date)
+        row = counts_query.one()
+        return (
+            int(row.total_transactions or 0),
+            int(row.income_transactions or 0),
+            int(row.expense_transactions or 0),
+        )
 
     def _application_service(self) -> TransactionApplicationService:
         return self._dependencies.transaction_application_service_factory(self._user_id)
