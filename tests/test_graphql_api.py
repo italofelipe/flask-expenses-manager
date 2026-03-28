@@ -2,14 +2,20 @@ import uuid
 from datetime import date, timedelta
 from decimal import Decimal
 from typing import Any, Dict
+from uuid import UUID
 
 from app.application.services.password_reset_service import (
     PASSWORD_RESET_INVALID_TOKEN_MESSAGE,
     PASSWORD_RESET_NEUTRAL_MESSAGE,
     PASSWORD_RESET_SUCCESS_MESSAGE,
 )
+from app.extensions.database import db
 from app.extensions.integration_metrics import snapshot_metrics
 from app.graphql.types import UserType
+from app.models.account import Account
+from app.models.credit_card import CreditCard
+from app.models.tag import Tag
+from app.models.user import User
 
 
 def _graphql(
@@ -74,6 +80,13 @@ def _register_and_login_graphql(client) -> str:
     token = login_body["data"]["login"]["token"]
     assert token
     return token
+
+
+def _get_user_id_by_email(app: Any, email: str) -> UUID:
+    with app.app_context():
+        user = User.query.filter_by(email=email).first()
+        assert user is not None
+        return UUID(str(user.id))
 
 
 def test_graphql_register_login_and_me(client) -> None:
@@ -244,24 +257,42 @@ def test_graphql_reset_password_flow_allows_new_credentials(client) -> None:
     assert new_login_body["data"]["login"]["token"]
 
 
-def test_graphql_transactions_summary_and_dashboard(client) -> None:
+def test_graphql_transactions_summary_and_dashboard(app, client) -> None:
     token = _register_and_login_graphql(client)
     due_date = date.today().isoformat()
+    user_id = _get_user_id_by_email(app, "graphql-user@email.com")
+
+    with app.app_context():
+        household_tag = Tag(user_id=user_id, name="Casa")
+        operating_account = Account(user_id=user_id, name="Conta principal")
+        travel_card = CreditCard(user_id=user_id, name="Cartao viagem")
+        db.session.add_all([household_tag, operating_account, travel_card])
+        db.session.commit()
+        household_tag_id = str(household_tag.id)
+        operating_account_id = str(operating_account.id)
+        travel_card_id = str(travel_card.id)
+
     create_mutation = """
     mutation CreateTx(
       $title: String!,
       $amount: String!,
       $type: String!,
-      $dueDate: String!
+      $dueDate: String!,
+      $tagId: UUID,
+      $accountId: UUID,
+      $creditCardId: UUID
     ) {
       createTransaction(
         title: $title,
         amount: $amount,
         type: $type,
-        dueDate: $dueDate
+        dueDate: $dueDate,
+        tagId: $tagId,
+        accountId: $accountId,
+        creditCardId: $creditCardId
       ) {
         message
-        items { id title type amount dueDate }
+        items { id title type amount dueDate tagId accountId creditCardId }
       }
     }
     """
@@ -273,6 +304,9 @@ def test_graphql_transactions_summary_and_dashboard(client) -> None:
             "amount": "150.00",
             "type": "expense",
             "dueDate": due_date,
+            "tagId": household_tag_id,
+            "accountId": operating_account_id,
+            "creditCardId": travel_card_id,
         },
         token=token,
     )
@@ -308,23 +342,39 @@ def test_graphql_transactions_summary_and_dashboard(client) -> None:
     assert "errors" not in overdue_response.get_json()
 
     list_query = """
-    query ListTx {
-      transactions(page: 1, perPage: 10) {
+    query ListTx($tagId: UUID!, $accountId: UUID!, $creditCardId: UUID!) {
+      transactions(
+        page: 1,
+        perPage: 10,
+        tagId: $tagId,
+        accountId: $accountId,
+        creditCardId: $creditCardId
+      ) {
         items { id title type amount }
         pagination { total page perPage }
       }
     }
     """
-    list_response = _graphql(client, list_query, token=token)
+    list_response = _graphql(
+        client,
+        list_query,
+        {
+            "tagId": household_tag_id,
+            "accountId": operating_account_id,
+            "creditCardId": travel_card_id,
+        },
+        token=token,
+    )
     assert list_response.status_code == 200
     list_body = list_response.get_json()
     assert "errors" not in list_body
-    assert list_body["data"]["transactions"]["pagination"]["total"] >= 2
+    assert list_body["data"]["transactions"]["pagination"]["total"] == 1
+    assert list_body["data"]["transactions"]["items"][0]["title"] == "Conta de luz"
 
     month_ref = date.today().strftime("%Y-%m")
     summary_query = """
     query Summary($month: String!) {
-      transactionSummary(month: $month, page: 1, pageSize: 10) {
+      transactionSummary(month: $month, page: 1, perPage: 10) {
         month
         incomeTotal
         expenseTotal
@@ -358,10 +408,10 @@ def test_graphql_transactions_summary_and_dashboard(client) -> None:
     assert dashboard_body["data"]["transactionDashboard"]["month"] == month_ref
 
     due_range_query = """
-    query DueRange($initialDate: String!, $finalDate: String!) {
+    query DueRange($startDate: String!, $endDate: String!) {
       transactionDueRange(
-        initialDate: $initialDate,
-        finalDate: $finalDate,
+        startDate: $startDate,
+        endDate: $endDate,
         page: 1,
         perPage: 10,
         orderBy: "overdue_first"
@@ -376,8 +426,8 @@ def test_graphql_transactions_summary_and_dashboard(client) -> None:
         client,
         due_range_query,
         {
-            "initialDate": (date.today() - timedelta(days=1)).isoformat(),
-            "finalDate": date.today().isoformat(),
+            "startDate": (date.today() - timedelta(days=1)).isoformat(),
+            "endDate": date.today().isoformat(),
         },
         token=token,
     )
@@ -448,6 +498,78 @@ def test_graphql_transactions_summary_and_dashboard(client) -> None:
         "Conta de luz atualizada"
     )
     assert update_body["data"]["updateTransaction"]["transaction"]["status"] == "paid"
+
+
+def test_graphql_transactions_supports_legacy_summary_and_due_range_arguments(
+    client,
+) -> None:
+    token = _register_and_login_graphql(client)
+    month_ref = date.today().strftime("%Y-%m")
+    create_mutation = """
+    mutation CreateTx($dueDate: String!) {
+      createTransaction(
+        title: "Conta legado",
+        amount: "50.00",
+        type: "expense",
+        dueDate: $dueDate
+      ) {
+        items { id }
+      }
+    }
+    """
+    create_response = _graphql(
+        client,
+        create_mutation,
+        {"dueDate": date.today().isoformat()},
+        token=token,
+    )
+    assert create_response.status_code == 200
+    assert "errors" not in create_response.get_json()
+
+    summary_query = """
+    query LegacySummary($month: String!) {
+      transactionSummary(month: $month, page: 1, pageSize: 10) {
+        month
+        pagination { total perPage }
+      }
+    }
+    """
+    summary_response = _graphql(
+        client,
+        summary_query,
+        {"month": month_ref},
+        token=token,
+    )
+    assert summary_response.status_code == 200
+    summary_body = summary_response.get_json()
+    assert "errors" not in summary_body
+    assert summary_body["data"]["transactionSummary"]["pagination"]["perPage"] == 10
+
+    due_range_query = """
+    query LegacyDueRange($initialDate: String!, $finalDate: String!) {
+      transactionDueRange(
+        initialDate: $initialDate,
+        finalDate: $finalDate,
+        page: 1,
+        perPage: 10
+      ) {
+        pagination { total }
+      }
+    }
+    """
+    due_range_response = _graphql(
+        client,
+        due_range_query,
+        {
+            "initialDate": date.today().isoformat(),
+            "finalDate": date.today().isoformat(),
+        },
+        token=token,
+    )
+    assert due_range_response.status_code == 200
+    due_range_body = due_range_response.get_json()
+    assert "errors" not in due_range_body
+    assert due_range_body["data"]["transactionDueRange"]["pagination"]["total"] == 1
 
 
 def test_graphql_wallet_and_ticker_queries_mutations(client) -> None:

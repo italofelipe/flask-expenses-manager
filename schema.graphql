@@ -13,10 +13,10 @@ type Query {
   goals(page: Int = 1, perPage: Int = 10, status: String): GoalListPayloadType
   goal(goalId: UUID!): GoalTypeObject
   goalPlan(goalId: UUID!): GoalPlanType
-  transactions(page: Int = 1, perPage: Int = 10, type: String, status: String, startDate: String, endDate: String): TransactionListPayloadType
-  transactionSummary(month: String!, page: Int = 1, pageSize: Int = 10): TransactionSummaryPayloadType
+  transactions(page: Int = 1, perPage: Int = 10, type: String, status: String, startDate: String, endDate: String, tagId: UUID, accountId: UUID, creditCardId: UUID): TransactionListPayloadType
+  transactionSummary(month: String!, page: Int = 1, perPage: Int = 10, pageSize: Int @deprecated(reason: "Use perPage.")): TransactionSummaryPayloadType
   transactionDashboard(month: String!): TransactionDashboardPayloadType
-  transactionDueRange(initialDate: String, finalDate: String, page: Int = 1, perPage: Int = 10, orderBy: String = "overdue_first"): TransactionDueRangePayloadType
+  transactionDueRange(startDate: String, endDate: String, initialDate: String @deprecated(reason: "Use startDate."), finalDate: String @deprecated(reason: "Use endDate."), page: Int = 1, perPage: Int = 10, orderBy: String = "overdue_first"): TransactionDueRangePayloadType
   transaction(transactionId: UUID!): TransactionTypeObject
   me: UserType
 }
