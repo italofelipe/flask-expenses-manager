@@ -78,6 +78,38 @@ def compat_success_response(
     return json_response(payload, status_code=status_code)
 
 
+def compat_success_response_deprecated(
+    *,
+    legacy_payload: dict[str, Any],
+    status_code: int,
+    message: str,
+    data: dict[str, Any],
+    meta: dict[str, Any] | None = None,
+    successor_endpoint: str | None = None,
+    successor_method: str | None = None,
+    successor_contract: str | None = None,
+    successor_field: str | None = None,
+    warning: str | None = None,
+    sunset: str = DEFAULT_DEPRECATION_SUNSET,
+) -> Response:
+    response = compat_success_response(
+        legacy_payload=legacy_payload,
+        status_code=status_code,
+        message=message,
+        data=data,
+        meta=meta,
+    )
+    return apply_deprecation_headers(
+        response,
+        successor_endpoint=successor_endpoint,
+        successor_method=successor_method,
+        successor_contract=successor_contract,
+        successor_field=successor_field,
+        warning=warning,
+        sunset=sunset,
+    )
+
+
 def compat_error_response(
     *,
     legacy_payload: dict[str, Any],
@@ -197,6 +229,7 @@ __all__ = [
     "is_v2_contract",
     "is_v3_contract",
     "compat_success_response",
+    "compat_success_response_deprecated",
     "compat_error_response",
     "compat_success_tuple",
     "compat_error_tuple",

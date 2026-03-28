@@ -10,6 +10,7 @@ from app.application.services.installment_vs_cash_application_service import (
     InstallmentVsCashApplicationError,
 )
 from app.auth import current_user_id
+from app.controllers.response_contract import compat_success_response_deprecated
 from app.docs.openapi_helpers import deprecated_headers_doc
 from app.schemas.installment_vs_cash_schema import (
     InstallmentVsCashCalculationSchema,
@@ -31,11 +32,7 @@ from app.utils.typed_decorators import (
     typed_use_kwargs as use_kwargs,
 )
 
-from .contracts import (
-    compat_success,
-    compat_success_deprecated,
-    installment_vs_cash_application_error_response,
-)
+from .contracts import compat_success, installment_vs_cash_application_error_response
 from .dependencies import get_simulation_dependencies
 
 INSTALLMENT_VS_CASH_SAVE_SUCCESS_MESSAGE = "Simulação salva com sucesso"
@@ -50,6 +47,32 @@ def _save_installment_vs_cash_simulation(
         current_user_id()
     )
     return service.save_simulation(dict(kwargs))
+
+
+def _installment_vs_cash_save_response(
+    result: InstallmentVsCashSaveResponse,
+    *,
+    deprecated: bool,
+) -> Response:
+    legacy_payload = {
+        "message": INSTALLMENT_VS_CASH_SAVE_SUCCESS_MESSAGE,
+        "simulation": result["simulation"],
+    }
+    if deprecated:
+        return compat_success_response_deprecated(
+            legacy_payload=legacy_payload,
+            status_code=201,
+            message=INSTALLMENT_VS_CASH_SAVE_SUCCESS_MESSAGE,
+            data=dict(result),
+            successor_endpoint=INSTALLMENT_VS_CASH_SAVE_SUCCESSOR_ENDPOINT,
+            successor_method="POST",
+        )
+    return compat_success(
+        legacy_payload=legacy_payload,
+        status_code=201,
+        message=INSTALLMENT_VS_CASH_SAVE_SUCCESS_MESSAGE,
+        data=result,
+    )
 
 
 class InstallmentVsCashCalculationResource(MethodResource):
@@ -104,15 +127,7 @@ class InstallmentVsCashCanonicalResource(MethodResource):
         except InstallmentVsCashApplicationError as exc:
             return installment_vs_cash_application_error_response(exc)
 
-        return compat_success(
-            legacy_payload={
-                "message": INSTALLMENT_VS_CASH_SAVE_SUCCESS_MESSAGE,
-                "simulation": result["simulation"],
-            },
-            status_code=201,
-            message=INSTALLMENT_VS_CASH_SAVE_SUCCESS_MESSAGE,
-            data=result,
-        )
+        return _installment_vs_cash_save_response(result, deprecated=False)
 
 
 class InstallmentVsCashSaveResource(MethodResource):
@@ -143,17 +158,7 @@ class InstallmentVsCashSaveResource(MethodResource):
         except InstallmentVsCashApplicationError as exc:
             return installment_vs_cash_application_error_response(exc)
 
-        return compat_success_deprecated(
-            legacy_payload={
-                "message": INSTALLMENT_VS_CASH_SAVE_SUCCESS_MESSAGE,
-                "simulation": result["simulation"],
-            },
-            status_code=201,
-            message=INSTALLMENT_VS_CASH_SAVE_SUCCESS_MESSAGE,
-            data=result,
-            successor_endpoint=INSTALLMENT_VS_CASH_SAVE_SUCCESSOR_ENDPOINT,
-            successor_method="POST",
-        )
+        return _installment_vs_cash_save_response(result, deprecated=True)
 
 
 class SimulationGoalBridgeResource(MethodResource):

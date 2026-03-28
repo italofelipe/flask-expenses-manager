@@ -9,16 +9,13 @@ from marshmallow import fields
 
 from app.application.services.goal_application_service import GoalApplicationError
 from app.auth import current_user_id
+from app.controllers.response_contract import compat_success_response_deprecated
 from app.docs.openapi_helpers import deprecated_headers_doc
 from app.utils.typed_decorators import typed_doc as doc
 from app.utils.typed_decorators import typed_jwt_required as jwt_required
 from app.utils.typed_decorators import typed_use_kwargs as use_kwargs
 
-from .contracts import (
-    compat_success,
-    compat_success_deprecated,
-    goal_application_error_response,
-)
+from .contracts import compat_success, goal_application_error_response
 from .dependencies import get_goal_dependencies
 
 GOAL_UPDATE_SUCCESS_MESSAGE = "Meta atualizada com sucesso"
@@ -31,6 +28,32 @@ def _update_goal_data(goal_id: UUID, payload: dict[str, Any]) -> dict[str, Any]:
     dependencies = get_goal_dependencies()
     service = dependencies.goal_application_service_factory(user_id)
     return service.update_goal(goal_id, payload)
+
+
+def _goal_update_response(
+    goal_data: dict[str, Any],
+    *,
+    deprecated: bool,
+) -> Any:
+    legacy_payload = {
+        "message": GOAL_UPDATE_SUCCESS_MESSAGE,
+        "goal": goal_data,
+    }
+    if deprecated:
+        return compat_success_response_deprecated(
+            legacy_payload=legacy_payload,
+            status_code=200,
+            message=GOAL_UPDATE_SUCCESS_MESSAGE,
+            data={"goal": goal_data},
+            successor_endpoint=GOAL_UPDATE_SUCCESSOR_ENDPOINT,
+            successor_method=GOAL_UPDATE_SUCCESSOR_METHOD,
+        )
+    return compat_success(
+        legacy_payload=legacy_payload,
+        status_code=200,
+        message=GOAL_UPDATE_SUCCESS_MESSAGE,
+        data={"goal": goal_data},
+    )
 
 
 class GoalCollectionResource(MethodResource):
@@ -187,17 +210,7 @@ class GoalResource(MethodResource):
         except GoalApplicationError as exc:
             return goal_application_error_response(exc)
 
-        return compat_success_deprecated(
-            legacy_payload={
-                "message": GOAL_UPDATE_SUCCESS_MESSAGE,
-                "goal": goal_data,
-            },
-            status_code=200,
-            message=GOAL_UPDATE_SUCCESS_MESSAGE,
-            data={"goal": goal_data},
-            successor_endpoint=GOAL_UPDATE_SUCCESSOR_ENDPOINT,
-            successor_method=GOAL_UPDATE_SUCCESSOR_METHOD,
-        )
+        return _goal_update_response(goal_data, deprecated=True)
 
     @doc(
         description="Atualiza parcialmente uma meta específica do usuário autenticado.",
@@ -220,15 +233,7 @@ class GoalResource(MethodResource):
         except GoalApplicationError as exc:
             return goal_application_error_response(exc)
 
-        return compat_success(
-            legacy_payload={
-                "message": GOAL_UPDATE_SUCCESS_MESSAGE,
-                "goal": goal_data,
-            },
-            status_code=200,
-            message=GOAL_UPDATE_SUCCESS_MESSAGE,
-            data={"goal": goal_data},
-        )
+        return _goal_update_response(goal_data, deprecated=False)
 
     @doc(
         description="Remove uma meta específica do usuário autenticado.",

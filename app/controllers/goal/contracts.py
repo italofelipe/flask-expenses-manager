@@ -6,7 +6,6 @@ from flask import Response
 
 from app.application.services.goal_application_service import GoalApplicationError
 from app.controllers.response_contract import (
-    apply_deprecation_headers,
     compat_error_response,
     compat_success_response,
 )
@@ -26,34 +25,6 @@ def compat_success(
         message=message,
         data=data,
         meta=meta,
-    )
-
-
-def compat_success_deprecated(
-    *,
-    legacy_payload: dict[str, Any],
-    status_code: int,
-    message: str,
-    data: dict[str, Any],
-    meta: dict[str, Any] | None = None,
-    successor_endpoint: str | None = None,
-    successor_method: str | None = None,
-    successor_field: str | None = None,
-    warning: str | None = None,
-) -> Response:
-    response = compat_success_response(
-        legacy_payload=legacy_payload,
-        status_code=status_code,
-        message=message,
-        data=data,
-        meta=meta,
-    )
-    return apply_deprecation_headers(
-        response,
-        successor_endpoint=successor_endpoint,
-        successor_method=successor_method,
-        successor_field=successor_field,
-        warning=warning,
     )
 
 
