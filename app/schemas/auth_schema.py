@@ -16,14 +16,14 @@ class AuthSchema(Schema):
     email = fields.String(
         load_default=None,
         metadata={
-            "description": "Endereço de email do usuário",
+            "description": "Endereço de email do usuário (identificador canônico)",
             "example": "joao.silva@email.com",
         },
     )
     name = fields.String(
         load_default=None,
         metadata={
-            "description": "Nome do usuário (alternativa ao email)",
+            "description": "Nome do usuário (compatibilidade transitória; use email)",
             "example": "João Silva",
         },
     )
@@ -45,7 +45,7 @@ class AuthSchema(Schema):
     @validates_schema
     def validate_identity(self, data: dict[str, str], **kwargs: object) -> None:
         if not data.get("email") and not data.get("name"):
-            raise ValidationError("Either 'email' or 'name' must be provided.")
+            raise ValidationError("Either 'email' or legacy 'name' must be provided.")
 
 
 class AuthSuccessResponseSchema(Schema):

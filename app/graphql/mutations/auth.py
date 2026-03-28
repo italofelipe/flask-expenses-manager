@@ -12,6 +12,7 @@ from werkzeug.security import generate_password_hash
 from app.application.services.auth_security_policy_service import (
     get_auth_security_policy,
 )
+from app.application.services.login_identity_service import resolve_login_identity
 from app.application.services.password_reset_service import (
     request_password_reset,
     reset_password,
@@ -21,6 +22,7 @@ from app.application.services.password_verification_service import (
 )
 from app.application.services.user_profile_service import update_user_profile
 from app.extensions.database import db
+from app.extensions.integration_metrics import increment_metric
 from app.graphql.auth import get_current_user_required
 from app.graphql.errors import (
     GRAPHQL_ERROR_CODE_AUTH_BACKEND_UNAVAILABLE,
@@ -187,16 +189,18 @@ class LoginMutation(graphene.Mutation):
                 code=GRAPHQL_ERROR_CODE_VALIDATION,
             )
 
-        principal = str(email or name or "")
-        user = (
-            User.query.filter_by(email=email).first()
-            if email
-            else User.query.filter_by(name=name).first()
+        identity = resolve_login_identity(
+            email=email,
+            name=name,
+            find_user_by_email=lambda value: User.query.filter_by(email=value).first(),
+            find_user_by_name=lambda value: User.query.filter_by(name=value).first(),
         )
+        identifier = "name_legacy" if identity.uses_legacy_name_identifier else "email"
+        increment_metric(f"auth.login.identifier.graphql.{identifier}")
         request_obj = cast(dict[str, Any], info.context).get("request")
         headers = request_obj.headers if request_obj is not None else {}
         login_context = build_login_attempt_context(
-            principal=principal,
+            principal=identity.principal,
             remote_addr=(
                 getattr(request_obj, "remote_addr", None)
                 if request_obj is not None
@@ -206,7 +210,8 @@ class LoginMutation(graphene.Mutation):
             forwarded_for=headers.get("X-Forwarded-For") if headers else None,
             real_ip=headers.get("X-Real-IP") if headers else None,
             known_principal=(
-                user is not None and auth_policy.login_guard.expose_known_principal
+                identity.user is not None
+                and auth_policy.login_guard.expose_known_principal
             ),
         )
         login_guard = get_login_attempt_guard()
@@ -221,12 +226,12 @@ class LoginMutation(graphene.Mutation):
                 retry_after_seconds=retry_after,
             )
 
-        password_hash = user.password if user is not None else None
+        password_hash = identity.user.password if identity.user is not None else None
         is_valid_password = verify_password_with_timing_protection(
             password_hash=password_hash,
             plain_password=password,
         )
-        if not user or not is_valid_password:
+        if not identity.user or not is_valid_password:
             _guard_register_failure_or_raise(
                 login_guard=login_guard,
                 login_context=login_context,
@@ -241,16 +246,16 @@ class LoginMutation(graphene.Mutation):
             login_context=login_context,
         )
         token = create_access_token(
-            identity=str(user.id), expires_delta=timedelta(hours=1)
+            identity=str(identity.user.id), expires_delta=timedelta(hours=1)
         )
         jti = get_jti(token)
-        if user.current_jti != jti:
-            user.current_jti = jti
+        if identity.user.current_jti != jti:
+            identity.user.current_jti = jti
             db.session.commit()
         return AuthPayloadType(
             message="Login successful",
             token=token,
-            user=UserType(**_user_basic_auth_payload(user)),
+            user=UserType(**_user_basic_auth_payload(identity.user)),
         )
 
 

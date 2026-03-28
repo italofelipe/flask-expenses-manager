@@ -1,3 +1,4 @@
+import uuid
 from datetime import date, timedelta
 from decimal import Decimal
 from typing import Any, Dict
@@ -7,6 +8,7 @@ from app.application.services.password_reset_service import (
     PASSWORD_RESET_NEUTRAL_MESSAGE,
     PASSWORD_RESET_SUCCESS_MESSAGE,
 )
+from app.extensions.integration_metrics import snapshot_metrics
 from app.graphql.types import UserType
 
 
@@ -741,6 +743,51 @@ def test_graphql_login_requires_email_or_name(client) -> None:
     body = response.get_json()
     assert "errors" in body
     assert body["errors"][0]["message"] == "Missing credentials"
+
+
+def test_graphql_login_by_legacy_name_tracks_metric(client) -> None:
+    suffix = uuid.uuid4().hex[:8]
+    email = f"graphql-name-{suffix}@email.com"
+    password = "StrongPass@123"
+    register_mutation = """
+    mutation Register($name: String!, $email: String!, $password: String!) {
+      registerUser(name: $name, email: $email, password: $password) {
+        message
+      }
+    }
+    """
+    register_response = _graphql(
+        client,
+        register_mutation,
+        {
+            "name": f"graphql-name-{suffix}",
+            "email": email,
+            "password": password,
+        },
+    )
+    assert register_response.status_code == 200
+
+    login_mutation = """
+    mutation LoginByName($name: String!, $password: String!) {
+      login(name: $name, password: $password) {
+        message
+        token
+      }
+    }
+    """
+    response = _graphql(
+        client,
+        login_mutation,
+        {"name": f"graphql-name-{suffix}", "password": password},
+    )
+
+    assert response.status_code == 200
+    body = response.get_json()
+    assert "errors" not in body
+    assert body["data"]["login"]["token"]
+
+    metrics = snapshot_metrics(prefix="auth.login.identifier.")
+    assert metrics["auth.login.identifier.graphql.name_legacy"] >= 1
 
 
 def test_graphql_logout_mutation_success(client) -> None:
