@@ -10,7 +10,6 @@ from app.application.services.password_reset_service import (
     PASSWORD_RESET_SUCCESS_MESSAGE,
 )
 from app.extensions.database import db
-from app.extensions.integration_metrics import snapshot_metrics
 from app.graphql.types import UserType
 from app.models.account import Account
 from app.models.credit_card import CreditCard
@@ -856,7 +855,7 @@ def test_graphql_wallet_and_ticker_queries_mutations(client) -> None:
     assert delete_body["data"]["deleteTicker"]["ok"] is True
 
 
-def test_graphql_login_requires_email_or_name(client) -> None:
+def test_graphql_login_requires_email_argument(client) -> None:
     login_mutation = """
     mutation LoginWithoutPrincipal($password: String!) {
       login(password: $password) {
@@ -870,13 +869,13 @@ def test_graphql_login_requires_email_or_name(client) -> None:
         login_mutation,
         {"password": "StrongPass@123"},
     )
-    assert response.status_code == 200
+    assert response.status_code == 400
     body = response.get_json()
     assert "errors" in body
-    assert body["errors"][0]["message"] == "Missing credentials"
+    assert "argument 'email'" in body["errors"][0]["message"]
 
 
-def test_graphql_login_by_legacy_name_tracks_metric(client) -> None:
+def test_graphql_login_rejects_legacy_name_argument(client) -> None:
     suffix = uuid.uuid4().hex[:8]
     email = f"graphql-name-{suffix}@email.com"
     password = "StrongPass@123"
@@ -912,13 +911,10 @@ def test_graphql_login_by_legacy_name_tracks_metric(client) -> None:
         {"name": f"graphql-name-{suffix}", "password": password},
     )
 
-    assert response.status_code == 200
+    assert response.status_code == 400
     body = response.get_json()
-    assert "errors" not in body
-    assert body["data"]["login"]["token"]
-
-    metrics = snapshot_metrics(prefix="auth.login.identifier.")
-    assert metrics["auth.login.identifier.graphql.name_legacy"] >= 1
+    assert body["errors"]
+    assert "Unknown argument 'name'" in body["errors"][0]["message"]
 
 
 def test_graphql_logout_mutation_success(client) -> None:

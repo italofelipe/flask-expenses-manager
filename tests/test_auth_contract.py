@@ -99,9 +99,11 @@ def test_auth_login_v2_contract(client) -> None:
     assert "user" in body["data"]
     assert "Deprecation" not in response.headers
     assert "X-Auraxis-Successor-Field" not in response.headers
+    metrics = snapshot_metrics(prefix="auth.login.identifier.")
+    assert metrics["auth.login.identifier.rest.email"] >= 1
 
 
-def test_auth_login_by_legacy_name_emits_deprecation_headers_and_metric(client) -> None:
+def test_auth_login_rejects_legacy_name_identifier_v2_contract(client) -> None:
     suffix = uuid.uuid4().hex[:8]
     payload = _register_payload(suffix)
     register = client.post("/auth/register", json=payload)
@@ -113,35 +115,25 @@ def test_auth_login_by_legacy_name_emits_deprecation_headers_and_metric(client) 
         json={"name": payload["name"], "password": payload["password"]},
     )
 
-    assert response.status_code == 200
+    assert response.status_code == 400
     body = response.get_json()
-    assert body["success"] is True
-    assert response.headers["Deprecation"] == "true"
-    assert response.headers["X-Auraxis-Successor-Field"] == "email"
-    assert response.headers["Sunset"]
-
-    metrics = snapshot_metrics(prefix="auth.login.identifier.")
-    assert metrics["auth.login.identifier.rest.name_legacy"] >= 1
+    assert body["success"] is False
+    assert body["error"]["code"] == "VALIDATION_ERROR"
+    assert "Deprecation" not in response.headers
+    assert "X-Auraxis-Successor-Field" not in response.headers
 
 
-def test_auth_login_invalid_legacy_name_still_emits_deprecation_headers(client) -> None:
-    suffix = uuid.uuid4().hex[:8]
-    payload = _register_payload(suffix)
-    register = client.post("/auth/register", json=payload)
-    assert register.status_code == 201
-
+def test_auth_login_requires_email_identifier_v2_contract(client) -> None:
     response = client.post(
         "/auth/login",
         headers=_v2_headers(),
-        json={"name": payload["name"], "password": "WrongPass@123"},
+        json={"password": "WrongPass@123"},
     )
 
-    assert response.status_code == 401
+    assert response.status_code == 400
     body = response.get_json()
     assert body["success"] is False
-    assert body["error"]["code"] == "UNAUTHORIZED"
-    assert response.headers["Deprecation"] == "true"
-    assert response.headers["X-Auraxis-Successor-Field"] == "email"
+    assert body["error"]["code"] == "VALIDATION_ERROR"
 
 
 def test_auth_login_invalid_credentials_v2_contract(client) -> None:

@@ -441,7 +441,7 @@ type UserType {
 
 type Mutation {
   registerUser(email: String!, investorProfile: String, name: String!, password: String!): AuthPayloadType
-  login(email: String, name: String, password: String!): AuthPayloadType
+  login(email: String!, password: String!): AuthPayloadType
   logout: LogoutMutation
   forgotPassword(email: String!): AuthPayloadType
   resetPassword(newPassword: String!, token: String!): AuthPayloadType
