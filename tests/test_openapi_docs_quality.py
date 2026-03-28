@@ -78,6 +78,24 @@ def test_openapi_docs_cover_mvp1_core_examples_and_headers(client) -> None:
     assert "Deprecation" in put_headers
     assert "X-Auraxis-Successor-Method" in put_headers
 
+    goal_patch = _operation(paths, "/goals/{goal_id}", "patch")
+    assert "description" in goal_patch
+    goal_put = _operation(paths, "/goals/{goal_id}", "put")
+    goal_put_headers = goal_put["responses"]["200"]["headers"]
+    assert "Deprecation" in goal_put_headers
+    assert goal_put_headers["X-Auraxis-Successor-Method"]["example"] == "PATCH"
+
+    simulation_canonical = _operation(paths, "/simulations/installment-vs-cash", "post")
+    assert "description" in simulation_canonical
+    simulation_compat = _operation(
+        paths, "/simulations/installment-vs-cash/save", "post"
+    )
+    simulation_headers = simulation_compat["responses"]["201"]["headers"]
+    assert "Deprecation" in simulation_headers
+    assert simulation_headers["X-Auraxis-Successor-Endpoint"]["example"] == (
+        "/simulations/installment-vs-cash"
+    )
+
     wallet_detail = _operation(paths, "/wallet/{investment_id}", "get")
     wallet_params = wallet_detail["parameters"]
     assert isinstance(wallet_params, list)

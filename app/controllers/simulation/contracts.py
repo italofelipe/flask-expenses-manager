@@ -12,6 +12,7 @@ from app.application.services.simulation_application_service import (
     SimulationApplicationError,
 )
 from app.controllers.response_contract import (
+    apply_deprecation_headers,
     compat_error_response,
     compat_success_response,
 )
@@ -31,6 +32,34 @@ def compat_success(
         message=message,
         data=cast(dict[str, Any], dict(data)),
         meta=None if meta is None else cast(dict[str, Any], dict(meta)),
+    )
+
+
+def compat_success_deprecated(
+    *,
+    legacy_payload: Mapping[str, object],
+    status_code: int,
+    message: str,
+    data: Mapping[str, object],
+    meta: Mapping[str, object] | None = None,
+    successor_endpoint: str | None = None,
+    successor_method: str | None = None,
+    successor_field: str | None = None,
+    warning: str | None = None,
+) -> Response:
+    response = compat_success_response(
+        legacy_payload=cast(dict[str, Any], dict(legacy_payload)),
+        status_code=status_code,
+        message=message,
+        data=cast(dict[str, Any], dict(data)),
+        meta=None if meta is None else cast(dict[str, Any], dict(meta)),
+    )
+    return apply_deprecation_headers(
+        response,
+        successor_endpoint=successor_endpoint,
+        successor_method=successor_method,
+        successor_field=successor_field,
+        warning=warning,
     )
 
 

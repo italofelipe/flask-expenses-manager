@@ -8,6 +8,7 @@ from .dependencies import (
 )
 from .installment_vs_cash_resources import (
     InstallmentVsCashCalculationResource,
+    InstallmentVsCashCanonicalResource,
     InstallmentVsCashSaveResource,
     SimulationGoalBridgeResource,
     SimulationPlannedExpenseBridgeResource,
@@ -22,6 +23,7 @@ __all__ = [
     "SimulationCollectionResource",
     "SimulationResource",
     "InstallmentVsCashCalculationResource",
+    "InstallmentVsCashCanonicalResource",
     "InstallmentVsCashSaveResource",
     "SimulationGoalBridgeResource",
     "SimulationPlannedExpenseBridgeResource",

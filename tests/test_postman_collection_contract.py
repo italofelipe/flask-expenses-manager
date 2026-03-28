@@ -193,6 +193,7 @@ def test_postman_collection_covers_critical_rest_routes() -> None:
         ("GET", "/wallet/{param}/operations/summary"),
         ("GET", "/wallet/{param}/operations/position"),
         ("GET", "/wallet/{param}/operations/invested-amount"),
+        ("POST", "/simulations/installment-vs-cash"),
         ("POST", "/simulations/installment-vs-cash/calculate"),
         ("POST", "/simulations/installment-vs-cash/save"),
         ("GET", "/simulations"),

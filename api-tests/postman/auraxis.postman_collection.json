@@ -2004,9 +2004,9 @@
           ]
         },
         {
-          "name": "06 - Update goal by id (REST v2)",
+          "name": "06 - Goal PATCH by id (REST v2)",
           "request": {
-            "method": "PUT",
+            "method": "PATCH",
             "header": [
               {
                 "key": "Content-Type",
@@ -2041,9 +2041,9 @@
               "listen": "test",
               "script": {
                 "exec": [
-                  "pm.test('goal update returns 200', function () { pm.response.to.have.status(200); });",
+                  "pm.test('goal patch returns 200', function () { pm.response.to.have.status(200); });",
                   "var body = pm.response.json();",
-                  "pm.test('goal update reflects paused status', function () {",
+                  "pm.test('goal patch reflects paused status', function () {",
                   "  pm.expect(body.success).to.eql(true);",
                   "  pm.expect(body.data.goal.status).to.eql('paused');",
                   "});"
@@ -2054,9 +2054,9 @@
           ]
         },
         {
-          "name": "07 - Goal PATCH by id (REST v2)",
+          "name": "07 - Goal PUT by id (REST v2 compat)",
           "request": {
-            "method": "PATCH",
+            "method": "PUT",
             "header": [
               {
                 "key": "Content-Type",
@@ -2091,11 +2091,12 @@
               "listen": "test",
               "script": {
                 "exec": [
-                  "pm.test('goal patch returns 200', function () { pm.response.to.have.status(200); });",
+                  "pm.test('goal put compat returns 200', function () { pm.response.to.have.status(200); });",
                   "var body = pm.response.json();",
-                  "pm.test('goal patch reflects updated amount', function () {",
+                  "pm.test('goal put compat emits deprecation headers', function () {",
                   "  pm.expect(body.success).to.eql(true);",
-                  "  pm.expect(body.data.goal.current_amount).to.eql('6500.00');",
+                  "  pm.expect(pm.response.headers.get('Deprecation')).to.eql('true');",
+                  "  pm.expect(pm.response.headers.get('X-Auraxis-Successor-Method')).to.eql('PATCH');",
                   "});"
                 ],
                 "type": "text/javascript"
@@ -3015,14 +3016,13 @@
               }
             ],
             "url": {
-              "raw": "{{baseUrl}}/simulations/installment-vs-cash/save",
+              "raw": "{{baseUrl}}/simulations/installment-vs-cash",
               "host": [
                 "{{baseUrl}}"
               ],
               "path": [
                 "simulations",
-                "installment-vs-cash",
-                "save"
+                "installment-vs-cash"
               ]
             },
             "body": {
@@ -3332,6 +3332,56 @@
                 "exec": [
                   "pm.test('fee simulation save returns 201', function () { pm.response.to.have.status(201); });",
                   "pm.collectionVariables.set('feeSimulationId', pm.response.json().data.simulation.id);"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "09 - Installment vs cash save legacy alias (REST v2 compat)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{authToken}}"
+              },
+              {
+                "key": "X-API-Contract",
+                "value": "v2"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/simulations/installment-vs-cash/save",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "simulations",
+                "installment-vs-cash",
+                "save"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n                      \"cash_price\": \"1000.00\",\n                      \"installment_count\": 4,\n                      \"installment_total\": \"1080.00\",\n                      \"first_payment_delay_days\": 30,\n                      \"opportunity_rate_type\": \"manual\",\n                      \"opportunity_rate_annual\": \"12.00\",\n                      \"inflation_rate_annual\": \"4.50\",\n                      \"fees_enabled\": false,\n                      \"fees_upfront\": \"0.00\",\n                      \"scenario_label\": \"Compat {{runSeed}}\"\n                    }\n"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('simulation save compat returns 201', function () { pm.response.to.have.status(201); });",
+                  "pm.test('simulation save compat emits deprecation headers', function () {",
+                  "  pm.expect(pm.response.headers.get('Deprecation')).to.eql('true');",
+                  "  pm.expect(pm.response.headers.get('X-Auraxis-Successor-Endpoint')).to.eql('/simulations/installment-vs-cash');",
+                  "});"
                 ],
                 "type": "text/javascript"
               }

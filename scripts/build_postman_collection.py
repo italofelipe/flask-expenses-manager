@@ -1058,9 +1058,9 @@ def build_collection() -> dict[str, Any]:
             ],
         ),
         _item(
-            "06 - Update goal by id (REST v2)",
+            "06 - Goal PATCH by id (REST v2)",
             _request(
-                method="PUT",
+                method="PATCH",
                 raw_url="{{baseUrl}}/goals/{{goalId}}",
                 headers=auth_json_headers,
                 body=_json_body(
@@ -1073,18 +1073,18 @@ def build_collection() -> dict[str, Any]:
                 ),
             ),
             test_lines=[
-                "pm.test('goal update returns 200', function () { pm.response.to.have.status(200); });",
+                "pm.test('goal patch returns 200', function () { pm.response.to.have.status(200); });",
                 "var body = pm.response.json();",
-                "pm.test('goal update reflects paused status', function () {",
+                "pm.test('goal patch reflects paused status', function () {",
                 "  pm.expect(body.success).to.eql(true);",
                 "  pm.expect(body.data.goal.status).to.eql('paused');",
                 "});",
             ],
         ),
         _item(
-            "07 - Goal PATCH by id (REST v2)",
+            "07 - Goal PUT by id (REST v2 compat)",
             _request(
-                method="PATCH",
+                method="PUT",
                 raw_url="{{baseUrl}}/goals/{{goalId}}",
                 headers=auth_json_headers,
                 body=_json_body(
@@ -1097,11 +1097,12 @@ def build_collection() -> dict[str, Any]:
                 ),
             ),
             test_lines=[
-                "pm.test('goal patch returns 200', function () { pm.response.to.have.status(200); });",
+                "pm.test('goal put compat returns 200', function () { pm.response.to.have.status(200); });",
                 "var body = pm.response.json();",
-                "pm.test('goal patch reflects updated amount', function () {",
+                "pm.test('goal put compat emits deprecation headers', function () {",
                 "  pm.expect(body.success).to.eql(true);",
-                "  pm.expect(body.data.goal.current_amount).to.eql('6500.00');",
+                "  pm.expect(pm.response.headers.get('Deprecation')).to.eql('true');",
+                "  pm.expect(pm.response.headers.get('X-Auraxis-Successor-Method')).to.eql('PATCH');",
                 "});",
             ],
         ),
@@ -1468,7 +1469,7 @@ def build_collection() -> dict[str, Any]:
             "02 - Installment vs cash save (REST auth required)",
             _request(
                 method="POST",
-                raw_url="{{baseUrl}}/simulations/installment-vs-cash/save",
+                raw_url="{{baseUrl}}/simulations/installment-vs-cash",
                 headers=auth_json_headers,
                 body=_json_body(
                     """
@@ -1622,6 +1623,37 @@ def build_collection() -> dict[str, Any]:
             test_lines=[
                 "pm.test('fee simulation save returns 201', function () { pm.response.to.have.status(201); });",
                 "pm.collectionVariables.set('feeSimulationId', pm.response.json().data.simulation.id);",
+            ],
+        ),
+        _item(
+            "09 - Installment vs cash save legacy alias (REST v2 compat)",
+            _request(
+                method="POST",
+                raw_url="{{baseUrl}}/simulations/installment-vs-cash/save",
+                headers=auth_json_headers,
+                body=_json_body(
+                    """
+                    {
+                      "cash_price": "1000.00",
+                      "installment_count": 4,
+                      "installment_total": "1080.00",
+                      "first_payment_delay_days": 30,
+                      "opportunity_rate_type": "manual",
+                      "opportunity_rate_annual": "12.00",
+                      "inflation_rate_annual": "4.50",
+                      "fees_enabled": false,
+                      "fees_upfront": "0.00",
+                      "scenario_label": "Compat {{runSeed}}"
+                    }
+                    """
+                ),
+            ),
+            test_lines=[
+                "pm.test('simulation save compat returns 201', function () { pm.response.to.have.status(201); });",
+                "pm.test('simulation save compat emits deprecation headers', function () {",
+                "  pm.expect(pm.response.headers.get('Deprecation')).to.eql('true');",
+                "  pm.expect(pm.response.headers.get('X-Auraxis-Successor-Endpoint')).to.eql('/simulations/installment-vs-cash');",
+                "});",
             ],
         ),
         _item(
