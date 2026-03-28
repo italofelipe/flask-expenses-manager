@@ -54,7 +54,7 @@ class UserBootstrapResource(MethodResource):
             "- `/wallet` = coleção canônica de carteira\n"
             "- `/user/bootstrap` = agregado leve para reduzir round-trips na home\n\n"
             "O bootstrap não substitui endpoints canônicos de coleção e expõe apenas "
-            "um preview recente de transações."
+            "previews recentes de transações e carteira."
         ),
         tags=["Usuário"],
         security=[{"BearerAuth": []}],
@@ -80,20 +80,35 @@ class UserBootstrapResource(MethodResource):
                 description="Bootstrap retornado com sucesso",
                 message="Bootstrap do usuário retornado com sucesso",
                 data_example={
-                    "profile": {
-                        "id": "4b2ef64b-b35d-4ea2-a6f2-4ef3cfb295f1",
-                        "name": "Italo",
-                        "email": "italo@email.com",
+                    "user": {
+                        "identity": {
+                            "id": "4b2ef64b-b35d-4ea2-a6f2-4ef3cfb295f1",
+                            "name": "Italo",
+                            "email": "italo@email.com",
+                        },
+                        "profile": {
+                            "gender": "outro",
+                            "birth_date": "1990-01-01",
+                            "state_uf": "SP",
+                            "occupation": "Founder",
+                        },
+                        "financial_profile": {
+                            "monthly_income_net": 1000.0,
+                            "monthly_expenses": 500.0,
+                            "net_worth": 2000.0,
+                            "initial_investment": 200.0,
+                            "monthly_investment": 100.0,
+                            "investment_goal_date": "2026-12-31",
+                        },
+                        "investor_profile": {
+                            "declared": "conservador",
+                            "suggested": "moderado",
+                            "quiz_score": 8,
+                            "taxonomy_version": "2026.1",
+                            "financial_objectives": "crescer",
+                        },
+                        "product_context": {"entitlements_version": 3},
                     },
-                    "wallet_entries": [
-                        {
-                            "id": "wallet-1",
-                            "name": "Caixa",
-                            "value": 100.0,
-                            "quantity": 1,
-                            "asset_class": "cash",
-                        }
-                    ],
                     "transactions_preview": {
                         "items": [
                             {
@@ -107,6 +122,21 @@ class UserBootstrapResource(MethodResource):
                         "limit": 5,
                         "returned_items": 1,
                         "has_more": False,
+                    },
+                    "wallet": {
+                        "items": [
+                            {
+                                "id": "wallet-1",
+                                "name": "Caixa",
+                                "value": 100.0,
+                                "quantity": 1,
+                                "asset_class": "cash",
+                            }
+                        ],
+                        "total": 8,
+                        "returned_items": 1,
+                        "limit": 5,
+                        "has_more": True,
                     },
                 },
             ),

@@ -163,7 +163,6 @@ class UserMeResource(MethodResource):
         user = user_or_response
 
         context_service = AuthenticatedUserContextService.with_defaults()
-        authenticated_user_context = context_service.build_context(user)
 
         if is_v3_contract_request():
             if _has_collection_semantics():
@@ -180,12 +179,14 @@ class UserMeResource(MethodResource):
                     message="Contexto autenticado retornado com sucesso",
                     data={
                         "user": to_authenticated_user_canonical_payload(
-                            authenticated_user_context.profile
+                            context_service.build_profile(user)
                         )
                     },
                 ),
                 status_code=200,
             )
+
+        authenticated_user_context = context_service.build_context(user)
 
         try:
             page = _parse_positive_int_compat(
