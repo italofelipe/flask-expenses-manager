@@ -31,6 +31,7 @@ services:
       retries: 5
 
   web:
+    image: ${WEB_IMAGE:-auraxis-api-web:dev}
     build:
       context: .
       dockerfile: Dockerfile

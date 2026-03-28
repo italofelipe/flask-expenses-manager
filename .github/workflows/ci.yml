@@ -196,6 +196,7 @@ jobs:
     needs: tests
     env:
       DOCKER_CONFIG: /tmp/docker-public
+      WEB_IMAGE: auraxis-api-web:${{ github.sha }}
 
     steps:
       - name: Checkout
@@ -221,10 +222,23 @@ jobs:
           docker logout docker.io || true
           docker logout https://index.docker.io/v1/ || true
 
+      - name: Build web image once for smoke
+        run: |
+          for attempt in 1 2 3; do
+            if docker build -f Dockerfile -t "$WEB_IMAGE" .; then
+              echo "Smoke web image built on attempt ${attempt}."
+              exit 0
+            fi
+            echo "Smoke image build failed on attempt ${attempt}; retrying..." >&2
+            sleep $((attempt * 5))
+          done
+          echo "Failed to build smoke web image after retries." >&2
+          exit 1
+
       - name: Boot local stack for smoke tests
         run: |
           for attempt in 1 2 3; do
-            if docker compose up -d --build db redis web; then
+            if docker compose up -d db redis web; then
               echo "Local smoke stack booted on attempt ${attempt}."
               exit 0
             fi
@@ -316,6 +330,7 @@ jobs:
     needs: api-smoke
     env:
       DOCKER_CONFIG: /tmp/docker-public
+      WEB_IMAGE: auraxis-api-web:${{ github.sha }}
 
     steps:
       - name: Checkout
@@ -341,10 +356,23 @@ jobs:
           docker logout docker.io || true
           docker logout https://index.docker.io/v1/ || true
 
+      - name: Build web image once for integration
+        run: |
+          for attempt in 1 2 3; do
+            if docker build -f Dockerfile -t "$WEB_IMAGE" .; then
+              echo "Integration web image built on attempt ${attempt}."
+              exit 0
+            fi
+            echo "Integration image build failed on attempt ${attempt}; retrying..." >&2
+            sleep $((attempt * 5))
+          done
+          echo "Failed to build integration web image after retries." >&2
+          exit 1
+
       - name: Boot local stack for integration tests
         run: |
           for attempt in 1 2 3; do
-            if docker compose up -d --build db redis web; then
+            if docker compose up -d db redis web; then
               echo "Local integration stack booted on attempt ${attempt}."
               exit 0
             fi
@@ -481,6 +509,7 @@ jobs:
     needs: tests
     env:
       DOCKER_CONFIG: /tmp/docker-public
+      WEB_IMAGE: auraxis-api-web:${{ github.sha }}
 
     steps:
       - name: Checkout
@@ -507,7 +536,7 @@ jobs:
       - name: Build image for scan
         run: |
           for attempt in 1 2 3; do
-            if docker build -f Dockerfile.prod -t auraxis-ci:${{ github.sha }} .; then
+            if docker build -f Dockerfile.prod -t "$WEB_IMAGE" .; then
               echo "Container image built for scan on attempt ${attempt}."
               exit 0
             fi
@@ -520,7 +549,7 @@ jobs:
       - name: Trivy image scan
         uses: aquasecurity/trivy-action@0.35.0
         with:
-          image-ref: auraxis-ci:${{ github.sha }}
+          image-ref: auraxis-api-web:${{ github.sha }}
           format: table
           ignore-unfixed: true
           vuln-type: os,library
