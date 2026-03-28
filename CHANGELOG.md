@@ -1,5 +1,23 @@
 # Changelog
 
+## [1.9.0](https://github.com/italofelipe/auraxis-api/compare/v1.8.0...v1.9.0) (2026-03-28)
+
+
+### Features
+
+* **auth:** harden canonical login identity ([#762](https://github.com/italofelipe/auraxis-api/issues/762)) ([02d0832](https://github.com/italofelipe/auraxis-api/commit/02d08328473c4c8cd8be8bb7b5afeca4f8df14cc))
+* **dashboard:** canonicalize graphql overview ownership ([#767](https://github.com/italofelipe/auraxis-api/issues/767)) ([779d53b](https://github.com/italofelipe/auraxis-api/commit/779d53b07087d9beda7ca0dd58243d734410d64a))
+* **goals:** normalize update and simulation semantics ([#765](https://github.com/italofelipe/auraxis-api/issues/765)) ([2da383a](https://github.com/italofelipe/auraxis-api/commit/2da383a0995fb9e50ad80b0a007645d26f8037bc))
+* **graphql:** align transactions with canonical filters ([#766](https://github.com/italofelipe/auraxis-api/issues/766)) ([d5fbcf8](https://github.com/italofelipe/auraxis-api/commit/d5fbcf844b98159231177210d0f3d2ba20eb8d18))
+* **transactions:** finalize mvp1 rest stabilization ([#750](https://github.com/italofelipe/auraxis-api/issues/750)) ([e7cbb6f](https://github.com/italofelipe/auraxis-api/commit/e7cbb6fbb8a46838997b9943da0101ce79533304))
+* **wallet:** normalize canonical detail and update semantics ([#764](https://github.com/italofelipe/auraxis-api/issues/764)) ([6339481](https://github.com/italofelipe/auraxis-api/commit/63394815ca4e0e065fc620b8a661cbce99cec67c))
+
+
+### Performance Improvements
+
+* **transactions:** simplify hot query paths ([#778](https://github.com/italofelipe/auraxis-api/issues/778)) ([ade4404](https://github.com/italofelipe/auraxis-api/commit/ade4404a4765f9b751800f0dfd90676efe5e0e03))
+* **user:** optimize canonical me and bootstrap preview ([#763](https://github.com/italofelipe/auraxis-api/issues/763)) ([38632a4](https://github.com/italofelipe/auraxis-api/commit/38632a4ea5b39ad91f8a63716fd5ae75063d0fcf))
+
 ## [1.8.0](https://github.com/italofelipe/auraxis-api/compare/v1.7.0...v1.8.0) (2026-03-27)
 
 
