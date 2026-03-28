@@ -24,6 +24,8 @@ from app.utils.response_builder import (
     success_payload,
 )
 
+DEFAULT_DEPRECATION_SUNSET = "Tue, 30 Jun 2026 23:59:59 GMT"
+
 
 def _debug_or_testing() -> bool:
     return runtime_debug_or_testing()
@@ -151,6 +153,31 @@ def compat_error_tuple_from_api_error(
     )
 
 
+def apply_deprecation_headers(
+    response: Response,
+    *,
+    successor_endpoint: str | None = None,
+    successor_method: str | None = None,
+    successor_contract: str | None = None,
+    successor_field: str | None = None,
+    warning: str | None = None,
+    sunset: str = DEFAULT_DEPRECATION_SUNSET,
+) -> Response:
+    response.headers["Deprecation"] = "true"
+    response.headers["Sunset"] = sunset
+    if successor_endpoint is not None:
+        response.headers["X-Auraxis-Successor-Endpoint"] = successor_endpoint
+    if successor_method is not None:
+        response.headers["X-Auraxis-Successor-Method"] = successor_method
+    if successor_contract is not None:
+        response.headers["X-Auraxis-Successor-Contract"] = successor_contract
+    if successor_field is not None:
+        response.headers["X-Auraxis-Successor-Field"] = successor_field
+    if warning is not None:
+        response.headers["Warning"] = warning
+    return response
+
+
 def response_from_contract_error(error: ResponseContractError) -> Response:
     return compat_error_response(
         legacy_payload=error.legacy_payload,
@@ -174,5 +201,6 @@ __all__ = [
     "compat_success_tuple",
     "compat_error_tuple",
     "compat_error_tuple_from_api_error",
+    "apply_deprecation_headers",
     "response_from_contract_error",
 ]

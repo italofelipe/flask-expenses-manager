@@ -3,18 +3,26 @@ from __future__ import annotations
 from typing import Any
 from uuid import UUID
 
-from flask import request
+from flask import Response, request
 from marshmallow import fields
 
 from app.application.services.wallet_application_service import WalletApplicationError
 from app.auth import current_user_id
+from app.docs.openapi_helpers import deprecated_headers_doc
 from app.utils.typed_decorators import typed_doc as doc
 from app.utils.typed_decorators import typed_jwt_required as jwt_required
 from app.utils.typed_decorators import typed_use_kwargs as use_kwargs
 
 from .blueprint import wallet_bp
-from .contracts import application_error_response, compat_success
+from .contracts import (
+    application_error_response,
+    compat_success,
+    compat_success_deprecated,
+)
 from .dependencies import get_wallet_dependencies
+
+WALLET_UPDATE_SUCCESSOR_ENDPOINT = "/wallet/{investment_id}"
+WALLET_UPDATE_SUCCESSOR_METHOD = "PATCH"
 
 
 @wallet_bp.route("", methods=["POST"])
@@ -126,6 +134,49 @@ def list_wallet_entries(page: int, per_page: int) -> tuple[dict[str, Any], int]:
     )
 
 
+@wallet_bp.route("/<uuid:investment_id>", methods=["GET"])
+@doc(
+    description=(
+        "Retorna o detalhe canônico de um investimento específico da carteira "
+        "do usuário autenticado."
+    ),
+    tags=["Wallet"],
+    security=[{"BearerAuth": []}],
+    params={
+        "investment_id": {"description": "ID do investimento"},
+        "X-API-Contract": {
+            "in": "header",
+            "description": "Opcional. Envie 'v2' para o contrato padronizado.",
+            "type": "string",
+            "required": False,
+        },
+    },
+    responses={
+        200: {"description": "Investimento retornado com sucesso"},
+        401: {"description": "Token inválido"},
+        403: {"description": "Sem permissão"},
+        404: {"description": "Investimento não encontrado"},
+    },
+)
+@jwt_required()
+def get_wallet_entry(investment_id: UUID) -> tuple[dict[str, Any], int]:
+    user_id = current_user_id()
+    dependencies = get_wallet_dependencies()
+    service = dependencies.wallet_application_service_factory(user_id)
+
+    try:
+        investment_data = service.get_entry(investment_id)
+    except WalletApplicationError as exc:
+        return application_error_response(exc)
+
+    return compat_success(
+        legacy_payload={"investment": investment_data},
+        status_code=200,
+        message="Investimento retornado com sucesso",
+        data={"investment": investment_data},
+    )
+
+
 @wallet_bp.route("/<uuid:investment_id>/history", methods=["GET"])
 @doc(
     description=(
@@ -137,7 +188,9 @@ def list_wallet_entries(page: int, per_page: int) -> tuple[dict[str, Any], int]:
     params={
         "investment_id": {"description": "ID do investimento"},
         "page": {"description": "Página desejada (default: 1)"},
-        "per_page": {"description": "Itens por página (default: 5, 0 para todos)"},
+        "per_page": {
+            "description": "Itens por página (default: 5, mínimo 1, máximo 100)"
+        },
         "X-API-Contract": {
             "in": "header",
             "description": "Opcional. Envie 'v2' para o contrato padronizado.",
@@ -193,9 +246,23 @@ def get_wallet_history(investment_id: UUID) -> tuple[dict[str, Any], int]:
     )
 
 
-@wallet_bp.route("/<uuid:investment_id>", methods=["PUT"])
+def _update_wallet_entry_data(
+    investment_id: UUID,
+    payload: dict[str, Any],
+) -> dict[str, Any]:
+    user_id = current_user_id()
+    dependencies = get_wallet_dependencies()
+    service = dependencies.wallet_application_service_factory(user_id)
+
+    return service.update_entry(investment_id, payload)
+
+
+@wallet_bp.route("/<uuid:investment_id>", methods=["PATCH"])
 @doc(
-    description="Atualiza um investimento existente da carteira do usuário.",
+    description=(
+        "Atualiza parcialmente um investimento existente da carteira do usuário. "
+        "Este é o método canônico para alterações parciais."
+    ),
     tags=["Wallet"],
     security=[{"BearerAuth": []}],
     params={
@@ -215,26 +282,76 @@ def get_wallet_history(investment_id: UUID) -> tuple[dict[str, Any], int]:
     },
 )
 @jwt_required()
-def update_wallet_entry(investment_id: UUID) -> tuple[dict[str, Any], int]:
-    user_id = current_user_id()
-    payload = request.get_json() or {}
-    dependencies = get_wallet_dependencies()
-    service = dependencies.wallet_application_service_factory(user_id)
-
+def patch_wallet_entry(investment_id: UUID) -> tuple[dict[str, Any], int]:
     try:
-        investment_data = service.update_entry(investment_id, payload)
+        investment_data = _update_wallet_entry_data(
+            investment_id,
+            request.get_json() or {},
+        )
     except WalletApplicationError as exc:
         return application_error_response(exc)
 
-    legacy_payload = {
-        "message": "Investimento atualizado com sucesso",
-        "investment": investment_data,
-    }
     return compat_success(
-        legacy_payload=legacy_payload,
+        legacy_payload={
+            "message": "Investimento atualizado com sucesso",
+            "investment": investment_data,
+        },
         status_code=200,
         message="Investimento atualizado com sucesso",
         data={"investment": investment_data},
+    )
+
+
+@wallet_bp.route("/<uuid:investment_id>", methods=["PUT"])
+@doc(
+    description=(
+        "Compatibilidade transitória para atualização parcial de investimento. "
+        "Use `PATCH /wallet/{investment_id}` como método canônico."
+    ),
+    tags=["Wallet"],
+    security=[{"BearerAuth": []}],
+    params={
+        "investment_id": {"description": "ID do investimento"},
+        "X-API-Contract": {
+            "in": "header",
+            "description": "Opcional. Envie 'v2' para o contrato padronizado.",
+            "type": "string",
+            "required": False,
+        },
+    },
+    responses={
+        200: {
+            "description": "Investimento atualizado com sucesso",
+            "headers": deprecated_headers_doc(
+                successor_endpoint=WALLET_UPDATE_SUCCESSOR_ENDPOINT,
+                successor_method=WALLET_UPDATE_SUCCESSOR_METHOD,
+            ),
+        },
+        400: {"description": "Dados inválidos"},
+        401: {"description": "Token inválido"},
+        404: {"description": "Investimento não encontrado"},
+    },
+)
+@jwt_required()
+def update_wallet_entry(investment_id: UUID) -> Response | tuple[dict[str, Any], int]:
+    try:
+        investment_data = _update_wallet_entry_data(
+            investment_id,
+            request.get_json() or {},
+        )
+    except WalletApplicationError as exc:
+        return application_error_response(exc)
+
+    return compat_success_deprecated(
+        legacy_payload={
+            "message": "Investimento atualizado com sucesso",
+            "investment": investment_data,
+        },
+        status_code=200,
+        message="Investimento atualizado com sucesso",
+        data={"investment": investment_data},
+        successor_endpoint=WALLET_UPDATE_SUCCESSOR_ENDPOINT,
+        successor_method=WALLET_UPDATE_SUCCESSOR_METHOD,
     )
 
 

@@ -88,7 +88,7 @@ def test_openapi_methods_match_main_routes(client) -> None:
         "/goals/{goal_id}/plan": {"get"},
         "/goals/simulate": {"post"},
         "/wallet": {"get", "post"},
-        "/wallet/{investment_id}": {"put", "delete"},
+        "/wallet/{investment_id}": {"get", "put", "patch", "delete"},
         "/wallet/{investment_id}/operations": {"get", "post"},
         "/wallet/{investment_id}/operations/{operation_id}": {"put", "delete"},
     }

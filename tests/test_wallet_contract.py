@@ -134,7 +134,7 @@ def test_wallet_list_v2_contract_has_meta_pagination(client) -> None:
     assert body["meta"]["pagination"]["page"] == 1
 
 
-def test_wallet_update_and_history_v2_contract(client) -> None:
+def test_wallet_detail_patch_and_history_v2_contract(client) -> None:
     token = _register_and_login(client)
     create_response = client.post(
         "/wallet",
@@ -144,7 +144,16 @@ def test_wallet_update_and_history_v2_contract(client) -> None:
     assert create_response.status_code == 201
     investment_id = create_response.get_json()["data"]["investment"]["id"]
 
-    update_response = client.put(
+    detail_response = client.get(
+        f"/wallet/{investment_id}",
+        headers=_auth_headers(token, "v2"),
+    )
+    assert detail_response.status_code == 200
+    detail_body = detail_response.get_json()
+    assert detail_body["success"] is True
+    assert detail_body["data"]["investment"]["id"] == investment_id
+
+    update_response = client.patch(
         f"/wallet/{investment_id}",
         json={"value": "2000.00"},
         headers=_auth_headers(token, "v2"),
@@ -163,3 +172,27 @@ def test_wallet_update_and_history_v2_contract(client) -> None:
     assert history_body["success"] is True
     assert "items" in history_body["data"]
     assert "pagination" in history_body["meta"]
+
+
+def test_wallet_put_alias_emits_deprecation_headers(client) -> None:
+    token = _register_and_login(client)
+    create_response = client.post(
+        "/wallet",
+        json=_wallet_payload(),
+        headers=_auth_headers(token, "v2"),
+    )
+    assert create_response.status_code == 201
+    investment_id = create_response.get_json()["data"]["investment"]["id"]
+
+    response = client.put(
+        f"/wallet/{investment_id}",
+        json={"value": "1750.00"},
+        headers=_auth_headers(token, "v2"),
+    )
+
+    assert response.status_code == 200
+    assert response.headers["Deprecation"] == "true"
+    assert response.headers["X-Auraxis-Successor-Endpoint"] == (
+        "/wallet/{investment_id}"
+    )
+    assert response.headers["X-Auraxis-Successor-Method"] == "PATCH"

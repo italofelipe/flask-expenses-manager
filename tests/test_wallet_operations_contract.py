@@ -336,7 +336,7 @@ def test_wallet_portfolio_valuation_history_v2(client) -> None:
     assert sell_response.status_code == 201
 
     response = client.get(
-        "/wallet/valuation/history?startDate=2026-02-08&finalDate=2026-02-09",
+        "/wallet/valuation/history?start_date=2026-02-08&end_date=2026-02-09",
         headers=_auth_headers(token, "v2"),
     )
     assert response.status_code == 200
@@ -358,6 +358,29 @@ def test_wallet_portfolio_valuation_history_v2(client) -> None:
     assert "total_profit_loss_estimate" in first_item
 
 
+def test_wallet_portfolio_valuation_history_legacy_alias_emits_deprecation_headers(
+    client,
+) -> None:
+    token = _register_and_login(client, "owner-op6-legacy")
+    investment_id = _create_wallet(client, token)
+
+    buy_response = client.post(
+        f"/wallet/{investment_id}/operations",
+        json=_operation_payload(quantity="10", unit_price="10", fees="1.00"),
+        headers=_auth_headers(token, "v2"),
+    )
+    assert buy_response.status_code == 201
+
+    response = client.get(
+        "/wallet/valuation/history?startDate=2026-02-08&finalDate=2026-02-09",
+        headers=_auth_headers(token, "v2"),
+    )
+
+    assert response.status_code == 200
+    assert response.headers["Deprecation"] == "true"
+    assert response.headers["X-Auraxis-Successor-Field"] == "start_date,end_date"
+
+
 def test_wallet_history_masks_unexpected_value_error(client, monkeypatch) -> None:
     token = _register_and_login(client, "owner-op6-value-error")
 
@@ -370,7 +393,7 @@ def test_wallet_history_masks_unexpected_value_error(client, monkeypatch) -> Non
     )
 
     response = client.get(
-        "/wallet/valuation/history?startDate=2026-02-08&finalDate=2026-02-09",
+        "/wallet/valuation/history?start_date=2026-02-08&end_date=2026-02-09",
         headers=_auth_headers(token, "v2"),
     )
 

@@ -24,8 +24,8 @@ SMOKE_REQUESTS = [
     "05 - Goal simulate (REST v2)",
     "01 - Create wallet investment (REST v2)",
     "02 - List wallet investments (REST v2)",
-    "08 - Create wallet operation (REST v2)",
-    "10 - Wallet operation summary (REST v2)",
+    "10 - Create wallet operation (REST v2)",
+    "12 - Wallet operation summary (REST v2)",
     "01 - Installment vs cash calculate (REST public)",
     "02 - Installment vs cash save (REST auth required)",
     "03 - Simulation goal bridge without entitlement returns 403",
@@ -1164,7 +1164,46 @@ def build_collection() -> dict[str, Any]:
             ],
         ),
         _item(
-            "03 - Update wallet investment (REST v2)",
+            "03 - Get wallet investment detail (REST v2)",
+            _request(
+                method="GET",
+                raw_url="{{baseUrl}}/wallet/{{investmentId}}",
+                headers=auth_contract_headers,
+            ),
+            test_lines=[
+                "pm.test('wallet detail returns 200', function () { pm.response.to.have.status(200); });",
+                "var body = pm.response.json();",
+                "pm.test('wallet detail returns investment payload', function () {",
+                "  pm.expect(body.success).to.eql(true);",
+                "  pm.expect(body.data.investment.id).to.eql(pm.collectionVariables.get('investmentId'));",
+                "});",
+            ],
+        ),
+        _item(
+            "04 - Patch wallet investment (REST v2)",
+            _request(
+                method="PATCH",
+                raw_url="{{baseUrl}}/wallet/{{investmentId}}",
+                headers=auth_json_headers,
+                body=_json_body(
+                    """
+                    {
+                      "value": "2000.00"
+                    }
+                    """
+                ),
+            ),
+            test_lines=[
+                "pm.test('wallet patch returns 200', function () { pm.response.to.have.status(200); });",
+                "var body = pm.response.json();",
+                "pm.test('wallet patch keeps history', function () {",
+                "  pm.expect(body.success).to.eql(true);",
+                "  pm.expect(body.data.investment.history).to.be.an('array');",
+                "});",
+            ],
+        ),
+        _item(
+            "05 - Put wallet investment (compat REST v2)",
             _request(
                 method="PUT",
                 raw_url="{{baseUrl}}/wallet/{{investmentId}}",
@@ -1178,16 +1217,20 @@ def build_collection() -> dict[str, Any]:
                 ),
             ),
             test_lines=[
-                "pm.test('wallet update returns 200', function () { pm.response.to.have.status(200); });",
+                "pm.test('wallet put returns 200', function () { pm.response.to.have.status(200); });",
                 "var body = pm.response.json();",
-                "pm.test('wallet update keeps history', function () {",
+                "pm.test('wallet put emits deprecation headers', function () {",
+                "  pm.expect(pm.response.headers.get('Deprecation')).to.eql('true');",
+                "  pm.expect(pm.response.headers.get('X-Auraxis-Successor-Method')).to.eql('PATCH');",
+                "});",
+                "pm.test('wallet put keeps history', function () {",
                 "  pm.expect(body.success).to.eql(true);",
                 "  pm.expect(body.data.investment.history).to.be.an('array');",
                 "});",
             ],
         ),
         _item(
-            "04 - Wallet investment history (REST v2)",
+            "06 - Wallet investment history (REST v2)",
             _request(
                 method="GET",
                 raw_url="{{baseUrl}}/wallet/{{investmentId}}/history?page=1&per_page=10",
@@ -1204,7 +1247,7 @@ def build_collection() -> dict[str, Any]:
             ],
         ),
         _item(
-            "05 - Wallet portfolio valuation (REST v2)",
+            "07 - Wallet portfolio valuation (REST v2)",
             _request(
                 method="GET",
                 raw_url="{{baseUrl}}/wallet/valuation",
@@ -1216,14 +1259,14 @@ def build_collection() -> dict[str, Any]:
             ],
         ),
         _item(
-            "06 - Wallet portfolio valuation history (REST v2)",
+            "08 - Wallet portfolio valuation history (REST v2)",
             _request(
                 method="GET",
-                raw_url="{{baseUrl}}/wallet/valuation/history?startDate={{runYesterday}}&finalDate={{runToday}}",
+                raw_url="{{baseUrl}}/wallet/valuation/history?start_date={{runYesterday}}&end_date={{runToday}}",
                 headers=auth_contract_headers,
                 query=[
-                    ("startDate", "{{runYesterday}}"),
-                    ("finalDate", "{{runToday}}"),
+                    ("start_date", "{{runYesterday}}"),
+                    ("end_date", "{{runToday}}"),
                 ],
             ),
             test_lines=[
@@ -1232,7 +1275,7 @@ def build_collection() -> dict[str, Any]:
             ],
         ),
         _item(
-            "07 - Wallet investment valuation (REST v2)",
+            "09 - Wallet investment valuation (REST v2)",
             _request(
                 method="GET",
                 raw_url="{{baseUrl}}/wallet/{{investmentId}}/valuation",
@@ -1248,7 +1291,7 @@ def build_collection() -> dict[str, Any]:
             ],
         ),
         _item(
-            "08 - Create wallet operation (REST v2)",
+            "10 - Create wallet operation (REST v2)",
             _request(
                 method="POST",
                 raw_url="{{baseUrl}}/wallet/{{investmentId}}/operations",
@@ -1274,7 +1317,7 @@ def build_collection() -> dict[str, Any]:
             ],
         ),
         _item(
-            "09 - List wallet operations (REST v2)",
+            "11 - List wallet operations (REST v2)",
             _request(
                 method="GET",
                 raw_url="{{baseUrl}}/wallet/{{investmentId}}/operations?page=1&per_page=10",
@@ -1291,7 +1334,7 @@ def build_collection() -> dict[str, Any]:
             ],
         ),
         _item(
-            "10 - Wallet operation summary (REST v2)",
+            "12 - Wallet operation summary (REST v2)",
             _request(
                 method="GET",
                 raw_url="{{baseUrl}}/wallet/{{investmentId}}/operations/summary",
@@ -1307,7 +1350,7 @@ def build_collection() -> dict[str, Any]:
             ],
         ),
         _item(
-            "11 - Wallet operation position (REST v2)",
+            "13 - Wallet operation position (REST v2)",
             _request(
                 method="GET",
                 raw_url="{{baseUrl}}/wallet/{{investmentId}}/operations/position",
@@ -1323,7 +1366,7 @@ def build_collection() -> dict[str, Any]:
             ],
         ),
         _item(
-            "12 - Wallet invested amount by date (REST v2)",
+            "14 - Wallet invested amount by date (REST v2)",
             _request(
                 method="GET",
                 raw_url="{{baseUrl}}/wallet/{{investmentId}}/operations/invested-amount?date={{runToday}}",
@@ -1340,7 +1383,7 @@ def build_collection() -> dict[str, Any]:
             ],
         ),
         _item(
-            "13 - Update wallet operation (REST v2)",
+            "15 - Update wallet operation (REST v2)",
             _request(
                 method="PUT",
                 raw_url="{{baseUrl}}/wallet/{{investmentId}}/operations/{{operationId}}",
@@ -1364,7 +1407,7 @@ def build_collection() -> dict[str, Any]:
             ],
         ),
         _item(
-            "14 - Delete wallet operation (REST v2)",
+            "16 - Delete wallet operation (REST v2)",
             _request(
                 method="DELETE",
                 raw_url="{{baseUrl}}/wallet/{{investmentId}}/operations/{{operationId}}",
@@ -1376,7 +1419,7 @@ def build_collection() -> dict[str, Any]:
             ],
         ),
         _item(
-            "15 - Delete wallet investment (REST v2)",
+            "17 - Delete wallet investment (REST v2)",
             _request(
                 method="DELETE",
                 raw_url="{{baseUrl}}/wallet/{{investmentId}}",

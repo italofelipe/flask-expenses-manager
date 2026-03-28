@@ -72,6 +72,26 @@ def test_openapi_docs_cover_mvp1_core_examples_and_headers(client) -> None:
     assert "Deprecation" in put_headers
     assert "X-Auraxis-Successor-Method" in put_headers
 
+    wallet_detail = _operation(paths, "/wallet/{investment_id}", "get")
+    wallet_params = wallet_detail["parameters"]
+    assert isinstance(wallet_params, list)
+    assert any(param.get("name") == "investment_id" for param in wallet_params)
+
+    wallet_patch = _operation(paths, "/wallet/{investment_id}", "patch")
+    assert "description" in wallet_patch
+    wallet_put = _operation(paths, "/wallet/{investment_id}", "put")
+    wallet_put_headers = wallet_put["responses"]["200"]["headers"]
+    assert "Deprecation" in wallet_put_headers
+    assert wallet_put_headers["X-Auraxis-Successor-Method"]["example"] == "PATCH"
+
+    wallet_history = _operation(paths, "/wallet/valuation/history", "get")
+    wallet_history_params = wallet_history["parameters"]
+    assert isinstance(wallet_history_params, list)
+    assert any(param.get("name") == "start_date" for param in wallet_history_params)
+    assert any(param.get("name") == "end_date" for param in wallet_history_params)
+    assert any(param.get("name") == "startDate" for param in wallet_history_params)
+    assert any(param.get("name") == "finalDate" for param in wallet_history_params)
+
     transaction_dashboard = _operation(paths, "/transactions/dashboard", "get")
     dashboard_headers = transaction_dashboard["responses"]["200"]["headers"]
     assert "Deprecation" in dashboard_headers
