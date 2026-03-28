@@ -917,6 +917,53 @@ def test_graphql_login_rejects_legacy_name_argument(client) -> None:
     assert "Unknown argument 'name'" in body["errors"][0]["message"]
 
 
+def test_graphql_login_with_blank_email_returns_public_validation_error(client) -> None:
+    login_mutation = """
+    mutation Login($email: String!, $password: String!) {
+      login(email: $email, password: $password) {
+        message
+        token
+      }
+    }
+    """
+    response = _graphql(
+        client,
+        login_mutation,
+        {"email": "   ", "password": "StrongPass@123"},
+    )
+
+    assert response.status_code == 200
+    body = response.get_json()
+    assert body["data"]["login"] is None
+    assert body["errors"][0]["extensions"]["code"] == "VALIDATION_ERROR"
+    assert body["errors"][0]["message"] == "Email is required."
+
+
+def test_graphql_login_invalid_credentials_returns_public_unauthorized(client) -> None:
+    login_mutation = """
+    mutation Login($email: String!, $password: String!) {
+      login(email: $email, password: $password) {
+        message
+        token
+      }
+    }
+    """
+    response = _graphql(
+        client,
+        login_mutation,
+        {
+            "email": f"missing-{uuid.uuid4().hex[:8]}@email.com",
+            "password": "WrongPass@123",
+        },
+    )
+
+    assert response.status_code == 200
+    body = response.get_json()
+    assert body["data"]["login"] is None
+    assert body["errors"][0]["extensions"]["code"] == "UNAUTHORIZED"
+    assert body["errors"][0]["message"] == "Invalid credentials"
+
+
 def test_graphql_logout_mutation_success(client) -> None:
     token = _register_and_login_graphql(client)
     logout_mutation = """

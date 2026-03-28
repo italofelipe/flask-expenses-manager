@@ -126,7 +126,7 @@ def test_graphql_normalizes_validation_errors_in_production(
         "/graphql",
         json={
             "query": (
-                "mutation Login($email: String, $password: String!) { "
+                "mutation Login($email: String!, $password: String!) { "
                 "login(email: $email, password: $password) { token } }"
             ),
             "variables": {"email": "fake@email.com", "password": "x"},
