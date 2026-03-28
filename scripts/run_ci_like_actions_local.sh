@@ -120,6 +120,9 @@ while [[ $# -gt 0 ]]; do
 done
 
 run_core_pipeline() {
+  echo "[ci-like-local] step=repo:hygiene"
+  python3 scripts/repo_hygiene_check.py
+
   echo "[ci-like-local] step=flags:hygiene"
   "${PYTHON_BIN}" scripts/check_feature_flags.py
 

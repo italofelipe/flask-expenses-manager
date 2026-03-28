@@ -41,7 +41,7 @@
   },
   {
     "access": "auth_required",
-    "domain": "transactions",
+    "domain": "dashboard",
     "name": "transactionDashboard",
     "operation_type": "query",
     "source_module": "app.graphql.queries.transaction",
