@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from collections.abc import Sequence
 from dataclasses import dataclass
 from datetime import date
 from decimal import Decimal
@@ -7,6 +8,7 @@ from typing import cast
 from uuid import UUID, uuid4
 
 from app.application.services.authenticated_user_bootstrap_service import (
+    DEFAULT_BOOTSTRAP_WALLET_LIMIT,
     AuthenticatedUserBootstrapDependencies,
     AuthenticatedUserBootstrapService,
 )
@@ -19,6 +21,7 @@ from app.application.services.authenticated_user_context_service import (
 )
 from app.models.transaction import Transaction
 from app.models.user import User
+from app.models.wallet import Wallet
 
 
 @dataclass(frozen=True)
@@ -102,10 +105,17 @@ def _build_context_service() -> AuthenticatedUserContextService:
                 )
             )
 
+        def build_profile(self, _user: User) -> AuthenticatedUserProfile:
+            return profile
+
+        def build_wallet_entries_snapshot(
+            self, _wallet_entries: Sequence[Wallet]
+        ) -> tuple[AuthenticatedWalletEntry, ...]:
+            return (wallet_entry,)
+
         def build_context(self, _user: User) -> AuthenticatedUserContext:
             return AuthenticatedUserContext(
-                profile=profile,
-                wallet_entries=(wallet_entry,),
+                profile=profile, wallet_entries=(wallet_entry,)
             )
 
     return cast(AuthenticatedUserContextService, _FakeContextService())
@@ -131,9 +141,17 @@ def test_authenticated_user_bootstrap_service_builds_preview_and_wallet() -> Non
     ) -> list[Transaction]:
         return cast(list[Transaction], list(transactions))
 
+    def _list_wallet_preview_entries(
+        _user_id: UUID,
+        _limit: int,
+    ) -> list[Wallet]:
+        return []
+
     service = AuthenticatedUserBootstrapService(
         dependencies=AuthenticatedUserBootstrapDependencies(
             list_recent_transactions_by_user_id=_list_recent_transactions,
+            list_wallet_preview_entries_by_user_id=_list_wallet_preview_entries,
+            count_wallet_entries_by_user_id=lambda _user_id: 1,
             context_service_factory=_build_context_service,
         )
     )
@@ -141,7 +159,11 @@ def test_authenticated_user_bootstrap_service_builds_preview_and_wallet() -> Non
     bootstrap = service.build_bootstrap(cast(User, fake_user), transactions_limit=2)
 
     assert bootstrap.profile.email == "italo@email.com"
-    assert len(bootstrap.wallet_entries) == 1
+    assert len(bootstrap.wallet_preview.items) == 1
+    assert bootstrap.wallet_preview.total == 1
+    assert bootstrap.wallet_preview.limit == DEFAULT_BOOTSTRAP_WALLET_LIMIT
+    assert bootstrap.wallet_preview.returned_items == 1
+    assert bootstrap.wallet_preview.has_more is False
     assert bootstrap.transactions_preview.limit == 2
     assert bootstrap.transactions_preview.returned_items == 2
     assert bootstrap.transactions_preview.has_more is True

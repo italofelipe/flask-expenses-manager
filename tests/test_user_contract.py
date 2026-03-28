@@ -3,6 +3,9 @@ from datetime import date, timedelta
 from decimal import Decimal
 from typing import Dict
 
+from app.application.services.authenticated_user_context_service import (
+    AuthenticatedUserContextService,
+)
 from app.extensions.database import db
 from app.extensions.integration_metrics import (
     build_http_observability_metrics_payload,
@@ -346,6 +349,25 @@ def test_user_me_v3_contract_returns_canonical_context_only(client) -> None:
     assert "wallet" not in body["data"]["user"]
     assert "Deprecation" not in response.headers
     assert "Sunset" not in response.headers
+
+
+def test_user_me_v3_contract_does_not_load_wallet_entries(client, monkeypatch) -> None:
+    token = _register_and_login(client)
+
+    def _raise_wallet_query(*_args: object, **_kwargs: object) -> object:
+        raise AssertionError("wallet preview should not be loaded for /user/me v3")
+
+    monkeypatch.setattr(
+        AuthenticatedUserContextService,
+        "build_wallet_entries",
+        _raise_wallet_query,
+    )
+
+    response = client.get("/user/me", headers=_auth_headers(token, "v3"))
+
+    assert response.status_code == 200
+    body = response.get_json()
+    assert body["success"] is True
 
 
 def test_user_me_legacy_contract_emits_deprecation_metrics(client) -> None:
