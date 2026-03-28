@@ -3,6 +3,7 @@ set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT_DIR"
+CI_LOCAL_PYTHON_IMAGE="${CI_LOCAL_PYTHON_IMAGE:-public.ecr.aws/docker/library/python:3.13-slim}"
 # shellcheck source=./lib_python.sh
 source "${ROOT_DIR}/scripts/lib_python.sh"
 
@@ -17,11 +18,11 @@ if [[ "$MODE" == "docker" ]]; then
     exit 1
   fi
 
-  echo "[quality-local] Running CI quality pipeline in python:3.13-slim container..."
+  echo "[quality-local] Running CI quality pipeline in ${CI_LOCAL_PYTHON_IMAGE} container..."
   docker run --rm \
     -v "$ROOT_DIR:/workspace" \
     -w /workspace \
-    python:3.13-slim \
+    "$CI_LOCAL_PYTHON_IMAGE" \
     bash -lc "python3 scripts/repo_hygiene_check.py && \
       python -m pip install --upgrade pip && \
       python -m pip install -r requirements.txt -r requirements-dev.txt && \

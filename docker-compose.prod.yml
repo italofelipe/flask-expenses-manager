@@ -1,6 +1,6 @@
 services:
   db:
-    image: postgres:16
+    image: ${POSTGRES_IMAGE:-public.ecr.aws/docker/library/postgres:16}
     restart: unless-stopped
     environment:
       POSTGRES_DB: ${POSTGRES_DB}
@@ -15,7 +15,7 @@ services:
       retries: 5
 
   redis:
-    image: redis:7-alpine
+    image: ${REDIS_IMAGE:-public.ecr.aws/docker/library/redis:7-alpine}
     restart: unless-stopped
     command: ["redis-server", "--appendonly", "yes"]
     volumes:

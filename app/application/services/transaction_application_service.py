@@ -389,16 +389,19 @@ class TransactionApplicationService:
     ) -> dict[str, Any]:
         year, month_number, normalized_month = _parse_month(month)
         analytics = self._analytics_service_factory(self._user_id)
-        transactions = analytics.get_month_transactions(
-            year=year, month_number=month_number
-        )
         aggregates = analytics.get_month_aggregates(
             year=year, month_number=month_number
         )
-
+        total_transactions, transactions = _resolve_month_summary_page(
+            analytics=analytics,
+            year=year,
+            month_number=month_number,
+            page=page,
+            page_size=page_size,
+        )
         serialized = [_serialize_transaction(item) for item in transactions]
         paginated = PaginatedResponse.format(
-            serialized, len(transactions), page, page_size
+            serialized, total_transactions, page, page_size
         )
         return {
             "month": normalized_month,
@@ -769,3 +772,45 @@ def _apply_transaction_updates(
 
 def _serialize_transaction(transaction: Transaction) -> TransactionPayload:
     return serialize_transaction_payload(transaction)
+
+
+def _resolve_month_summary_page(
+    *,
+    analytics: TransactionAnalyticsService,
+    year: int,
+    month_number: int,
+    page: int,
+    page_size: int,
+) -> tuple[int, list[Transaction]]:
+    analytics_type = type(analytics)
+    supports_paginated_path = (
+        getattr(analytics_type, "get_month_transaction_count", None)
+        is not TransactionAnalyticsService.get_month_transaction_count
+        and getattr(analytics_type, "get_month_transactions_page", None)
+        is not TransactionAnalyticsService.get_month_transactions_page
+    )
+    paginated_count = getattr(analytics, "get_month_transaction_count", None)
+    paginated_page = getattr(analytics, "get_month_transactions_page", None)
+    if (
+        supports_paginated_path
+        and callable(paginated_count)
+        and callable(paginated_page)
+    ):
+        total_transactions = int(paginated_count(year=year, month_number=month_number))
+        transactions = cast(
+            list[Transaction],
+            paginated_page(
+                year=year,
+                month_number=month_number,
+                page=page,
+                per_page=page_size,
+            ),
+        )
+        return total_transactions, transactions
+
+    transactions = analytics.get_month_transactions(
+        year=year, month_number=month_number
+    )
+    start_index = max(0, (page - 1) * page_size)
+    end_index = start_index + page_size
+    return len(transactions), transactions[start_index:end_index]

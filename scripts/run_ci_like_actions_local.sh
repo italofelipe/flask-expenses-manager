@@ -18,6 +18,7 @@ set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT_DIR"
+CI_LOCAL_PYTHON_IMAGE="${CI_LOCAL_PYTHON_IMAGE:-public.ecr.aws/docker/library/python:3.13-slim}"
 # shellcheck source=./lib_python.sh
 source "${ROOT_DIR}/scripts/lib_python.sh"
 
@@ -212,11 +213,11 @@ run_in_docker() {
     exit 4
   fi
 
-  echo "[ci-like-local] Running in python:3.13-slim container..."
+  echo "[ci-like-local] Running in ${CI_LOCAL_PYTHON_IMAGE} container..."
   docker run --rm \
     -v "$ROOT_DIR:/workspace" \
     -w /workspace \
-    python:3.13-slim \
+    "$CI_LOCAL_PYTHON_IMAGE" \
     bash -lc "python -m pip install --upgrade pip && \
       pip install -r requirements.txt && \
       pip install -r requirements-dev.txt && \

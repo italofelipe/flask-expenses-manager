@@ -25,6 +25,27 @@ class TransactionAnalyticsService:
         transactions = self._month_query(year=year, month_number=month_number).all()
         return cast(list[Transaction], transactions)
 
+    def get_month_transaction_count(self, *, year: int, month_number: int) -> int:
+        total = self._month_query(year=year, month_number=month_number).count()
+        return int(total)
+
+    def get_month_transactions_page(
+        self,
+        *,
+        year: int,
+        month_number: int,
+        page: int,
+        per_page: int,
+    ) -> list[Transaction]:
+        transactions = (
+            self._month_query(year=year, month_number=month_number)
+            .order_by(Transaction.created_at.asc(), Transaction.id.asc())
+            .offset((page - 1) * per_page)
+            .limit(per_page)
+            .all()
+        )
+        return cast(list[Transaction], transactions)
+
     def get_month_aggregates(self, *, year: int, month_number: int) -> dict[str, Any]:
         row = (
             db.session.query(
