@@ -98,7 +98,9 @@ class PortfolioHistoryService:
         resolved_end = end_date or today
         resolved_start = start_date or (resolved_end - timedelta(days=30))
         if resolved_start > resolved_end:
-            raise PublicValidationError("startDate não pode ser maior que finalDate.")
+            raise PublicValidationError(
+                "A data inicial não pode ser maior que a data final."
+            )
         return PortfolioHistoryRange(start_date=resolved_start, end_date=resolved_end)
 
     def _load_ticker_prices(

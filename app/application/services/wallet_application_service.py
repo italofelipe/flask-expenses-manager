@@ -101,6 +101,15 @@ class WalletApplicationService:
             },
         }
 
+    def get_entry(self, investment_id: UUID) -> dict[str, Any]:
+        investment = self._get_owned_wallet(
+            investment_id,
+            forbidden_message=(
+                "Você não tem permissão para visualizar este investimento."
+            ),
+        )
+        return self._serialize_wallet_item(investment)
+
     def get_history(
         self,
         investment_id: UUID,

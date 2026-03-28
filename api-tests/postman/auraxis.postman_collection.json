@@ -10,7 +10,7 @@
       "listen": "prerequest",
       "script": {
         "exec": [
-          "var smokeRequests = [\"01 - Healthz\", \"02 - Register user (REST v2)\", \"03 - Login user (REST v2)\", \"04 - Login invalid credentials returns safe error\", \"05 - Me (REST v2)\", \"06 - User bootstrap (REST v2)\", \"01 - Create transaction (REST v2)\", \"04 - List active transactions (REST v2)\", \"05 - Transaction summary by month (REST v2)\", \"06 - Dashboard overview (REST v2)\", \"01 - Create goal (REST v2)\", \"02 - List goals (REST v2)\", \"05 - Goal simulate (REST v2)\", \"01 - Create wallet investment (REST v2)\", \"02 - List wallet investments (REST v2)\", \"08 - Create wallet operation (REST v2)\", \"10 - Wallet operation summary (REST v2)\", \"01 - Installment vs cash calculate (REST public)\", \"02 - Installment vs cash save (REST auth required)\", \"03 - Simulation goal bridge without entitlement returns 403\", \"02 - GraphQL login invalid credentials (safe error)\", \"03 - GraphQL me query (auth required)\", \"04 - GraphQL installment vs cash calculate (public)\", \"01 - List alert preferences (REST v2)\", \"01 - Get my subscription (REST v2)\", \"01 - List entitlements (REST v2)\", \"01 - List shared entries by me (REST v2)\", \"01 - CSV upload preview (REST v2)\"];",
+          "var smokeRequests = [\"01 - Healthz\", \"02 - Register user (REST v2)\", \"03 - Login user (REST v2)\", \"04 - Login invalid credentials returns safe error\", \"05 - Me (REST v2)\", \"06 - User bootstrap (REST v2)\", \"01 - Create transaction (REST v2)\", \"04 - List active transactions (REST v2)\", \"05 - Transaction summary by month (REST v2)\", \"06 - Dashboard overview (REST v2)\", \"01 - Create goal (REST v2)\", \"02 - List goals (REST v2)\", \"05 - Goal simulate (REST v2)\", \"01 - Create wallet investment (REST v2)\", \"02 - List wallet investments (REST v2)\", \"10 - Create wallet operation (REST v2)\", \"12 - Wallet operation summary (REST v2)\", \"01 - Installment vs cash calculate (REST public)\", \"02 - Installment vs cash save (REST auth required)\", \"03 - Simulation goal bridge without entitlement returns 403\", \"02 - GraphQL login invalid credentials (safe error)\", \"03 - GraphQL me query (auth required)\", \"04 - GraphQL installment vs cash calculate (public)\", \"01 - List alert preferences (REST v2)\", \"01 - Get my subscription (REST v2)\", \"01 - List entitlements (REST v2)\", \"01 - List shared entries by me (REST v2)\", \"01 - CSV upload preview (REST v2)\"];",
           "var privilegedOnlyRequests = [\"04 - Grant advanced simulations entitlement (optional admin)\", \"05 - Save advanced simulation for success bridges (optional admin)\", \"06 - Simulation goal bridge success (optional admin)\", \"07 - Save fee simulation for planned expense bridge (optional admin)\", \"08 - Simulation planned expense bridge success (optional admin)\", \"09 - Revoke advanced simulations entitlement (optional admin)\"];",
           "var privilegedProfileRequests = [\"01 - Healthz\", \"02 - Register user (REST v2)\", \"03 - Login user (REST v2)\", \"05 - Me (REST v2)\", \"06 - User bootstrap (REST v2)\", \"01 - Installment vs cash calculate (REST public)\", \"02 - Installment vs cash save (REST auth required)\", \"03 - Simulation goal bridge without entitlement returns 403\", \"04 - Grant advanced simulations entitlement (optional admin)\", \"05 - Save advanced simulation for success bridges (optional admin)\", \"06 - Simulation goal bridge success (optional admin)\", \"07 - Save fee simulation for planned expense bridge (optional admin)\", \"08 - Simulation planned expense bridge success (optional admin)\", \"09 - Revoke advanced simulations entitlement (optional admin)\"];",
           "var activeProfile = String(pm.environment.get('suiteProfile') || pm.collectionVariables.get('suiteProfile') || 'full').toLowerCase();",
@@ -2246,7 +2246,99 @@
           ]
         },
         {
-          "name": "03 - Update wallet investment (REST v2)",
+          "name": "03 - Get wallet investment detail (REST v2)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{authToken}}"
+              },
+              {
+                "key": "X-API-Contract",
+                "value": "v2"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/wallet/{{investmentId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "wallet",
+                "{{investmentId}}"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('wallet detail returns 200', function () { pm.response.to.have.status(200); });",
+                  "var body = pm.response.json();",
+                  "pm.test('wallet detail returns investment payload', function () {",
+                  "  pm.expect(body.success).to.eql(true);",
+                  "  pm.expect(body.data.investment.id).to.eql(pm.collectionVariables.get('investmentId'));",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "04 - Patch wallet investment (REST v2)",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{authToken}}"
+              },
+              {
+                "key": "X-API-Contract",
+                "value": "v2"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/wallet/{{investmentId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "wallet",
+                "{{investmentId}}"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n                      \"value\": \"2000.00\"\n                    }\n"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('wallet patch returns 200', function () { pm.response.to.have.status(200); });",
+                  "var body = pm.response.json();",
+                  "pm.test('wallet patch keeps history', function () {",
+                  "  pm.expect(body.success).to.eql(true);",
+                  "  pm.expect(body.data.investment.history).to.be.an('array');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "05 - Put wallet investment (compat REST v2)",
           "request": {
             "method": "PUT",
             "header": [
@@ -2283,9 +2375,13 @@
               "listen": "test",
               "script": {
                 "exec": [
-                  "pm.test('wallet update returns 200', function () { pm.response.to.have.status(200); });",
+                  "pm.test('wallet put returns 200', function () { pm.response.to.have.status(200); });",
                   "var body = pm.response.json();",
-                  "pm.test('wallet update keeps history', function () {",
+                  "pm.test('wallet put emits deprecation headers', function () {",
+                  "  pm.expect(pm.response.headers.get('Deprecation')).to.eql('true');",
+                  "  pm.expect(pm.response.headers.get('X-Auraxis-Successor-Method')).to.eql('PATCH');",
+                  "});",
+                  "pm.test('wallet put keeps history', function () {",
                   "  pm.expect(body.success).to.eql(true);",
                   "  pm.expect(body.data.investment.history).to.be.an('array');",
                   "});"
@@ -2296,7 +2392,7 @@
           ]
         },
         {
-          "name": "04 - Wallet investment history (REST v2)",
+          "name": "06 - Wallet investment history (REST v2)",
           "request": {
             "method": "GET",
             "header": [
@@ -2349,7 +2445,7 @@
           ]
         },
         {
-          "name": "05 - Wallet portfolio valuation (REST v2)",
+          "name": "07 - Wallet portfolio valuation (REST v2)",
           "request": {
             "method": "GET",
             "header": [
@@ -2387,7 +2483,7 @@
           ]
         },
         {
-          "name": "06 - Wallet portfolio valuation history (REST v2)",
+          "name": "08 - Wallet portfolio valuation history (REST v2)",
           "request": {
             "method": "GET",
             "header": [
@@ -2401,7 +2497,7 @@
               }
             ],
             "url": {
-              "raw": "{{baseUrl}}/wallet/valuation/history?startDate={{runYesterday}}&finalDate={{runToday}}",
+              "raw": "{{baseUrl}}/wallet/valuation/history?start_date={{runYesterday}}&end_date={{runToday}}",
               "host": [
                 "{{baseUrl}}"
               ],
@@ -2412,11 +2508,11 @@
               ],
               "query": [
                 {
-                  "key": "startDate",
+                  "key": "start_date",
                   "value": "{{runYesterday}}"
                 },
                 {
-                  "key": "finalDate",
+                  "key": "end_date",
                   "value": "{{runToday}}"
                 }
               ]
@@ -2436,7 +2532,7 @@
           ]
         },
         {
-          "name": "07 - Wallet investment valuation (REST v2)",
+          "name": "09 - Wallet investment valuation (REST v2)",
           "request": {
             "method": "GET",
             "header": [
@@ -2479,7 +2575,7 @@
           ]
         },
         {
-          "name": "08 - Create wallet operation (REST v2)",
+          "name": "10 - Create wallet operation (REST v2)",
           "request": {
             "method": "POST",
             "header": [
@@ -2528,7 +2624,7 @@
           ]
         },
         {
-          "name": "09 - List wallet operations (REST v2)",
+          "name": "11 - List wallet operations (REST v2)",
           "request": {
             "method": "GET",
             "header": [
@@ -2581,7 +2677,7 @@
           ]
         },
         {
-          "name": "10 - Wallet operation summary (REST v2)",
+          "name": "12 - Wallet operation summary (REST v2)",
           "request": {
             "method": "GET",
             "header": [
@@ -2625,7 +2721,7 @@
           ]
         },
         {
-          "name": "11 - Wallet operation position (REST v2)",
+          "name": "13 - Wallet operation position (REST v2)",
           "request": {
             "method": "GET",
             "header": [
@@ -2669,7 +2765,7 @@
           ]
         },
         {
-          "name": "12 - Wallet invested amount by date (REST v2)",
+          "name": "14 - Wallet invested amount by date (REST v2)",
           "request": {
             "method": "GET",
             "header": [
@@ -2719,7 +2815,7 @@
           ]
         },
         {
-          "name": "13 - Update wallet operation (REST v2)",
+          "name": "15 - Update wallet operation (REST v2)",
           "request": {
             "method": "PUT",
             "header": [
@@ -2771,7 +2867,7 @@
           ]
         },
         {
-          "name": "14 - Delete wallet operation (REST v2)",
+          "name": "16 - Delete wallet operation (REST v2)",
           "request": {
             "method": "DELETE",
             "header": [
@@ -2811,7 +2907,7 @@
           ]
         },
         {
-          "name": "15 - Delete wallet investment (REST v2)",
+          "name": "17 - Delete wallet investment (REST v2)",
           "request": {
             "method": "DELETE",
             "header": [
