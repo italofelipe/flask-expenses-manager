@@ -53,6 +53,19 @@ def test_premium_simulation_bridges_are_flagged() -> None:
     ].entitlements == ("advanced_simulations",)
 
 
+def test_dashboard_graphql_ownership_is_explicit_in_catalog() -> None:
+    catalog = {
+        operation.name: operation for operation in get_graphql_operation_catalog()
+    }
+
+    assert catalog["dashboardOverview"].domain == "dashboard"
+    assert catalog["dashboardOverview"].source_module == "app.graphql.queries.dashboard"
+    assert catalog["transactionDashboard"].domain == "dashboard"
+    assert catalog["transactionDashboard"].source_module == (
+        "app.graphql.queries.transaction"
+    )
+
+
 def test_committed_graphql_docs_match_runtime_bundle() -> None:
     generated = build_graphql_docs_bundle("runtime")
     committed = read_committed_graphql_docs_bundle()
