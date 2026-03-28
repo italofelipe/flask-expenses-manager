@@ -7,6 +7,7 @@ GraphQLOperationType = Literal["query", "mutation"]
 GraphQLOperationAccess = Literal["public", "auth_required"]
 GraphQLDomain = Literal[
     "auth",
+    "dashboard",
     "goals",
     "investments",
     "simulations",
@@ -16,6 +17,7 @@ GraphQLDomain = Literal[
 ]
 
 QUERY_USER_MODULE = "app.graphql.queries.user"
+QUERY_DASHBOARD_MODULE = "app.graphql.queries.dashboard"
 QUERY_TRANSACTION_MODULE = "app.graphql.queries.transaction"
 QUERY_GOAL_MODULE = "app.graphql.queries.goal"
 QUERY_SIMULATION_MODULE = "app.graphql.queries.simulation"
@@ -65,6 +67,14 @@ GRAPHQL_OPERATION_CATALOG: tuple[GraphQLOperationDoc, ...] = (
         source_module=QUERY_USER_MODULE,
     ),
     GraphQLOperationDoc(
+        name="dashboardOverview",
+        operation_type="query",
+        domain="dashboard",
+        access="auth_required",
+        summary="Retorna o read model canônico do dashboard financeiro mensal.",
+        source_module=QUERY_DASHBOARD_MODULE,
+    ),
+    GraphQLOperationDoc(
         name="transactions",
         operation_type="query",
         domain="transactions",
@@ -93,7 +103,10 @@ GRAPHQL_OPERATION_CATALOG: tuple[GraphQLOperationDoc, ...] = (
         operation_type="query",
         domain="transactions",
         access="auth_required",
-        summary="Entrega visão consolidada mensal de receitas, despesas e categorias.",
+        summary=(
+            "Compatibilidade transitória do dashboard mensal; "
+            "prefira dashboardOverview."
+        ),
         source_module=QUERY_TRANSACTION_MODULE,
     ),
     GraphQLOperationDoc(

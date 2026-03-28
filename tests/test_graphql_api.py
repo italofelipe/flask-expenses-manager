@@ -392,10 +392,14 @@ def test_graphql_transactions_summary_and_dashboard(app, client) -> None:
 
     dashboard_query = """
     query Dashboard($month: String!) {
-      transactionDashboard(month: $month) {
+      dashboardOverview(month: $month) {
         month
         totals { incomeTotal expenseTotal balance }
         counts { totalTransactions incomeTransactions expenseTransactions }
+      }
+      transactionDashboard(month: $month) {
+        month
+        totals { incomeTotal expenseTotal balance }
       }
     }
     """
@@ -405,7 +409,12 @@ def test_graphql_transactions_summary_and_dashboard(app, client) -> None:
     assert dashboard_response.status_code == 200
     dashboard_body = dashboard_response.get_json()
     assert "errors" not in dashboard_body
+    assert dashboard_body["data"]["dashboardOverview"]["month"] == month_ref
     assert dashboard_body["data"]["transactionDashboard"]["month"] == month_ref
+    assert (
+        dashboard_body["data"]["dashboardOverview"]["totals"]["expenseTotal"]
+        == dashboard_body["data"]["transactionDashboard"]["totals"]["expenseTotal"]
+    )
 
     due_range_query = """
     query DueRange($startDate: String!, $endDate: String!) {

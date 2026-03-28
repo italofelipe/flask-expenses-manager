@@ -941,9 +941,9 @@
                   }
                 }
               ],
-              "deprecationReason": null,
+              "deprecationReason": "Use dashboardOverview.",
               "description": null,
-              "isDeprecated": false,
+              "isDeprecated": true,
               "name": "transactionDashboard",
               "type": {
                 "kind": "OBJECT",
@@ -1074,6 +1074,35 @@
               "type": {
                 "kind": "OBJECT",
                 "name": "TransactionTypeObject",
+                "ofType": null
+              }
+            },
+            {
+              "args": [
+                {
+                  "defaultValue": null,
+                  "deprecationReason": null,
+                  "description": null,
+                  "isDeprecated": false,
+                  "name": "month",
+                  "type": {
+                    "kind": "NON_NULL",
+                    "name": null,
+                    "ofType": {
+                      "kind": "SCALAR",
+                      "name": "String",
+                      "ofType": null
+                    }
+                  }
+                }
+              ],
+              "deprecationReason": null,
+              "description": null,
+              "isDeprecated": false,
+              "name": "dashboardOverview",
+              "type": {
+                "kind": "OBJECT",
+                "name": "TransactionDashboardPayloadType",
                 "ofType": null
               }
             },
