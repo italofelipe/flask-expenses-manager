@@ -55,6 +55,16 @@ subscription_bp = Blueprint("subscriptions", __name__, url_prefix="/subscription
 # ---------------------------------------------------------------------------
 
 _FREE_PLAN_CODE = "free"
+_CHECKOUT_SESSION_FAILURE_MESSAGE = "Failed to create checkout session"
+_SUPPORTED_WEBHOOK_EVENTS = {
+    "subscription.activated",
+    "subscription.canceled",
+    "subscription.past_due",
+    "PAYMENT_RECEIVED",
+    "PAYMENT_CONFIRMED",
+    "PAYMENT_OVERDUE",
+    "SUBSCRIPTION_DELETED",
+}
 
 
 def _serialize_subscription(sub: Subscription) -> dict[str, Any]:
@@ -103,6 +113,11 @@ def _err(
 
 def _get_provider() -> BillingProvider:
     return get_default_billing_provider()
+
+
+def _checkout_error(status_code: int, error_code: str) -> ResponseReturnValue:
+    current_app.logger.exception(_CHECKOUT_SESSION_FAILURE_MESSAGE)
+    return _err(_CHECKOUT_SESSION_FAILURE_MESSAGE, error_code, status_code)
 
 
 # ---------------------------------------------------------------------------
@@ -160,11 +175,9 @@ def create_checkout_session() -> ResponseReturnValue:
             plan_slug=offer.slug,
         )
     except BillingProviderError:
-        current_app.logger.exception("Failed to create checkout session")
-        return _err("Failed to create checkout session", "UPSTREAM_ERROR", 502)
+        return _checkout_error(502, "UPSTREAM_ERROR")
     except Exception:
-        current_app.logger.exception("Failed to create checkout session")
-        return _err("Failed to create checkout session", "INTERNAL_ERROR", 500)
+        return _checkout_error(500, "INTERNAL_ERROR")
 
     subscription = get_or_create_subscription(UUID(auth.subject))
     provider_name = str(result.get("provider") or "").strip()
@@ -447,6 +460,55 @@ def _extract_provider_snapshot(
     return snapshot
 
 
+def _is_supported_webhook_event(event_type: str) -> bool:
+    return event_type in _SUPPORTED_WEBHOOK_EVENTS
+
+
+def _find_subscription_for_snapshot(
+    snapshot: BillingSubscriptionSnapshot,
+) -> Subscription | None:
+    provider_subscription_id = snapshot.get("provider_id")
+    if provider_subscription_id:
+        subscription: Subscription | None = Subscription.query.filter_by(
+            provider_subscription_id=provider_subscription_id
+        ).first()
+        if subscription is not None:
+            return subscription
+
+    provider_customer_id = snapshot.get("provider_customer_id")
+    if provider_customer_id:
+        subscription = Subscription.query.filter_by(
+            provider_customer_id=provider_customer_id
+        ).first()
+        return subscription
+
+    return None
+
+
+def _process_webhook_snapshot(
+    event_type: str,
+    event_id: str | None,
+    snapshot: BillingSubscriptionSnapshot,
+) -> ResponseReturnValue:
+    subscription = _find_subscription_for_snapshot(snapshot)
+    if subscription is None:
+        logger.warning(
+            "Webhook %s for unknown provider_subscription_id=%s — ignoring",
+            event_type,
+            snapshot.get("provider_id"),
+        )
+        return _ok({"received": True, "processed": False})
+
+    if event_id and subscription.provider_event_id == event_id:
+        return _ok({"received": True, "processed": False, "reason": "duplicate"})
+
+    if event_id:
+        subscription.provider_event_id = event_id
+    apply_subscription_snapshot(subscription, snapshot)
+
+    return _ok({"received": True, "processed": True})
+
+
 @subscription_bp.post("/webhook")
 def handle_webhook() -> ResponseReturnValue:
     """Receive provider webhook events.
@@ -483,16 +545,7 @@ def handle_webhook() -> ResponseReturnValue:
     event_id = _extract_event_id(payload)
     snapshot = _extract_provider_snapshot(payload)
 
-    # No-op for unknown events
-    if event_type not in {
-        "subscription.activated",
-        "subscription.canceled",
-        "subscription.past_due",
-        "PAYMENT_RECEIVED",
-        "PAYMENT_CONFIRMED",
-        "PAYMENT_OVERDUE",
-        "SUBSCRIPTION_DELETED",
-    }:
+    if not _is_supported_webhook_event(event_type):
         logger.info("Unhandled billing webhook event: %s — ignoring", event_type)
         return _ok({"received": True, "processed": False})
 
@@ -503,33 +556,7 @@ def handle_webhook() -> ResponseReturnValue:
             400,
         )
 
-    sub: Subscription | None = Subscription.query.filter_by(
-        provider_subscription_id=snapshot.get("provider_id")
-    ).first()
-    if sub is None and snapshot.get("provider_customer_id"):
-        sub = Subscription.query.filter_by(
-            provider_customer_id=snapshot["provider_customer_id"]
-        ).first()
-
-    if sub is None:
-        # Provider may send events for subscriptions we haven't recorded yet.
-        # Accept and ignore gracefully.
-        logger.warning(
-            "Webhook %s for unknown provider_subscription_id=%s — ignoring",
-            event_type,
-            snapshot.get("provider_id"),
-        )
-        return _ok({"received": True, "processed": False})
-
-    # Idempotency: skip already-processed events
-    if event_id and sub.provider_event_id == event_id:
-        return _ok({"received": True, "processed": False, "reason": "duplicate"})
-
-    if event_id:
-        sub.provider_event_id = event_id
-    apply_subscription_snapshot(sub, snapshot)
-
-    return _ok({"received": True, "processed": True})
+    return _process_webhook_snapshot(event_type, event_id, snapshot)
 
 
 def register_subscription_dependencies(app: Any) -> None:  # noqa: ANN401
