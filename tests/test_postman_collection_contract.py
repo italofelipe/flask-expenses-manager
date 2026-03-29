@@ -252,7 +252,8 @@ def test_postman_collection_uses_domain_folders() -> None:
         "06 - Subscriptions and Entitlements",
         "07 - Shared Entries",
         "08 - Fiscal",
-        "09 - GraphQL",
+        "09 - Tags, Accounts and Credit Cards",
+        "10 - GraphQL",
     ]
 
 
