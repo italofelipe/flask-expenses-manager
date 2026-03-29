@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+# mypy: disable-error-code=untyped-decorator
 from typing import Any
 from uuid import UUID
 
@@ -14,6 +15,10 @@ from app.models.tag import Tag
 from app.utils.typed_decorators import typed_jwt_required as jwt_required
 
 from .blueprint import tag_bp
+
+MISSING_NAME_MESSAGE = "Field 'name' is required"
+NAME_TOO_LONG_MESSAGE = "Field 'name' must be at most 50 characters"
+TAG_NOT_FOUND_MESSAGE = "Tag not found"
 
 
 @tag_bp.route("", methods=["GET"])
@@ -44,16 +49,16 @@ def create_tag() -> tuple[dict[str, Any], int]:
     name = (payload.get("name") or "").strip()
     if not name:
         return compat_error_tuple(
-            legacy_payload={"error": "Field 'name' is required"},
+            legacy_payload={"error": MISSING_NAME_MESSAGE},
             status_code=400,
-            message="Field 'name' is required",
+            message=MISSING_NAME_MESSAGE,
             error_code="MISSING_NAME",
         )
     if len(name) > 50:
         return compat_error_tuple(
-            legacy_payload={"error": "Field 'name' must be at most 50 characters"},
+            legacy_payload={"error": NAME_TOO_LONG_MESSAGE},
             status_code=400,
-            message="Field 'name' must be at most 50 characters",
+            message=NAME_TOO_LONG_MESSAGE,
             error_code="NAME_TOO_LONG",
         )
 
@@ -78,9 +83,9 @@ def update_tag(tag_id: UUID) -> tuple[dict[str, Any], int]:
     tag = Tag.query.filter_by(id=tag_id, user_id=user_id).first()
     if tag is None:
         return compat_error_tuple(
-            legacy_payload={"error": "Tag not found"},
+            legacy_payload={"error": TAG_NOT_FOUND_MESSAGE},
             status_code=404,
-            message="Tag not found",
+            message=TAG_NOT_FOUND_MESSAGE,
             error_code="NOT_FOUND",
         )
 
@@ -88,16 +93,16 @@ def update_tag(tag_id: UUID) -> tuple[dict[str, Any], int]:
     name = (payload.get("name") or "").strip()
     if not name:
         return compat_error_tuple(
-            legacy_payload={"error": "Field 'name' is required"},
+            legacy_payload={"error": MISSING_NAME_MESSAGE},
             status_code=400,
-            message="Field 'name' is required",
+            message=MISSING_NAME_MESSAGE,
             error_code="MISSING_NAME",
         )
     if len(name) > 50:
         return compat_error_tuple(
-            legacy_payload={"error": "Field 'name' must be at most 50 characters"},
+            legacy_payload={"error": NAME_TOO_LONG_MESSAGE},
             status_code=400,
-            message="Field 'name' must be at most 50 characters",
+            message=NAME_TOO_LONG_MESSAGE,
             error_code="NAME_TOO_LONG",
         )
 
@@ -121,9 +126,9 @@ def delete_tag(tag_id: UUID) -> tuple[dict[str, Any], int]:
     tag = Tag.query.filter_by(id=tag_id, user_id=user_id).first()
     if tag is None:
         return compat_error_tuple(
-            legacy_payload={"error": "Tag not found"},
+            legacy_payload={"error": TAG_NOT_FOUND_MESSAGE},
             status_code=404,
-            message="Tag not found",
+            message=TAG_NOT_FOUND_MESSAGE,
             error_code="NOT_FOUND",
         )
 

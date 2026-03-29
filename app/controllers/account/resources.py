@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+# mypy: disable-error-code=untyped-decorator
 from typing import Any
 from uuid import UUID
 
@@ -14,6 +15,10 @@ from app.models.account import Account
 from app.utils.typed_decorators import typed_jwt_required as jwt_required
 
 from .blueprint import account_bp
+
+MISSING_NAME_MESSAGE = "Field 'name' is required"
+NAME_TOO_LONG_MESSAGE = "Field 'name' must be at most 100 characters"
+ACCOUNT_NOT_FOUND_MESSAGE = "Account not found"
 
 
 @account_bp.route("", methods=["GET"])
@@ -44,16 +49,16 @@ def create_account() -> tuple[dict[str, Any], int]:
     name = (payload.get("name") or "").strip()
     if not name:
         return compat_error_tuple(
-            legacy_payload={"error": "Field 'name' is required"},
+            legacy_payload={"error": MISSING_NAME_MESSAGE},
             status_code=400,
-            message="Field 'name' is required",
+            message=MISSING_NAME_MESSAGE,
             error_code="MISSING_NAME",
         )
     if len(name) > 100:
         return compat_error_tuple(
-            legacy_payload={"error": "Field 'name' must be at most 100 characters"},
+            legacy_payload={"error": NAME_TOO_LONG_MESSAGE},
             status_code=400,
-            message="Field 'name' must be at most 100 characters",
+            message=NAME_TOO_LONG_MESSAGE,
             error_code="NAME_TOO_LONG",
         )
 
@@ -78,9 +83,9 @@ def update_account(account_id: UUID) -> tuple[dict[str, Any], int]:
     account = Account.query.filter_by(id=account_id, user_id=user_id).first()
     if account is None:
         return compat_error_tuple(
-            legacy_payload={"error": "Account not found"},
+            legacy_payload={"error": ACCOUNT_NOT_FOUND_MESSAGE},
             status_code=404,
-            message="Account not found",
+            message=ACCOUNT_NOT_FOUND_MESSAGE,
             error_code="NOT_FOUND",
         )
 
@@ -88,16 +93,16 @@ def update_account(account_id: UUID) -> tuple[dict[str, Any], int]:
     name = (payload.get("name") or "").strip()
     if not name:
         return compat_error_tuple(
-            legacy_payload={"error": "Field 'name' is required"},
+            legacy_payload={"error": MISSING_NAME_MESSAGE},
             status_code=400,
-            message="Field 'name' is required",
+            message=MISSING_NAME_MESSAGE,
             error_code="MISSING_NAME",
         )
     if len(name) > 100:
         return compat_error_tuple(
-            legacy_payload={"error": "Field 'name' must be at most 100 characters"},
+            legacy_payload={"error": NAME_TOO_LONG_MESSAGE},
             status_code=400,
-            message="Field 'name' must be at most 100 characters",
+            message=NAME_TOO_LONG_MESSAGE,
             error_code="NAME_TOO_LONG",
         )
 
@@ -124,9 +129,9 @@ def delete_account(account_id: UUID) -> tuple[dict[str, Any], int]:
     account = Account.query.filter_by(id=account_id, user_id=user_id).first()
     if account is None:
         return compat_error_tuple(
-            legacy_payload={"error": "Account not found"},
+            legacy_payload={"error": ACCOUNT_NOT_FOUND_MESSAGE},
             status_code=404,
-            message="Account not found",
+            message=ACCOUNT_NOT_FOUND_MESSAGE,
             error_code="NOT_FOUND",
         )
 
