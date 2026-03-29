@@ -41,6 +41,7 @@ class GraphQLOperationDoc:
     access: GraphQLOperationAccess
     summary: str
     source_module: str
+    legacy_alias_of: str | None = None
     entitlements: tuple[str, ...] = ()
 
     def to_manifest_entry(self) -> dict[str, object]:
@@ -52,6 +53,8 @@ class GraphQLOperationDoc:
             "summary": self.summary,
             "source_module": self.source_module,
         }
+        if self.legacy_alias_of:
+            entry["legacy_alias_of"] = self.legacy_alias_of
         if self.entitlements:
             entry["entitlements"] = list(self.entitlements)
         return entry
@@ -103,11 +106,9 @@ GRAPHQL_OPERATION_CATALOG: tuple[GraphQLOperationDoc, ...] = (
         operation_type="query",
         domain="dashboard",
         access="auth_required",
-        summary=(
-            "Compatibilidade transitória do dashboard mensal; "
-            "prefira dashboardOverview."
-        ),
-        source_module=QUERY_TRANSACTION_MODULE,
+        summary="Alias legado do dashboard mensal; prefira dashboardOverview.",
+        source_module=QUERY_DASHBOARD_MODULE,
+        legacy_alias_of="dashboardOverview",
     ),
     GraphQLOperationDoc(
         name="transactionDueRange",
