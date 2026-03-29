@@ -6045,6 +6045,83 @@
           ]
         }
       ]
+    },
+    {
+      "name": "11 - Observability",
+      "item": [
+        {
+          "name": "01 - Observability snapshot (JSON export)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "X-Observability-Key",
+                "value": "{{observabilityToken}}",
+                "description": "Required observability export token"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/ops/observability",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "ops",
+                "observability"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('observability snapshot status 200 or 401 or 404', function () {",
+                  "  pm.expect([200, 401, 404]).to.include(pm.response.code);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "02 - Observability metrics (Prometheus text)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "X-Observability-Key",
+                "value": "{{observabilityToken}}",
+                "description": "Required observability export token"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/ops/metrics",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "ops",
+                "metrics"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('metrics status 200 or 401 or 404', function () {",
+                  "  pm.expect([200, 401, 404]).to.include(pm.response.code);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        }
+      ]
     }
   ],
   "variable": [
