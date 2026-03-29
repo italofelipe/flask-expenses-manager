@@ -765,6 +765,9 @@ class TestWebhook:
             user = User.query.filter_by(id=updated.user_id).first()
             assert user is not None
             assert user.entitlements_version == 1
+            outbox = app.extensions.get("email_outbox", [])
+            assert isinstance(outbox, list)
+            assert outbox[-1]["tag"] == "billing_payment_confirmed"
 
     def test_webhook_rejects_invalid_signature_when_secret_is_configured(
         self,
