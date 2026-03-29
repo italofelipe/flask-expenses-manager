@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import timedelta
 from typing import Callable, cast
 from uuid import UUID
@@ -36,6 +36,19 @@ from app.services.login_attempt_guard_service import (
 )
 
 AUTH_DEPENDENCIES_EXTENSION_KEY = "auth_dependencies"
+_NOOP_EMAIL_CONFIRMATION_RESULT = EmailConfirmationResult(ok=True, message="noop")
+
+
+def _noop_issue_email_confirmation(_user: User) -> EmailConfirmationResult:
+    return _NOOP_EMAIL_CONFIRMATION_RESULT
+
+
+def _noop_resend_email_confirmation(_email: str) -> EmailConfirmationResult:
+    return _NOOP_EMAIL_CONFIRMATION_RESULT
+
+
+def _noop_confirm_email(_token: str) -> EmailConfirmationResult:
+    return _NOOP_EMAIL_CONFIRMATION_RESULT
 
 
 @dataclass(frozen=True)
@@ -51,9 +64,15 @@ class AuthDependencies:
     get_user_by_id: Callable[[UUID], User | None]
     request_password_reset: Callable[[str], PasswordResetResult]
     reset_password: Callable[[str, str], PasswordResetResult]
-    issue_email_confirmation: Callable[[User], EmailConfirmationResult]
-    resend_email_confirmation: Callable[[str], EmailConfirmationResult]
-    confirm_email: Callable[[str], EmailConfirmationResult]
+    issue_email_confirmation: Callable[[User], EmailConfirmationResult] = field(
+        default=_noop_issue_email_confirmation
+    )
+    resend_email_confirmation: Callable[[str], EmailConfirmationResult] = field(
+        default=_noop_resend_email_confirmation
+    )
+    confirm_email: Callable[[str], EmailConfirmationResult] = field(
+        default=_noop_confirm_email
+    )
 
 
 def _find_user_by_email(email: str) -> User | None:
