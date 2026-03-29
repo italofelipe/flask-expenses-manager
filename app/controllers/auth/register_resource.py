@@ -113,6 +113,13 @@ class RegisterResource(MethodResource):
             db.session.flush()
             db.session.commit()
 
+            try:
+                dependencies.issue_email_confirmation(user)
+            except Exception:
+                current_app.logger.exception(
+                    "Failed to dispatch account confirmation email after registration."
+                )
+
             if auth_policy.registration.conceal_conflict:
                 return compat_success(
                     legacy_payload=registration_ack_payload(

@@ -23,6 +23,10 @@ class User(db.Model):
     password_reset_token_hash = db.Column(db.String(128), nullable=True)
     password_reset_token_expires_at = db.Column(db.DateTime, nullable=True)
     password_reset_requested_at = db.Column(db.DateTime, nullable=True)
+    email_verification_token_hash = db.Column(db.String(128), nullable=True)
+    email_verification_token_expires_at = db.Column(db.DateTime, nullable=True)
+    email_verification_requested_at = db.Column(db.DateTime, nullable=True)
+    email_verified_at = db.Column(db.DateTime, nullable=True)
 
     # Personal data collected after the initial signup flow.
     gender = db.Column(db.String(20), nullable=True)

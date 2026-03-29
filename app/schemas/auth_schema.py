@@ -7,6 +7,8 @@ from marshmallow import (
 
 from app.schemas.sanitization import sanitize_string_fields
 
+EXAMPLE_USER_EMAIL = "joao.silva@email.com"
+
 
 class AuthSchema(Schema):
     """Schema para autenticação de usuários"""
@@ -15,7 +17,7 @@ class AuthSchema(Schema):
         required=True,
         metadata={
             "description": "Endereço de email do usuário (identificador canônico)",
-            "example": "joao.silva@email.com",
+            "example": EXAMPLE_USER_EMAIL,
         },
     )
     password = fields.String(
@@ -78,7 +80,7 @@ class ForgotPasswordSchema(Schema):
         required=True,
         metadata={
             "description": "Email da conta que deseja recuperar acesso",
-            "example": "joao.silva@email.com",
+            "example": EXAMPLE_USER_EMAIL,
         },
     )
 
@@ -122,3 +124,39 @@ class ResetPasswordSchema(Schema):
     @pre_load
     def sanitize_input(self, data: object, **kwargs: object) -> object:
         return sanitize_string_fields(data, {"token"})
+
+
+class ConfirmEmailSchema(Schema):
+    """Schema para confirmacao de conta via token"""
+
+    token = fields.String(
+        required=True,
+        validate=validate.Length(min=24, max=512),
+        metadata={
+            "description": "Token de confirmacao recebido por email",
+            "example": "G9Q7zJ6lQ4Vwm6dXj6nQjzH8QqfUuBqbMTe4PmS7p8Q",
+        },
+    )
+
+    @pre_load
+    def sanitize_input(self, data: object, **kwargs: object) -> object:
+        return sanitize_string_fields(data, {"token"})
+
+
+class ResendConfirmationSchema(Schema):
+    """Schema para reenvio de confirmacao de conta"""
+
+    email = fields.Email(
+        required=True,
+        metadata={
+            "description": "Email da conta que deseja confirmar",
+            "example": EXAMPLE_USER_EMAIL,
+        },
+    )
+
+    @pre_load
+    def sanitize_input(self, data: object, **kwargs: object) -> object:
+        sanitized = sanitize_string_fields(data, {"email"})
+        if isinstance(sanitized, dict) and isinstance(sanitized.get("email"), str):
+            sanitized["email"] = str(sanitized["email"]).lower()
+        return sanitized

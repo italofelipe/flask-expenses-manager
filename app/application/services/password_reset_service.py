@@ -16,6 +16,7 @@ from app.http.runtime import (
     set_runtime_extension,
 )
 from app.models.user import User
+from app.services.email_provider import EmailMessage, get_default_email_provider
 
 PASSWORD_RESET_NEUTRAL_MESSAGE = (
     "If an account exists for this email, recovery instructions were sent."
@@ -80,6 +81,22 @@ def _dispatch_reset_instructions(*, email: str, token: str) -> None:
                 "reset_url": reset_url,
             }
         )
+
+    get_default_email_provider().send(
+        EmailMessage(
+            to_email=email,
+            subject="Redefina sua senha Auraxis",
+            html=(
+                "<p>Recebemos uma solicitacao para redefinir sua senha.</p>"
+                f'<p><a href="{reset_url}">Redefinir senha</a></p>'
+            ),
+            text=(
+                "Recebemos uma solicitacao para redefinir sua senha. "
+                f"Acesse: {reset_url}"
+            ),
+            tag="password_reset",
+        )
+    )
 
     runtime_logger().info(
         (

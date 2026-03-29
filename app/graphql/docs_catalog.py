@@ -271,6 +271,22 @@ GRAPHQL_OPERATION_CATALOG: tuple[GraphQLOperationDoc, ...] = (
         source_module=MUTATION_AUTH_MODULE,
     ),
     GraphQLOperationDoc(
+        name="resendConfirmationEmail",
+        operation_type="mutation",
+        domain="auth",
+        access="public",
+        summary="Reenvia o email de confirmação com resposta neutra.",
+        source_module=MUTATION_AUTH_MODULE,
+    ),
+    GraphQLOperationDoc(
+        name="confirmEmail",
+        operation_type="mutation",
+        domain="auth",
+        access="public",
+        summary="Confirma a conta do usuário a partir de um token válido.",
+        source_module=MUTATION_AUTH_MODULE,
+    ),
+    GraphQLOperationDoc(
         name="updateUserProfile",
         operation_type="mutation",
         domain="user",

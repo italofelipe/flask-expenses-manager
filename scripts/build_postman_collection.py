@@ -562,7 +562,50 @@ def build_collection() -> dict[str, Any]:
             ],
         ),
         _item(
-            "17 - Salary increase simulation (REST v2)",
+            "17 - Email resend unknown email (REST v2)",
+            _request(
+                method="POST",
+                raw_url="{{baseUrl}}/auth/email/resend",
+                headers=contract_headers,
+                body=_json_body(
+                    """
+                    {
+                      "email": "unknown-{{runSeed}}@example.com"
+                    }
+                    """
+                ),
+            ),
+            test_lines=[
+                "pm.test('email resend unknown returns neutral 200', function () { pm.response.to.have.status(200); });",
+                "var body = pm.response.json();",
+                "pm.test('email resend unknown stays neutral', function () { pm.expect(body.success).to.eql(true); });",
+            ],
+        ),
+        _item(
+            "18 - Email confirm invalid token (REST v2)",
+            _request(
+                method="POST",
+                raw_url="{{baseUrl}}/auth/email/confirm",
+                headers=contract_headers,
+                body=_json_body(
+                    """
+                    {
+                      "token": "invalid-token-value-with-sufficient-length-123456"
+                    }
+                    """
+                ),
+            ),
+            test_lines=[
+                "pm.test('email confirm invalid token returns 400', function () { pm.response.to.have.status(400); });",
+                "var body = pm.response.json();",
+                "pm.test('email confirm invalid token is a validation error', function () {",
+                "  pm.expect(body.success).to.eql(false);",
+                "  pm.expect(body.error.code).to.eql('VALIDATION_ERROR');",
+                "});",
+            ],
+        ),
+        _item(
+            "19 - Salary increase simulation (REST v2)",
             _request(
                 method="POST",
                 raw_url="{{baseUrl}}/user/simulate-salary-increase",

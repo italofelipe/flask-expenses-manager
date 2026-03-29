@@ -19,6 +19,8 @@ TRIGGER_MATRIX: dict[str, dict[str, str]] = {
     "goal_deadline": {"severity": "info", "category": "goals"},
     "suspicious_transaction": {"severity": "critical", "category": "transactions"},
     "subscription_expiring": {"severity": "warning", "category": "subscription"},
+    "due_soon_7_days": {"severity": "info", "category": "due_soon"},
+    "due_soon_1_day": {"severity": "warning", "category": "due_soon"},
 }
 
 
