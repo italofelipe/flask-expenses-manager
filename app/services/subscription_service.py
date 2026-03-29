@@ -13,7 +13,9 @@ from app.config.billing_plans import parse_billing_cycle, resolve_checkout_plan_
 from app.config.plan_features import PLAN_FEATURES
 from app.extensions.database import db
 from app.models.subscription import BillingCycle, Subscription, SubscriptionStatus
-from app.services.billing_adapter import BillingProvider
+from app.models.user import User
+from app.services.billing_adapter import BillingProvider, BillingSubscriptionSnapshot
+from app.services.entitlement_service import sync_entitlements_from_subscription
 
 _FREE_PLAN_CODE = "free"
 
@@ -57,6 +59,91 @@ def get_or_create_subscription(user_id: UUID) -> Subscription:
     return subscription
 
 
+def _bump_entitlements_version(user_id: UUID) -> None:
+    user = cast(User | None, db.session.get(User, user_id))
+    if user is None:
+        return
+    user.entitlements_version = int(user.entitlements_version or 0) + 1
+
+
+def _sync_access_if_needed(subscription: Subscription, *, changed: bool) -> None:
+    if not changed:
+        return
+    sync_entitlements_from_subscription(subscription)
+    _bump_entitlements_version(subscription.user_id)
+
+
+def _set_if_changed[T](current: T, next_value: T | None) -> tuple[T, bool]:
+    if next_value is None or current == next_value:
+        return current, False
+    return next_value, True
+
+
+def apply_subscription_snapshot(
+    subscription: Subscription,
+    snapshot: BillingSubscriptionSnapshot,
+) -> Subscription:
+    """Apply provider data to *subscription* and sync entitlement side effects."""
+
+    changed = False
+
+    raw_status = snapshot.get("status", "")
+    try:
+        next_status = SubscriptionStatus(str(raw_status))
+    except ValueError:
+        next_status = None
+    subscription.status, did_change = _set_if_changed(subscription.status, next_status)
+    changed = changed or did_change
+
+    normalized_plan = _normalize_plan_snapshot(
+        raw_plan_code=snapshot.get("plan_code"),
+        raw_billing_cycle=snapshot.get("billing_cycle"),
+        raw_offer_code=snapshot.get("offer_code"),
+    )
+    if normalized_plan is not None:
+        next_plan_code, next_billing_cycle = normalized_plan
+        subscription.plan_code, did_change = _set_if_changed(
+            subscription.plan_code, next_plan_code
+        )
+        changed = changed or did_change
+        subscription.billing_cycle, did_change = _set_if_changed(
+            subscription.billing_cycle, next_billing_cycle
+        )
+        changed = changed or did_change
+
+    provider = snapshot.get("provider")
+    subscription.provider, did_change = _set_if_changed(subscription.provider, provider)
+    changed = changed or did_change
+
+    provider_id = snapshot.get("provider_id")
+    subscription.provider_subscription_id, did_change = _set_if_changed(
+        subscription.provider_subscription_id, provider_id
+    )
+    changed = changed or did_change
+
+    provider_customer_id = snapshot.get("provider_customer_id")
+    subscription.provider_customer_id, did_change = _set_if_changed(
+        subscription.provider_customer_id, provider_customer_id
+    )
+    changed = changed or did_change
+
+    next_period_start = snapshot.get("current_period_start")
+    subscription.current_period_start, did_change = _set_if_changed(
+        subscription.current_period_start, next_period_start
+    )
+    changed = changed or did_change
+
+    next_period_end = snapshot.get("current_period_end")
+    subscription.current_period_end, did_change = _set_if_changed(
+        subscription.current_period_end, next_period_end
+    )
+    changed = changed or did_change
+
+    _sync_access_if_needed(subscription, changed=changed)
+    db.session.commit()
+    return subscription
+
+
 def sync_subscription_from_provider(
     subscription: Subscription,
     provider: BillingProvider,
@@ -71,28 +158,7 @@ def sync_subscription_from_provider(
         return subscription
 
     data = provider.get_subscription(subscription.provider_subscription_id)
-
-    raw_status = data.get("status", "")
-    try:
-        subscription.status = SubscriptionStatus(raw_status)
-    except ValueError:
-        # Unknown status from provider — leave existing status intact.
-        pass
-
-    normalized_plan = _normalize_plan_snapshot(
-        raw_plan_code=data.get("plan_code"),
-        raw_billing_cycle=data.get("billing_cycle"),
-        raw_offer_code=data.get("offer_code"),
-    )
-    if normalized_plan is not None:
-        subscription.plan_code, subscription.billing_cycle = normalized_plan
-    if "current_period_start" in data and data["current_period_start"] is not None:
-        subscription.current_period_start = data["current_period_start"]
-    if "current_period_end" in data and data["current_period_end"] is not None:
-        subscription.current_period_end = data["current_period_end"]
-
-    db.session.commit()
-    return subscription
+    return apply_subscription_snapshot(subscription, data)
 
 
 def cancel_subscription(
@@ -107,6 +173,16 @@ def cancel_subscription(
     if subscription.provider_subscription_id:
         provider.cancel_subscription(subscription.provider_subscription_id)
 
-    subscription.status = SubscriptionStatus.CANCELED
-    db.session.commit()
-    return subscription
+    return apply_subscription_snapshot(
+        subscription,
+        {
+            "status": SubscriptionStatus.CANCELED.value,
+            "provider_customer_id": subscription.provider_customer_id,
+            **({"provider": subscription.provider} if subscription.provider else {}),
+            **(
+                {"provider_id": subscription.provider_subscription_id}
+                if subscription.provider_subscription_id
+                else {}
+            ),
+        },
+    )

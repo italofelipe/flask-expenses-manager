@@ -6,11 +6,20 @@ import hashlib
 import hmac
 import logging
 import uuid
+from datetime import datetime
 from typing import Dict
 from unittest.mock import MagicMock
 
 from app.models.subscription import BillingCycle, Subscription, SubscriptionStatus
-from app.services.billing_adapter import BillingProvider, StubBillingProvider
+from app.models.user import User
+from app.services.billing_adapter import (
+    AsaasBillingProvider,
+    BillingCheckoutCustomer,
+    BillingProvider,
+    BillingProviderError,
+    StubBillingProvider,
+    get_default_billing_provider,
+)
 from app.services.subscription_service import (
     cancel_subscription,
     get_or_create_subscription,
@@ -66,10 +75,94 @@ class TestStubBillingProvider:
         assert result["provider"] == "stub"
 
     def test_create_checkout_session_returns_url(self) -> None:
-        result = self.provider.create_checkout_session("user_abc", "premium_monthly")
+        result = self.provider.create_checkout_session(
+            BillingCheckoutCustomer(
+                user_id="user_abc",
+                name="Auraxis User",
+                email="user_abc@email.com",
+            ),
+            "premium_monthly",
+        )
         assert "checkout_url" in result
         assert "premium_monthly" in result["checkout_url"]
         assert result["provider"] == "stub"
+
+
+class TestBillingProviderFactory:
+    def test_factory_returns_stub_by_default(self, monkeypatch) -> None:
+        monkeypatch.delenv("BILLING_PROVIDER", raising=False)
+        provider = get_default_billing_provider()
+        assert isinstance(provider, StubBillingProvider)
+
+    def test_factory_returns_asaas_when_enabled(self, monkeypatch) -> None:
+        monkeypatch.setenv("BILLING_PROVIDER", "asaas")
+        monkeypatch.setenv("BILLING_ASAAS_API_KEY", "asaas_test_key")
+        provider = get_default_billing_provider()
+        assert isinstance(provider, AsaasBillingProvider)
+
+
+class TestAsaasBillingProvider:
+    def test_create_checkout_session_returns_customer_id_and_url(
+        self, monkeypatch
+    ) -> None:
+        provider = AsaasBillingProvider()
+        monkeypatch.setenv("BILLING_ASAAS_API_KEY", "asaas_test_key")
+        monkeypatch.setenv(
+            "BILLING_CHECKOUT_SUCCESS_URL", "https://auraxis.com/success"
+        )
+        monkeypatch.setenv("BILLING_CHECKOUT_CANCEL_URL", "https://auraxis.com/cancel")
+        responses = iter(
+            [
+                {"id": "cus_123"},
+                {"id": "chk_123", "link": "https://asaas.com/c/chk_123"},
+            ]
+        )
+
+        def _fake_request(
+            method: str, path: str, *, json_payload: object | None = None
+        ):
+            payload = next(responses)
+            assert method == "POST"
+            if path == "/customers":
+                assert json_payload is not None
+            return payload
+
+        monkeypatch.setattr(provider, "_request", _fake_request)
+
+        result = provider.create_checkout_session(
+            BillingCheckoutCustomer(
+                user_id="user_123",
+                name="Auraxis User",
+                email="user_123@email.com",
+            ),
+            "premium_monthly",
+        )
+
+        assert result["provider"] == "asaas"
+        assert result["provider_customer_id"] == "cus_123"
+        assert result["checkout_url"] == "https://asaas.com/c/chk_123"
+
+    def test_create_checkout_session_requires_callback_urls(self, monkeypatch) -> None:
+        provider = AsaasBillingProvider()
+        monkeypatch.setenv("BILLING_ASAAS_API_KEY", "asaas_test_key")
+        monkeypatch.delenv("BILLING_CHECKOUT_SUCCESS_URL", raising=False)
+        monkeypatch.delenv("BILLING_CHECKOUT_CANCEL_URL", raising=False)
+
+        monkeypatch.setattr(provider, "_ensure_customer", lambda _customer: "cus_123")
+
+        try:
+            provider.create_checkout_session(
+                BillingCheckoutCustomer(
+                    user_id="user_123",
+                    name="Auraxis User",
+                    email="user_123@email.com",
+                ),
+                "premium_monthly",
+            )
+        except BillingProviderError as exc:
+            assert "BILLING_CHECKOUT_SUCCESS_URL" in str(exc)
+        else:
+            raise AssertionError("Expected BillingProviderError")
 
 
 # ---------------------------------------------------------------------------
@@ -124,6 +217,39 @@ class TestSubscriptionService:
             assert synced.plan_code == "premium"
             assert synced.billing_cycle == BillingCycle.MONTHLY
             mock_provider.get_subscription.assert_called_once_with("sub_xyz")
+
+    def test_sync_updates_entitlements_version_on_status_change(self, app) -> None:
+        user_id = uuid.uuid4()
+        with app.app_context():
+            from app.extensions.database import db
+
+            user = User(
+                id=user_id,
+                name="Auraxis User",
+                email="auraxis-user@email.com",
+                password="hash",
+            )
+            db.session.add(user)
+            db.session.commit()
+
+            sub = get_or_create_subscription(user_id)
+            sub.provider_subscription_id = "sub_xyz"
+            db.session.commit()
+
+            provider = MagicMock()
+            provider.get_subscription.return_value = {
+                "status": "active",
+                "plan_code": "premium",
+                "offer_code": "premium_monthly",
+                "billing_cycle": "monthly",
+                "current_period_end": datetime.fromisoformat("2026-12-31T00:00:00"),
+            }
+
+            synced = sync_subscription_from_provider(sub, provider)
+            db.session.refresh(user)
+
+            assert synced.status == SubscriptionStatus.ACTIVE
+            assert user.entitlements_version == 1
 
     def test_cancel_sets_canceled_status(self, app) -> None:
         user_id = uuid.uuid4()
@@ -264,6 +390,40 @@ class TestCreateCheckoutSession:
     def test_checkout_requires_auth(self, client) -> None:
         resp = client.post("/subscriptions/checkout", json={"plan_slug": "pro_monthly"})
         assert resp.status_code == 401
+
+    def test_checkout_persists_provider_customer_id(
+        self, client, app, monkeypatch
+    ) -> None:
+        token = _register_and_login(client, prefix="sub-checkout-provider")
+
+        class _FakeProvider:
+            def create_checkout_session(
+                self, customer: BillingCheckoutCustomer, plan_slug: str
+            ) -> dict[str, str]:
+                assert customer.email.endswith("@email.com")
+                assert plan_slug == "premium_monthly"
+                return {
+                    "checkout_url": "https://asaas.com/c/chk_123",
+                    "provider": "asaas",
+                    "provider_customer_id": "cus_123",
+                }
+
+        monkeypatch.setattr(
+            "app.controllers.subscription_controller._get_provider",
+            lambda: _FakeProvider(),
+        )
+
+        resp = client.post(
+            "/subscriptions/checkout",
+            json={"plan_slug": "premium_monthly"},
+            headers=_auth_headers(token),
+        )
+
+        assert resp.status_code == 201
+        with app.app_context():
+            sub = Subscription.query.filter_by(provider_customer_id="cus_123").first()
+            assert sub is not None
+            assert sub.provider == "asaas"
 
 
 class TestCancelSubscription:
@@ -459,6 +619,74 @@ class TestWebhook:
         body = resp.get_json()
         assert body["data"]["received"] is True
         assert body["data"]["processed"] is False
+
+    def test_webhook_accepts_valid_asaas_token(self, client, monkeypatch) -> None:
+        monkeypatch.delenv("BILLING_WEBHOOK_SECRET", raising=False)
+        monkeypatch.setenv("BILLING_WEBHOOK_ALLOW_UNSIGNED", "false")
+        monkeypatch.setenv("BILLING_ASAAS_WEBHOOK_TOKEN", "asaas-webhook-token")
+
+        resp = client.post(
+            "/subscriptions/webhook",
+            json={"event": "unknown.event", "subscription_id": "sub_xyz"},
+            headers={"asaas-access-token": "asaas-webhook-token"},
+        )
+
+        assert resp.status_code == 200
+        body = resp.get_json()
+        assert body["data"]["processed"] is False
+
+    def test_asaas_payment_webhook_updates_subscription_by_customer_id(
+        self,
+        client,
+        app,
+        monkeypatch,
+    ) -> None:
+        monkeypatch.delenv("BILLING_WEBHOOK_SECRET", raising=False)
+        monkeypatch.setenv("BILLING_WEBHOOK_ALLOW_UNSIGNED", "false")
+        monkeypatch.setenv("BILLING_ASAAS_WEBHOOK_TOKEN", "asaas-webhook-token")
+
+        token = _register_and_login(client, prefix="sub-wh-asaas")
+        response = client.get("/subscriptions/me", headers=_auth_headers(token))
+        sub_id = response.get_json()["data"]["subscription"]["id"]
+
+        with app.app_context():
+            from app.extensions.database import db
+
+            sub = Subscription.query.filter_by(id=uuid.UUID(sub_id)).first()
+            assert sub is not None
+            sub.provider_customer_id = "cus_asaas_123"
+            db.session.commit()
+            user = User.query.filter_by(id=sub.user_id).first()
+            assert user is not None
+            user_id = str(sub.user_id)
+
+        resp = client.post(
+            "/subscriptions/webhook",
+            json={
+                "id": "evt_asaas_123",
+                "event": "PAYMENT_RECEIVED",
+                "payment": {
+                    "customer": "cus_asaas_123",
+                    "subscription": "sub_asaas_123",
+                    "externalReference": f"auraxis:{user_id}:premium_monthly",
+                    "dueDate": "2026-12-31",
+                },
+            },
+            headers={"asaas-access-token": "asaas-webhook-token"},
+        )
+
+        assert resp.status_code == 200
+        with app.app_context():
+            updated = Subscription.query.filter_by(id=uuid.UUID(sub_id)).first()
+            assert updated is not None
+            assert updated.status == SubscriptionStatus.ACTIVE
+            assert updated.plan_code == "premium"
+            assert updated.billing_cycle == BillingCycle.MONTHLY
+            assert updated.provider_subscription_id == "sub_asaas_123"
+            assert updated.provider_event_id == "evt_asaas_123"
+            user = User.query.filter_by(id=updated.user_id).first()
+            assert user is not None
+            assert user.entitlements_version == 1
 
     def test_webhook_rejects_invalid_signature_when_secret_is_configured(
         self,
