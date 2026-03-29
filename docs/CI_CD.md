@@ -51,12 +51,14 @@ Jobs relevantes:
 - executa o gate oficial rapido de release/pre-merge (`smoke`) via `scripts/run_postman_suite.sh`
 - publica `reports/newman-smoke-report.xml`
 - em local, o mesmo caminho é reproduzido por `scripts/run_ci_like_actions_local.sh --local --with-postman`
+- publica `reports/ci-stack/smoke/diagnostic-summary.{md,json}` com a categoria canonica de falha e evidencias
 
 8. `api-integration`
 - sobe stack local docker isolada para a suite `full`
 - usa `scripts/ci_stack_bootstrap.py` como bootstrap canônico
 - executa o gate oficial dedicado de release/integracao da superficie canonica nao-privilegiada
 - publica `reports/newman-full-report.xml`
+- publica `reports/ci-stack/full/diagnostic-summary.{md,json}` com a categoria canonica de falha e evidencias
 
 9. `schemathesis`
 - contrato OpenAPI com seed deterministico (`HYPOTHESIS_SEED`)
@@ -128,6 +130,7 @@ Arquitetura canonica de smoke/release gate:
 - pré-merge: `ci-runtime-images` constrói a imagem uma vez e distribui artifacts efêmeros
 - pré-merge: Newman roda nos jobs `api-smoke` (`smoke`) e `api-integration` (`full`) do `ci.yml`, ambos reutilizando a mesma imagem canônica
 - pré-merge: smoke/full compartilham o mesmo bootstrap principal em `scripts/ci_stack_bootstrap.py`
+- pré-merge: smoke/full publicam `diagnostic-summary.{md,json}` via `scripts/ci_failure_summary.py`
 - pré-merge: `api-smoke` tambem executa `scripts/http_latency_budget_gate.py`
 - local: `scripts/ci_suite_doctor.py` detecta drift operacional antes de subir a mesma stack do CI
 - pós-deploy: smoke deterministico em Python dentro do `deploy.yml`
