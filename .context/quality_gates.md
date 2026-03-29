@@ -196,3 +196,4 @@ Quality Gate requerido:
 - As imagens base críticas (`python`, `postgres`, `redis`) usam os mirrors `public.ecr.aws/docker/library/*`.
 - O job `ci-runtime-images` constrói uma vez as imagens `auraxis-ci-dev:${GITHUB_SHA}` e `auraxis-ci-prod:${GITHUB_SHA}`.
 - `api-smoke`, `api-integration` e `trivy` baixam artifacts efêmeros e reutilizam essas imagens, evitando rebuild redundante nos gates críticos.
+- `api-smoke` e `api-integration` usam `scripts/ci_stack_bootstrap.py` como bootstrap principal, com report JSON e dumps padronizados em `reports/ci-stack/*`.
