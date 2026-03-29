@@ -17,7 +17,7 @@ from __future__ import annotations
 from alembic import op
 
 revision = "b2_align_shared_entry_enums"
-down_revision = "j618_foundation"
+down_revision = "4a2e1d7c9b0f"
 branch_labels = None
 depends_on = None
 
