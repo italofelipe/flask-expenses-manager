@@ -281,9 +281,11 @@ jobs:
           docker logout https://index.docker.io/v1/ || true
 
       - name: Load runtime image
+        id: load_image
         run: bash scripts/ci_image_artifact.sh load reports/ci-images/runtime-dev.tar.gz
 
       - name: Bootstrap smoke stack
+        id: bootstrap
         run: |
           python3 scripts/ci_stack_bootstrap.py bootstrap \
             --compose-file docker-compose.ci.yml \
@@ -291,9 +293,11 @@ jobs:
             --report-path reports/ci-stack/smoke/bootstrap-report.json
 
       - name: Run Postman smoke suite
+        id: newman
         run: npm run postman:smoke:ci
 
       - name: Enforce HTTP latency budget
+        id: latency
         run: |
           python3 scripts/http_latency_budget_gate.py \
             --base-url http://localhost:3333 \
@@ -302,15 +306,18 @@ jobs:
       - name: Summarize smoke release gate
         if: always()
         run: |
-          {
-            echo "## API release gate: smoke"
-            echo
-            echo "- Profile: \`smoke\`"
-            echo "- Purpose: fast pre-merge black-box validation across critical domains"
-            echo "- Policy: this gate must pass before the dedicated \`full\` integration gate starts"
-            echo "- Artifact: \`newman-smoke-report\` (\`reports/newman-smoke-report.xml\`)"
-            echo "- Canonical runner: \`scripts/run_postman_suite.sh --profile smoke\`"
-          } >> "$GITHUB_STEP_SUMMARY"
+          python3 scripts/ci_failure_summary.py \
+            --job-name "API Release Gate (Postman/Newman Smoke)" \
+            --profile smoke \
+            --job-status "${{ job.status }}" \
+            --reports-dir reports/ci-stack/smoke \
+            --bootstrap-report reports/ci-stack/smoke/bootstrap-report.json \
+            --newman-report reports/newman-smoke-report.xml \
+            --latency-report reports/performance/http-latency-budget.json \
+            --step-outcome "bootstrap=${{ steps.bootstrap.outcome }}" \
+            --step-outcome "newman=${{ steps.newman.outcome }}" \
+            --step-outcome "latency=${{ steps.latency.outcome }}" \
+            --write-summary
 
       - name: Upload Newman report
         if: always()
@@ -333,6 +340,23 @@ jobs:
             --compose-file docker-compose.ci.yml \
             --reports-dir reports/ci-stack/smoke \
             --prefix failure
+
+      - name: Summarize smoke diagnostics
+        if: always()
+        run: |
+          python3 scripts/ci_failure_summary.py \
+            --job-name "API Smoke (Postman/Newman)" \
+            --profile smoke \
+            --job-status "${{ job.status }}" \
+            --reports-dir reports/ci-stack/smoke \
+            --bootstrap-report reports/ci-stack/smoke/bootstrap-report.json \
+            --newman-report reports/newman-smoke-report.xml \
+            --latency-report reports/performance/http-latency-budget.json \
+            --step-outcome load_image=${{ steps.load_image.outcome || 'skipped' }} \
+            --step-outcome bootstrap=${{ steps.bootstrap.outcome || 'skipped' }} \
+            --step-outcome newman=${{ steps.newman.outcome || 'skipped' }} \
+            --step-outcome latency=${{ steps.latency.outcome || 'skipped' }} \
+            --write-summary
 
       - name: Tear down local stack
         if: always()
@@ -384,9 +408,11 @@ jobs:
           docker logout https://index.docker.io/v1/ || true
 
       - name: Load runtime image
+        id: load_image
         run: bash scripts/ci_image_artifact.sh load reports/ci-images/runtime-dev.tar.gz
 
       - name: Bootstrap integration stack
+        id: bootstrap
         run: |
           python3 scripts/ci_stack_bootstrap.py bootstrap \
             --compose-file docker-compose.ci.yml \
@@ -394,20 +420,22 @@ jobs:
             --report-path reports/ci-stack/full/bootstrap-report.json
 
       - name: Run Postman full integration suite
+        id: newman
         run: npm run postman:full:ci
 
       - name: Summarize full release gate
         if: always()
         run: |
-          {
-            echo "## API release gate: full"
-            echo
-            echo "- Profile: \`full\`"
-            echo "- Purpose: dedicated release-gate integration coverage for the canonical REST + GraphQL surface"
-            echo "- Policy: release readiness depends on \`smoke\` and \`full\` both passing; \`privileged\` remains manual and out of the common merge path"
-            echo "- Artifact: \`newman-full-report\` (\`reports/newman-full-report.xml\`)"
-            echo "- Canonical runner: \`scripts/run_postman_suite.sh --profile full\`"
-          } >> "$GITHUB_STEP_SUMMARY"
+          python3 scripts/ci_failure_summary.py \
+            --job-name "API Release Gate (Postman/Newman Full)" \
+            --profile full \
+            --job-status "${{ job.status }}" \
+            --reports-dir reports/ci-stack/full \
+            --bootstrap-report reports/ci-stack/full/bootstrap-report.json \
+            --newman-report reports/newman-full-report.xml \
+            --step-outcome "bootstrap=${{ steps.bootstrap.outcome }}" \
+            --step-outcome "newman=${{ steps.newman.outcome }}" \
+            --write-summary
 
       - name: Upload Newman full report
         if: always()
@@ -423,6 +451,21 @@ jobs:
             --compose-file docker-compose.ci.yml \
             --reports-dir reports/ci-stack/full \
             --prefix failure
+
+      - name: Summarize full diagnostics
+        if: always()
+        run: |
+          python3 scripts/ci_failure_summary.py \
+            --job-name "API Release Gate (Postman/Newman Full)" \
+            --profile full \
+            --job-status "${{ job.status }}" \
+            --reports-dir reports/ci-stack/full \
+            --bootstrap-report reports/ci-stack/full/bootstrap-report.json \
+            --newman-report reports/newman-full-report.xml \
+            --step-outcome load_image=${{ steps.load_image.outcome || 'skipped' }} \
+            --step-outcome bootstrap=${{ steps.bootstrap.outcome || 'skipped' }} \
+            --step-outcome newman=${{ steps.newman.outcome || 'skipped' }} \
+            --write-summary
 
       - name: Tear down local stack
         if: always()
