@@ -23,19 +23,21 @@ depends_on = None
 
 
 def upgrade() -> None:
-    # PostgreSQL does not allow using a value added via ALTER TYPE … ADD VALUE
-    # within the same transaction (UnsafeNewEnumValueUsage).
-    #
-    # Safe pattern that works inside Alembic's transactional DDL:
-    #   1. Cast the column to VARCHAR  (releases the enum type lock)
-    #   2. UPDATE rows using plain string literals (no enum constraint)
-    #   3. DROP the old enum type
-    #   4. CREATE the new enum type with renamed values
-    #   5. Cast the column back to the new enum type
+    # Safe pattern for renaming enum values inside Alembic transactional DDL:
+    #   1. Drop the column default (PostgreSQL tracks the default as depending
+    #      on the enum type, so DROP TYPE fails if the default still exists)
+    #   2. Cast column to VARCHAR (releases the enum type constraint)
+    #   3. UPDATE rows with plain string literals (no enum constraint active)
+    #   4. DROP the old enum type
+    #   5. CREATE the new enum type with renamed values
+    #   6. Cast the column back to the new enum type
+    #   7. Restore the column default using the new type
 
     # ------------------------------------------------------------------ #
     # sharedentriesstatus: active -> accepted, revoked -> declined
+    # j618 migration created status with server_default='pending'::sharedentriesstatus
     # ------------------------------------------------------------------ #
+    op.execute("ALTER TABLE shared_entries ALTER COLUMN status DROP DEFAULT")
     op.execute("ALTER TABLE shared_entries ALTER COLUMN status TYPE VARCHAR(20)")
     op.execute("UPDATE shared_entries SET status = 'accepted' WHERE status = 'active'")
     op.execute("UPDATE shared_entries SET status = 'declined' WHERE status = 'revoked'")
@@ -48,9 +50,14 @@ def upgrade() -> None:
         "ALTER COLUMN status TYPE sharedentriesstatus "
         "USING status::sharedentriesstatus"
     )
+    op.execute(
+        "ALTER TABLE shared_entries "
+        "ALTER COLUMN status SET DEFAULT 'pending'::sharedentriesstatus"
+    )
 
     # ------------------------------------------------------------------ #
     # splittype: fixed -> custom
+    # split_type has no server_default, so no default drop/restore needed
     # ------------------------------------------------------------------ #
     op.execute("ALTER TABLE shared_entries ALTER COLUMN split_type TYPE VARCHAR(20)")
     op.execute(
@@ -80,6 +87,7 @@ def downgrade() -> None:
     )
 
     # sharedentriesstatus: accepted -> active, declined -> revoked
+    op.execute("ALTER TABLE shared_entries ALTER COLUMN status DROP DEFAULT")
     op.execute("ALTER TABLE shared_entries ALTER COLUMN status TYPE VARCHAR(20)")
     op.execute("UPDATE shared_entries SET status = 'active' WHERE status = 'accepted'")
     op.execute("UPDATE shared_entries SET status = 'revoked' WHERE status = 'declined'")
@@ -91,4 +99,8 @@ def downgrade() -> None:
         "ALTER TABLE shared_entries "
         "ALTER COLUMN status TYPE sharedentriesstatus "
         "USING status::sharedentriesstatus"
+    )
+    op.execute(
+        "ALTER TABLE shared_entries "
+        "ALTER COLUMN status SET DEFAULT 'pending'::sharedentriesstatus"
     )
