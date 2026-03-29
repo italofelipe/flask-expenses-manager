@@ -283,13 +283,21 @@ def _collect_artifacts(
     latency_path: Path | None,
 ) -> list[str]:
     artifacts: list[str] = []
+    seen: set[str] = set()
+
+    def append(path: Path) -> None:
+        normalized = str(path)
+        if normalized not in seen:
+            artifacts.append(normalized)
+            seen.add(normalized)
+
     for path in (bootstrap_path, newman_path, latency_path):
         if path is not None and path.exists():
-            artifacts.append(str(path))
+            append(path)
     if reports_dir.exists():
         for candidate in sorted(reports_dir.glob("*")):
             if candidate.is_file():
-                artifacts.append(str(candidate))
+                append(candidate)
     return artifacts
 
 
