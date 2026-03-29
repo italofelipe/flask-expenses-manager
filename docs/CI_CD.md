@@ -50,6 +50,7 @@ Jobs relevantes:
 - usa `scripts/ci_stack_bootstrap.py` como bootstrap canônico
 - executa o gate oficial rapido de release/pre-merge (`smoke`) via `scripts/run_postman_suite.sh`
 - publica `reports/newman-smoke-report.xml`
+- em local, o mesmo caminho é reproduzido por `scripts/run_ci_like_actions_local.sh --local --with-postman`
 
 8. `api-integration`
 - sobe stack local docker isolada para a suite `full`
@@ -112,6 +113,7 @@ Arquitetura canonica de smoke/release gate:
 - pré-merge: Newman roda nos jobs `api-smoke` (`smoke`) e `api-integration` (`full`) do `ci.yml`, ambos reutilizando a mesma imagem canônica
 - pré-merge: smoke/full compartilham o mesmo bootstrap principal em `scripts/ci_stack_bootstrap.py`
 - pré-merge: `api-smoke` tambem executa `scripts/http_latency_budget_gate.py`
+- local: `scripts/ci_suite_doctor.py` detecta drift operacional antes de subir a mesma stack do CI
 - pós-deploy: smoke deterministico em Python dentro do `deploy.yml`
 - fluxos legados paralelos de smoke foram removidos para evitar drift
 - readiness no caminho comum de merge/release exige os dois gates oficiais (`smoke` + `full`) em verde
@@ -242,6 +244,7 @@ Exemplos:
 - `bash scripts/run_ci_like_actions_local.sh`
 - `bash scripts/run_ci_like_actions_local.sh --local --with-postman`
 - `bash scripts/run_ci_like_actions_local.sh --local --with-mutation`
+- `python3 scripts/ci_suite_doctor.py --web-image "$(bash scripts/ci_image_artifact.sh ref dev)"`
 - `npm ci && npm run smoke:local`
 
 ## Secrets e Vars esperados

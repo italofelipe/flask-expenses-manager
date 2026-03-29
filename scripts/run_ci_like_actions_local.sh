@@ -8,7 +8,7 @@ set -euo pipefail
 #   --local               run in current environment (no docker wrapper)
 #   --fast                skip schemathesis checks
 #   --with-mutation       include cosmic-ray mutation gate
-#   --with-postman        run Postman/Newman smoke suite (expects API at localhost:3333)
+#   --with-postman        run Postman/Newman smoke suite through the same image/bootstrap path used by CI
 #   --help                show usage
 #
 # Notes:
@@ -27,6 +27,8 @@ RUN_SCHEMATHESIS=1
 RUN_MUTATION=0
 RUN_POSTMAN=0
 PYTHON_BIN=""
+LOCAL_STACK_STARTED=0
+WEB_IMAGE_REF=""
 
 require_command() {
   local cmd="$1"
@@ -68,6 +70,12 @@ EOF
     echo "[ci-like-local] local Newman dependency not installed." >&2
     echo "[ci-like-local] run: npm ci" >&2
     exit 3
+  fi
+}
+
+cleanup_local_stack() {
+  if [[ "$LOCAL_STACK_STARTED" -eq 1 ]]; then
+    python3 scripts/ci_stack_bootstrap.py teardown --compose-file docker-compose.ci.yml || true
   fi
 }
 
@@ -182,6 +190,28 @@ run_core_pipeline() {
   fi
 
   if [[ "$RUN_POSTMAN" -eq 1 ]]; then
+    if [[ ! -f .env ]]; then
+      cp .env.dev.example .env
+    fi
+    WEB_IMAGE_REF="$(bash scripts/ci_image_artifact.sh ref dev)"
+    echo "[ci-like-local] step=doctor:ci-suite"
+    python3 scripts/ci_suite_doctor.py \
+      --compose-file docker-compose.ci.yml \
+      --env-file .env \
+      --web-image "$WEB_IMAGE_REF"
+
+    trap cleanup_local_stack EXIT
+    echo "[ci-like-local] step=ci-runtime-images:build-dev"
+    bash scripts/ci_image_artifact.sh build dev "$WEB_IMAGE_REF"
+
+    echo "[ci-like-local] step=stack:bootstrap"
+    export WEB_IMAGE="$WEB_IMAGE_REF"
+    python3 scripts/ci_stack_bootstrap.py bootstrap \
+      --compose-file docker-compose.ci.yml \
+      --reports-dir reports/ci-stack/local \
+      --report-path reports/ci-stack/local/bootstrap-report.json
+    LOCAL_STACK_STARTED=1
+
     echo "[ci-like-local] step=tests:postman-smoke"
     bash scripts/run_postman_suite.sh \
       api-tests/postman/environments/local.postman_environment.json
@@ -189,6 +219,9 @@ run_core_pipeline() {
     "${PYTHON_BIN}" scripts/http_latency_budget_gate.py \
       --base-url "${API_BASE_URL:-http://localhost:3333}" \
       --samples 3
+    cleanup_local_stack
+    trap - EXIT
+    LOCAL_STACK_STARTED=0
   else
     echo "[ci-like-local] step=tests:postman-smoke skipped (use --with-postman)"
   fi
@@ -209,7 +242,7 @@ run_in_docker() {
   fi
   if [[ "$RUN_POSTMAN" -eq 1 ]]; then
     echo "[ci-like-local] --with-postman is supported only in --local mode." >&2
-    echo "[ci-like-local] Start stack and rerun with --local --with-postman." >&2
+    echo "[ci-like-local] The canonical local stack path builds the same dev image and bootstrap used by CI." >&2
     exit 4
   fi
 

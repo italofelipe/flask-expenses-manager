@@ -17,6 +17,7 @@ Definir pipelines de CI/CD e gates de qualidade, seguranca e deploy.
 ## Gates oficiais de release (Newman/Postman)
 - `CI Runtime Images`: build único das imagens canônicas do CI com artifacts efêmeros para reuso
 - `scripts/ci_stack_bootstrap.py`: bootstrap/dump/teardown canônico compartilhado por smoke/full
+- `scripts/ci_suite_doctor.py`: doctor canônico para detectar drift operacional antes da suíte local
 - `API Release Gate (Postman/Newman Smoke)`: gate rapido obrigatorio de pre-merge para a superficie black-box cross-domain
 - `API Release Gate (Postman/Newman Full)`: gate dedicado obrigatorio de integracao/release para a superficie canonica REST + GraphQL nao-privilegiada
 - `postman-privileged.yml`: workflow manual separado para fluxos privilegiados/admin; nao participa do caminho comum de merge
@@ -36,6 +37,7 @@ Definir pipelines de CI/CD e gates de qualidade, seguranca e deploy.
 - O runner Newman do CI e local usa dependencias Node versionadas com `npm ci`, evitando dependencia de install global.
 - O job `CI Runtime Images` publica artifacts com `retention-days: 1` para reuso entre smoke/full/security com custo controlado.
 - `api-smoke` e `api-integration` compartilham o mesmo bootstrap principal e publicam diagnósticos em `reports/ci-stack/*`.
+- O caminho local recomendado com `scripts/run_ci_like_actions_local.sh --local --with-postman` reutiliza a mesma imagem dev e o mesmo bootstrap do CI.
 - O job `Dependency Security (OSV-Scanner)` publica `osv-results.json` como artifact para auditoria de vulnerabilidades em lockfiles.
 
 ## Padroes obrigatorios
