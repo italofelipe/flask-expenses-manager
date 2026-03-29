@@ -164,6 +164,56 @@ class TestAsaasBillingProvider:
         else:
             raise AssertionError("Expected BillingProviderError")
 
+    def test_get_subscription_maps_external_reference(self, monkeypatch) -> None:
+        provider = AsaasBillingProvider()
+        monkeypatch.setenv("BILLING_ASAAS_API_KEY", "asaas_test_key")
+
+        def _fake_request(
+            method: str, path: str, *, json_payload: object | None = None
+        ):
+            assert method == "GET"
+            assert path == "/subscriptions/sub_123"
+            assert json_payload is None
+            return {
+                "id": "sub_123",
+                "customer": "cus_123",
+                "status": "ACTIVE",
+                "cycle": "MONTHLY",
+                "externalReference": "auraxis:user_123:premium_monthly",
+                "dateCreated": "2026-03-29T00:00:00+00:00",
+                "nextDueDate": "2026-04-29",
+            }
+
+        monkeypatch.setattr(provider, "_request", _fake_request)
+
+        snapshot = provider.get_subscription("sub_123")
+        assert snapshot["provider"] == "asaas"
+        assert snapshot["provider_id"] == "sub_123"
+        assert snapshot["provider_customer_id"] == "cus_123"
+        assert snapshot["plan_code"] == "premium"
+        assert snapshot["offer_code"] == "premium_monthly"
+        assert snapshot["billing_cycle"] == "monthly"
+
+    def test_cancel_subscription_maps_provider_payload(self, monkeypatch) -> None:
+        provider = AsaasBillingProvider()
+        monkeypatch.setenv("BILLING_ASAAS_API_KEY", "asaas_test_key")
+
+        def _fake_request(
+            method: str, path: str, *, json_payload: object | None = None
+        ):
+            assert method == "DELETE"
+            assert path == "/subscriptions/sub_123"
+            assert json_payload is None
+            return {"id": "sub_123", "customer": "cus_123"}
+
+        monkeypatch.setattr(provider, "_request", _fake_request)
+
+        snapshot = provider.cancel_subscription("sub_123")
+        assert snapshot["provider"] == "asaas"
+        assert snapshot["provider_id"] == "sub_123"
+        assert snapshot["provider_customer_id"] == "cus_123"
+        assert snapshot["status"] == "canceled"
+
 
 # ---------------------------------------------------------------------------
 # Subscription service unit tests
@@ -272,6 +322,34 @@ class TestSubscriptionService:
 
             cancel_subscription(sub, mock_provider)
             mock_provider.cancel_subscription.assert_called_once_with("sub_abc")
+
+    def test_cancel_updates_entitlements_version_for_real_user(self, app) -> None:
+        user_id = uuid.uuid4()
+        with app.app_context():
+            from app.extensions.database import db
+
+            user = User(
+                id=user_id,
+                name="Auraxis User",
+                email="cancel-user@email.com",
+                password="hash",
+            )
+            db.session.add(user)
+            db.session.commit()
+
+            sub = get_or_create_subscription(user_id)
+            sub.status = SubscriptionStatus.ACTIVE
+            sub.plan_code = "premium"
+            sub.billing_cycle = BillingCycle.MONTHLY
+            sub.provider = "stub"
+            sub.provider_subscription_id = "sub_abc"
+            db.session.commit()
+
+            canceled = cancel_subscription(sub, StubBillingProvider())
+            db.session.refresh(user)
+
+            assert canceled.status == SubscriptionStatus.CANCELED
+            assert user.entitlements_version == 1
 
 
 # ---------------------------------------------------------------------------
