@@ -1,5 +1,21 @@
 # Changelog
 
+## [1.11.0](https://github.com/italofelipe/auraxis-api/compare/v1.10.0...v1.11.0) (2026-03-29)
+
+
+### Features
+
+* **api:** F1-F3 — tags, accounts, credit-cards REST endpoints ([#797](https://github.com/italofelipe/auraxis-api/issues/797)) ([5ec620f](https://github.com/italofelipe/auraxis-api/commit/5ec620f4bc254ba3143c17b0edd9eca0e139984e))
+* **api:** integrate Asaas hosted checkout and webhook sync ([#800](https://github.com/italofelipe/auraxis-api/issues/800)) ([602b941](https://github.com/italofelipe/auraxis-api/commit/602b94191cded563f5efda623314c5d13fa71d9e))
+* **api:** publish billing plan catalog ([#799](https://github.com/italofelipe/auraxis-api/issues/799)) ([bdde07a](https://github.com/italofelipe/auraxis-api/commit/bdde07a8876c49e40801d8368526bcb39cd388ba))
+* **seeds:** G5 — local development seed script with demo data ([#798](https://github.com/italofelipe/auraxis-api/issues/798)) ([e066305](https://github.com/italofelipe/auraxis-api/commit/e066305df6676df67b40d15e11561d2117497654))
+
+
+### Bug Fixes
+
+* call .scalar_subquery() on the select() before passing to .in_(). ([49f104f](https://github.com/italofelipe/auraxis-api/commit/49f104f651b17016b76cd89a7b7e7e9389eeafa8))
+* **shared-entries:** add .scalar_subquery() to fix 500 on GET /with-me ([#802](https://github.com/italofelipe/auraxis-api/issues/802)) ([49f104f](https://github.com/italofelipe/auraxis-api/commit/49f104f651b17016b76cd89a7b7e7e9389eeafa8))
+
 ## [1.10.0](https://github.com/italofelipe/auraxis-api/compare/v1.9.0...v1.10.0) (2026-03-29)
 
 
