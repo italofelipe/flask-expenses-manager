@@ -197,6 +197,7 @@ Quality Gate requerido:
 - O job `ci-runtime-images` constrói uma vez as imagens `auraxis-ci-dev:${GITHUB_SHA}` e `auraxis-ci-prod:${GITHUB_SHA}`.
 - `api-smoke`, `api-integration` e `trivy` baixam artifacts efêmeros e reutilizam essas imagens, evitando rebuild redundante nos gates críticos.
 - `api-smoke` e `api-integration` usam `scripts/ci_stack_bootstrap.py` como bootstrap principal, com report JSON e dumps padronizados em `reports/ci-stack/*`.
+- `api-smoke` e `api-integration` usam `scripts/ci_failure_summary.py` para classificar falhas e publicar `diagnostic-summary.{md,json}` com causa provável e artifacts mínimos.
 - o caminho local `scripts/run_ci_like_actions_local.sh --local --with-postman` reaproveita a mesma imagem dev e o mesmo bootstrap principal do CI.
 - `scripts/ci_suite_doctor.py` deve ser o primeiro passo para detectar drift operacional local antes de subir a stack.
 - `ci-suite-canary.yml` roda fora do contexto de PR para validar supply chain, bootstrap, smoke HTTP e budget econômico com custo controlado.

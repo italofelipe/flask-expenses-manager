@@ -34,6 +34,7 @@ Scripts operacionais e de engenharia para CI/CD, seguranca, deploy, observabilid
 - Para bootstrap canônico da stack de smoke/full: `scripts/python_exec.sh scripts/ci_stack_bootstrap.py`.
 - Para diagnosticar drift operacional antes da suite local: `scripts/python_exec.sh scripts/ci_suite_doctor.py --web-image <image-ref>`.
 - Para o canário contínuo e o relatório econômico da suíte: `scripts/python_exec.sh scripts/ci_suite_canary.py --web-image <image-ref>`.
+- Para taxonomia de falhas e sumário diagnóstico da suíte: `scripts/python_exec.sh scripts/ci_failure_summary.py`.
 - Para contrato OpenAPI determinístico: `bash scripts/run_schemathesis_contract.sh`.
 - Para sinal de review Cursor Bugbot: `scripts/python_exec.sh scripts/pr_review_signal_check.py --repo <owner/repo> --pr-number <numero> --mode advisory`.
 - Para governanca de branch: `scripts/python_exec.sh scripts/github_ruleset_manager.py --owner <owner> --repo <repo> --mode audit`.

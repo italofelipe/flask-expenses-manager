@@ -35,6 +35,7 @@ class AttemptRecord:
     attempt: int
     success: bool
     detail: str
+    duration_ms: int
 
 
 @dataclass(frozen=True)
@@ -47,6 +48,7 @@ class DiagnosticsArtifacts:
 class BootstrapReport:
     status: str
     failed_phase: str | None
+    total_duration_ms: int
     attempts: list[AttemptRecord] = field(default_factory=list)
     diagnostics: list[DiagnosticsArtifacts] = field(default_factory=list)
 
@@ -115,10 +117,12 @@ def _bootstrap_stack(
     *,
     sleep_fn: Callable[[float], None] = time.sleep,
 ) -> BootstrapReport:
+    started_at = time.perf_counter()
     attempts: list[AttemptRecord] = []
     diagnostics: list[DiagnosticsArtifacts] = []
 
     for attempt in range(1, config.up_attempts + 1):
+        phase_started = time.perf_counter()
         result = _run_subprocess(
             _compose_base_args(config.compose_file) + ["up", "-d", *config.services]
         )
@@ -129,6 +133,7 @@ def _bootstrap_stack(
                 attempt=attempt,
                 success=success,
                 detail=(result.stderr or result.stdout).strip() or "ok",
+                duration_ms=int((time.perf_counter() - phase_started) * 1000),
             )
         )
         if success:
@@ -149,12 +154,14 @@ def _bootstrap_stack(
         return BootstrapReport(
             status="failed",
             failed_phase="boot",
+            total_duration_ms=int((time.perf_counter() - started_at) * 1000),
             attempts=attempts,
             diagnostics=diagnostics,
         )
 
     migration_args = shlex.split(config.migration_command)
     for attempt in range(1, config.migration_attempts + 1):
+        phase_started = time.perf_counter()
         result = _run_subprocess(
             _compose_base_args(config.compose_file)
             + ["exec", "-T", "web", *migration_args]
@@ -166,6 +173,7 @@ def _bootstrap_stack(
                 attempt=attempt,
                 success=success,
                 detail=(result.stderr or result.stdout).strip() or "ok",
+                duration_ms=int((time.perf_counter() - phase_started) * 1000),
             )
         )
         if success:
@@ -183,11 +191,13 @@ def _bootstrap_stack(
         return BootstrapReport(
             status="failed",
             failed_phase="migration",
+            total_duration_ms=int((time.perf_counter() - started_at) * 1000),
             attempts=attempts,
             diagnostics=diagnostics,
         )
 
     for attempt in range(1, config.health_attempts + 1):
+        phase_started = time.perf_counter()
         try:
             _check_health(config.health_url, config.health_timeout_seconds)
             attempts.append(
@@ -196,6 +206,7 @@ def _bootstrap_stack(
                     attempt=attempt,
                     success=True,
                     detail="ok",
+                    duration_ms=int((time.perf_counter() - phase_started) * 1000),
                 )
             )
             break
@@ -206,6 +217,7 @@ def _bootstrap_stack(
                     attempt=attempt,
                     success=False,
                     detail=str(exc),
+                    duration_ms=int((time.perf_counter() - phase_started) * 1000),
                 )
             )
             sleep_fn(config.retry_sleep_seconds)
@@ -221,6 +233,7 @@ def _bootstrap_stack(
         return BootstrapReport(
             status="failed",
             failed_phase="health",
+            total_duration_ms=int((time.perf_counter() - started_at) * 1000),
             attempts=attempts,
             diagnostics=diagnostics,
         )
@@ -228,6 +241,7 @@ def _bootstrap_stack(
     return BootstrapReport(
         status="ok",
         failed_phase=None,
+        total_duration_ms=int((time.perf_counter() - started_at) * 1000),
         attempts=attempts,
         diagnostics=diagnostics,
     )
@@ -238,6 +252,7 @@ def _write_report(path: Path, report: BootstrapReport) -> None:
     payload = {
         "status": report.status,
         "failed_phase": report.failed_phase,
+        "total_duration_ms": report.total_duration_ms,
         "attempts": [asdict(record) for record in report.attempts],
         "diagnostics": [asdict(record) for record in report.diagnostics],
     }

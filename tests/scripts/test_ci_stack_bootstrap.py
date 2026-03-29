@@ -57,11 +57,13 @@ def test_bootstrap_stack_records_successful_bootstrap(
 
     assert report.status == "ok"
     assert report.failed_phase is None
+    assert report.total_duration_ms >= 0
     assert [record.phase for record in report.attempts] == [
         "boot",
         "migration",
         "health",
     ]
+    assert all(record.duration_ms >= 0 for record in report.attempts)
     assert calls[0] == [
         "docker",
         "compose",
@@ -123,6 +125,7 @@ def test_bootstrap_stack_dumps_diagnostics_when_boot_fails(
 
     assert report.status == "failed"
     assert report.failed_phase == "boot"
+    assert report.total_duration_ms >= 0
     assert report.diagnostics
     ps_path = Path(report.diagnostics[0].ps_path)
     logs_path = Path(report.diagnostics[0].logs_path)
@@ -137,7 +140,11 @@ def test_main_bootstrap_writes_report_file(tmp_path: Path, monkeypatch) -> None:
     monkeypatch.setattr(
         module,
         "_bootstrap_stack",
-        lambda config: module.BootstrapReport(status="ok", failed_phase=None),
+        lambda config: module.BootstrapReport(
+            status="ok",
+            failed_phase=None,
+            total_duration_ms=42,
+        ),
     )
     monkeypatch.setattr(
         sys,
@@ -157,3 +164,4 @@ def test_main_bootstrap_writes_report_file(tmp_path: Path, monkeypatch) -> None:
     assert exit_code == 0
     payload = json.loads(report_path.read_text(encoding="utf-8"))
     assert payload["status"] == "ok"
+    assert payload["total_duration_ms"] == 42

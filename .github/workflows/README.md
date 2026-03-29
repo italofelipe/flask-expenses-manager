@@ -20,6 +20,7 @@ Definir pipelines de CI/CD e gates de qualidade, seguranca e deploy.
 - `scripts/ci_stack_bootstrap.py`: bootstrap/dump/teardown canônico compartilhado por smoke/full
 - `scripts/ci_suite_doctor.py`: doctor canônico para detectar drift operacional antes da suíte local
 - `scripts/ci_suite_canary.py`: canário contínuo com métricas de duração, custo aproximado e flags de sustentabilidade
+- `scripts/ci_failure_summary.py`: taxonomia de falhas e summary canônico com evidências mínimas por categoria
 - `API Release Gate (Postman/Newman Smoke)`: gate rapido obrigatorio de pre-merge para a superficie black-box cross-domain
 - `API Release Gate (Postman/Newman Full)`: gate dedicado obrigatorio de integracao/release para a superficie canonica REST + GraphQL nao-privilegiada
 - `postman-privileged.yml`: workflow manual separado para fluxos privilegiados/admin; nao participa do caminho comum de merge
@@ -41,6 +42,7 @@ Definir pipelines de CI/CD e gates de qualidade, seguranca e deploy.
 - `api-smoke` e `api-integration` compartilham o mesmo bootstrap principal e publicam diagnósticos em `reports/ci-stack/*`.
 - O caminho local recomendado com `scripts/run_ci_like_actions_local.sh --local --with-postman` reutiliza a mesma imagem dev e o mesmo bootstrap do CI.
 - `ci-suite-canary.yml` publica `reports/ci-canary/*` com duração total, custo aproximado e guardrails econômicos do fluxo.
+- `api-smoke` e `api-integration` publicam `diagnostic-summary.{md,json}` com categoria canônica de falha, artifacts e pista de causa raiz.
 - O job `Dependency Security (OSV-Scanner)` publica `osv-results.json` como artifact para auditoria de vulnerabilidades em lockfiles.
 
 ## Padroes obrigatorios
