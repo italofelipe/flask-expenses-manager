@@ -283,48 +283,12 @@ jobs:
       - name: Load runtime image
         run: bash scripts/ci_image_artifact.sh load reports/ci-images/runtime-dev.tar.gz
 
-      - name: Boot local stack for smoke tests
+      - name: Bootstrap smoke stack
         run: |
-          for attempt in 1 2 3; do
-            if docker compose -f docker-compose.ci.yml up -d db redis web; then
-              echo "Local smoke stack booted on attempt ${attempt}."
-              exit 0
-            fi
-            echo "Smoke stack boot failed on attempt ${attempt}; retrying..." >&2
-            docker compose -f docker-compose.ci.yml down -v --remove-orphans || true
-            sleep $((attempt * 5))
-          done
-          echo "Failed to boot local smoke stack after retries." >&2
-          exit 1
-
-      - name: Apply database migrations for smoke tests
-        run: |
-          for _ in {1..20}; do
-            if docker compose -f docker-compose.ci.yml exec -T web flask db upgrade; then
-              echo "Database migrations applied."
-              exit 0
-            fi
-            echo "Waiting for web/db before migration retry..."
-            sleep 3
-          done
-          echo "Failed to apply database migrations for smoke tests." >&2
-          docker compose -f docker-compose.ci.yml ps
-          docker compose -f docker-compose.ci.yml logs --tail=200 web db
-          exit 1
-
-      - name: Wait for API health
-        run: |
-          for _ in {1..40}; do
-            if curl -fsS http://localhost:3333/healthz >/dev/null; then
-              echo "API is healthy."
-              exit 0
-            fi
-            sleep 3
-          done
-          echo "API did not become healthy in time." >&2
-          docker compose -f docker-compose.ci.yml ps
-          docker compose -f docker-compose.ci.yml logs --tail=200 web db redis
-          exit 1
+          python3 scripts/ci_stack_bootstrap.py bootstrap \
+            --compose-file docker-compose.ci.yml \
+            --reports-dir reports/ci-stack/smoke \
+            --report-path reports/ci-stack/smoke/bootstrap-report.json
 
       - name: Run Postman smoke suite
         run: npm run postman:smoke:ci
@@ -365,12 +329,21 @@ jobs:
       - name: Dump stack logs on failure
         if: failure()
         run: |
-          docker compose -f docker-compose.ci.yml ps
-          docker compose -f docker-compose.ci.yml logs --tail=200 web db redis
+          python3 scripts/ci_stack_bootstrap.py dump-state \
+            --compose-file docker-compose.ci.yml \
+            --reports-dir reports/ci-stack/smoke \
+            --prefix failure
 
       - name: Tear down local stack
         if: always()
-        run: docker compose -f docker-compose.ci.yml down -v --remove-orphans
+        run: python3 scripts/ci_stack_bootstrap.py teardown --compose-file docker-compose.ci.yml
+
+      - name: Upload smoke stack diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ci-stack-smoke-diagnostics
+          path: reports/ci-stack/smoke
 
   api-integration:
     name: API Release Gate (Postman/Newman Full)
@@ -413,48 +386,12 @@ jobs:
       - name: Load runtime image
         run: bash scripts/ci_image_artifact.sh load reports/ci-images/runtime-dev.tar.gz
 
-      - name: Boot local stack for integration tests
+      - name: Bootstrap integration stack
         run: |
-          for attempt in 1 2 3; do
-            if docker compose -f docker-compose.ci.yml up -d db redis web; then
-              echo "Local integration stack booted on attempt ${attempt}."
-              exit 0
-            fi
-            echo "Integration stack boot failed on attempt ${attempt}; retrying..." >&2
-            docker compose -f docker-compose.ci.yml down -v --remove-orphans || true
-            sleep $((attempt * 5))
-          done
-          echo "Failed to boot local integration stack after retries." >&2
-          exit 1
-
-      - name: Apply database migrations for integration tests
-        run: |
-          for _ in {1..20}; do
-            if docker compose -f docker-compose.ci.yml exec -T web flask db upgrade; then
-              echo "Database migrations applied."
-              exit 0
-            fi
-            echo "Waiting for web/db before migration retry..."
-            sleep 3
-          done
-          echo "Failed to apply database migrations for integration tests." >&2
-          docker compose -f docker-compose.ci.yml ps
-          docker compose -f docker-compose.ci.yml logs --tail=200 web db
-          exit 1
-
-      - name: Wait for API health
-        run: |
-          for _ in {1..40}; do
-            if curl -fsS http://localhost:3333/healthz >/dev/null; then
-              echo "API is healthy."
-              exit 0
-            fi
-            sleep 3
-          done
-          echo "API did not become healthy in time." >&2
-          docker compose -f docker-compose.ci.yml ps
-          docker compose -f docker-compose.ci.yml logs --tail=200 web db redis
-          exit 1
+          python3 scripts/ci_stack_bootstrap.py bootstrap \
+            --compose-file docker-compose.ci.yml \
+            --reports-dir reports/ci-stack/full \
+            --report-path reports/ci-stack/full/bootstrap-report.json
 
       - name: Run Postman full integration suite
         run: npm run postman:full:ci
@@ -482,12 +419,21 @@ jobs:
       - name: Dump stack logs on failure
         if: failure()
         run: |
-          docker compose -f docker-compose.ci.yml ps
-          docker compose -f docker-compose.ci.yml logs --tail=200 web db redis
+          python3 scripts/ci_stack_bootstrap.py dump-state \
+            --compose-file docker-compose.ci.yml \
+            --reports-dir reports/ci-stack/full \
+            --prefix failure
 
       - name: Tear down local stack
         if: always()
-        run: docker compose -f docker-compose.ci.yml down -v --remove-orphans
+        run: python3 scripts/ci_stack_bootstrap.py teardown --compose-file docker-compose.ci.yml
+
+      - name: Upload full stack diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ci-stack-full-diagnostics
+          path: reports/ci-stack/full
 
   schemathesis:
     name: API Reliability (Schemathesis)

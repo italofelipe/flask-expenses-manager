@@ -47,11 +47,13 @@ Jobs relevantes:
 7. `api-smoke`
 - sobe stack local docker
 - instala dependencias Node versionadas com `npm ci`
+- usa `scripts/ci_stack_bootstrap.py` como bootstrap canônico
 - executa o gate oficial rapido de release/pre-merge (`smoke`) via `scripts/run_postman_suite.sh`
 - publica `reports/newman-smoke-report.xml`
 
 8. `api-integration`
 - sobe stack local docker isolada para a suite `full`
+- usa `scripts/ci_stack_bootstrap.py` como bootstrap canônico
 - executa o gate oficial dedicado de release/integracao da superficie canonica nao-privilegiada
 - publica `reports/newman-full-report.xml`
 
@@ -108,6 +110,7 @@ Controles:
 Arquitetura canonica de smoke/release gate:
 - pré-merge: `ci-runtime-images` constrói a imagem uma vez e distribui artifacts efêmeros
 - pré-merge: Newman roda nos jobs `api-smoke` (`smoke`) e `api-integration` (`full`) do `ci.yml`, ambos reutilizando a mesma imagem canônica
+- pré-merge: smoke/full compartilham o mesmo bootstrap principal em `scripts/ci_stack_bootstrap.py`
 - pré-merge: `api-smoke` tambem executa `scripts/http_latency_budget_gate.py`
 - pós-deploy: smoke deterministico em Python dentro do `deploy.yml`
 - fluxos legados paralelos de smoke foram removidos para evitar drift
