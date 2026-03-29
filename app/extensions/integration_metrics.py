@@ -243,15 +243,16 @@ def _prometheus_metric_name(name: str) -> str:
     return f"auraxis_{normalized or 'unknown'}"
 
 
-def build_prometheus_metrics_payload() -> str:
-    lines: list[str] = []
-    counters = snapshot_metrics()
+def _emit_counter_metrics(lines: list[str], counters: dict[str, int]) -> None:
     for metric_name, value in sorted(counters.items()):
         exported_name = _prometheus_metric_name(metric_name)
         lines.append(f"# TYPE {exported_name} counter")
         lines.append(f"{exported_name} {value}")
 
-    samples = snapshot_metric_samples(prefix="http.route.duration_ms.")
+
+def _emit_latency_sample_metrics(
+    lines: list[str], samples: dict[str, list[int]]
+) -> None:
     for metric_name, values in sorted(samples.items()):
         exported_name = _prometheus_metric_name(metric_name)
         lines.append(f"# TYPE {exported_name} gauge")
@@ -260,25 +261,31 @@ def build_prometheus_metrics_payload() -> str:
         lines.append(f"{exported_name}_p95 {_nearest_rank_percentile(values, 95)}")
         lines.append(f"{exported_name}_max {max(values) if values else 0}")
 
-    latency_payload = build_http_latency_budget_payload()
-    routes = latency_payload.get("routes", {})
+
+def _emit_latency_budget_route(
+    lines: list[str], route_name: str, route_payload: dict[str, Any]
+) -> None:
+    exported_name = _prometheus_metric_name(f"http.latency_budget.{route_name}")
+    lines.append(f"# TYPE {exported_name}_budget_ms gauge")
+    lines.append(f"{exported_name}_budget_ms {route_payload.get('budget_ms', 0)}")
+    lines.append(f"{exported_name}_samples {route_payload.get('samples', 0)}")
+    lines.append(f"{exported_name}_p50_ms {route_payload.get('p50_ms', 0)}")
+    lines.append(f"{exported_name}_p95_ms {route_payload.get('p95_ms', 0)}")
+    lines.append(f"{exported_name}_max_ms {route_payload.get('max_ms', 0)}")
+    within_budget = route_payload.get("within_budget")
+    if within_budget is not None:
+        lines.append(f"{exported_name}_within_budget {1 if within_budget else 0}")
+
+
+def build_prometheus_metrics_payload() -> str:
+    lines: list[str] = []
+    _emit_counter_metrics(lines, snapshot_metrics())
+    _emit_latency_sample_metrics(
+        lines, snapshot_metric_samples(prefix="http.route.duration_ms.")
+    )
+    routes = build_http_latency_budget_payload().get("routes", {})
     if isinstance(routes, dict):
         for route_name, route_payload in sorted(routes.items()):
-            if not isinstance(route_payload, dict):
-                continue
-            exported_name = _prometheus_metric_name(f"http.latency_budget.{route_name}")
-            lines.append(f"# TYPE {exported_name}_budget_ms gauge")
-            lines.append(
-                f"{exported_name}_budget_ms {route_payload.get('budget_ms', 0)}"
-            )
-            lines.append(f"{exported_name}_samples {route_payload.get('samples', 0)}")
-            lines.append(f"{exported_name}_p50_ms {route_payload.get('p50_ms', 0)}")
-            lines.append(f"{exported_name}_p95_ms {route_payload.get('p95_ms', 0)}")
-            lines.append(f"{exported_name}_max_ms {route_payload.get('max_ms', 0)}")
-            within_budget = route_payload.get("within_budget")
-            if within_budget is not None:
-                lines.append(
-                    f"{exported_name}_within_budget {1 if within_budget else 0}"
-                )
-
+            if isinstance(route_payload, dict):
+                _emit_latency_budget_route(lines, route_name, route_payload)
     return "\n".join(lines) + ("\n" if lines else "")
