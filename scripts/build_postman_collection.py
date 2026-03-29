@@ -1865,6 +1865,23 @@ def build_collection() -> dict[str, Any]:
 
     subscription_items = [
         _item(
+            "00 - List billing plans (REST v2)",
+            _request(
+                method="GET",
+                raw_url="{{baseUrl}}/subscriptions/plans",
+                headers=contract_headers,
+            ),
+            test_lines=[
+                "pm.test('subscription plans returns 200', function () { pm.response.to.have.status(200); });",
+                "var body = pm.response.json();",
+                "pm.test('subscription plans returns canonical offers', function () {",
+                "  pm.expect(body.success).to.eql(true);",
+                "  pm.expect(body.data.plans).to.be.an('array');",
+                "  pm.expect(body.data.plans[1].slug).to.eql('premium_monthly');",
+                "});",
+            ],
+        ),
+        _item(
             "01 - Get my subscription (REST v2)",
             _request(
                 method="GET",
@@ -1890,7 +1907,7 @@ def build_collection() -> dict[str, Any]:
                 body=_json_body(
                     """
                     {
-                      "plan_slug": "pro_monthly"
+                      "plan_slug": "premium_monthly"
                     }
                     """
                 ),
@@ -1900,6 +1917,7 @@ def build_collection() -> dict[str, Any]:
                 "var body = pm.response.json();",
                 "pm.test('subscription checkout returns checkout url', function () {",
                 "  pm.expect(body.success).to.eql(true);",
+                "  pm.expect(body.data.plan_slug).to.eql('premium_monthly');",
                 "  pm.expect(body.data.checkout_url).to.be.a('string').and.not.empty;",
                 "});",
             ],

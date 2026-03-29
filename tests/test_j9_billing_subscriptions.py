@@ -9,7 +9,7 @@ import uuid
 from typing import Dict
 from unittest.mock import MagicMock
 
-from app.models.subscription import Subscription, SubscriptionStatus
+from app.models.subscription import BillingCycle, Subscription, SubscriptionStatus
 from app.services.billing_adapter import BillingProvider, StubBillingProvider
 from app.services.subscription_service import (
     cancel_subscription,
@@ -66,9 +66,9 @@ class TestStubBillingProvider:
         assert result["provider"] == "stub"
 
     def test_create_checkout_session_returns_url(self) -> None:
-        result = self.provider.create_checkout_session("user_abc", "pro_monthly")
+        result = self.provider.create_checkout_session("user_abc", "premium_monthly")
         assert "checkout_url" in result
-        assert "pro_monthly" in result["checkout_url"]
+        assert "premium_monthly" in result["checkout_url"]
         assert result["provider"] == "stub"
 
 
@@ -108,7 +108,9 @@ class TestSubscriptionService:
         mock_provider = MagicMock()
         mock_provider.get_subscription.return_value = {
             "status": "active",
-            "plan_code": "pro_monthly",
+            "plan_code": "premium",
+            "offer_code": "premium_monthly",
+            "billing_cycle": "monthly",
         }
         with app.app_context():
             from app.extensions.database import db
@@ -119,7 +121,8 @@ class TestSubscriptionService:
 
             synced = sync_subscription_from_provider(sub, mock_provider)
             assert synced.status == SubscriptionStatus.ACTIVE
-            assert synced.plan_code == "pro_monthly"
+            assert synced.plan_code == "premium"
+            assert synced.billing_cycle == BillingCycle.MONTHLY
             mock_provider.get_subscription.assert_called_once_with("sub_xyz")
 
     def test_cancel_sets_canceled_status(self, app) -> None:
@@ -151,6 +154,17 @@ class TestSubscriptionService:
 
 
 class TestGetMySubscription:
+    def test_get_plans_returns_public_catalog(self, client) -> None:
+        resp = client.get("/subscriptions/plans")
+        assert resp.status_code == 200
+        body = resp.get_json()
+        assert body["success"] is True
+        plans = body["data"]["plans"]
+        assert len(plans) == 3
+        assert plans[0]["slug"] == "free"
+        assert plans[1]["slug"] == "premium_monthly"
+        assert plans[2]["slug"] == "premium_annual"
+
     def test_get_subscription_no_prior_record_returns_free(self, client) -> None:
         """GET /subscriptions/me — returns free defaults when no subscription exists."""
         token = _register_and_login(client, prefix="sub-get")
@@ -183,14 +197,17 @@ class TestGetMySubscription:
                 id=uuid.UUID(sub_id)
             ).first()  # type: ignore[assignment]
             sub.status = SubscriptionStatus.ACTIVE
-            sub.plan_code = "pro_monthly"
+            sub.plan_code = "premium"
+            sub.billing_cycle = BillingCycle.MONTHLY
             db.session.commit()
 
         resp = client.get("/subscriptions/me", headers=_auth_headers(token))
         assert resp.status_code == 200
         body = resp.get_json()
         assert body["data"]["subscription"]["status"] == "active"
-        assert body["data"]["subscription"]["plan_code"] == "pro_monthly"
+        assert body["data"]["subscription"]["plan_code"] == "premium"
+        assert body["data"]["subscription"]["offer_code"] == "premium_monthly"
+        assert body["data"]["subscription"]["billing_cycle"] == "monthly"
 
 
 class TestCreateCheckoutSession:
@@ -198,14 +215,39 @@ class TestCreateCheckoutSession:
         token = _register_and_login(client, prefix="sub-checkout")
         resp = client.post(
             "/subscriptions/checkout",
-            json={"plan_slug": "pro_monthly"},
+            json={"plan_slug": "premium_monthly"},
             headers=_auth_headers(token),
         )
         assert resp.status_code == 201
         body = resp.get_json()
         assert body["success"] is True
         assert "checkout_url" in body["data"]
-        assert "pro_monthly" in body["data"]["checkout_url"]
+        assert body["data"]["plan_slug"] == "premium_monthly"
+        assert body["data"]["plan_code"] == "premium"
+        assert body["data"]["billing_cycle"] == "monthly"
+        assert "premium_monthly" in body["data"]["checkout_url"]
+
+    def test_checkout_legacy_alias_is_normalized(self, client) -> None:
+        token = _register_and_login(client, prefix="sub-checkout-legacy")
+        resp = client.post(
+            "/subscriptions/checkout",
+            json={"plan_slug": "pro_monthly"},
+            headers=_auth_headers(token),
+        )
+        assert resp.status_code == 201
+        body = resp.get_json()
+        assert body["data"]["plan_slug"] == "premium_monthly"
+
+    def test_checkout_unknown_plan_slug_returns_400(self, client) -> None:
+        token = _register_and_login(client, prefix="sub-checkout-unknown")
+        resp = client.post(
+            "/subscriptions/checkout",
+            json={"plan_slug": "invalid-plan"},
+            headers=_auth_headers(token),
+        )
+        assert resp.status_code == 400
+        body = resp.get_json()
+        assert body["error"]["code"] == "VALIDATION_ERROR"
 
     def test_checkout_missing_plan_slug_returns_400(self, client) -> None:
         token = _register_and_login(client, prefix="sub-checkout-err")
