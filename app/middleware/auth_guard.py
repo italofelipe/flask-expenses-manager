@@ -31,6 +31,8 @@ def register_auth_guard(app: Flask) -> None:
             "installment_vs_cash_calculation",
             # Billing webhook — provider calls this directly without JWT
             "handle_webhook",
+            # Public billing catalog for checkout surfaces
+            "list_subscription_plans",
         }
         if not request.endpoint:
             return None
