@@ -27,13 +27,17 @@ class SharedEntryForbiddenError(APIError):
         )
 
 
-class SharedEntryAlreadyRevokedError(APIError):
+class SharedEntryAlreadyDeclinedError(APIError):
     def __init__(self) -> None:
         super().__init__(
-            message="Este compartilhamento já foi revogado.",
-            code="SHARED_ENTRY_ALREADY_REVOKED",
+            message="Este compartilhamento já foi encerrado.",
+            code="SHARED_ENTRY_ALREADY_DECLINED",
             status_code=409,
         )
+
+
+# Backward-compat alias so existing call-sites don't break during migration
+SharedEntryAlreadyRevokedError = SharedEntryAlreadyDeclinedError
 
 
 def share_entry(
@@ -55,15 +59,15 @@ def share_entry(
 
 
 def revoke_share(shared_entry_id: UUID, owner_id: UUID) -> SharedEntry:
-    """Revoke a shared entry by setting status to REVOKED."""
+    """Decline/revoke a shared entry by setting its status to DECLINED."""
     entry: SharedEntry | None = db.session.get(SharedEntry, shared_entry_id)
     if entry is None:
         raise SharedEntryNotFoundError()
     if entry.owner_id != owner_id:
         raise SharedEntryForbiddenError()
-    if entry.status == SharedEntryStatus.REVOKED:
-        raise SharedEntryAlreadyRevokedError()
-    entry.status = SharedEntryStatus.REVOKED
+    if entry.status == SharedEntryStatus.DECLINED:
+        raise SharedEntryAlreadyDeclinedError()
+    entry.status = SharedEntryStatus.DECLINED
     db.session.commit()
     return entry
 
