@@ -14,6 +14,7 @@ import hashlib
 import hmac
 import logging
 import os
+from datetime import datetime
 from typing import Any
 from uuid import UUID
 
@@ -21,7 +22,7 @@ from flask import Blueprint, current_app, jsonify, request
 from flask.ctx import has_app_context
 from flask.typing import ResponseReturnValue
 
-from app.auth import get_active_auth_context
+from app.auth import get_active_auth_context, get_active_user
 from app.config.billing_plans import (
     canonical_offer_slug,
     list_public_billing_plans,
@@ -31,8 +32,15 @@ from app.controllers.response_contract import compat_error_response
 from app.extensions.database import db
 from app.http.request_context import current_request_id
 from app.models.subscription import Subscription, SubscriptionStatus
-from app.services.billing_adapter import BillingProvider, get_default_billing_provider
+from app.services.billing_adapter import (
+    BillingCheckoutCustomer,
+    BillingProvider,
+    BillingProviderError,
+    BillingSubscriptionSnapshot,
+    get_default_billing_provider,
+)
 from app.services.subscription_service import (
+    apply_subscription_snapshot,
     cancel_subscription,
     get_or_create_subscription,
     sync_subscription_from_provider,
@@ -47,6 +55,16 @@ subscription_bp = Blueprint("subscriptions", __name__, url_prefix="/subscription
 # ---------------------------------------------------------------------------
 
 _FREE_PLAN_CODE = "free"
+_CHECKOUT_SESSION_FAILURE_MESSAGE = "Failed to create checkout session"
+_SUPPORTED_WEBHOOK_EVENTS = {
+    "subscription.activated",
+    "subscription.canceled",
+    "subscription.past_due",
+    "PAYMENT_RECEIVED",
+    "PAYMENT_CONFIRMED",
+    "PAYMENT_OVERDUE",
+    "SUBSCRIPTION_DELETED",
+}
 
 
 def _serialize_subscription(sub: Subscription) -> dict[str, Any]:
@@ -97,6 +115,11 @@ def _get_provider() -> BillingProvider:
     return get_default_billing_provider()
 
 
+def _checkout_error(status_code: int, error_code: str) -> ResponseReturnValue:
+    current_app.logger.exception(_CHECKOUT_SESSION_FAILURE_MESSAGE)
+    return _err(_CHECKOUT_SESSION_FAILURE_MESSAGE, error_code, status_code)
+
+
 # ---------------------------------------------------------------------------
 # GET /subscriptions/plans
 # ---------------------------------------------------------------------------
@@ -131,7 +154,7 @@ def get_my_subscription() -> ResponseReturnValue:
 @subscription_bp.post("/checkout")
 def create_checkout_session() -> ResponseReturnValue:
     """Create a billing checkout session for the requested plan."""
-    auth = get_active_auth_context()
+    auth, user = get_active_user()
 
     body: dict[str, Any] = request.get_json(silent=True) or {}
     plan_slug: str | None = body.get("plan_slug")
@@ -144,11 +167,26 @@ def create_checkout_session() -> ResponseReturnValue:
     provider = _get_provider()
     try:
         result = provider.create_checkout_session(
-            user_id=str(UUID(auth.subject)), plan_slug=offer.slug
+            customer=BillingCheckoutCustomer(
+                user_id=str(UUID(auth.subject)),
+                name=str(user.name),
+                email=str(user.email),
+            ),
+            plan_slug=offer.slug,
         )
+    except BillingProviderError:
+        return _checkout_error(502, "UPSTREAM_ERROR")
     except Exception:
-        current_app.logger.exception("Failed to create checkout session")
-        return _err("Failed to create checkout session", "INTERNAL_ERROR", 500)
+        return _checkout_error(500, "INTERNAL_ERROR")
+
+    subscription = get_or_create_subscription(UUID(auth.subject))
+    provider_name = str(result.get("provider") or "").strip()
+    provider_customer_id = result.get("provider_customer_id")
+    if provider_name:
+        subscription.provider = provider_name
+    if isinstance(provider_customer_id, str) and provider_customer_id.strip():
+        subscription.provider_customer_id = provider_customer_id.strip()
+    db.session.commit()
 
     return _ok(
         {
@@ -193,8 +231,10 @@ def cancel_my_subscription() -> ResponseReturnValue:
 # ---------------------------------------------------------------------------
 
 _WEBHOOK_SIGNATURE_HEADER = "X-Billing-Signature"
+_ASAAS_WEBHOOK_TOKEN_HEADER = "asaas-access-token"
 _WEBHOOK_SECRET_ENV = "BILLING_WEBHOOK_SECRET"
 _WEBHOOK_ALLOW_UNSIGNED_ENV = "BILLING_WEBHOOK_ALLOW_UNSIGNED"
+_ASAAS_WEBHOOK_TOKEN_ENV = "BILLING_ASAAS_WEBHOOK_TOKEN"
 
 
 def _read_bool_env(name: str, default: bool = False) -> bool:
@@ -245,6 +285,269 @@ def _verify_webhook_signature(payload: bytes, signature: str) -> bool:
     return hmac.compare_digest(expected, signature)
 
 
+def _verify_asaas_webhook_token(header_value: str) -> bool:
+    expected = os.getenv(_ASAAS_WEBHOOK_TOKEN_ENV, "").strip()
+    if not expected:
+        return False
+    if not header_value.strip():
+        return False
+    return hmac.compare_digest(expected, header_value.strip())
+
+
+def _is_webhook_request_authorized(
+    payload: bytes, signature: str, asaas_token: str
+) -> bool:
+    return _verify_webhook_signature(payload, signature) or _verify_asaas_webhook_token(
+        asaas_token
+    )
+
+
+def _extract_event_id(payload: dict[str, Any]) -> str | None:
+    for key in ("event_id", "id"):
+        value = payload.get(key)
+        if isinstance(value, str) and value.strip():
+            return value.strip()
+    return None
+
+
+def _resolve_offer_from_external_reference(
+    external_reference: str | None,
+) -> dict[str, str | None]:
+    raw_reference = str(external_reference or "").strip()
+    if not raw_reference:
+        return {
+            "plan_code": None,
+            "offer_code": None,
+            "billing_cycle": None,
+        }
+
+    offer = resolve_checkout_plan_offer(raw_reference.split(":")[-1])
+    if offer is None:
+        return {
+            "plan_code": None,
+            "offer_code": None,
+            "billing_cycle": None,
+        }
+    return {
+        "plan_code": offer.plan_code,
+        "offer_code": offer.slug,
+        "billing_cycle": (offer.billing_cycle.value if offer.billing_cycle else None),
+    }
+
+
+def _coerce_datetime(value: object) -> datetime | None:
+    if value is None:
+        return None
+    if isinstance(value, datetime):
+        return value
+    raw = str(value).strip()
+    if not raw:
+        return None
+    normalized = raw.replace("Z", "+00:00")
+    for candidate in (normalized, normalized.replace("+0000", "+00:00")):
+        try:
+            return datetime.fromisoformat(candidate)
+        except ValueError:
+            continue
+    return None
+
+
+def _clean_optional_string(value: object) -> str | None:
+    return str(value or "").strip() or None
+
+
+def _extract_identifiers_from_subscription_object(
+    subscription_object: dict[str, Any],
+) -> tuple[str | None, str | None, str | None, object, object]:
+    return (
+        _clean_optional_string(subscription_object.get("id")),
+        _clean_optional_string(subscription_object.get("customer")),
+        _clean_optional_string(subscription_object.get("externalReference")),
+        subscription_object.get("dateCreated"),
+        subscription_object.get("nextDueDate"),
+    )
+
+
+def _merge_identifiers_from_payment_object(
+    provider_subscription_id: str | None,
+    provider_customer_id: str | None,
+    external_reference: str | None,
+    current_period_end: object,
+    payment_object: dict[str, Any],
+) -> tuple[str | None, str | None, str | None, object]:
+    return (
+        _clean_optional_string(payment_object.get("subscription"))
+        or provider_subscription_id,
+        _clean_optional_string(payment_object.get("customer")) or provider_customer_id,
+        _clean_optional_string(payment_object.get("externalReference"))
+        or external_reference,
+        payment_object.get("dueDate") or current_period_end,
+    )
+
+
+def _merge_customer_from_checkout_object(
+    provider_customer_id: str | None,
+    checkout_object: dict[str, Any],
+) -> str | None:
+    return (
+        _clean_optional_string(checkout_object.get("customer")) or provider_customer_id
+    )
+
+
+def _extract_subscription_identifiers(
+    payload: dict[str, Any],
+) -> tuple[str | None, str | None, str | None, Any, Any]:
+    provider_subscription_id: str | None = None
+    provider_customer_id: str | None = None
+    external_reference: str | None = None
+    current_period_start: object | None = None
+    current_period_end: object | None = None
+
+    subscription_object = payload.get("subscription")
+    payment_object = payload.get("payment")
+    checkout_object = payload.get("checkout")
+
+    if isinstance(subscription_object, dict):
+        (
+            provider_subscription_id,
+            provider_customer_id,
+            external_reference,
+            current_period_start,
+            current_period_end,
+        ) = _extract_identifiers_from_subscription_object(subscription_object)
+
+    if isinstance(payment_object, dict):
+        (
+            provider_subscription_id,
+            provider_customer_id,
+            external_reference,
+            current_period_end,
+        ) = _merge_identifiers_from_payment_object(
+            provider_subscription_id,
+            provider_customer_id,
+            external_reference,
+            current_period_end,
+            payment_object,
+        )
+
+    if isinstance(checkout_object, dict):
+        provider_customer_id = _merge_customer_from_checkout_object(
+            provider_customer_id,
+            checkout_object,
+        )
+
+    legacy_subscription_id = _clean_optional_string(payload.get("subscription_id"))
+    provider_subscription_id = provider_subscription_id or legacy_subscription_id
+    return (
+        provider_subscription_id,
+        provider_customer_id,
+        external_reference,
+        _coerce_datetime(current_period_start),
+        _coerce_datetime(current_period_end),
+    )
+
+
+def _resolve_status(event_type: str) -> str | None:
+    status_map = {
+        "subscription.activated": SubscriptionStatus.ACTIVE.value,
+        "subscription.canceled": SubscriptionStatus.CANCELED.value,
+        "subscription.past_due": SubscriptionStatus.PAST_DUE.value,
+        "PAYMENT_RECEIVED": SubscriptionStatus.ACTIVE.value,
+        "PAYMENT_CONFIRMED": SubscriptionStatus.ACTIVE.value,
+        "PAYMENT_OVERDUE": SubscriptionStatus.PAST_DUE.value,
+        "SUBSCRIPTION_DELETED": SubscriptionStatus.CANCELED.value,
+    }
+    return status_map.get(event_type)
+
+
+def _extract_provider_snapshot(
+    payload: dict[str, Any],
+) -> BillingSubscriptionSnapshot | None:
+    event_type = str(payload.get("event") or "").strip()
+    (
+        provider_subscription_id,
+        provider_customer_id,
+        external_reference,
+        current_period_start,
+        current_period_end,
+    ) = _extract_subscription_identifiers(payload)
+
+    if not provider_customer_id and not provider_subscription_id:
+        return None
+
+    status = _resolve_status(event_type)
+    if status is None:
+        return None
+
+    offer_metadata = _resolve_offer_from_external_reference(external_reference)
+    snapshot: BillingSubscriptionSnapshot = {
+        "status": status,
+        "provider_customer_id": provider_customer_id,
+        "current_period_start": current_period_start,
+        "current_period_end": current_period_end,
+    }
+    if event_type.isupper():
+        snapshot["provider"] = "asaas"
+    if provider_subscription_id:
+        snapshot["provider_id"] = provider_subscription_id
+    if offer_metadata["plan_code"]:
+        snapshot["plan_code"] = offer_metadata["plan_code"]
+    if offer_metadata["offer_code"]:
+        snapshot["offer_code"] = offer_metadata["offer_code"]
+    if offer_metadata["billing_cycle"]:
+        snapshot["billing_cycle"] = offer_metadata["billing_cycle"]
+    return snapshot
+
+
+def _is_supported_webhook_event(event_type: str) -> bool:
+    return event_type in _SUPPORTED_WEBHOOK_EVENTS
+
+
+def _find_subscription_for_snapshot(
+    snapshot: BillingSubscriptionSnapshot,
+) -> Subscription | None:
+    provider_subscription_id = snapshot.get("provider_id")
+    if provider_subscription_id:
+        subscription: Subscription | None = Subscription.query.filter_by(
+            provider_subscription_id=provider_subscription_id
+        ).first()
+        if subscription is not None:
+            return subscription
+
+    provider_customer_id = snapshot.get("provider_customer_id")
+    if provider_customer_id:
+        subscription = Subscription.query.filter_by(
+            provider_customer_id=provider_customer_id
+        ).first()
+        return subscription
+
+    return None
+
+
+def _process_webhook_snapshot(
+    event_type: str,
+    event_id: str | None,
+    snapshot: BillingSubscriptionSnapshot,
+) -> ResponseReturnValue:
+    subscription = _find_subscription_for_snapshot(snapshot)
+    if subscription is None:
+        logger.warning(
+            "Webhook %s for unknown provider_subscription_id=%s — ignoring",
+            event_type,
+            snapshot.get("provider_id"),
+        )
+        return _ok({"received": True, "processed": False})
+
+    if event_id and subscription.provider_event_id == event_id:
+        return _ok({"received": True, "processed": False, "reason": "duplicate"})
+
+    if event_id:
+        subscription.provider_event_id = event_id
+    apply_subscription_snapshot(subscription, snapshot)
+
+    return _ok({"received": True, "processed": True})
+
+
 @subscription_bp.post("/webhook")
 def handle_webhook() -> ResponseReturnValue:
     """Receive provider webhook events.
@@ -262,8 +565,9 @@ def handle_webhook() -> ResponseReturnValue:
     """
     raw_body: bytes = request.get_data()
     signature = request.headers.get(_WEBHOOK_SIGNATURE_HEADER, "")
+    asaas_token = request.headers.get(_ASAAS_WEBHOOK_TOKEN_HEADER, "")
 
-    if not _verify_webhook_signature(raw_body, signature):
+    if not _is_webhook_request_authorized(raw_body, signature, asaas_token):
         logger.warning(
             "Billing webhook invalid signature request_id=%s",
             current_request_id(),
@@ -277,50 +581,21 @@ def handle_webhook() -> ResponseReturnValue:
 
     payload: dict[str, Any] = request.get_json(silent=True) or {}
     event_type: str = payload.get("event", "")
-    provider_subscription_id: str | None = payload.get("subscription_id")
-    event_id: str | None = payload.get("event_id")
+    event_id = _extract_event_id(payload)
+    snapshot = _extract_provider_snapshot(payload)
 
-    # No-op for unknown events
-    if event_type not in {
-        "subscription.activated",
-        "subscription.canceled",
-        "subscription.past_due",
-    }:
+    if not _is_supported_webhook_event(event_type):
         logger.info("Unhandled billing webhook event: %s — ignoring", event_type)
         return _ok({"received": True, "processed": False})
 
-    if not provider_subscription_id:
-        return _err("subscription_id is required", "VALIDATION_ERROR", 400)
-
-    sub: Subscription | None = Subscription.query.filter_by(
-        provider_subscription_id=provider_subscription_id
-    ).first()
-
-    if sub is None:
-        # Provider may send events for subscriptions we haven't recorded yet.
-        # Accept and ignore gracefully.
-        logger.warning(
-            "Webhook %s for unknown provider_subscription_id=%s — ignoring",
-            event_type,
-            provider_subscription_id,
+    if snapshot is None:
+        return _err(
+            "Unable to resolve subscription from webhook payload",
+            "VALIDATION_ERROR",
+            400,
         )
-        return _ok({"received": True, "processed": False})
 
-    # Idempotency: skip already-processed events
-    if event_id and sub.provider_event_id == event_id:
-        return _ok({"received": True, "processed": False, "reason": "duplicate"})
-
-    _STATUS_MAP = {
-        "subscription.activated": SubscriptionStatus.ACTIVE,
-        "subscription.canceled": SubscriptionStatus.CANCELED,
-        "subscription.past_due": SubscriptionStatus.PAST_DUE,
-    }
-    sub.status = _STATUS_MAP[event_type]
-    if event_id:
-        sub.provider_event_id = event_id
-    db.session.commit()
-
-    return _ok({"received": True, "processed": True})
+    return _process_webhook_snapshot(event_type, event_id, snapshot)
 
 
 def register_subscription_dependencies(app: Any) -> None:  # noqa: ANN401
