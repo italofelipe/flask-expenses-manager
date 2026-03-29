@@ -352,52 +352,91 @@ def _coerce_datetime(value: object) -> datetime | None:
     return None
 
 
+def _clean_optional_string(value: object) -> str | None:
+    return str(value or "").strip() or None
+
+
+def _extract_identifiers_from_subscription_object(
+    subscription_object: dict[str, Any],
+) -> tuple[str | None, str | None, str | None, object, object]:
+    return (
+        _clean_optional_string(subscription_object.get("id")),
+        _clean_optional_string(subscription_object.get("customer")),
+        _clean_optional_string(subscription_object.get("externalReference")),
+        subscription_object.get("dateCreated"),
+        subscription_object.get("nextDueDate"),
+    )
+
+
+def _merge_identifiers_from_payment_object(
+    provider_subscription_id: str | None,
+    provider_customer_id: str | None,
+    external_reference: str | None,
+    current_period_end: object,
+    payment_object: dict[str, Any],
+) -> tuple[str | None, str | None, str | None, object]:
+    return (
+        _clean_optional_string(payment_object.get("subscription"))
+        or provider_subscription_id,
+        _clean_optional_string(payment_object.get("customer")) or provider_customer_id,
+        _clean_optional_string(payment_object.get("externalReference"))
+        or external_reference,
+        payment_object.get("dueDate") or current_period_end,
+    )
+
+
+def _merge_customer_from_checkout_object(
+    provider_customer_id: str | None,
+    checkout_object: dict[str, Any],
+) -> str | None:
+    return (
+        _clean_optional_string(checkout_object.get("customer")) or provider_customer_id
+    )
+
+
 def _extract_subscription_identifiers(
     payload: dict[str, Any],
 ) -> tuple[str | None, str | None, str | None, Any, Any]:
     provider_subscription_id: str | None = None
     provider_customer_id: str | None = None
     external_reference: str | None = None
-    current_period_start: datetime | None = None
-    current_period_end: datetime | None = None
+    current_period_start: object | None = None
+    current_period_end: object | None = None
 
     subscription_object = payload.get("subscription")
     payment_object = payload.get("payment")
     checkout_object = payload.get("checkout")
 
     if isinstance(subscription_object, dict):
-        provider_subscription_id = (
-            str(subscription_object.get("id") or "").strip() or None
-        )
-        provider_customer_id = (
-            str(subscription_object.get("customer") or "").strip() or None
-        )
-        external_reference = (
-            str(subscription_object.get("externalReference") or "").strip() or None
-        )
-        current_period_start = subscription_object.get("dateCreated")
-        current_period_end = subscription_object.get("nextDueDate")
+        (
+            provider_subscription_id,
+            provider_customer_id,
+            external_reference,
+            current_period_start,
+            current_period_end,
+        ) = _extract_identifiers_from_subscription_object(subscription_object)
 
     if isinstance(payment_object, dict):
-        provider_subscription_id = (
-            str(payment_object.get("subscription") or "").strip()
-            or provider_subscription_id
+        (
+            provider_subscription_id,
+            provider_customer_id,
+            external_reference,
+            current_period_end,
+        ) = _merge_identifiers_from_payment_object(
+            provider_subscription_id,
+            provider_customer_id,
+            external_reference,
+            current_period_end,
+            payment_object,
         )
-        provider_customer_id = (
-            str(payment_object.get("customer") or "").strip() or provider_customer_id
-        )
-        external_reference = (
-            str(payment_object.get("externalReference") or "").strip()
-            or external_reference
-        )
-        current_period_end = payment_object.get("dueDate") or current_period_end
 
     if isinstance(checkout_object, dict):
-        provider_customer_id = (
-            str(checkout_object.get("customer") or "").strip() or provider_customer_id
+        provider_customer_id = _merge_customer_from_checkout_object(
+            provider_customer_id,
+            checkout_object,
         )
 
-    legacy_subscription_id = str(payload.get("subscription_id") or "").strip() or None
+    legacy_subscription_id = _clean_optional_string(payload.get("subscription_id"))
     provider_subscription_id = provider_subscription_id or legacy_subscription_id
     return (
         provider_subscription_id,
