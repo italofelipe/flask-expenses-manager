@@ -87,13 +87,28 @@ jobs:
           echo "  github_ref_name=${GITHUB_REF_NAME}"
           echo "  input_ref=${INPUT_REF:-<empty>}"
           echo "  resolved_ref=${REF}"
-          python scripts/aws_deploy_i6.py \
-            --profile "" \
-            --region "${AWS_REGION}" \
-            --dev-instance-id "${DEV_INSTANCE_ID}" \
-            --prod-instance-id "${PROD_INSTANCE_ID}" \
-            --diagnostics-json-path "${DEPLOY_DIAGNOSTICS_PATH}" \
-            deploy --env dev --git-ref "${REF}"
+          MAX_ATTEMPTS=2
+          ATTEMPT=0
+          while [ "${ATTEMPT}" -lt "${MAX_ATTEMPTS}" ]; do
+            ATTEMPT=$((ATTEMPT + 1))
+            echo "SSM deploy attempt ${ATTEMPT}/${MAX_ATTEMPTS}"
+            if python scripts/aws_deploy_i6.py \
+              --profile "" \
+              --region "${AWS_REGION}" \
+              --dev-instance-id "${DEV_INSTANCE_ID}" \
+              --prod-instance-id "${PROD_INSTANCE_ID}" \
+              --diagnostics-json-path "${DEPLOY_DIAGNOSTICS_PATH}" \
+              deploy --env dev --git-ref "${REF}"; then
+              break
+            fi
+            if [ "${ATTEMPT}" -lt "${MAX_ATTEMPTS}" ]; then
+              echo "Attempt ${ATTEMPT} failed — waiting 60s before retry (SSM IPC transient errors are common)..."
+              sleep 60
+            else
+              echo "All ${MAX_ATTEMPTS} deploy attempts failed." >&2
+              exit 1
+            fi
+          done
 
       - name: Upload deploy diagnostics artifact (DEV)
         if: ${{ always() }}
@@ -140,18 +155,13 @@ jobs:
             echo "- deploy step outcome: \`${{ steps.deploy_dev.outcome }}\`"
             echo "- smoke checks: \`enabled (REST + GraphQL)\`"
             echo "- rollback on failure: \`enabled\`"
-            if [ -f "${{ runner.temp }}/deploy-dev-ssm-diagnostics.json" ]; then
+            _diag="${{ runner.temp }}/deploy-dev-ssm-diagnostics.json"
+            if [ -f "${_diag}" ]; then
               echo "- diagnostics artifact: \`deploy-dev-ssm-diagnostics\`"
-              python - <<'PY' "${{ runner.temp }}/deploy-dev-ssm-diagnostics.json"
-              import json
-              import sys
-
-              payload = json.load(open(sys.argv[1], encoding="utf-8"))
-              print(f"- SSM command id: `{payload.get('command_id', '')}`")
-              print(f"- SSM status: `{payload.get('status', '')}`")
-              print(f"- SSM status details: `{payload.get('status_details') or '<none>'}`")
-              print(f"- SSM response code: `{payload.get('response_code')}`")
-              PY
+              echo "- SSM command id: \`$(jq -r '.command_id // ""' "${_diag}")\`"
+              echo "- SSM status: \`$(jq -r '.status // ""' "${_diag}")\`"
+              echo "- SSM status details: \`$(jq -r '.status_details // "<none>"' "${_diag}")\`"
+              echo "- SSM response code: \`$(jq -r '.response_code // ""' "${_diag}")\`"
             fi
             echo "- ref resolution:"
             echo "  - event: \`${{ github.event_name }}\`"
@@ -223,13 +233,28 @@ jobs:
           echo "  github_ref_name=${GITHUB_REF_NAME}"
           echo "  input_ref=${INPUT_REF:-<empty>}"
           echo "  resolved_ref=${REF}"
-          python scripts/aws_deploy_i6.py \
-            --profile "" \
-            --region "${AWS_REGION}" \
-            --dev-instance-id "${DEV_INSTANCE_ID}" \
-            --prod-instance-id "${PROD_INSTANCE_ID}" \
-            --diagnostics-json-path "${DEPLOY_DIAGNOSTICS_PATH}" \
-            deploy --env prod --git-ref "${REF}"
+          MAX_ATTEMPTS=2
+          ATTEMPT=0
+          while [ "${ATTEMPT}" -lt "${MAX_ATTEMPTS}" ]; do
+            ATTEMPT=$((ATTEMPT + 1))
+            echo "SSM deploy attempt ${ATTEMPT}/${MAX_ATTEMPTS}"
+            if python scripts/aws_deploy_i6.py \
+              --profile "" \
+              --region "${AWS_REGION}" \
+              --dev-instance-id "${DEV_INSTANCE_ID}" \
+              --prod-instance-id "${PROD_INSTANCE_ID}" \
+              --diagnostics-json-path "${DEPLOY_DIAGNOSTICS_PATH}" \
+              deploy --env prod --git-ref "${REF}"; then
+              break
+            fi
+            if [ "${ATTEMPT}" -lt "${MAX_ATTEMPTS}" ]; then
+              echo "Attempt ${ATTEMPT} failed — waiting 60s before retry (SSM IPC transient errors are common)..."
+              sleep 60
+            else
+              echo "All ${MAX_ATTEMPTS} deploy attempts failed." >&2
+              exit 1
+            fi
+          done
 
       - name: Upload deploy diagnostics artifact (PROD)
         if: ${{ always() }}
@@ -277,18 +302,13 @@ jobs:
             echo "- deploy step outcome: \`${{ steps.deploy_prod.outcome }}\`"
             echo "- smoke checks: \`enabled (REST + GraphQL)\`"
             echo "- rollback on failure: \`enabled\`"
-            if [ -f "${{ runner.temp }}/deploy-prod-ssm-diagnostics.json" ]; then
+            _diag="${{ runner.temp }}/deploy-prod-ssm-diagnostics.json"
+            if [ -f "${_diag}" ]; then
               echo "- diagnostics artifact: \`deploy-prod-ssm-diagnostics\`"
-              python - <<'PY' "${{ runner.temp }}/deploy-prod-ssm-diagnostics.json"
-              import json
-              import sys
-
-              payload = json.load(open(sys.argv[1], encoding="utf-8"))
-              print(f"- SSM command id: `{payload.get('command_id', '')}`")
-              print(f"- SSM status: `{payload.get('status', '')}`")
-              print(f"- SSM status details: `{payload.get('status_details') or '<none>'}`")
-              print(f"- SSM response code: `{payload.get('response_code')}`")
-              PY
+              echo "- SSM command id: \`$(jq -r '.command_id // ""' "${_diag}")\`"
+              echo "- SSM status: \`$(jq -r '.status // ""' "${_diag}")\`"
+              echo "- SSM status details: \`$(jq -r '.status_details // "<none>"' "${_diag}")\`"
+              echo "- SSM response code: \`$(jq -r '.response_code // ""' "${_diag}")\`"
             fi
             echo "- ref resolution:"
             echo "  - event: \`${{ github.event_name }}\`"
