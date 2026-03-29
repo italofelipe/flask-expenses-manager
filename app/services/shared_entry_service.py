@@ -83,9 +83,16 @@ def list_shared_with_me(user_id: UUID) -> list[SharedEntry]:
 
     from app.models.shared_entry import Invitation, InvitationStatus
 
-    subquery = select(Invitation.shared_entry_id).where(
-        Invitation.to_user_id == user_id,
-        Invitation.status == InvitationStatus.ACCEPTED,
+    # .scalar_subquery() is required when mixing legacy Model.query with
+    # SQLAlchemy 2.x select() — without it, the compiler raises an
+    # ArgumentError ("Ambiguous") that surfaces as an unhandled 500.
+    subquery = (
+        select(Invitation.shared_entry_id)
+        .where(
+            Invitation.to_user_id == user_id,
+            Invitation.status == InvitationStatus.ACCEPTED,
+        )
+        .scalar_subquery()
     )
     return list(
         SharedEntry.query.filter(SharedEntry.id.in_(subquery))
