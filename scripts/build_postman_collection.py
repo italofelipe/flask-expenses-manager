@@ -1863,6 +1863,189 @@ def build_collection() -> dict[str, Any]:
         ),
     ]
 
+    auxiliary_items = [
+        _item(
+            "01 - List tags (REST v2)",
+            _request(
+                method="GET",
+                raw_url="{{baseUrl}}/tags",
+                headers=auth_contract_headers,
+            ),
+            test_lines=[
+                "pm.test('tags list returns 200', function () { pm.response.to.have.status(200); });",
+            ],
+        ),
+        _item(
+            "02 - Create tag (REST v2)",
+            _request(
+                method="POST",
+                raw_url="{{baseUrl}}/tags",
+                headers=auth_json_headers,
+                body=_json_body(
+                    """
+                    {
+                      "name": "Casa {{runSeed}}"
+                    }
+                    """
+                ),
+            ),
+            test_lines=[
+                "pm.test('tag create returns 201', function () { pm.response.to.have.status(201); });",
+                "var body = pm.response.json();",
+                "pm.collectionVariables.set('tagId', body.data.tag.id);",
+            ],
+        ),
+        _item(
+            "03 - Update tag (REST v2)",
+            _request(
+                method="PUT",
+                raw_url="{{baseUrl}}/tags/{{tagId}}",
+                headers=auth_json_headers,
+                body=_json_body(
+                    """
+                    {
+                      "name": "Casa ajustada {{runSeed}}"
+                    }
+                    """
+                ),
+            ),
+            test_lines=[
+                "pm.test('tag update returns 200', function () { pm.response.to.have.status(200); });",
+            ],
+        ),
+        _item(
+            "04 - Delete tag (REST v2)",
+            _request(
+                method="DELETE",
+                raw_url="{{baseUrl}}/tags/{{tagId}}",
+                headers=auth_contract_headers,
+            ),
+            test_lines=[
+                "pm.test('tag delete returns 200', function () { pm.response.to.have.status(200); });",
+            ],
+        ),
+        _item(
+            "05 - List accounts (REST v2)",
+            _request(
+                method="GET",
+                raw_url="{{baseUrl}}/accounts",
+                headers=auth_contract_headers,
+            ),
+            test_lines=[
+                "pm.test('accounts list returns 200', function () { pm.response.to.have.status(200); });",
+            ],
+        ),
+        _item(
+            "06 - Create account (REST v2)",
+            _request(
+                method="POST",
+                raw_url="{{baseUrl}}/accounts",
+                headers=auth_json_headers,
+                body=_json_body(
+                    """
+                    {
+                      "name": "Conta principal {{runSeed}}"
+                    }
+                    """
+                ),
+            ),
+            test_lines=[
+                "pm.test('account create returns 201', function () { pm.response.to.have.status(201); });",
+                "var body = pm.response.json();",
+                "pm.collectionVariables.set('accountId', body.data.account.id);",
+            ],
+        ),
+        _item(
+            "07 - Update account (REST v2)",
+            _request(
+                method="PUT",
+                raw_url="{{baseUrl}}/accounts/{{accountId}}",
+                headers=auth_json_headers,
+                body=_json_body(
+                    """
+                    {
+                      "name": "Conta ajuste {{runSeed}}"
+                    }
+                    """
+                ),
+            ),
+            test_lines=[
+                "pm.test('account update returns 200', function () { pm.response.to.have.status(200); });",
+            ],
+        ),
+        _item(
+            "08 - Delete account (REST v2)",
+            _request(
+                method="DELETE",
+                raw_url="{{baseUrl}}/accounts/{{accountId}}",
+                headers=auth_contract_headers,
+            ),
+            test_lines=[
+                "pm.test('account delete returns 200', function () { pm.response.to.have.status(200); });",
+            ],
+        ),
+        _item(
+            "09 - List credit cards (REST v2)",
+            _request(
+                method="GET",
+                raw_url="{{baseUrl}}/credit-cards",
+                headers=auth_contract_headers,
+            ),
+            test_lines=[
+                "pm.test('credit cards list returns 200', function () { pm.response.to.have.status(200); });",
+            ],
+        ),
+        _item(
+            "10 - Create credit card (REST v2)",
+            _request(
+                method="POST",
+                raw_url="{{baseUrl}}/credit-cards",
+                headers=auth_json_headers,
+                body=_json_body(
+                    """
+                    {
+                      "name": "Cartao {{runSeed}}"
+                    }
+                    """
+                ),
+            ),
+            test_lines=[
+                "pm.test('credit card create returns 201', function () { pm.response.to.have.status(201); });",
+                "var body = pm.response.json();",
+                "pm.collectionVariables.set('creditCardId', body.data.credit_card.id);",
+            ],
+        ),
+        _item(
+            "11 - Update credit card (REST v2)",
+            _request(
+                method="PUT",
+                raw_url="{{baseUrl}}/credit-cards/{{creditCardId}}",
+                headers=auth_json_headers,
+                body=_json_body(
+                    """
+                    {
+                      "name": "Cartao ajuste {{runSeed}}"
+                    }
+                    """
+                ),
+            ),
+            test_lines=[
+                "pm.test('credit card update returns 200', function () { pm.response.to.have.status(200); });",
+            ],
+        ),
+        _item(
+            "12 - Delete credit card (REST v2)",
+            _request(
+                method="DELETE",
+                raw_url="{{baseUrl}}/credit-cards/{{creditCardId}}",
+                headers=auth_contract_headers,
+            ),
+            test_lines=[
+                "pm.test('credit card delete returns 200', function () { pm.response.to.have.status(200); });",
+            ],
+        ),
+    ]
+
     subscription_items = [
         _item(
             "00 - List billing plans (REST v2)",
@@ -2590,7 +2773,8 @@ def build_collection() -> dict[str, Any]:
             ),
             _folder("07 - Shared Entries", shared_entries_items),
             _folder("08 - Fiscal", fiscal_items),
-            _folder("09 - GraphQL", graphql_items),
+            _folder("09 - Tags, Accounts and Credit Cards", auxiliary_items),
+            _folder("10 - GraphQL", graphql_items),
         ],
         "variable": [
             {"key": "runSeed", "value": ""},
@@ -2613,6 +2797,9 @@ def build_collection() -> dict[str, Any]:
             {"key": "invitationId", "value": ""},
             {"key": "subscriptionId", "value": ""},
             {"key": "graphqlWalletId", "value": ""},
+            {"key": "tagId", "value": ""},
+            {"key": "accountId", "value": ""},
+            {"key": "creditCardId", "value": ""},
             {"key": "fakeUuid", "value": "00000000-0000-4000-8000-000000000001"},
             {"key": "alertCategory", "value": "system"},
             {"key": "nonexistentInvitationToken", "value": ""},
