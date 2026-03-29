@@ -1,0 +1,59 @@
+name: CI Suite Canary
+
+on:
+  schedule:
+    - cron: "0 12 * * 1-5"
+  workflow_dispatch:
+
+concurrency:
+  group: ci-suite-canary
+  cancel-in-progress: true
+
+jobs:
+  suite-canary:
+    name: Suite Canary
+    runs-on: ubuntu-latest
+    env:
+      DOCKER_CONFIG: /tmp/docker-public
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+
+      - name: Prepare environment file
+        run: cp .env.dev.example .env
+
+      - name: Reset Docker auth for public pulls
+        run: |
+          mkdir -p "$DOCKER_CONFIG"
+          printf '{}\n' > "$DOCKER_CONFIG/config.json"
+          docker logout docker.io || true
+          docker logout https://index.docker.io/v1/ || true
+
+      - name: Run canary suite
+        run: |
+          python3 scripts/ci_suite_canary.py \
+            --compose-file docker-compose.ci.yml \
+            --env-file .env \
+            --report-dir reports/ci-canary \
+            --web-image auraxis-ci-dev:canary \
+            --base-url http://localhost:3333 \
+            --env-name canary \
+            --latency-samples 2
+
+      - name: Upload canary artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ci-suite-canary
+          path: reports/ci-canary
+
+      - name: Append canary summary
+        if: always()
+        run: |
+          cat reports/ci-canary/suite-canary-report.md >> "$GITHUB_STEP_SUMMARY"

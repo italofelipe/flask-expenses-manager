@@ -5,6 +5,7 @@ Definir pipelines de CI/CD e gates de qualidade, seguranca e deploy.
 
 ## Workflows principais
 - `ci.yml`: lint, type-check, testes, seguranca, quality gate.
+- `ci-suite-canary.yml`: canário agendado/manual de baixo custo para supply chain, bootstrap, smoke HTTP e budget de latência.
 - `deploy.yml`: deploy automatizado/controlado por ambiente (DEV/PROD).
 - `governance.yml`: auditoria/sincronizacao do ruleset de branch protection via API do GitHub.
 - `aws-security-audit.yml`: auditoria IAM (I8) agendada/manual com artefato JSON.
@@ -18,6 +19,7 @@ Definir pipelines de CI/CD e gates de qualidade, seguranca e deploy.
 - `CI Runtime Images`: build único das imagens canônicas do CI com artifacts efêmeros para reuso
 - `scripts/ci_stack_bootstrap.py`: bootstrap/dump/teardown canônico compartilhado por smoke/full
 - `scripts/ci_suite_doctor.py`: doctor canônico para detectar drift operacional antes da suíte local
+- `scripts/ci_suite_canary.py`: canário contínuo com métricas de duração, custo aproximado e flags de sustentabilidade
 - `API Release Gate (Postman/Newman Smoke)`: gate rapido obrigatorio de pre-merge para a superficie black-box cross-domain
 - `API Release Gate (Postman/Newman Full)`: gate dedicado obrigatorio de integracao/release para a superficie canonica REST + GraphQL nao-privilegiada
 - `postman-privileged.yml`: workflow manual separado para fluxos privilegiados/admin; nao participa do caminho comum de merge
@@ -38,6 +40,7 @@ Definir pipelines de CI/CD e gates de qualidade, seguranca e deploy.
 - O job `CI Runtime Images` publica artifacts com `retention-days: 1` para reuso entre smoke/full/security com custo controlado.
 - `api-smoke` e `api-integration` compartilham o mesmo bootstrap principal e publicam diagnósticos em `reports/ci-stack/*`.
 - O caminho local recomendado com `scripts/run_ci_like_actions_local.sh --local --with-postman` reutiliza a mesma imagem dev e o mesmo bootstrap do CI.
+- `ci-suite-canary.yml` publica `reports/ci-canary/*` com duração total, custo aproximado e guardrails econômicos do fluxo.
 - O job `Dependency Security (OSV-Scanner)` publica `osv-results.json` como artifact para auditoria de vulnerabilidades em lockfiles.
 
 ## Padroes obrigatorios
