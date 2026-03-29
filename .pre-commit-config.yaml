@@ -33,6 +33,11 @@ repos:
     entry: python3 scripts/repo_hygiene_check.py
     language: system
     pass_filenames: false
+  - id: graphql-auth-config-check
+    name: graphql-auth-config-check
+    entry: python3 scripts/graphql_auth_config_check.py
+    language: system
+    pass_filenames: false
   - id: mypy
     name: mypy
     entry: scripts/python_tool.sh mypy --no-incremental app
