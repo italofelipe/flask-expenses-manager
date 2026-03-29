@@ -20,6 +20,8 @@ from .contracts import api_error_tuple, compat_success, contract_error_tuple
 from .dependencies import get_shared_entries_dependencies
 from .serializers import serialize_invitation, serialize_shared_entry
 
+INVALID_EXPIRES_IN_HOURS_MESSAGE = "Campo 'expires_in_hours' inválido."
+
 
 @dataclass(frozen=True)
 class CreateSharedEntryInput:
@@ -81,19 +83,19 @@ def _parse_expires_in_hours(payload: dict[str, object]) -> int:
         value = int(str(raw_value))
     except (TypeError, ValueError) as exc:
         raise ResponseContractError(
-            "Campo 'expires_in_hours' inválido.",
+            INVALID_EXPIRES_IN_HOURS_MESSAGE,
             code="VALIDATION_ERROR",
             status_code=400,
             details={"expires_in_hours": ["must_be_integer"]},
-            legacy_payload={"error": "Campo 'expires_in_hours' inválido."},
+            legacy_payload={"error": INVALID_EXPIRES_IN_HOURS_MESSAGE},
         ) from exc
     if value <= 0:
         raise ResponseContractError(
-            "Campo 'expires_in_hours' inválido.",
+            INVALID_EXPIRES_IN_HOURS_MESSAGE,
             code="VALIDATION_ERROR",
             status_code=400,
             details={"expires_in_hours": ["must_be_positive"]},
-            legacy_payload={"error": "Campo 'expires_in_hours' inválido."},
+            legacy_payload={"error": INVALID_EXPIRES_IN_HOURS_MESSAGE},
         )
     return value
 
