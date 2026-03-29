@@ -5,8 +5,10 @@ from typing import Any
 from flask import Response
 
 from app.controllers.response_contract import (
+    ResponseContractError,
     compat_error_response,
     compat_success_response,
+    response_from_contract_error,
 )
 from app.services.alert_service import AlertServiceError
 
@@ -53,3 +55,7 @@ def alert_service_error_response(exc: AlertServiceError) -> Response:
         error_code=exc.code,
         details=exc.details,
     )
+
+
+def alert_contract_error_response(error: ResponseContractError) -> Response:
+    return response_from_contract_error(error)

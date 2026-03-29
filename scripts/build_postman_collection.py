@@ -1984,7 +1984,7 @@ def build_collection() -> dict[str, Any]:
             ),
             test_lines=[
                 "pm.test('shared entries by me returns 200', function () { pm.response.to.have.status(200); });",
-                "pm.test('shared entries by me returns array', function () { pm.expect(pm.response.json().shared_entries).to.be.an('array'); });",
+                "pm.test('shared entries by me returns array', function () { pm.expect(pm.response.json().data.shared_entries).to.be.an('array'); });",
             ],
         ),
         _item(
@@ -1996,7 +1996,7 @@ def build_collection() -> dict[str, Any]:
             ),
             test_lines=[
                 "pm.test('shared entries with me returns 200', function () { pm.response.to.have.status(200); });",
-                "pm.test('shared entries with me returns array', function () { pm.expect(pm.response.json().shared_entries).to.be.an('array'); });",
+                "pm.test('shared entries with me returns array', function () { pm.expect(pm.response.json().data.shared_entries).to.be.an('array'); });",
             ],
         ),
         _item(
@@ -2020,7 +2020,7 @@ def build_collection() -> dict[str, Any]:
             ),
             test_lines=[
                 "pm.test('shared invitations list returns 200', function () { pm.response.to.have.status(200); });",
-                "pm.test('shared invitations list returns array', function () { pm.expect(pm.response.json().invitations).to.be.an('array'); });",
+                "pm.test('shared invitations list returns array', function () { pm.expect(pm.response.json().data.invitations).to.be.an('array'); });",
             ],
         ),
         _item(

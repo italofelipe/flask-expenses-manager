@@ -12,7 +12,7 @@ from flask_marshmallow import Marshmallow
 from flask_migrate import Migrate
 from sqlalchemy.pool import NullPool
 
-from app.controllers.alert_controller import alert_bp
+from app.controllers.alert_controller import alert_bp, register_alert_dependencies
 from app.controllers.auth_controller import auth_bp, register_auth_dependencies
 from app.controllers.bank_statement import bank_statement_bp
 from app.controllers.dashboard import dashboard_bp
@@ -24,7 +24,10 @@ from app.controllers.fiscal import fiscal_bp
 from app.controllers.goal_controller import goal_bp, register_goal_dependencies
 from app.controllers.graphql_controller import graphql_bp, register_graphql_dependencies
 from app.controllers.health_controller import health_bp
-from app.controllers.shared_entries import shared_entries_bp
+from app.controllers.shared_entries import (
+    register_shared_entries_dependencies,
+    shared_entries_bp,
+)
 from app.controllers.simulation import (
     register_simulation_dependencies,
     simulation_bp,
@@ -230,6 +233,7 @@ def create_app(*, enable_http_runtime: bool = True) -> Flask:
     register_user_dependencies(app)
     register_transaction_dependencies(app)
     register_goal_dependencies(app)
+    register_alert_dependencies(app)
     if enable_http_runtime:
         _register_http_runtime(app)
     register_audit_trail(app)
@@ -238,6 +242,7 @@ def create_app(*, enable_http_runtime: bool = True) -> Flask:
     register_wallet_dependencies(app)
     register_entitlement_dependencies(app)
     register_simulation_dependencies(app)
+    register_shared_entries_dependencies(app)
 
     # Registra blueprints ANTES dos endpoints no Swagger
     app.register_blueprint(transaction_bp)
