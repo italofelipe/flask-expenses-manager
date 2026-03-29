@@ -42,10 +42,11 @@
   {
     "access": "auth_required",
     "domain": "dashboard",
+    "legacy_alias_of": "dashboardOverview",
     "name": "transactionDashboard",
     "operation_type": "query",
-    "source_module": "app.graphql.queries.transaction",
-    "summary": "Compatibilidade transitória do dashboard mensal; prefira dashboardOverview."
+    "source_module": "app.graphql.queries.dashboard",
+    "summary": "Alias legado do dashboard mensal; prefira dashboardOverview."
   },
   {
     "access": "auth_required",
