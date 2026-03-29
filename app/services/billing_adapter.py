@@ -50,7 +50,8 @@ class StubBillingProvider:
         return {
             "provider_id": provider_id,
             "status": "active",
-            "plan_code": "pro_monthly",
+            "plan_code": "premium",
+            "offer_code": "premium_monthly",
             "billing_cycle": "monthly",
             "current_period_start": None,
             "current_period_end": None,
