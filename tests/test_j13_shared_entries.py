@@ -303,6 +303,26 @@ def test_post_shared_entries_missing_fields_v2_contract(client) -> None:
     }
 
 
+def test_post_shared_entries_invalid_split_type_v2_contract(client) -> None:
+    _uid, token = _register_and_login(client, "v2-shared-invalid-split")
+    response = client.post(
+        "/shared-entries",
+        json={
+            "transaction_id": str(uuid.uuid4()),
+            "split_type": "invalid",
+        },
+        headers={**_auth(token), "X-API-Contract": "v2"},
+    )
+
+    assert response.status_code == 400
+    body = response.get_json()
+    assert body["success"] is False
+    assert body["error"]["code"] == "VALIDATION_ERROR"
+    assert body["error"]["details"] == {
+        "split_type": ["must_be_one_of: equal, percentage, fixed"],
+    }
+
+
 def test_get_shared_entries_by_me_empty(client) -> None:
     """GET /shared-entries/by-me returns empty list for new user."""
     _uid, token = _register_and_login(client)
@@ -349,6 +369,27 @@ def test_post_invitation_missing_fields_v2_contract(client) -> None:
     assert body["error"]["details"] == {
         "shared_entry_id": ["required"],
         "invitee_email": ["required"],
+    }
+
+
+def test_post_invitation_invalid_expiration_v2_contract(client) -> None:
+    _uid, token = _register_and_login(client, "v2-inv-invalid-exp")
+    response = client.post(
+        "/shared-entries/invitations",
+        json={
+            "shared_entry_id": str(uuid.uuid4()),
+            "invitee_email": "invitee@test.com",
+            "expires_in_hours": "oops",
+        },
+        headers={**_auth(token), "X-API-Contract": "v2"},
+    )
+
+    assert response.status_code == 400
+    body = response.get_json()
+    assert body["success"] is False
+    assert body["error"]["code"] == "VALIDATION_ERROR"
+    assert body["error"]["details"] == {
+        "expires_in_hours": ["must_be_integer"],
     }
 
 

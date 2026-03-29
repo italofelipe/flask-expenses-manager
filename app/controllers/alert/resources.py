@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from dataclasses import dataclass
 from typing import Any
 from uuid import UUID
 
@@ -9,19 +10,75 @@ from flask import request
 from flask_apispec.views import MethodResource
 
 from app.auth import current_user_id
-from app.controllers.response_contract import compat_error_response
+from app.controllers.response_contract import ResponseContractError
 from app.services.alert_service import (
     AlertServiceError,
-    delete_alert,
-    get_preferences,
-    get_user_alerts,
-    mark_read,
-    upsert_preference,
 )
 from app.utils.typed_decorators import typed_jwt_required as jwt_required
 
-from .contracts import alert_service_error_response, compat_success
+from .contracts import (
+    alert_contract_error_response,
+    alert_service_error_response,
+    compat_success,
+)
+from .dependencies import get_alert_dependencies
 from .serializers import serialize_alert, serialize_preference
+
+
+@dataclass(frozen=True)
+class AlertPreferenceInput:
+    enabled: bool
+    channels: list[str]
+    global_opt_out: bool
+
+
+def _require_bool(value: object, field_name: str) -> bool:
+    if isinstance(value, bool):
+        return value
+    raise ResponseContractError(
+        f"Campo '{field_name}' inválido.",
+        code="VALIDATION_ERROR",
+        status_code=400,
+        details={field_name: ["must_be_boolean"]},
+        legacy_payload={"error": f"Campo '{field_name}' inválido."},
+    )
+
+
+def _parse_channels(value: object) -> list[str]:
+    if value is None:
+        return []
+    if not isinstance(value, list) or any(not isinstance(item, str) for item in value):
+        raise ResponseContractError(
+            "Campo 'channels' inválido.",
+            code="VALIDATION_ERROR",
+            status_code=400,
+            details={"channels": ["must_be_string_list"]},
+            legacy_payload={"error": "Campo 'channels' inválido."},
+        )
+    return value
+
+
+def _parse_alert_preference_input(payload: object) -> AlertPreferenceInput:
+    if payload is None:
+        payload = {}
+    if not isinstance(payload, dict):
+        raise ResponseContractError(
+            "Payload inválido.",
+            code="VALIDATION_ERROR",
+            status_code=400,
+            details={"body": ["must_be_object"]},
+            legacy_payload={"error": "Payload inválido."},
+        )
+    enabled = _require_bool(payload.get("enabled", True), "enabled")
+    global_opt_out = _require_bool(
+        payload.get("global_opt_out", False),
+        "global_opt_out",
+    )
+    return AlertPreferenceInput(
+        enabled=enabled,
+        channels=_parse_channels(payload.get("channels")),
+        global_opt_out=global_opt_out,
+    )
 
 
 class AlertCollectionResource(MethodResource):
@@ -31,7 +88,12 @@ class AlertCollectionResource(MethodResource):
     def get(self) -> Any:
         user_id: UUID = current_user_id()
         unread_only = request.args.get("unread_only", "false").lower() == "true"
-        alerts = get_user_alerts(user_id, unread_only=unread_only)
+        dependencies = get_alert_dependencies()
+        alerts = (
+            dependencies.get_unread_alerts(user_id)
+            if unread_only
+            else dependencies.get_user_alerts(user_id)
+        )
         serialized = [serialize_alert(a) for a in alerts]
         return compat_success(
             legacy_payload={"alerts": serialized},
@@ -47,8 +109,9 @@ class AlertReadResource(MethodResource):
     @jwt_required()
     def post(self, alert_id: UUID) -> Any:
         user_id: UUID = current_user_id()
+        dependencies = get_alert_dependencies()
         try:
-            alert = mark_read(alert_id, user_id)
+            alert = dependencies.mark_read(alert_id, user_id)
         except AlertServiceError as exc:
             return alert_service_error_response(exc)
         serialized = serialize_alert(alert)
@@ -66,8 +129,9 @@ class AlertResource(MethodResource):
     @jwt_required()
     def delete(self, alert_id: UUID) -> Any:
         user_id: UUID = current_user_id()
+        dependencies = get_alert_dependencies()
         try:
-            delete_alert(alert_id, user_id)
+            dependencies.delete_alert(alert_id, user_id)
         except AlertServiceError as exc:
             return alert_service_error_response(exc)
         return compat_success(
@@ -84,7 +148,7 @@ class AlertPreferenceCollectionResource(MethodResource):
     @jwt_required()
     def get(self) -> Any:
         user_id: UUID = current_user_id()
-        prefs = get_preferences(user_id)
+        prefs = get_alert_dependencies().get_preferences(user_id)
         serialized = [serialize_preference(p) for p in prefs]
         return compat_success(
             legacy_payload={"preferences": serialized},
@@ -100,26 +164,19 @@ class AlertPreferenceResource(MethodResource):
     @jwt_required()
     def put(self, category: str) -> Any:
         user_id: UUID = current_user_id()
-        payload = request.get_json() or {}
-        enabled = payload.get("enabled", True)
-        channels = payload.get("channels", [])
-        global_opt_out = payload.get("global_opt_out", False)
-
         try:
-            pref = upsert_preference(
+            parsed = _parse_alert_preference_input(request.get_json(silent=True))
+            pref = get_alert_dependencies().upsert_preference(
                 user_id,
                 category,
-                enabled=bool(enabled),
-                channels=channels,
-                global_opt_out=bool(global_opt_out),
+                parsed.enabled,
+                parsed.channels,
+                parsed.global_opt_out,
             )
-        except Exception as exc:  # noqa: BLE001
-            return compat_error_response(
-                legacy_payload={"error": str(exc)},
-                status_code=500,
-                message=str(exc),
-                error_code="INTERNAL_ERROR",
-            )
+        except ResponseContractError as exc:
+            return alert_contract_error_response(exc)
+        except AlertServiceError as exc:
+            return alert_service_error_response(exc)
 
         serialized = serialize_preference(pref)
         return compat_success(
