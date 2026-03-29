@@ -7,6 +7,8 @@ from marshmallow import (
 
 from app.schemas.sanitization import sanitize_string_fields
 
+EXAMPLE_USER_EMAIL = "joao.silva@email.com"
+
 
 class AuthSchema(Schema):
     """Schema para autenticação de usuários"""
@@ -15,7 +17,7 @@ class AuthSchema(Schema):
         required=True,
         metadata={
             "description": "Endereço de email do usuário (identificador canônico)",
-            "example": "joao.silva@email.com",
+            "example": EXAMPLE_USER_EMAIL,
         },
     )
     password = fields.String(
@@ -78,7 +80,7 @@ class ForgotPasswordSchema(Schema):
         required=True,
         metadata={
             "description": "Email da conta que deseja recuperar acesso",
-            "example": "joao.silva@email.com",
+            "example": EXAMPLE_USER_EMAIL,
         },
     )
 
@@ -148,7 +150,7 @@ class ResendConfirmationSchema(Schema):
         required=True,
         metadata={
             "description": "Email da conta que deseja confirmar",
-            "example": "joao.silva@email.com",
+            "example": EXAMPLE_USER_EMAIL,
         },
     )
 
