@@ -23,6 +23,8 @@ DEFAULT_GRAPHQL_PUBLIC_MUTATIONS = frozenset(
         "login",
         "forgotPassword",
         "resetPassword",
+        "resendConfirmationEmail",
+        "confirmEmail",
     }
 )
 

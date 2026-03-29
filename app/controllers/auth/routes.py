@@ -1,10 +1,12 @@
 from __future__ import annotations
 
 from .blueprint import auth_bp
+from .confirm_email_resource import ConfirmEmailResource
 from .forgot_password_resource import ForgotPasswordResource
 from .login_resource import AuthResource
 from .logout_resource import LogoutResource
 from .register_resource import RegisterResource
+from .resend_confirmation_resource import ResendConfirmationResource
 from .reset_password_resource import ResetPasswordResource
 
 _ROUTES_REGISTERED = False
@@ -27,6 +29,14 @@ def register_auth_routes() -> None:
     auth_bp.add_url_rule(
         "/password/reset",
         view_func=ResetPasswordResource.as_view("resetpasswordresource"),
+    )
+    auth_bp.add_url_rule(
+        "/email/confirm",
+        view_func=ConfirmEmailResource.as_view("confirmemailresource"),
+    )
+    auth_bp.add_url_rule(
+        "/email/resend",
+        view_func=ResendConfirmationResource.as_view("resendconfirmationresource"),
     )
     _ROUTES_REGISTERED = True
 

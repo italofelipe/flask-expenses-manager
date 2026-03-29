@@ -1,6 +1,11 @@
 import uuid
 from typing import Dict
 
+from app.application.services.email_confirmation_service import (
+    EMAIL_CONFIRMATION_INVALID_TOKEN_MESSAGE,
+    EMAIL_CONFIRMATION_NEUTRAL_MESSAGE,
+    EMAIL_CONFIRMATION_SUCCESS_MESSAGE,
+)
 from app.application.services.password_reset_service import (
     PASSWORD_RESET_INVALID_TOKEN_MESSAGE,
     PASSWORD_RESET_NEUTRAL_MESSAGE,
@@ -35,10 +40,11 @@ def test_auth_register_v1_legacy_contract(client) -> None:
 
 def test_auth_register_v2_contract(client) -> None:
     suffix = uuid.uuid4().hex[:8]
+    payload = _register_payload(suffix)
     response = client.post(
         "/auth/register",
         headers=_v2_headers(),
-        json=_register_payload(suffix),
+        json=payload,
     )
 
     assert response.status_code == 201
@@ -46,6 +52,10 @@ def test_auth_register_v2_contract(client) -> None:
     assert body["success"] is True
     assert body["message"] == "User created successfully"
     assert "user" in body["data"]
+    outbox = client.application.extensions.get("email_confirmation_outbox", [])
+    assert isinstance(outbox, list)
+    assert len(outbox) == 1
+    assert outbox[0]["email"] == payload["email"]
 
 
 def test_auth_register_validation_error_v2_contract(client) -> None:
@@ -290,3 +300,54 @@ def test_auth_password_reset_v2_contract_revokes_existing_sessions(client) -> No
         json={"email": payload["email"], "password": "NovaSenha@123"},
     )
     assert new_login.status_code == 200
+
+
+def test_auth_email_confirm_v2_contract(client) -> None:
+    suffix = uuid.uuid4().hex[:8]
+    payload = _register_payload(suffix)
+    register = client.post("/auth/register", json=payload)
+    assert register.status_code == 201
+
+    outbox = client.application.extensions.get("email_confirmation_outbox", [])
+    assert isinstance(outbox, list)
+    token = outbox[0]["token"]
+
+    response = client.post(
+        "/auth/email/confirm",
+        headers=_v2_headers(),
+        json={"token": token},
+    )
+
+    assert response.status_code == 200
+    body = response.get_json()
+    assert body["success"] is True
+    assert body["message"] == EMAIL_CONFIRMATION_SUCCESS_MESSAGE
+    assert body["data"] == {}
+
+
+def test_auth_email_confirm_v2_contract_with_invalid_token(client) -> None:
+    response = client.post(
+        "/auth/email/confirm",
+        headers=_v2_headers(),
+        json={"token": "invalid-token-value-with-sufficient-length-123456"},
+    )
+
+    assert response.status_code == 400
+    body = response.get_json()
+    assert body["success"] is False
+    assert body["error"]["code"] == "VALIDATION_ERROR"
+    assert body["message"] == EMAIL_CONFIRMATION_INVALID_TOKEN_MESSAGE
+
+
+def test_auth_email_resend_v2_contract_is_neutral(client) -> None:
+    response = client.post(
+        "/auth/email/resend",
+        headers=_v2_headers(),
+        json={"email": "unknown-user@email.com"},
+    )
+
+    assert response.status_code == 200
+    body = response.get_json()
+    assert body["success"] is True
+    assert body["message"] == EMAIL_CONFIRMATION_NEUTRAL_MESSAGE
+    assert body["data"] == {}

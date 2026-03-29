@@ -22,6 +22,7 @@ from flask import Blueprint, current_app, jsonify, request
 from flask.ctx import has_app_context
 from flask.typing import ResponseReturnValue
 
+from app.application.services.billing_email_service import dispatch_billing_email
 from app.auth import get_active_auth_context, get_active_user
 from app.config.billing_plans import (
     canonical_offer_slug,
@@ -32,6 +33,7 @@ from app.controllers.response_contract import compat_error_response
 from app.extensions.database import db
 from app.http.request_context import current_request_id
 from app.models.subscription import Subscription, SubscriptionStatus
+from app.models.user import User
 from app.services.billing_adapter import (
     BillingCheckoutCustomer,
     BillingProvider,
@@ -544,6 +546,21 @@ def _process_webhook_snapshot(
     if event_id:
         subscription.provider_event_id = event_id
     apply_subscription_snapshot(subscription, snapshot)
+
+    user = User.query.filter_by(id=subscription.user_id).first()
+    if user is not None:
+        try:
+            dispatch_billing_email(
+                user=user,
+                subscription=subscription,
+                event_type=event_type,
+            )
+        except Exception:
+            logger.exception(
+                "Failed to dispatch billing email for event=%s subscription_id=%s",
+                event_type,
+                str(subscription.id),
+            )
 
     return _ok({"received": True, "processed": True})
 

@@ -209,6 +209,22 @@
     "summary": "Conclui a redefinição de senha com token válido."
   },
   {
+    "access": "public",
+    "domain": "auth",
+    "name": "resendConfirmationEmail",
+    "operation_type": "mutation",
+    "source_module": "app.graphql.mutations.auth",
+    "summary": "Reenvia o email de confirmação com resposta neutra."
+  },
+  {
+    "access": "public",
+    "domain": "auth",
+    "name": "confirmEmail",
+    "operation_type": "mutation",
+    "source_module": "app.graphql.mutations.auth",
+    "summary": "Confirma a conta do usuário a partir de um token válido."
+  },
+  {
     "access": "auth_required",
     "domain": "user",
     "name": "updateUserProfile",
