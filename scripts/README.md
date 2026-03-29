@@ -40,3 +40,20 @@ Scripts operacionais e de engenharia para CI/CD, seguranca, deploy, observabilid
 - Para governanca de branch: `scripts/python_exec.sh scripts/github_ruleset_manager.py --owner <owner> --repo <repo> --mode audit`.
 - Para auditoria IAM contínua: `scripts/python_exec.sh scripts/aws_iam_audit_i8.py --profile auraxis-admin --region us-east-1 --fail-on fail --output-json reports/aws-iam-audit.json`.
 - Secret esperado no GitHub Actions para governanca: `TOKEN_GITHUB_ADMIN`.
+
+## seed_local.py
+
+Popula o banco de desenvolvimento local com dados de demonstração.
+
+**Uso:**
+```bash
+python scripts/seed_local.py           # Adiciona dados sem apagar existentes
+python scripts/seed_local.py --reset   # Apaga e recria todas as tabelas antes de popular
+```
+
+**Dados criados:**
+- 1 usuário demo (demo@auraxis.com / Demo@1234)
+- 5 tags, 3 contas, 2 cartões
+- 24 transações (12 meses de receita + despesa)
+- 3 metas financeiras
+- 4 entradas de carteira
