@@ -9,11 +9,32 @@ from __future__ import annotations
 from typing import cast
 from uuid import UUID
 
+from app.config.billing_plans import parse_billing_cycle, resolve_checkout_plan_offer
+from app.config.plan_features import PLAN_FEATURES
 from app.extensions.database import db
-from app.models.subscription import Subscription, SubscriptionStatus
+from app.models.subscription import BillingCycle, Subscription, SubscriptionStatus
 from app.services.billing_adapter import BillingProvider
 
 _FREE_PLAN_CODE = "free"
+
+
+def _normalize_plan_snapshot(
+    *,
+    raw_plan_code: object,
+    raw_billing_cycle: object,
+    raw_offer_code: object,
+) -> tuple[str, BillingCycle | None] | None:
+    offer = resolve_checkout_plan_offer(
+        str(raw_offer_code or raw_plan_code or "").strip().lower()
+    )
+    if offer is not None:
+        return offer.plan_code, offer.billing_cycle
+
+    normalized_plan = str(raw_plan_code or "").strip().lower()
+    if normalized_plan not in PLAN_FEATURES:
+        return None
+
+    return normalized_plan, parse_billing_cycle(str(raw_billing_cycle or ""))
 
 
 def get_or_create_subscription(user_id: UUID) -> Subscription:
@@ -58,8 +79,13 @@ def sync_subscription_from_provider(
         # Unknown status from provider — leave existing status intact.
         pass
 
-    if "plan_code" in data:
-        subscription.plan_code = data["plan_code"]
+    normalized_plan = _normalize_plan_snapshot(
+        raw_plan_code=data.get("plan_code"),
+        raw_billing_cycle=data.get("billing_cycle"),
+        raw_offer_code=data.get("offer_code"),
+    )
+    if normalized_plan is not None:
+        subscription.plan_code, subscription.billing_cycle = normalized_plan
     if "current_period_start" in data and data["current_period_start"] is not None:
         subscription.current_period_start = data["current_period_start"]
     if "current_period_end" in data and data["current_period_end"] is not None:

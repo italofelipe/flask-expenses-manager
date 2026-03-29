@@ -207,6 +207,7 @@ def test_postman_collection_covers_critical_rest_routes() -> None:
         ("GET", "/alerts"),
         ("POST", "/alerts/{param}/read"),
         ("DELETE", "/alerts/{param}"),
+        ("GET", "/subscriptions/plans"),
         ("GET", "/subscriptions/me"),
         ("POST", "/subscriptions/checkout"),
         ("POST", "/subscriptions/cancel"),
