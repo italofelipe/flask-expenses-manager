@@ -25,6 +25,7 @@ if [[ "$MODE" == "docker" ]]; then
     "$CI_LOCAL_PYTHON_IMAGE" \
     bash -lc "python3 scripts/repo_hygiene_check.py && \
       python3 scripts/graphql_auth_config_check.py && \
+      python3 scripts/alembic_single_head_check.py && \
       python -m pip install --upgrade pip && \
       python -m pip install -r requirements.txt -r requirements-dev.txt && \
       python3 scripts/security_exception_governance.py check && \
@@ -42,6 +43,7 @@ PYTHON_BIN="$(resolve_repo_python "$ROOT_DIR")"
 echo "[quality-local] Running CI quality pipeline in local environment with ${PYTHON_BIN}..."
 python3 scripts/repo_hygiene_check.py
 python3 scripts/graphql_auth_config_check.py
+python3 scripts/alembic_single_head_check.py
 python3 scripts/security_exception_governance.py check
 "${PYTHON_BIN}" -m pip_audit -r requirements.txt $(python3 scripts/security_exception_governance.py pip-audit-args)
 "${PYTHON_BIN}" -m ruff format --check .

@@ -10,7 +10,7 @@ import sqlalchemy as sa
 
 
 revision = "f2c4a1e8b7d0"
-down_revision = "e3b1f6a2d8c9"
+down_revision = "b2_align_shared_entry_enums"
 branch_labels = None
 depends_on = None
 
