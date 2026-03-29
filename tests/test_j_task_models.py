@@ -282,7 +282,7 @@ def test_invitation_defaults_to_pending(app) -> None:
         entry = SharedEntry(
             owner_id=owner.id,
             transaction_id=txn.id,
-            split_type=SplitType.FIXED,
+            split_type=SplitType.CUSTOM,
         )
         db.session.add(entry)
         db.session.flush()

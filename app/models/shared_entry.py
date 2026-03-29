@@ -18,14 +18,14 @@ def _enum_values(enum_cls: type[enum.Enum]) -> list[str]:
 
 class SharedEntryStatus(enum.Enum):
     PENDING = "pending"
-    ACTIVE = "active"
-    REVOKED = "revoked"
+    ACCEPTED = "accepted"
+    DECLINED = "declined"
 
 
 class SplitType(enum.Enum):
     EQUAL = "equal"
     PERCENTAGE = "percentage"
-    FIXED = "fixed"
+    CUSTOM = "custom"
 
 
 class InvitationStatus(enum.Enum):
@@ -69,6 +69,7 @@ class SharedEntry(db.Model):
         db.DateTime, nullable=False, default=utc_now_naive, onupdate=utc_now_naive
     )
 
+    transaction = db.relationship("Transaction", lazy="joined")
     invitations = db.relationship(
         "Invitation", back_populates="shared_entry", cascade="all, delete-orphan"
     )

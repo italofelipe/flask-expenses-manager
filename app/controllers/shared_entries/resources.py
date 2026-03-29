@@ -18,7 +18,11 @@ from app.utils.typed_decorators import typed_jwt_required as jwt_required
 from .blueprint import shared_entries_bp
 from .contracts import api_error_tuple, compat_success, contract_error_tuple
 from .dependencies import get_shared_entries_dependencies
-from .serializers import serialize_invitation, serialize_shared_entry
+from .serializers import (
+    serialize_invitation,
+    serialize_shared_entry,
+    serialize_shared_entry_with_me,
+)
 
 INVALID_EXPIRES_IN_HOURS_MESSAGE = "Campo 'expires_in_hours' inválido."
 
@@ -121,7 +125,7 @@ def _parse_create_shared_entry_payload(payload: object) -> CreateSharedEntryInpu
             "Campo 'split_type' inválido.",
             code="VALIDATION_ERROR",
             status_code=400,
-            details={"split_type": ["must_be_one_of: equal, percentage, fixed"]},
+            details={"split_type": ["must_be_one_of: equal, percentage, custom"]},
             legacy_payload={"error": "Campo 'split_type' inválido."},
         )
     return CreateSharedEntryInput(
@@ -224,7 +228,7 @@ def list_shared_with_me() -> tuple[dict[str, Any], int]:
     """List all shared entries where I am an accepted invitee."""
     user_id: UUID = current_user_id()
     entries = get_shared_entries_dependencies().list_shared_with_me(user_id)
-    serialized = [serialize_shared_entry(entry) for entry in entries]
+    serialized = [serialize_shared_entry_with_me(entry, user_id) for entry in entries]
     return compat_success(
         legacy_payload={"shared_entries": serialized},
         status_code=200,

@@ -89,8 +89,8 @@ def test_share_entry_appears_in_list_shared_by_me(app) -> None:
         assert any(str(r.id) == str(entry.id) for r in results)
 
 
-def test_revoke_share_sets_status_revoked(app) -> None:
-    """Revoking a shared entry sets its status to REVOKED."""
+def test_revoke_share_sets_status_declined(app) -> None:
+    """Revoking a shared entry sets its status to DECLINED."""
     from app.extensions.database import db
     from app.models.shared_entry import SharedEntryStatus
     from app.services.shared_entry_service import revoke_share, share_entry
@@ -106,10 +106,10 @@ def test_revoke_share_sets_status_revoked(app) -> None:
         entry = share_entry(
             owner_id=owner.id,
             transaction_id=txn.id,
-            split_type="fixed",
+            split_type="custom",
         )
         revoked = revoke_share(shared_entry_id=entry.id, owner_id=owner.id)
-        assert revoked.status == SharedEntryStatus.REVOKED
+        assert revoked.status == SharedEntryStatus.DECLINED
 
 
 def test_revoke_share_non_owner_raises_forbidden(app) -> None:
@@ -319,7 +319,7 @@ def test_post_shared_entries_invalid_split_type_v2_contract(client) -> None:
     assert body["success"] is False
     assert body["error"]["code"] == "VALIDATION_ERROR"
     assert body["error"]["details"] == {
-        "split_type": ["must_be_one_of: equal, percentage, fixed"],
+        "split_type": ["must_be_one_of: equal, percentage, custom"],
     }
 
 
@@ -423,3 +423,279 @@ def test_shared_entry_requires_auth(client) -> None:
     """Endpoints require a valid JWT."""
     resp = client.get("/shared-entries/by-me")
     assert resp.status_code in (401, 422)
+
+
+# ---------------------------------------------------------------------------
+# Serializer unit tests — enriched fields
+# ---------------------------------------------------------------------------
+
+
+def _make_shared_entry(owner, txn, split_type: str = "equal"):
+    """Return a SharedEntry (not persisted) with the transaction relationship set."""
+    from app.models.shared_entry import SharedEntry, SharedEntryStatus, SplitType
+    from app.utils.datetime_utils import utc_now_naive
+
+    entry = SharedEntry(
+        id=uuid.uuid4(),
+        owner_id=owner.id,
+        transaction_id=txn.id,
+        split_type=SplitType(split_type),
+        status=SharedEntryStatus.PENDING,
+        created_at=utc_now_naive(),
+        updated_at=utc_now_naive(),
+    )
+    # Attach the transaction object directly (simulating lazy="joined")
+    entry.transaction = txn
+    entry.invitations = []
+    return entry
+
+
+def test_serialize_shared_entry_includes_transaction_fields(app) -> None:
+    """Serializer exposes transaction_title and transaction_amount."""
+    from app.controllers.shared_entries.serializers import serialize_shared_entry
+
+    with app.app_context():
+        owner = _make_user("ser-txn")
+        txn = _make_transaction(owner.id)
+
+        entry = _make_shared_entry(owner, txn, split_type="equal")
+        payload = serialize_shared_entry(entry)
+
+        assert payload["transaction_title"] == txn.title
+        assert payload["transaction_amount"] == float(txn.amount)
+
+
+def test_serialize_my_share_equal_split(app) -> None:
+    """my_share for split_type=equal is amount/2."""
+    from app.controllers.shared_entries.serializers import serialize_shared_entry
+
+    with app.app_context():
+        owner = _make_user("ser-eq")
+        txn = _make_transaction(owner.id)  # amount=100
+
+        entry = _make_shared_entry(owner, txn, split_type="equal")
+        payload = serialize_shared_entry(entry)
+
+        assert payload["my_share"] == 50.0
+
+
+def test_serialize_my_share_percentage_split(app) -> None:
+    """my_share for split_type=percentage is amount * split_value/100."""
+    from app.controllers.shared_entries.serializers import serialize_shared_entry
+    from app.models.shared_entry import Invitation, InvitationStatus
+    from app.utils.datetime_utils import utc_now_naive
+
+    with app.app_context():
+        owner = _make_user("ser-pct")
+        txn = _make_transaction(owner.id)  # amount=100
+
+        entry = _make_shared_entry(owner, txn, split_type="percentage")
+
+        inv = Invitation(
+            id=uuid.uuid4(),
+            shared_entry_id=entry.id,
+            from_user_id=owner.id,
+            to_user_email="invitee@test.com",
+            split_value=30,  # 30%
+            share_amount=None,
+            status=InvitationStatus.ACCEPTED,
+            created_at=utc_now_naive(),
+        )
+        entry.invitations = [inv]
+
+        payload = serialize_shared_entry(entry)
+        assert payload["my_share"] == pytest.approx(30.0)
+
+
+def test_serialize_my_share_custom_split(app) -> None:
+    """my_share for split_type=custom is the fixed share_amount."""
+    from app.controllers.shared_entries.serializers import serialize_shared_entry
+    from app.models.shared_entry import Invitation, InvitationStatus
+    from app.utils.datetime_utils import utc_now_naive
+
+    with app.app_context():
+        owner = _make_user("ser-cst")
+        txn = _make_transaction(owner.id)  # amount=100
+
+        entry = _make_shared_entry(owner, txn, split_type="custom")
+
+        inv = Invitation(
+            id=uuid.uuid4(),
+            shared_entry_id=entry.id,
+            from_user_id=owner.id,
+            to_user_email="invitee@test.com",
+            split_value=None,
+            share_amount=40,
+            status=InvitationStatus.ACCEPTED,
+            created_at=utc_now_naive(),
+        )
+        entry.invitations = [inv]
+
+        payload = serialize_shared_entry(entry)
+        assert payload["my_share"] == pytest.approx(40.0)
+
+
+def test_serialize_other_party_email(app) -> None:
+    """other_party_email comes from the first invitation's to_user_email."""
+    from app.controllers.shared_entries.serializers import serialize_shared_entry
+    from app.models.shared_entry import Invitation, InvitationStatus
+    from app.utils.datetime_utils import utc_now_naive
+
+    with app.app_context():
+        owner = _make_user("ser-ope")
+        txn = _make_transaction(owner.id)
+
+        entry = _make_shared_entry(owner, txn, split_type="equal")
+
+        inv = Invitation(
+            id=uuid.uuid4(),
+            shared_entry_id=entry.id,
+            from_user_id=owner.id,
+            to_user_email="partner@test.com",
+            split_value=None,
+            share_amount=None,
+            status=InvitationStatus.ACCEPTED,
+            created_at=utc_now_naive(),
+        )
+        entry.invitations = [inv]
+
+        payload = serialize_shared_entry(entry)
+        assert payload["other_party_email"] == "partner@test.com"
+
+
+# ---------------------------------------------------------------------------
+# Integration tests — GET /shared-entries/by-me and /with-me enriched fields
+# ---------------------------------------------------------------------------
+
+
+def _create_transaction_via_api(client, token: str) -> str:
+    """Helper: create a transaction and return its id."""
+    from datetime import date
+
+    resp = client.post(
+        "/transactions",
+        json={
+            "title": "Shared Txn",
+            "amount": 200.0,
+            "type": "EXPENSE",
+            "due_date": str(date(2026, 6, 1)),
+        },
+        headers=_auth(token),
+    )
+    assert resp.status_code == 201, resp.get_json()
+    body = resp.get_json()
+    # The transactions endpoint returns {transaction: [<obj>]} (list with one item)
+    txn_value = body.get("transaction") or body.get("data", {}).get("transaction")
+    if isinstance(txn_value, list) and txn_value:
+        return str(txn_value[0]["id"])
+    if isinstance(txn_value, dict):
+        return str(txn_value["id"])
+    raise AssertionError(f"Could not extract transaction id from response: {body}")
+
+
+def test_get_shared_entries_by_me_has_enriched_fields(client) -> None:
+    """GET /shared-entries/by-me returns transaction_title, transaction_amount, my_share."""  # noqa: E501
+    owner_id, owner_token = _register_and_login(client, "enrich-own")
+    txn_id = _create_transaction_via_api(client, owner_token)
+
+    # Create shared entry
+    resp = client.post(
+        "/shared-entries",
+        json={"transaction_id": txn_id, "split_type": "equal"},
+        headers=_auth(owner_token),
+    )
+    assert resp.status_code == 201, resp.get_json()
+
+    # List
+    list_resp = client.get("/shared-entries/by-me", headers=_auth(owner_token))
+    assert list_resp.status_code == 200
+    entries = list_resp.get_json()["shared_entries"]
+    assert len(entries) >= 1
+    entry = next(e for e in entries if e["transaction_id"] == txn_id)
+
+    assert entry["transaction_title"] == "Shared Txn"
+    assert entry["transaction_amount"] == pytest.approx(200.0)
+    assert entry["my_share"] == pytest.approx(100.0)  # equal split: 200/2
+    assert entry["status"] in ("pending", "accepted", "declined")
+    assert entry["split_type"] == "equal"
+
+
+def test_get_shared_entries_with_me_has_enriched_fields(client) -> None:
+    """GET /shared-entries/with-me returns enriched fields from invitee perspective."""
+    suffix = uuid.uuid4().hex[:6]
+    invitee_email = f"j13-enrich-wi-inv-{suffix}@test.com"
+
+    owner_id, owner_token = _register_and_login(client, f"wim-own-{suffix}")
+    # Register invitee with a known email so we can use it directly
+    inv_password = "StrongPass@123"
+    reg = client.post(
+        "/auth/register",
+        json={
+            "name": f"wim-inv-{suffix}",
+            "email": invitee_email,
+            "password": inv_password,
+        },
+    )
+    assert reg.status_code == 201, reg.get_json()
+    login = client.post(
+        "/auth/login", json={"email": invitee_email, "password": inv_password}
+    )
+    assert login.status_code == 200, login.get_json()
+    invitee_token: str = login.get_json()["token"]
+
+    txn_id = _create_transaction_via_api(client, owner_token)
+
+    # Owner creates shared entry
+    resp = client.post(
+        "/shared-entries",
+        json={"transaction_id": txn_id, "split_type": "equal"},
+        headers=_auth(owner_token),
+    )
+    assert resp.status_code == 201, resp.get_json()
+    se_body = resp.get_json()
+    shared_entry_id = se_body.get("shared_entry", {}).get("id") or se_body.get(
+        "data", {}
+    ).get("shared_entry", {}).get("id")
+
+    # Owner sends invitation
+    inv_resp = client.post(
+        "/shared-entries/invitations",
+        json={"shared_entry_id": shared_entry_id, "invitee_email": invitee_email},
+        headers=_auth(owner_token),
+    )
+    assert inv_resp.status_code == 201, inv_resp.get_json()
+    inv_body = inv_resp.get_json()
+    token_val = inv_body.get("invitation", {}).get("token") or inv_body.get(
+        "data", {}
+    ).get("invitation", {}).get("token")
+
+    # Invitee accepts
+    accept_resp = client.post(
+        f"/shared-entries/invitations/{token_val}/accept",
+        headers=_auth(invitee_token),
+    )
+    assert accept_resp.status_code == 200, accept_resp.get_json()
+
+    # Invitee lists /with-me
+    with_me_resp = client.get("/shared-entries/with-me", headers=_auth(invitee_token))
+    assert with_me_resp.status_code == 200
+    entries = with_me_resp.get_json()["shared_entries"]
+    assert len(entries) >= 1
+    entry = next(e for e in entries if e["transaction_id"] == txn_id)
+
+    assert entry["transaction_title"] == "Shared Txn"
+    assert entry["transaction_amount"] == pytest.approx(200.0)
+    assert entry["my_share"] == pytest.approx(100.0)  # equal split
+
+
+def test_enum_values_aligned_with_frontend(app) -> None:
+    """Status and split_type enum values match what the frontend expects."""
+    from app.models.shared_entry import SharedEntryStatus, SplitType
+
+    with app.app_context():
+        assert {s.value for s in SharedEntryStatus} == {
+            "pending",
+            "accepted",
+            "declined",
+        }
+        assert {s.value for s in SplitType} == {"equal", "percentage", "custom"}
