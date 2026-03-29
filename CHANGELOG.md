@@ -1,5 +1,20 @@
 # Changelog
 
+## [1.10.0](https://github.com/italofelipe/auraxis-api/compare/v1.9.0...v1.10.0) (2026-03-29)
+
+
+### Features
+
+* **api-18-3:** clarify graphql dashboard ownership ([#786](https://github.com/italofelipe/auraxis-api/issues/786)) ([81eb42c](https://github.com/italofelipe/auraxis-api/commit/81eb42cf26b25c30003c79136de4487b5eb28d0b))
+* **ci:** add canonical stack bootstrap ([#789](https://github.com/italofelipe/auraxis-api/issues/789)) ([c13e934](https://github.com/italofelipe/auraxis-api/commit/c13e93409c09436f33509483babacb12d002d18b))
+* **ci:** add continuous suite canary ([#792](https://github.com/italofelipe/auraxis-api/issues/792)) ([d0036cb](https://github.com/italofelipe/auraxis-api/commit/d0036cb0dfee6f2acec7b6fb864f5dd22caf7808))
+* **ci:** align local suite bootstrap with ci ([#791](https://github.com/italofelipe/auraxis-api/issues/791)) ([b52f3df](https://github.com/italofelipe/auraxis-api/commit/b52f3df3c0a32e7db5b7f883cf36c20289fdb5c7))
+
+
+### Performance Improvements
+
+* **api-19-1:** prebuild web image for release gates ([#785](https://github.com/italofelipe/auraxis-api/issues/785)) ([aaefc52](https://github.com/italofelipe/auraxis-api/commit/aaefc529066a24ce04211b811215b0ea8350b8ab))
+
 ## [1.9.0](https://github.com/italofelipe/auraxis-api/compare/v1.8.0...v1.9.0) (2026-03-28)
 
 
