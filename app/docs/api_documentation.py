@@ -41,6 +41,10 @@ TAGS = [
         "name": "Health",
         "description": "Endpoint público para liveness/readiness de infraestrutura",
     },
+    {
+        "name": "Observability",
+        "description": "Export operacional protegido para métricas e collector externo",
+    },
     {"name": "Contas", "description": "Gerenciamento de contas bancárias (pendente)"},
     {
         "name": "Cartões de Crédito",

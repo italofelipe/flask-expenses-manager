@@ -254,6 +254,7 @@ def test_postman_collection_uses_domain_folders() -> None:
         "08 - Fiscal",
         "09 - Tags, Accounts and Credit Cards",
         "10 - GraphQL",
+        "11 - Observability",
     ]
 
 

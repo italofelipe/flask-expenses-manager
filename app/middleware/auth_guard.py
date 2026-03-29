@@ -35,6 +35,9 @@ def register_auth_guard(app: Flask) -> None:
             "handle_webhook",
             # Public billing catalog for checkout surfaces
             "list_subscription_plans",
+            # Internal observability export guarded by dedicated header token
+            "observability_snapshot",
+            "observability_metrics",
         }
         if not request.endpoint:
             return None
