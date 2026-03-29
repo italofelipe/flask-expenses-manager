@@ -19,6 +19,8 @@ def register_auth_guard(app: Flask) -> None:
             "authresource",
             "forgotpasswordresource",
             "resetpasswordresource",
+            "confirmemailresource",
+            "resendconfirmationresource",
             "refreshtokenresource",
             "execute_graphql",
             "static",

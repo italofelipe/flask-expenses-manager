@@ -444,7 +444,9 @@ type Mutation {
   login(email: String!, password: String!): AuthPayloadType
   logout: LogoutMutation
   forgotPassword(email: String!): AuthPayloadType
+  resendConfirmationEmail(email: String!): AuthPayloadType
   resetPassword(newPassword: String!, token: String!): AuthPayloadType
+  confirmEmail(token: String!): AuthPayloadType
   updateUserProfile(birthDate: String, financialObjectives: String, gender: String, initialInvestment: Float, investmentGoalDate: String, investorProfile: String, investorProfileSuggested: String, monthlyExpenses: Float, monthlyIncome: Float, monthlyIncomeNet: Float, monthlyInvestment: Float, netWorth: Float, occupation: String, profileQuizScore: Int, stateUf: String, taxonomyVersion: String): UpdateUserProfileMutation
   createTransaction(accountId: UUID, amount: String!, creditCardId: UUID, currency: String = "BRL", description: String, dueDate: String!, endDate: String, installmentCount: Int, isInstallment: Boolean = false, isRecurring: Boolean = false, observation: String, startDate: String, status: String = "pending", tagId: UUID, title: String!, type: String!): CreateTransactionMutation
   updateTransaction(accountId: UUID, amount: String, creditCardId: UUID, currency: String, description: String, dueDate: String, endDate: String, installmentCount: Int, isInstallment: Boolean, isRecurring: Boolean, observation: String, paidAt: String, startDate: String, status: String, tagId: UUID, title: String, transactionId: UUID!, type: String): UpdateTransactionMutation

@@ -804,7 +804,98 @@
           ]
         },
         {
-          "name": "17 - Salary increase simulation (REST v2)",
+          "name": "17 - Email resend unknown email (REST v2)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "X-API-Contract",
+                "value": "v2"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/auth/email/resend",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "email",
+                "resend"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n                      \"email\": \"unknown-{{runSeed}}@example.com\"\n                    }\n"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('email resend unknown returns neutral 200', function () { pm.response.to.have.status(200); });",
+                  "var body = pm.response.json();",
+                  "pm.test('email resend unknown stays neutral', function () { pm.expect(body.success).to.eql(true); });"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "18 - Email confirm invalid token (REST v2)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "X-API-Contract",
+                "value": "v2"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/auth/email/confirm",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "email",
+                "confirm"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n                      \"token\": \"invalid-token-value-with-sufficient-length-123456\"\n                    }\n"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('email confirm invalid token returns 400', function () { pm.response.to.have.status(400); });",
+                  "var body = pm.response.json();",
+                  "pm.test('email confirm invalid token is a validation error', function () {",
+                  "  pm.expect(body.success).to.eql(false);",
+                  "  pm.expect(body.error.code).to.eql('VALIDATION_ERROR');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "19 - Salary increase simulation (REST v2)",
           "request": {
             "method": "POST",
             "header": [

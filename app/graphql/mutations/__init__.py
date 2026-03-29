@@ -3,10 +3,12 @@ from __future__ import annotations
 import graphene
 
 from app.graphql.mutations.auth import (
+    ConfirmEmailMutation,
     ForgotPasswordMutation,
     LoginMutation,
     LogoutMutation,
     RegisterUserMutation,
+    ResendConfirmationEmailMutation,
     ResetPasswordMutation,
     UpdateUserProfileMutation,
 )
@@ -44,7 +46,9 @@ class Mutation(graphene.ObjectType):
     login = LoginMutation.Field()
     logout = LogoutMutation.Field()
     forgot_password = ForgotPasswordMutation.Field()
+    resend_confirmation_email = ResendConfirmationEmailMutation.Field()
     reset_password = ResetPasswordMutation.Field()
+    confirm_email = ConfirmEmailMutation.Field()
     update_user_profile = UpdateUserProfileMutation.Field()
     create_transaction = CreateTransactionMutation.Field()
     update_transaction = UpdateTransactionMutation.Field()

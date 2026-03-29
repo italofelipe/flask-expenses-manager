@@ -13,6 +13,12 @@ from app.application.dto.auth_security_policy_dto import AuthSecurityPolicyDTO
 from app.application.services.auth_security_policy_service import (
     get_auth_security_policy,
 )
+from app.application.services.email_confirmation_service import (
+    EmailConfirmationResult,
+    confirm_email,
+    issue_email_confirmation,
+    resend_email_confirmation,
+)
 from app.application.services.password_reset_service import (
     PasswordResetResult,
     request_password_reset,
@@ -45,6 +51,9 @@ class AuthDependencies:
     get_user_by_id: Callable[[UUID], User | None]
     request_password_reset: Callable[[str], PasswordResetResult]
     reset_password: Callable[[str, str], PasswordResetResult]
+    issue_email_confirmation: Callable[[User], EmailConfirmationResult]
+    resend_email_confirmation: Callable[[str], EmailConfirmationResult]
+    confirm_email: Callable[[str], EmailConfirmationResult]
 
 
 def _find_user_by_email(email: str) -> User | None:
@@ -92,6 +101,9 @@ def _default_dependencies() -> AuthDependencies:
             token=token,
             new_password_hash=password_hash,
         ),
+        issue_email_confirmation=issue_email_confirmation,
+        resend_email_confirmation=resend_email_confirmation,
+        confirm_email=lambda token: confirm_email(token=token),
     )
 
 

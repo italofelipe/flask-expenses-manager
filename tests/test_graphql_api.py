@@ -4,6 +4,11 @@ from decimal import Decimal
 from typing import Any, Dict
 from uuid import UUID
 
+from app.application.services.email_confirmation_service import (
+    EMAIL_CONFIRMATION_INVALID_TOKEN_MESSAGE,
+    EMAIL_CONFIRMATION_NEUTRAL_MESSAGE,
+    EMAIL_CONFIRMATION_SUCCESS_MESSAGE,
+)
 from app.application.services.password_reset_service import (
     PASSWORD_RESET_INVALID_TOKEN_MESSAGE,
     PASSWORD_RESET_NEUTRAL_MESSAGE,
@@ -254,6 +259,89 @@ def test_graphql_reset_password_flow_allows_new_credentials(client) -> None:
     new_login_body = new_login_response.get_json()
     assert "errors" not in new_login_body
     assert new_login_body["data"]["login"]["token"]
+
+
+def test_graphql_resend_confirmation_is_neutral(client) -> None:
+    mutation = """
+    mutation ResendConfirmation($email: String!) {
+      resendConfirmationEmail(email: $email) {
+        message
+      }
+    }
+    """
+    response = _graphql(client, mutation, {"email": "unknown-user@email.com"})
+    assert response.status_code == 200
+    body = response.get_json()
+    assert "errors" not in body
+    assert (
+        body["data"]["resendConfirmationEmail"]["message"]
+        == EMAIL_CONFIRMATION_NEUTRAL_MESSAGE
+    )
+
+
+def test_graphql_confirm_email_flow(client) -> None:
+    suffix = "graphql-confirm-user"
+    register_mutation = """
+    mutation Register($name: String!, $email: String!, $password: String!) {
+      registerUser(name: $name, email: $email, password: $password) {
+        message
+      }
+    }
+    """
+    email = f"{suffix}@email.com"
+    register_response = _graphql(
+        client,
+        register_mutation,
+        {
+            "name": suffix,
+            "email": email,
+            "password": "StrongPass@123",
+        },
+    )
+    assert register_response.status_code == 200
+    assert "errors" not in register_response.get_json()
+
+    outbox = client.application.extensions.get("email_confirmation_outbox", [])
+    assert isinstance(outbox, list)
+    token = outbox[0]["token"]
+
+    confirm_mutation = """
+    mutation ConfirmEmail($token: String!) {
+      confirmEmail(token: $token) {
+        message
+      }
+    }
+    """
+    confirm_response = _graphql(client, confirm_mutation, {"token": token})
+    assert confirm_response.status_code == 200
+    confirm_body = confirm_response.get_json()
+    assert "errors" not in confirm_body
+    assert (
+        confirm_body["data"]["confirmEmail"]["message"]
+        == EMAIL_CONFIRMATION_SUCCESS_MESSAGE
+    )
+
+
+def test_graphql_confirm_email_with_invalid_token_returns_public_validation_error(
+    client,
+) -> None:
+    mutation = """
+    mutation ConfirmEmail($token: String!) {
+      confirmEmail(token: $token) {
+        message
+      }
+    }
+    """
+    response = _graphql(
+        client,
+        mutation,
+        {"token": "invalid-token-value-with-sufficient-length-123456"},
+    )
+    assert response.status_code == 200
+    body = response.get_json()
+    assert body["data"]["confirmEmail"] is None
+    assert body["errors"][0]["extensions"]["code"] == "VALIDATION_ERROR"
+    assert body["errors"][0]["message"] == EMAIL_CONFIRMATION_INVALID_TOKEN_MESSAGE
 
 
 def test_graphql_transactions_summary_and_dashboard(app, client) -> None:

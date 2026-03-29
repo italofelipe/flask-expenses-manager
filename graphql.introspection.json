@@ -6166,6 +6166,35 @@
                   "deprecationReason": null,
                   "description": null,
                   "isDeprecated": false,
+                  "name": "email",
+                  "type": {
+                    "kind": "NON_NULL",
+                    "name": null,
+                    "ofType": {
+                      "kind": "SCALAR",
+                      "name": "String",
+                      "ofType": null
+                    }
+                  }
+                }
+              ],
+              "deprecationReason": null,
+              "description": null,
+              "isDeprecated": false,
+              "name": "resendConfirmationEmail",
+              "type": {
+                "kind": "OBJECT",
+                "name": "AuthPayloadType",
+                "ofType": null
+              }
+            },
+            {
+              "args": [
+                {
+                  "defaultValue": null,
+                  "deprecationReason": null,
+                  "description": null,
+                  "isDeprecated": false,
                   "name": "newPassword",
                   "type": {
                     "kind": "NON_NULL",
@@ -6198,6 +6227,35 @@
               "description": null,
               "isDeprecated": false,
               "name": "resetPassword",
+              "type": {
+                "kind": "OBJECT",
+                "name": "AuthPayloadType",
+                "ofType": null
+              }
+            },
+            {
+              "args": [
+                {
+                  "defaultValue": null,
+                  "deprecationReason": null,
+                  "description": null,
+                  "isDeprecated": false,
+                  "name": "token",
+                  "type": {
+                    "kind": "NON_NULL",
+                    "name": null,
+                    "ofType": {
+                      "kind": "SCALAR",
+                      "name": "String",
+                      "ofType": null
+                    }
+                  }
+                }
+              ],
+              "deprecationReason": null,
+              "description": null,
+              "isDeprecated": false,
+              "name": "confirmEmail",
               "type": {
                 "kind": "OBJECT",
                 "name": "AuthPayloadType",
