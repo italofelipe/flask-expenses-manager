@@ -7,6 +7,7 @@ from app.controllers.alert import (
     AlertReadResource,
     AlertResource,
     alert_bp,
+    register_alert_dependencies,
 )
 
 __all__ = [
@@ -16,4 +17,5 @@ __all__ = [
     "AlertResource",
     "AlertPreferenceCollectionResource",
     "AlertPreferenceResource",
+    "register_alert_dependencies",
 ]
