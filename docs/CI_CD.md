@@ -88,6 +88,22 @@ Governanca de excecoes de seguranca:
 14. `sonar`
 - scan SonarCloud + quality gate + enforce de ratings A
 
+### 1.1) Canary contínuo da suíte
+Arquivo: `.github/workflows/ci-suite-canary.yml`
+
+Fluxo:
+- `schedule` em dias úteis e `workflow_dispatch`
+- constroi uma imagem dev canônica de baixo custo
+- executa `scripts/ci_suite_doctor.py`
+- executa `scripts/ci_stack_bootstrap.py`
+- executa `scripts/http_smoke_check.py`
+- executa `scripts/http_latency_budget_gate.py` com amostragem reduzida
+- publica `reports/ci-canary/suite-canary-report.{md,json}`
+
+Objetivo:
+- detectar drift operacional e degradação da suíte fora do contexto de PR
+- medir duração total, custo aproximado e budget de sustentabilidade do caminho crítico
+
 Notas:
 - `Cursor Bugbot` e camada complementar de review em PR.
 - Bugbot nao eh gate obrigatorio no ruleset (quota/ruido), mas continua util como sinal adicional.
@@ -118,6 +134,7 @@ Arquitetura canonica de smoke/release gate:
 - fluxos legados paralelos de smoke foram removidos para evitar drift
 - readiness no caminho comum de merge/release exige os dois gates oficiais (`smoke` + `full`) em verde
 - o perfil `privileged` continua em workflow manual separado, fora do caminho comum
+- observabilidade contínua: `ci-suite-canary.yml` valida supply chain + bootstrap + smoke HTTP com custo reduzido
 
 Traceability adicional:
 - todo `pull_request` publica resumo advisory via `scripts/pr_traceability_check.py`
@@ -245,6 +262,7 @@ Exemplos:
 - `bash scripts/run_ci_like_actions_local.sh --local --with-postman`
 - `bash scripts/run_ci_like_actions_local.sh --local --with-mutation`
 - `python3 scripts/ci_suite_doctor.py --web-image "$(bash scripts/ci_image_artifact.sh ref dev)"`
+- `python3 scripts/ci_suite_canary.py --web-image "$(bash scripts/ci_image_artifact.sh ref dev)"`
 - `npm ci && npm run smoke:local`
 
 ## Secrets e Vars esperados
