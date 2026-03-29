@@ -56,6 +56,8 @@ O que faz:
 - Verifica existência e autorização do investimento.
 - Lê histórico JSON (`history`) da entidade.
 - Ordena e pagina resultado.
+- Usa `start_date` e `end_date` como nomes canônicos para o período.
+- Mantém `startDate` e `finalDate` apenas como alias legado observável.
 
 Contrato v2:
 - `data.items`
@@ -70,6 +72,8 @@ O que faz:
 - Detecta mudança de `quantity` ou `value` e registra snapshot em `history`.
 - Recalcula `estimated_value_on_create_date` com `InvestmentService`.
 - Persiste alterações.
+- `PATCH /wallet/{investment_id}` é o contrato canônico para update parcial.
+- `PUT /wallet/{investment_id}` fica apenas como alias legado com headers de deprecação.
 
 Contrato v2:
 - sucesso em `data.investment`

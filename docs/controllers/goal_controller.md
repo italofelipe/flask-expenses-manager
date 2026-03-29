@@ -48,7 +48,16 @@ Endpoint: `PUT /goals/{goal_id}`
 
 O que faz:
 - Exige JWT.
-- Atualiza uma meta especifica.
+- Alias legado para atualização parcial de uma meta especifica.
+- Mantem validacao de ownership e regras de dominio.
+- O contrato canônico é `PATCH /goals/{goal_id}`.
+
+## `GoalResource.patch`
+Endpoint: `PATCH /goals/{goal_id}`
+
+O que faz:
+- Exige JWT.
+- Atualiza parcialmente uma meta específica.
 - Mantem validacao de ownership e regras de dominio.
 
 ## `GoalResource.delete`
