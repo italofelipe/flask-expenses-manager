@@ -1,6 +1,7 @@
 """Subscriptions controller — J9 (billing / plan management).
 
-Exposes four endpoints:
+Exposes five endpoints:
+  GET  /subscriptions/plans    — public billing plan catalog        (public)
   GET  /subscriptions/me       — current user subscription state (auth required)
   POST /subscriptions/checkout — create a checkout session      (auth required)
   POST /subscriptions/cancel   — cancel the subscription        (auth required)
@@ -21,6 +22,11 @@ from flask.ctx import has_app_context
 from flask.typing import ResponseReturnValue
 
 from app.auth import get_active_auth_context
+from app.config.billing_plans import (
+    canonical_offer_slug,
+    list_public_billing_plans,
+    resolve_checkout_plan_offer,
+)
 from app.controllers.response_contract import compat_error_response
 from app.extensions.database import db
 from app.http.request_context import current_request_id
@@ -44,10 +50,12 @@ _FREE_PLAN_CODE = "free"
 
 
 def _serialize_subscription(sub: Subscription) -> dict[str, Any]:
+    offer_code = canonical_offer_slug(sub.plan_code, sub.billing_cycle)
     return {
         "id": str(sub.id),
         "user_id": str(sub.user_id),
         "plan_code": sub.plan_code,
+        "offer_code": offer_code,
         "status": sub.status.value,
         "billing_cycle": sub.billing_cycle.value if sub.billing_cycle else None,
         "provider": sub.provider,
@@ -90,6 +98,17 @@ def _get_provider() -> BillingProvider:
 
 
 # ---------------------------------------------------------------------------
+# GET /subscriptions/plans
+# ---------------------------------------------------------------------------
+
+
+@subscription_bp.get("/plans")
+def list_subscription_plans() -> ResponseReturnValue:
+    """Return the public billing plan catalog for MVP1."""
+    return _ok({"plans": list_public_billing_plans()})
+
+
+# ---------------------------------------------------------------------------
 # GET /subscriptions/me
 # ---------------------------------------------------------------------------
 
@@ -118,11 +137,14 @@ def create_checkout_session() -> ResponseReturnValue:
     plan_slug: str | None = body.get("plan_slug")
     if not plan_slug:
         return _err("plan_slug is required", "VALIDATION_ERROR", 400)
+    offer = resolve_checkout_plan_offer(plan_slug)
+    if offer is None:
+        return _err("Unsupported plan_slug", "VALIDATION_ERROR", 400)
 
     provider = _get_provider()
     try:
         result = provider.create_checkout_session(
-            user_id=str(UUID(auth.subject)), plan_slug=plan_slug
+            user_id=str(UUID(auth.subject)), plan_slug=offer.slug
         )
     except Exception:
         current_app.logger.exception("Failed to create checkout session")
@@ -130,6 +152,11 @@ def create_checkout_session() -> ResponseReturnValue:
 
     return _ok(
         {
+            "plan_slug": offer.slug,
+            "plan_code": offer.plan_code,
+            "billing_cycle": (
+                offer.billing_cycle.value if offer.billing_cycle else None
+            ),
             "checkout_url": result.get("checkout_url"),
             "provider": result.get("provider"),
         },

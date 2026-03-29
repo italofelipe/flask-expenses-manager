@@ -3916,6 +3916,49 @@
       "name": "06 - Subscriptions and Entitlements",
       "item": [
         {
+          "name": "00 - List billing plans (REST v2)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "X-API-Contract",
+                "value": "v2"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/subscriptions/plans",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "subscriptions",
+                "plans"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('subscription plans returns 200', function () { pm.response.to.have.status(200); });",
+                  "var body = pm.response.json();",
+                  "pm.test('subscription plans returns canonical offers', function () {",
+                  "  pm.expect(body.success).to.eql(true);",
+                  "  pm.expect(body.data.plans).to.be.an('array');",
+                  "  pm.expect(body.data.plans[1].slug).to.eql('premium_monthly');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
           "name": "01 - Get my subscription (REST v2)",
           "request": {
             "method": "GET",
@@ -3988,7 +4031,7 @@
             },
             "body": {
               "mode": "raw",
-              "raw": "{\n                      \"plan_slug\": \"pro_monthly\"\n                    }\n"
+              "raw": "{\n                      \"plan_slug\": \"premium_monthly\"\n                    }\n"
             }
           },
           "event": [
@@ -4000,6 +4043,7 @@
                   "var body = pm.response.json();",
                   "pm.test('subscription checkout returns checkout url', function () {",
                   "  pm.expect(body.success).to.eql(true);",
+                  "  pm.expect(body.data.plan_slug).to.eql('premium_monthly');",
                   "  pm.expect(body.data.checkout_url).to.be.a('string').and.not.empty;",
                   "});"
                 ],
