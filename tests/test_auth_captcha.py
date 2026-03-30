@@ -218,3 +218,68 @@ def test_login_succeeds_when_captcha_valid_and_enabled(
     with _mock_turnstile(True):
         resp = captcha_client.post("/auth/login", json=login_payload)
     assert resp.status_code == 200
+
+
+# ---------------------------------------------------------------------------
+# Schema-level: camelCase normalization (TypeScript frontend sends captchaToken)
+# ---------------------------------------------------------------------------
+
+
+class TestAuthSchemaCamelCaseNormalization:
+    """AuthSchema pre_load must accept captchaToken (camelCase) from TS clients."""
+
+    def test_login_schema_normalizes_camelcase_captcha_token(self) -> None:
+        from app.schemas.auth_schema import AuthSchema
+
+        schema = AuthSchema()
+        result = schema.sanitize_input(
+            {"email": "TEST@EXAMPLE.COM", "password": "pass", "captchaToken": "tok123"},
+        )
+        assert isinstance(result, dict)
+        assert result["captcha_token"] == "tok123"
+        assert "captchaToken" not in result
+        assert result["email"] == "test@example.com"
+
+    def test_login_schema_snake_case_token_is_not_renamed(self) -> None:
+        from app.schemas.auth_schema import AuthSchema
+
+        schema = AuthSchema()
+        result = schema.sanitize_input(
+            {"email": "a@b.com", "password": "p", "captcha_token": "tok"},
+        )
+        assert isinstance(result, dict)
+        assert result["captcha_token"] == "tok"
+        assert "captchaToken" not in result
+
+    def test_login_schema_non_dict_input_passes_through(self) -> None:
+        from app.schemas.auth_schema import AuthSchema
+
+        schema = AuthSchema()
+        # sanitize_string_fields may return non-dict for non-dict raw input;
+        # the guard must return it unchanged so Marshmallow can raise its own error.
+        result = schema.sanitize_input(None)
+        assert result is None
+
+    def test_register_schema_normalizes_camelcase_captcha_token(self) -> None:
+        from app.schemas.user_schemas import UserRegistrationSchema
+
+        schema = UserRegistrationSchema()
+        result = schema.sanitize_input(
+            {
+                "name": "  Alice  ",
+                "email": "ALICE@EXAMPLE.COM",
+                "password": "Secret@1234",
+                "captchaToken": "reg-tok",
+            },
+        )
+        assert isinstance(result, dict)
+        assert result["captcha_token"] == "reg-tok"
+        assert "captchaToken" not in result
+        assert result["email"] == "alice@example.com"
+
+    def test_register_schema_non_dict_input_passes_through(self) -> None:
+        from app.schemas.user_schemas import UserRegistrationSchema
+
+        schema = UserRegistrationSchema()
+        result = schema.sanitize_input(None)
+        assert result is None

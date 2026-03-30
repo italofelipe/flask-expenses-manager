@@ -219,6 +219,7 @@ class AuthResource(MethodResource):
                 "id": str(identity.user.id),
                 "name": identity.user.name,
                 "email": identity.user.email,
+                "email_confirmed": identity.user.email_verified_at is not None,
             }
             return compat_success(
                 legacy_payload={
