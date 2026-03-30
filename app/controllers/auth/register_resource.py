@@ -144,6 +144,8 @@ class RegisterResource(MethodResource):
                 "id": str(user.id),
                 "name": user.name,
                 "email": user.email,
+                # New registrations are always unconfirmed.
+                "email_confirmed": False,
             }
             return compat_success(
                 legacy_payload={
