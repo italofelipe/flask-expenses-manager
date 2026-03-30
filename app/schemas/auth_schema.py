@@ -27,6 +27,18 @@ class AuthSchema(Schema):
             "example": "minhasenha123",
         },
     )
+    captcha_token = fields.String(
+        required=False,
+        allow_none=True,
+        load_default=None,
+        metadata={
+            "description": (
+                "Token Cloudflare Turnstile obtido pelo cliente. "
+                "Obrigatório quando CAPTCHA está habilitado no servidor."
+            ),
+            "example": "0.xxxxxxxxxxx",
+        },
+    )
 
     @pre_load
     def sanitize_input(self, data: object, **kwargs: object) -> object:

@@ -84,6 +84,14 @@ class Config:
     # Brapi config
     BRAPI_KEY = os.getenv("BRAPI_KEY")
 
+    # Cloudflare Turnstile CAPTCHA
+    # Set CLOUDFLARE_TURNSTILE_SECRET_KEY in the environment to enable verification.
+    # When the key is empty the service falls back to allow-all (dev/test mode).
+    # Set CLOUDFLARE_TURNSTILE_ENABLED=false to explicitly disable (not recommended
+    # in production environments).
+    CLOUDFLARE_TURNSTILE_SECRET_KEY = os.getenv("CLOUDFLARE_TURNSTILE_SECRET_KEY", "")
+    CLOUDFLARE_TURNSTILE_ENABLED = _read_bool_env("CLOUDFLARE_TURNSTILE_ENABLED", True)
+
 
 class DevelopmentConfig(Config):
     DEBUG = True
