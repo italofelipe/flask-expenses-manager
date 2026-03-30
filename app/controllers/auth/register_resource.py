@@ -14,6 +14,7 @@ from app.docs.openapi_helpers import (
 from app.extensions.database import db
 from app.models.user import User
 from app.schemas.user_schemas import UserRegistrationSchema
+from app.services.captcha_service import get_captcha_service
 from app.utils.typed_decorators import typed_doc as doc
 from app.utils.typed_decorators import typed_use_kwargs as use_kwargs
 
@@ -78,6 +79,15 @@ class RegisterResource(MethodResource):
     )
     @use_kwargs(UserRegistrationSchema, location="json")
     def post(self, **validated_data: Any) -> Response:
+        captcha_token: str | None = validated_data.pop("captcha_token", None)
+        if not get_captcha_service().verify(captcha_token):
+            return compat_error(
+                legacy_payload={"message": "CAPTCHA verification failed"},
+                status_code=400,
+                message="CAPTCHA verification failed",
+                error_code="CAPTCHA_INVALID",
+            )
+
         dependencies = get_auth_dependencies()
         auth_policy = dependencies.get_auth_security_policy()
         duplicate_user = dependencies.find_user_by_email(validated_data["email"])

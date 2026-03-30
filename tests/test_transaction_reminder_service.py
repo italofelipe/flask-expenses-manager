@@ -14,7 +14,7 @@ from app.services.email_provider import get_email_outbox
 
 
 def test_transaction_reminder_service_dispatches_due_soon_email(app) -> None:
-    today = date(2026, 3, 29)
+    today = date(2030, 6, 15)
     with app.app_context():
         user = User(
             id=uuid.uuid4(),
@@ -46,7 +46,7 @@ def test_transaction_reminder_service_dispatches_due_soon_email(app) -> None:
 
 
 def test_transaction_reminder_service_is_idempotent_per_day(app) -> None:
-    today = date(2026, 3, 29)
+    today = date(2030, 6, 15)
     with app.app_context():
         user = User(
             id=uuid.uuid4(),
