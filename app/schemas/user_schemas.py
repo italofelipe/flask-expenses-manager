@@ -58,16 +58,31 @@ class UserRegistrationSchema(Schema):
             "example": "conservador",
         },
     )
+    captcha_token = fields.String(
+        required=False,
+        allow_none=True,
+        load_default=None,
+        metadata={
+            "description": (
+                "Token Cloudflare Turnstile obtido pelo cliente. "
+                "Obrigatório quando CAPTCHA está habilitado no servidor."
+            ),
+            "example": "0.xxxxxxxxxxx",
+        },
+    )
 
     @pre_load
     def sanitize_input(self, data: object, **kwargs: object) -> object:
         sanitized = sanitize_string_fields(data, {"name", "email", "investor_profile"})
-        if isinstance(sanitized, dict) and isinstance(sanitized.get("email"), str):
+        if not isinstance(sanitized, dict):
+            return sanitized
+        if isinstance(sanitized.get("email"), str):
             sanitized["email"] = str(sanitized["email"]).lower()
-        if isinstance(sanitized, dict) and isinstance(
-            sanitized.get("investor_profile"), str
-        ):
+        if isinstance(sanitized.get("investor_profile"), str):
             sanitized["investor_profile"] = str(sanitized["investor_profile"]).lower()
+        # Normalize camelCase sent by TypeScript frontend clients → snake_case.
+        if "captchaToken" in sanitized and "captcha_token" not in sanitized:
+            sanitized["captcha_token"] = sanitized.pop("captchaToken")
         return sanitized
 
 
