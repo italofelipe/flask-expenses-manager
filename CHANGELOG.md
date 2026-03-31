@@ -1,5 +1,17 @@
 # Changelog
 
+## [1.13.0](https://github.com/italofelipe/auraxis-api/compare/v1.12.0...v1.13.0) (2026-03-31)
+
+
+### Features
+
+* **email:** branded transactional email templates + Route53 deliverability fix ([#818](https://github.com/italofelipe/auraxis-api/issues/818)) ([fe95677](https://github.com/italofelipe/auraxis-api/commit/fe9567740c2278fb969dec84b303e4b233c2c3ed))
+
+
+### Bug Fixes
+
+* **auth:** protect /auth/email/resend with JWT ([#816](https://github.com/italofelipe/auraxis-api/issues/816)) ([1788eaa](https://github.com/italofelipe/auraxis-api/commit/1788eaa23fcea71703d5743b6ef555c5189ac920))
+
 ## [1.12.0](https://github.com/italofelipe/auraxis-api/compare/v1.11.0...v1.12.0) (2026-03-30)
 
 
