@@ -804,10 +804,14 @@
           ]
         },
         {
-          "name": "17 - Email resend unknown email (REST v2)",
+          "name": "17 - Email resend authenticated user (REST v2)",
           "request": {
             "method": "POST",
             "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{authToken}}"
+              },
               {
                 "key": "Content-Type",
                 "value": "application/json"
@@ -827,10 +831,6 @@
                 "email",
                 "resend"
               ]
-            },
-            "body": {
-              "mode": "raw",
-              "raw": "{\n                      \"email\": \"unknown-{{runSeed}}@example.com\"\n                    }\n"
             }
           },
           "event": [
@@ -838,9 +838,9 @@
               "listen": "test",
               "script": {
                 "exec": [
-                  "pm.test('email resend unknown returns neutral 200', function () { pm.response.to.have.status(200); });",
+                  "pm.test('email resend returns neutral 200 with valid jwt', function () { pm.response.to.have.status(200); });",
                   "var body = pm.response.json();",
-                  "pm.test('email resend unknown stays neutral', function () { pm.expect(body.success).to.eql(true); });"
+                  "pm.test('email resend stays neutral', function () { pm.expect(body.success).to.eql(true); });"
                 ],
                 "type": "text/javascript"
               }
