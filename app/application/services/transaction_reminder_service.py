@@ -133,7 +133,10 @@ def dispatch_due_transaction_reminders(
                 status=AlertStatus.SENT,
                 entity_type="transaction",
                 entity_id=transaction.id,
-                triggered_at=utc_now_naive(),
+                # Anchor triggered_at to reference_day so idempotency checks that
+                # filter by _start_of_day(day)//_end_of_day(day) always match,
+                # even when the caller passes a synthetic `today` (e.g. in tests).
+                triggered_at=_start_of_day(reference_day),
                 sent_at=utc_now_naive(),
             )
         )

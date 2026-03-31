@@ -162,7 +162,23 @@ def create_checkout_session() -> ResponseReturnValue:
     plan_slug: str | None = body.get("plan_slug")
     if not plan_slug:
         return _err("plan_slug is required", "VALIDATION_ERROR", 400)
-    offer = resolve_checkout_plan_offer(plan_slug)
+
+    # Frontend clients send a plan-code-style slug ("pro") together with a
+    # separate billing_cycle ("monthly"|"annual"). Compose the canonical alias
+    # ("pro_monthly", "pro_annual") so resolve_checkout_plan_offer can find it
+    # via legacy_aliases. Fall back to resolving plan_slug alone when
+    # billing_cycle is absent (e.g. direct API calls using the full slug).
+    billing_cycle_raw: str | None = (
+        str(body.get("billing_cycle") or "").strip().lower() or None
+    )
+    if billing_cycle_raw:
+        composed_slug = f"{plan_slug}_{billing_cycle_raw}"
+        offer = resolve_checkout_plan_offer(
+            composed_slug
+        ) or resolve_checkout_plan_offer(plan_slug)
+    else:
+        offer = resolve_checkout_plan_offer(plan_slug)
+
     if offer is None:
         return _err("Unsupported plan_slug", "VALIDATION_ERROR", 400)
 
