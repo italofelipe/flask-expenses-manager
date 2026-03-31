@@ -21,7 +21,7 @@ marshmallow-sqlalchemy==1.4.2
 packaging==25.0
 pluggy==1.6.0
 psycopg2-binary==2.9.11
-Pygments==2.19.2
+Pygments==2.20.0
 PyJWT==2.12.1
 pytest==8.4.2
 pytest-cov==6.3.0
@@ -37,4 +37,4 @@ typing_extensions==4.14.0
 webargs==8.7.1
 Werkzeug==3.1.7
 types-python-dateutil==2.9.0.20260323
-types-requests==2.32.4.20260107
+types-requests==2.33.0.20260327
