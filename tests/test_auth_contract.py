@@ -339,11 +339,32 @@ def test_auth_email_confirm_v2_contract_with_invalid_token(client) -> None:
     assert body["message"] == EMAIL_CONFIRMATION_INVALID_TOKEN_MESSAGE
 
 
-def test_auth_email_resend_v2_contract_is_neutral(client) -> None:
+def test_auth_email_resend_v2_contract_requires_jwt(client) -> None:
+    """Resend endpoint is now JWT-protected — must return 401 without token."""
     response = client.post(
         "/auth/email/resend",
         headers=_v2_headers(),
         json={"email": "unknown-user@email.com"},
+    )
+
+    assert response.status_code == 401
+
+
+def test_auth_email_resend_v2_contract_is_neutral_with_jwt(client) -> None:
+    """With a valid JWT, resend returns 200 neutral regardless of confirmation state."""
+    suffix = uuid.uuid4().hex[:8]
+    reg_payload = _register_payload(suffix)
+    client.post("/auth/register", json=reg_payload)
+    login_resp = client.post(
+        "/auth/login",
+        json={"email": reg_payload["email"], "password": reg_payload["password"]},
+    )
+    body_login = login_resp.get_json()
+    token = body_login.get("token") or body_login.get("data", {}).get("token")
+
+    response = client.post(
+        "/auth/email/resend",
+        headers={**_v2_headers(), "Authorization": f"Bearer {token}"},
     )
 
     assert response.status_code == 200

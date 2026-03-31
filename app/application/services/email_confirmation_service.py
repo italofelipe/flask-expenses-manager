@@ -76,6 +76,11 @@ def _confirmation_frontend_url() -> str:
 def _build_confirmation_url(token: str) -> str:
     base_url = _confirmation_frontend_url()
     if not base_url:
+        runtime_logger().warning(
+            "event=auth.email_confirmation_url_missing "
+            "EMAIL_CONFIRMATION_FRONTEND_URL is not configured — "
+            "confirmation link will be 'n/a'. Set this variable in your environment."
+        )
         return "n/a"
     separator = "&" if "?" in base_url else "?"
     return f"{base_url}{separator}token={token}"
