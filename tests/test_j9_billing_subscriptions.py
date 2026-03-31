@@ -469,6 +469,38 @@ class TestCreateCheckoutSession:
         resp = client.post("/subscriptions/checkout", json={"plan_slug": "pro_monthly"})
         assert resp.status_code == 401
 
+    def test_checkout_plan_code_plus_billing_cycle_resolves_monthly(
+        self, client
+    ) -> None:
+        """plan_slug='pro' + billing_cycle='monthly' must resolve premium_monthly."""
+        token = _register_and_login(client, prefix="sub-checkout-cycle-m")
+        resp = client.post(
+            "/subscriptions/checkout",
+            json={"plan_slug": "pro", "billing_cycle": "monthly"},
+            headers=_auth_headers(token),
+        )
+        assert resp.status_code == 201
+        body = resp.get_json()
+        assert body["success"] is True
+        assert body["data"]["plan_slug"] == "premium_monthly"
+        assert body["data"]["billing_cycle"] == "monthly"
+
+    def test_checkout_plan_code_plus_billing_cycle_resolves_annual(
+        self, client
+    ) -> None:
+        """plan_slug='pro' + billing_cycle='annual' must resolve premium_annual."""
+        token = _register_and_login(client, prefix="sub-checkout-cycle-a")
+        resp = client.post(
+            "/subscriptions/checkout",
+            json={"plan_slug": "pro", "billing_cycle": "annual"},
+            headers=_auth_headers(token),
+        )
+        assert resp.status_code == 201
+        body = resp.get_json()
+        assert body["success"] is True
+        assert body["data"]["plan_slug"] == "premium_annual"
+        assert body["data"]["billing_cycle"] == "annual"
+
     def test_checkout_persists_provider_customer_id(
         self, client, app, monkeypatch
     ) -> None:
