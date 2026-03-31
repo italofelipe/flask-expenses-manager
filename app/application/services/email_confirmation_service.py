@@ -17,6 +17,7 @@ from app.http.runtime import (
 )
 from app.models.user import User
 from app.services.email_provider import EmailMessage, get_default_email_provider
+from app.services.email_templates import render_confirmation_email
 
 EMAIL_CONFIRMATION_NEUTRAL_MESSAGE = (
     "If an account exists for this email, confirmation instructions were sent."
@@ -96,15 +97,13 @@ def _dispatch_confirmation_email(*, email: str, token: str) -> None:
                 "confirmation_url": confirmation_url,
             }
         )
+    html, text = render_confirmation_email(confirmation_url=confirmation_url)
     get_default_email_provider().send(
         EmailMessage(
             to_email=email,
             subject="Confirme sua conta Auraxis",
-            html=(
-                "<p>Confirme sua conta para concluir a ativacao.</p>"
-                f'<p><a href="{confirmation_url}">Confirmar email</a></p>'
-            ),
-            text=(f"Confirme sua conta Auraxis. Acesse: {confirmation_url}"),
+            html=html,
+            text=text,
             tag="account_confirmation",
         )
     )
