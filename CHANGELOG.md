@@ -1,5 +1,20 @@
 # Changelog
 
+## [1.12.0](https://github.com/italofelipe/auraxis-api/compare/v1.11.0...v1.12.0) (2026-03-30)
+
+
+### Features
+
+* **api:** add email confirmation foundation ([#807](https://github.com/italofelipe/auraxis-api/issues/807)) ([908d10e](https://github.com/italofelipe/auraxis-api/commit/908d10e488b7f5124f4c2e88da6de8f353f4f0cb))
+* **api:** add observability export surface ([#808](https://github.com/italofelipe/auraxis-api/issues/808)) ([5e1c0ff](https://github.com/italofelipe/auraxis-api/commit/5e1c0ff27c69fcf01d888003258cf54c5e5f442d))
+* **auth:** add Cloudflare Turnstile CAPTCHA verification to register and login ([#814](https://github.com/italofelipe/auraxis-api/issues/814)) ([8ddd5ec](https://github.com/italofelipe/auraxis-api/commit/8ddd5ec09339eadff4b1c101d8b6bc87508d10c3))
+* **shared-entries:** enrich serializer with transaction + invitation data [B2] ([#805](https://github.com/italofelipe/auraxis-api/issues/805)) ([9fde2f3](https://github.com/italofelipe/auraxis-api/commit/9fde2f3de3aa9850d5533c0cc891ec57d409b48b))
+
+
+### Bug Fixes
+
+* **ci:** replace indented heredoc with jq in deploy summary; add SSM retry ([#809](https://github.com/italofelipe/auraxis-api/issues/809)) ([2ffb66c](https://github.com/italofelipe/auraxis-api/commit/2ffb66c2d196f7c4b74c9cddeeb2e3e8c14a0556))
+
 ## [1.11.0](https://github.com/italofelipe/auraxis-api/compare/v1.10.0...v1.11.0) (2026-03-29)
 
 
