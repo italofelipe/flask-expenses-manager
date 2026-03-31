@@ -16,6 +16,7 @@ from app.extensions.database import db
 from app.extensions.integration_metrics import increment_metric
 from app.http.request_context import get_request_context
 from app.schemas.auth_schema import AuthSchema
+from app.services.captcha_service import get_captcha_service
 from app.services.login_attempt_guard_service import (
     LoginAttemptContext,
     LoginAttemptGuardService,
@@ -142,6 +143,15 @@ class AuthResource(MethodResource):
     )
     @use_kwargs(AuthSchema, location="json")
     def post(self, **kwargs: Any) -> Response:
+        captcha_token: str | None = kwargs.pop("captcha_token", None)
+        if not get_captcha_service().verify(captcha_token):
+            return compat_error(
+                legacy_payload={"message": "CAPTCHA verification failed"},
+                status_code=400,
+                message="CAPTCHA verification failed",
+                error_code="CAPTCHA_INVALID",
+            )
+
         email = str(kwargs.get("email", ""))
         password = kwargs.get("password")
 
@@ -209,6 +219,7 @@ class AuthResource(MethodResource):
                 "id": str(identity.user.id),
                 "name": identity.user.name,
                 "email": identity.user.email,
+                "email_confirmed": identity.user.email_verified_at is not None,
             }
             return compat_success(
                 legacy_payload={
