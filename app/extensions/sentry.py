@@ -13,6 +13,13 @@ Optional env vars:
     SENTRY_RELEASE       — release identifier, e.g. git sha or semver tag
     SENTRY_TRACES_RATE   — float 0-1 for performance tracing (default: 0.0)
     SENTRY_PROFILES_RATE — float 0-1 for profiling          (default: 0.0)
+    SENTRY_ERROR_RATE    — float 0-1 for error sampling      (default: 1.0)
+
+Quota protection:
+    before_send drops HTTP 4xx exceptions (client errors) — they are expected
+    and the primary cause of free-tier quota exhaustion. Only 5xx server errors
+    and unhandled exceptions are forwarded to Sentry.
+    SENTRY_ERROR_RATE provides an additional sampling knob (e.g. 0.5 = 50%).
 
 Privacy:
     send_default_pii is ALWAYS false (LGPD compliance — see ADR #407).
@@ -21,6 +28,30 @@ Privacy:
 from __future__ import annotations
 
 import os
+import secrets
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from sentry_sdk.types import Event, Hint
+
+
+def _before_send(event: Event, hint: Hint) -> Event | None:
+    """Drop client errors (4xx) and apply error sampling to reduce quota use."""
+    exc_info = hint.get("exc_info")
+    if exc_info:
+        exc_type, exc_value, _ = exc_info
+        # Drop werkzeug/Flask HTTP exceptions with status < 500 (client errors)
+        status_code = getattr(exc_value, "code", None)
+        if status_code is not None and status_code < 500:
+            return None
+
+    error_rate = float(os.getenv("SENTRY_ERROR_RATE", "1.0"))
+    if error_rate < 1.0 and secrets.randbelow(1_000_000) >= round(
+        error_rate * 1_000_000
+    ):
+        return None
+
+    return event
 
 
 def init_sentry() -> None:
@@ -57,6 +88,7 @@ def init_sentry() -> None:
         release=release or None,
         traces_sample_rate=traces_sample_rate,
         profiles_sample_rate=profiles_sample_rate,
+        before_send=_before_send,
         # LGPD — never attach user IPs, cookies, or request bodies by default.
         send_default_pii=False,
     )
