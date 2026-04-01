@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.13.1](https://github.com/italofelipe/auraxis-api/compare/v1.13.0...v1.13.1) (2026-04-01)
+
+
+### Bug Fixes
+
+* **deploy:** disk/swap pre-flight to prevent OOM and disk-full incidents ([#822](https://github.com/italofelipe/auraxis-api/issues/822)) ([c2e9f34](https://github.com/italofelipe/auraxis-api/commit/c2e9f34ea5269cc12e5c8e7c26407a7e91a8e45b))
+* **sentry:** before_send quota guard + SENTRY_ERROR_RATE ([#823](https://github.com/italofelipe/auraxis-api/issues/823)) ([1fd3329](https://github.com/italofelipe/auraxis-api/commit/1fd33290381db9f9bf74b10c27a2e3bf3f93fb56))
+
 ## [1.13.0](https://github.com/italofelipe/auraxis-api/compare/v1.12.0...v1.13.0) (2026-03-31)
 
 
