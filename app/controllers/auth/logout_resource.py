@@ -9,6 +9,7 @@ from app.docs.openapi_helpers import (
     json_success_response,
 )
 from app.extensions.database import db
+from app.extensions.jwt_revocation_cache import get_jwt_revocation_cache
 from app.utils.typed_decorators import typed_doc as doc
 from app.utils.typed_decorators import typed_jwt_required as jwt_required
 
@@ -43,6 +44,7 @@ class LogoutResource(MethodResource):
         if user:
             user.current_jti = None
             db.session.commit()
+            get_jwt_revocation_cache().invalidate(str(identity))
         return compat_success(
             legacy_payload={"message": "Logout successful"},
             status_code=200,
