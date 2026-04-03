@@ -427,6 +427,36 @@ if ! docker info >/dev/null 2>&1; then
   exit 24
 fi
 
+# Pre-flight: disk space (Docker build needs at least 5GB free)
+DISK_FREE_GB=$(df / --output=avail -BG | tail -1 | tr -d 'G ')
+if [ "${{DISK_FREE_GB}}" -lt 5 ]; then
+  echo "[i6] ABORT: only ${{DISK_FREE_GB}}GB free. Need 5GB for Docker build."
+  echo "[i6] Fix: docker system prune -af && docker builder prune -af"
+  exit 25
+fi
+echo "[i6] disk OK: ${{DISK_FREE_GB}}GB free"
+
+# Pre-flight: swap (Docker build on t2.micro OOMs without swap)
+SWAP_TOTAL=$(free -m | awk '/^Swap:/ {{print $2}}')
+if [ "${{SWAP_TOTAL}}" -lt 512 ]; then
+  echo "[i6] swap is ${{SWAP_TOTAL}}MB — enabling 2GB swapfile to prevent OOM."
+  fallocate -l 2G /swapfile 2>/dev/null \
+    || dd if=/dev/zero of=/swapfile bs=1M count=2048 2>/dev/null \
+    || true
+  chmod 600 /swapfile
+  mkswap /swapfile >/dev/null 2>&1 || true
+  swapon /swapfile 2>/dev/null || true
+  echo "[i6] swap: $(free -m | awk '/^Swap:/ {{print $2}}')MB"
+fi
+
+# Pre-flight: prune builder cache if disk < 8GB to reclaim space before build
+if [ "${{DISK_FREE_GB}}" -lt 8 ]; then
+  echo "[i6] disk < 8GB — pruning Docker builder cache..."
+  docker builder prune --force >/dev/null 2>&1 || true
+  DISK_FREE_GB=$(df / --output=avail -BG | tail -1 | tr -d 'G ')
+  echo "[i6] disk after prune: ${{DISK_FREE_GB}}GB free"
+fi
+
 ensure_env_default() {{
   key="$1"
   value="$2"
