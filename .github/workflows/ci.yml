@@ -284,6 +284,18 @@ jobs:
         id: load_image
         run: bash scripts/ci_image_artifact.sh load reports/ci-images/runtime-dev.tar.gz
 
+      - name: Pre-pull base images (ECR public, with retry)
+        run: |
+          POSTGRES_IMG="${POSTGRES_IMAGE:-public.ecr.aws/docker/library/postgres:16}"
+          REDIS_IMG="${REDIS_IMAGE:-public.ecr.aws/docker/library/redis:7-alpine}"
+          for img in "$POSTGRES_IMG" "$REDIS_IMG"; do
+            for i in 1 2 3 4 5; do
+              docker pull "$img" && break
+              echo "Pull attempt $i for $img failed — waiting ${i}0s before retry..."
+              sleep "${i}0"
+            done
+          done
+
       - name: Bootstrap smoke stack
         id: bootstrap
         run: |
@@ -410,6 +422,18 @@ jobs:
       - name: Load runtime image
         id: load_image
         run: bash scripts/ci_image_artifact.sh load reports/ci-images/runtime-dev.tar.gz
+
+      - name: Pre-pull base images (ECR public, with retry)
+        run: |
+          POSTGRES_IMG="${POSTGRES_IMAGE:-public.ecr.aws/docker/library/postgres:16}"
+          REDIS_IMG="${REDIS_IMAGE:-public.ecr.aws/docker/library/redis:7-alpine}"
+          for img in "$POSTGRES_IMG" "$REDIS_IMG"; do
+            for i in 1 2 3 4 5; do
+              docker pull "$img" && break
+              echo "Pull attempt $i for $img failed — waiting ${i}0s before retry..."
+              sleep "${i}0"
+            done
+          done
 
       - name: Bootstrap integration stack
         id: bootstrap
