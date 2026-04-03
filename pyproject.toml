@@ -57,6 +57,8 @@ module = [
     "app.extensions.audit_trail",
     "app.extensions.http_observability",
     "app.extensions.error_handlers",
+    "app.extensions.prometheus_metrics",
+    "app.controllers.observability_controller",
 ]
 disable_error_code = ["untyped-decorator"]
 

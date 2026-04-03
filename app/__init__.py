@@ -51,6 +51,7 @@ from app.extensions.database import db
 from app.extensions.error_handlers import register_error_handlers
 from app.extensions.http_observability import register_http_observability
 from app.extensions.integration_metrics_cli import register_integration_metrics_commands
+from app.extensions.prometheus_metrics import register_prometheus_middleware
 from app.extensions.sentry import init_sentry
 from app.http.request_context import register_request_context_adapter
 from app.middleware.cors import register_cors
@@ -85,6 +86,7 @@ DOCS_CLASS_REGISTRATION_FALLBACK_ENDPOINTS = {
 def _register_http_runtime(app: Flask) -> None:
     register_request_context_adapter(app)
     register_http_observability(app)
+    register_prometheus_middleware(app)
     register_cors(app)
     register_security_headers(app)
     register_docs_access_guard(app)
