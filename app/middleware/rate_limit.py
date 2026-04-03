@@ -139,6 +139,7 @@ class RateLimiterService:
         self.fail_closed = settings.fail_closed
         self.backend_failure_reason = backend_failure_reason
         self._route_rule_order: tuple[tuple[str, str], ...] = (
+            ("/auth/refresh", "token_refresh"),
             ("/auth/login", "auth"),
             ("/auth/register", "auth"),
             ("/auth/password", "auth"),
@@ -156,6 +157,14 @@ class RateLimiterService:
                 limit=_read_int_env("RATE_LIMIT_AUTH_LIMIT", 20),
                 window_seconds=_read_int_env(
                     "RATE_LIMIT_AUTH_WINDOW_SECONDS", default_window
+                ),
+                key_scope=KEY_SCOPE_IP,
+            ),
+            "token_refresh": RateLimitRule(
+                name="token_refresh",
+                limit=_read_int_env("RATE_LIMIT_TOKEN_REFRESH_LIMIT", 10),
+                window_seconds=_read_int_env(
+                    "RATE_LIMIT_TOKEN_REFRESH_WINDOW_SECONDS", default_window
                 ),
                 key_scope=KEY_SCOPE_IP,
             ),

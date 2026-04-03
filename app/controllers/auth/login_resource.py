@@ -211,9 +211,16 @@ class AuthResource(MethodResource):
                 return success_guard_response
 
             token = dependencies.create_access_token(str(identity.user.id))
+            refresh_token = dependencies.create_refresh_token(str(identity.user.id))
             jti = dependencies.get_token_jti(token)
-            if identity.user.current_jti != jti:
+            refresh_jti = dependencies.get_token_jti(refresh_token)
+            needs_commit = (
+                identity.user.current_jti != jti
+                or identity.user.refresh_token_jti != refresh_jti
+            )
+            if needs_commit:
                 identity.user.current_jti = jti
+                identity.user.refresh_token_jti = refresh_jti
                 db.session.commit()
             user_data = {
                 "id": str(identity.user.id),
@@ -225,11 +232,16 @@ class AuthResource(MethodResource):
                 legacy_payload={
                     "message": "Login successful",
                     "token": token,
+                    "refresh_token": refresh_token,
                     "user": user_data,
                 },
                 status_code=200,
                 message="Login successful",
-                data={"token": token, "user": user_data},
+                data={
+                    "token": token,
+                    "refresh_token": refresh_token,
+                    "user": user_data,
+                },
             )
         except Exception:
             current_app.logger.exception("Login failed due to unexpected error.")

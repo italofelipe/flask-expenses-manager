@@ -6,7 +6,7 @@ from typing import Callable, cast
 from uuid import UUID
 
 from flask import Flask, current_app
-from flask_jwt_extended import create_access_token, get_jti
+from flask_jwt_extended import create_access_token, create_refresh_token, get_jti
 from werkzeug.security import generate_password_hash
 
 from app.application.dto.auth_security_policy_dto import AuthSecurityPolicyDTO
@@ -59,6 +59,7 @@ class AuthDependencies:
     verify_password: Callable[[str | None, str], bool]
     hash_password: Callable[[str], str]
     create_access_token: Callable[[str], str]
+    create_refresh_token: Callable[[str], str]
     get_token_jti: Callable[[str], str]
     find_user_by_email: Callable[[str], User | None]
     get_user_by_id: Callable[[UUID], User | None]
@@ -90,6 +91,13 @@ def _create_access_token_with_default_expiry(identity: str) -> str:
     )
 
 
+def _create_refresh_token_with_default_expiry(identity: str) -> str:
+    return cast(
+        str,
+        create_refresh_token(identity=identity, expires_delta=timedelta(days=7)),
+    )
+
+
 def _verify_password(password_hash: str | None, plain_password: str) -> bool:
     return verify_password_with_timing_protection(
         password_hash=password_hash,
@@ -112,6 +120,7 @@ def _default_dependencies() -> AuthDependencies:
         verify_password=_verify_password,
         hash_password=generate_password_hash,
         create_access_token=_create_access_token_with_default_expiry,
+        create_refresh_token=_create_refresh_token_with_default_expiry,
         get_token_jti=_get_token_jti,
         find_user_by_email=_find_user_by_email,
         get_user_by_id=_get_user_by_id,
