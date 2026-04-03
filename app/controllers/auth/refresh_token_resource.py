@@ -40,8 +40,8 @@ class RefreshTokenResource(MethodResource):
                 description="Tokens renovados com sucesso",
                 message="Token refreshed",
                 data_example={
-                    "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
-                    "refresh_token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+                    "token": "<access_token>",
+                    "refresh_token": "<access_token>",
                 },
             ),
             401: json_error_response(
