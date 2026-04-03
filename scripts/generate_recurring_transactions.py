@@ -14,14 +14,27 @@ logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(mess
 logger = logging.getLogger(__name__)
 
 
-def main() -> None:
-    app = create_app(enable_http_runtime=False)
+def main() -> int:
+    try:
+        app = create_app(enable_http_runtime=False)
+    except Exception:
+        logger.exception("recurrence: failed to initialise application factory")
+        return 1
+
     with app.app_context():
-        created = RecurrenceService.generate_missing_occurrences(
-            reference_date=date.today()
-        )
-        logger.info("Recurring transactions created=%s", created)
+        try:
+            created = RecurrenceService.generate_missing_occurrences(
+                reference_date=date.today()
+            )
+        except Exception:
+            logger.exception(
+                "recurrence: unhandled error in generate_missing_occurrences"
+            )
+            return 1
+
+    logger.info("recurrence: done — transactions created=%s", created)
+    return 0
 
 
 if __name__ == "__main__":
-    main()
+    sys.exit(main())

@@ -1,5 +1,8 @@
 from datetime import date
 from decimal import Decimal
+from unittest.mock import patch
+
+import pytest
 
 from app.extensions.database import db
 from app.models.transaction import Transaction, TransactionStatus, TransactionType
@@ -92,3 +95,30 @@ def test_generate_missing_occurrences_skips_invalid_or_installment(app) -> None:
         )
 
         assert created == 0
+
+
+def test_generate_missing_occurrences_rolls_back_and_raises_on_db_error(
+    app,
+) -> None:
+    with app.app_context():
+        user = _create_user()
+        template = Transaction(
+            user_id=user.id,
+            title="Streaming",
+            amount=Decimal("29.90"),
+            type=TransactionType.EXPENSE,
+            status=TransactionStatus.PENDING,
+            due_date=date(2026, 1, 1),
+            is_recurring=True,
+            start_date=date(2026, 1, 1),
+            end_date=date(2026, 3, 1),
+            currency="BRL",
+        )
+        db.session.add(template)
+        db.session.commit()
+
+        with patch.object(db.session, "commit", side_effect=RuntimeError("db down")):
+            with pytest.raises(RuntimeError, match="db down"):
+                RecurrenceService.generate_missing_occurrences(
+                    reference_date=date(2026, 3, 31)
+                )
