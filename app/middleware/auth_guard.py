@@ -11,8 +11,9 @@ def register_auth_guard(app: Flask) -> None:
     def auth_guard() -> ResponseReturnValue | None:
         if request.method == "OPTIONS":
             return None
-        # Liveness endpoint must remain public for infra health checks.
-        if request.path.rstrip("/") == "/healthz":
+        # Health/readiness endpoints must remain public for infra probes.
+        # /readiness performs its own internal bearer-token check.
+        if request.path.rstrip("/") in {"/healthz", "/readiness"}:
             return None
         open_endpoints = {
             "registerresource",
