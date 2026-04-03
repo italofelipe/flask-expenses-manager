@@ -8,6 +8,7 @@ from datetime import UTC, datetime, timedelta
 from typing import cast
 
 from app.extensions.database import db
+from app.extensions.jwt_revocation_cache import get_jwt_revocation_cache
 from app.http.runtime import (
     runtime_config,
     runtime_debug_or_testing,
@@ -150,6 +151,7 @@ def reset_password(*, token: str, new_password_hash: str) -> PasswordResetResult
     user.password_reset_token_expires_at = None
     user.password_reset_requested_at = None
     db.session.commit()
+    get_jwt_revocation_cache().invalidate(str(user.id))
 
     runtime_logger().info(
         "event=auth.password_reset_completed user_id=%s",
