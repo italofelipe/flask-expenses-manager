@@ -69,6 +69,54 @@ def test_generate_recurring_transactions_uses_internal_runtime(
         SimpleNamespace(generate_missing_occurrences=lambda reference_date: 0),
     )
 
-    recurrence_script.main()
+    exit_code = recurrence_script.main()
 
     assert called == {"enable_http_runtime": False}
+    assert exit_code == 0
+
+
+def test_generate_recurring_transactions_returns_1_on_service_error(
+    monkeypatch,
+) -> None:
+    class _AppContext:
+        def __enter__(self) -> "_AppContext":
+            return self
+
+        def __exit__(self, exc_type, exc, tb) -> None:
+            return None
+
+    class _FakeApp:
+        def app_context(self) -> _AppContext:
+            return _AppContext()
+
+    monkeypatch.setattr(
+        recurrence_script,
+        "create_app",
+        lambda *, enable_http_runtime=True: _FakeApp(),
+    )
+
+    def _failing_service(*, reference_date):
+        raise RuntimeError("simulated DB failure")
+
+    monkeypatch.setattr(
+        recurrence_script,
+        "RecurrenceService",
+        SimpleNamespace(generate_missing_occurrences=_failing_service),
+    )
+
+    exit_code = recurrence_script.main()
+
+    assert exit_code == 1
+
+
+def test_generate_recurring_transactions_returns_1_on_factory_error(
+    monkeypatch,
+) -> None:
+    def _bad_factory(*, enable_http_runtime=True):
+        raise RuntimeError("factory boom")
+
+    monkeypatch.setattr(recurrence_script, "create_app", _bad_factory)
+
+    exit_code = recurrence_script.main()
+
+    assert exit_code == 1
