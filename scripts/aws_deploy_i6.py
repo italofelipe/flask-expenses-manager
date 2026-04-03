@@ -853,7 +853,7 @@ if not r:
 p.write_text('\\n'.join(out)+'\\n', encoding="utf-8")
 PY
 
-echo "[i6] restarting compose..."
+echo "[i6] rolling deploy: web-only restart (db/redis preserved)..."
 dump_compose_diagnostics() {{
   echo "[i6] dumping compose diagnostics..."
   docker compose --env-file "$ENV_FILE" -f docker-compose.prod.yml ps || true
@@ -875,9 +875,52 @@ dump_compose_diagnostics() {{
     logs --tail=120 redis || true
 }}
 
+# Phase 1: Ensure infrastructure services are up (never force-recreate if healthy).
+# Restarting db/redis during a web-only deploy drops in-flight DB connections
+# and increases risk unnecessarily — keep them alive across deploys.
+echo "[i6] ensuring infrastructure services (db, redis)..."
 if ! docker compose --env-file "$ENV_FILE" -f docker-compose.prod.yml \\
-  up -d --build --force-recreate db redis web; then
-  echo "[i6] compose up failed for db/redis/web"
+  up -d --no-recreate db redis; then
+  echo "[i6] failed to start infrastructure services"
+  dump_compose_diagnostics
+  exit 30
+fi
+
+# Phase 2: Wait for db to accept connections before starting web.
+# Migrations (MIGRATE_ON_START=true) run inside the web container on startup
+# and require a live PostgreSQL connection.
+echo "[i6] waiting for db readiness (max 60s)..."
+for i in $(seq 1 20); do
+  DB_CID="$(docker compose --env-file "$ENV_FILE" -f docker-compose.prod.yml ps -q db 2>/dev/null || true)"
+  if [ -n "$DB_CID" ]; then
+    DB_HEALTH="$(docker inspect --format '{{{{.State.Health.Status}}}}' "$DB_CID" 2>/dev/null || echo "none")"
+    if [ "$DB_HEALTH" = "healthy" ] || [ "$DB_HEALTH" = "none" ]; then
+      echo "[i6] db ready (health=$DB_HEALTH)"
+      break
+    fi
+    echo "[i6] db not ready yet (health=$DB_HEALTH), attempt $i/20..."
+  fi
+  sleep 3
+done
+
+# Phase 3: Build new web image while old container is still serving traffic.
+# --no-cache is intentionally omitted: layer cache speeds up deploys significantly.
+echo "[i6] building new web image (old container still serving)..."
+if ! docker compose --env-file "$ENV_FILE" -f docker-compose.prod.yml build web; then
+  echo "[i6] web image build failed"
+  dump_compose_diagnostics
+  exit 35
+fi
+
+# Phase 4: Swap web container only.
+# --no-deps: do not touch db or redis.
+# --force-recreate: ensure the new image is used even if compose thinks nothing changed.
+# Downtime window = gunicorn startup time (~2-3s). For true zero-downtime a load
+# balancer with multiple web replicas is needed (post-MVP scope).
+echo "[i6] swapping web container (rolling restart)..."
+if ! docker compose --env-file "$ENV_FILE" -f docker-compose.prod.yml \\
+  up -d --no-deps --force-recreate web; then
+  echo "[i6] compose up failed for web"
   dump_compose_diagnostics
   exit 31
 fi

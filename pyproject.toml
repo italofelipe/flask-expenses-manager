@@ -13,6 +13,8 @@ ignore = ["E203"]
 "__init__.py" = ["F401"]
 # HTML email templates contain long inline styles — line-length not applicable
 "app/services/email_templates/*.py" = ["E501"]
+# Deploy scripts embed shell commands in Python strings — line-length not applicable
+"scripts/aws_deploy_i6.py" = ["E501"]
 
 [tool.ruff.lint.mccabe]
 max-complexity = 10
