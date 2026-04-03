@@ -14,6 +14,7 @@ from app.docs.openapi_helpers import (
 )
 from app.extensions.database import db
 from app.extensions.integration_metrics import increment_metric
+from app.extensions.prometheus_metrics import record_auth_login
 from app.http.request_context import get_request_context
 from app.schemas.auth_schema import AuthSchema
 from app.services.captcha_service import get_captcha_service
@@ -38,6 +39,7 @@ def _invalid_credentials_response(
     login_guard: LoginAttemptGuardService,
     login_context: LoginAttemptContext,
 ) -> Response:
+    record_auth_login(status="failure")
     failure_guard_response = guard_register_failure(
         login_guard=login_guard,
         login_context=login_context,
@@ -228,6 +230,7 @@ class AuthResource(MethodResource):
                 "email": identity.user.email,
                 "email_confirmed": identity.user.email_verified_at is not None,
             }
+            record_auth_login(status="success")
             return compat_success(
                 legacy_payload={
                     "message": "Login successful",
