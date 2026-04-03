@@ -12,6 +12,7 @@ from app.docs.openapi_helpers import (
     json_success_response,
 )
 from app.extensions.database import db
+from app.extensions.jwt_revocation_cache import get_jwt_revocation_cache
 from app.models.user import User
 from app.utils.typed_decorators import typed_doc as doc
 from app.utils.typed_decorators import typed_jwt_required as jwt_required
@@ -92,6 +93,7 @@ class RefreshTokenResource(MethodResource):
             user.current_jti = new_access_jti
             user.refresh_token_jti = new_refresh_jti
             db.session.commit()
+            get_jwt_revocation_cache().set_current_jti(user_id, new_access_jti)
 
             return compat_success(
                 legacy_payload={
