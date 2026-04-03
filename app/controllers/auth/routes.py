@@ -5,6 +5,7 @@ from .confirm_email_resource import ConfirmEmailResource
 from .forgot_password_resource import ForgotPasswordResource
 from .login_resource import AuthResource
 from .logout_resource import LogoutResource
+from .refresh_token_resource import RefreshTokenResource
 from .register_resource import RegisterResource
 from .resend_confirmation_resource import ResendConfirmationResource
 from .reset_password_resource import ResetPasswordResource
@@ -21,6 +22,9 @@ def register_auth_routes() -> None:
         "/register", view_func=RegisterResource.as_view("registerresource")
     )
     auth_bp.add_url_rule("/login", view_func=AuthResource.as_view("authresource"))
+    auth_bp.add_url_rule(
+        "/refresh", view_func=RefreshTokenResource.as_view("refreshtokenresource")
+    )
     auth_bp.add_url_rule("/logout", view_func=LogoutResource.as_view("logoutresource"))
     auth_bp.add_url_rule(
         "/password/forgot",

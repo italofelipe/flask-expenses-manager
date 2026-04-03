@@ -124,6 +124,7 @@ def test_login_resource_unexpected_failure_returns_internal_error(
         create_access_token=lambda _identity: (_ for _ in ()).throw(
             RuntimeError("token creation failed")
         ),
+        create_refresh_token=lambda _identity: "noop-refresh-token",
         get_token_jti=lambda token: token,
         find_user_by_email=lambda _email: user,
         get_user_by_id=lambda _user_id: None,

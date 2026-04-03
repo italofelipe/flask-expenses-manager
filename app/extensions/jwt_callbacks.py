@@ -43,12 +43,18 @@ def register_jwt_callbacks(jwt: JWTManager) -> None:
     ) -> bool:
         user_id = jwt_payload.get("sub")
         jti = jwt_payload.get("jti")
+        token_type = jwt_payload.get("type", "access")
 
         if not user_id or not jti:
             return True
 
         user = db.session.get(User, UUID(user_id))
-        return not user or user.current_jti != jti
+        if not user:
+            return True
+
+        if token_type == "refresh":
+            return bool(user.refresh_token_jti != jti)
+        return bool(user.current_jti != jti)
 
     @jwt.revoked_token_loader
     def revoked_token_callback(
