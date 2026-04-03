@@ -190,7 +190,8 @@
 									"  pm.expect(body.data.user.id).to.be.a('string').and.not.empty;",
 									"});",
 									"pm.collectionVariables.set('authToken', body.data.token);",
-									"pm.collectionVariables.set('userId', body.data.user.id);"
+									"pm.collectionVariables.set('userId', body.data.user.id);",
+									"if (body.data.refresh_token) { pm.collectionVariables.set('refreshToken', body.data.refresh_token); }"
 								],
 								"type": "text/javascript"
 							}
@@ -584,6 +585,55 @@
 					]
 				},
 				{
+					"name": "12a - Refresh token (REST v2)",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test('refresh returns 200', function () { pm.response.to.have.status(200); });",
+									"var body = pm.response.json();",
+									"pm.test('refresh returns new access token', function () {",
+									"  pm.expect(body.success).to.eql(true);",
+									"  pm.expect(body.data.token).to.be.a('string').and.not.empty;",
+									"  pm.expect(body.data.refresh_token).to.be.a('string').and.not.empty;",
+									"});",
+									"pm.collectionVariables.set('authToken', body.data.token);",
+									"pm.collectionVariables.set('refreshToken', body.data.refresh_token);"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{refreshToken}}",
+								"type": "text"
+							},
+							{
+								"key": "X-API-Contract",
+								"value": "v2",
+								"type": "text"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/auth/refresh",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"auth",
+								"refresh"
+							]
+						},
+						"description": "Renova o access token usando o refresh token. Rotation: cada uso invalida o anterior."
+					},
+					"response": []
+				},
+				{
 					"name": "12 - Logout (REST v2)",
 					"request": {
 						"method": "POST",
@@ -621,44 +671,6 @@
 							}
 						}
 					]
-				},
-				{
-					"name": "12a - Refresh token (REST v2)",
-					"event": [
-						{
-							"listen": "test",
-							"script": {
-								"exec": [
-									"pm.test('logout returns 200', function () { pm.response.to.have.status(200); });",
-									"var body = pm.response.json();",
-									"pm.test('logout returns canonical success payload', function () { pm.expect(body.success).to.eql(true); });"
-								],
-								"type": "text/javascript"
-							}
-						}
-					],
-					"request": {
-						"method": "POST",
-						"header": [
-							{
-								"key": "X-API-Contract",
-								"value": "v2",
-								"type": "text"
-							}
-						],
-						"url": {
-							"raw": "{{baseUrl}}/auth/refresh",
-							"host": [
-								"{{baseUrl}}"
-							],
-							"path": [
-								"auth",
-								"refresh"
-							]
-						},
-						"description": "Renova o access token usando o refresh token. Rotation: cada uso invalida o anterior."
-					},
-					"response": []
 				},
 				{
 					"name": "13 - Login again after logout (REST v2)",
