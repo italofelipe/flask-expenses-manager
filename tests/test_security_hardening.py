@@ -74,10 +74,30 @@ def test_security_headers_are_set_on_response(client: Any) -> None:
         headers={"X-Forwarded-Proto": "https"},
     )
     assert response.status_code == 200
+    csp = response.headers["Content-Security-Policy"]
+    assert csp == "default-src 'none'; frame-ancestors 'none'"
     assert response.headers["X-Frame-Options"] == "SAMEORIGIN"
     assert response.headers["X-Content-Type-Options"] == "nosniff"
     assert response.headers["Referrer-Policy"] == "strict-origin-when-cross-origin"
     assert "Strict-Transport-Security" not in response.headers
+
+
+def test_csp_header_can_be_overridden_via_env(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    custom_csp = "default-src 'self'"
+    monkeypatch.setenv("SECURITY_CSP", custom_csp)
+    app = Flask(__name__)
+
+    @app.get("/health")
+    def _health() -> tuple[str, int]:
+        return "ok", 200
+
+    register_security_headers(app)
+    test_client = app.test_client()
+
+    response = test_client.get("/health")
+    assert response.headers["Content-Security-Policy"] == custom_csp
 
 
 def test_security_headers_add_hsts_when_enabled(
