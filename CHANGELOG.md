@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.15.0](https://github.com/italofelipe/auraxis-api/compare/v1.14.1...v1.15.0) (2026-04-04)
+
+
+### Features
+
+* **billing:** Asaas checkout + webhook + trial period + entitlement activation ([#860](https://github.com/italofelipe/auraxis-api/issues/860)) ([#869](https://github.com/italofelipe/auraxis-api/issues/869)) ([c999594](https://github.com/italofelipe/auraxis-api/commit/c999594f642756ee0414d1539e90529dcc796da4))
+
 ## [1.14.1](https://github.com/italofelipe/auraxis-api/compare/v1.14.0...v1.14.1) (2026-04-04)
 
 
