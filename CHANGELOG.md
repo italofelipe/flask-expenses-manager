@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.14.1](https://github.com/italofelipe/auraxis-api/compare/v1.14.0...v1.14.1) (2026-04-04)
+
+
+### Bug Fixes
+
+* **deps:** pin prometheus-client to 0.24.1 ([#865](https://github.com/italofelipe/auraxis-api/issues/865)) ([19b43d6](https://github.com/italofelipe/auraxis-api/commit/19b43d6e09362ab660e3ba140fc730d3a5445f5c))
+
 ## [1.14.0](https://github.com/italofelipe/auraxis-api/compare/v1.13.1...v1.14.0) (2026-04-03)
 
 
