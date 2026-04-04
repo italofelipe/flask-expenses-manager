@@ -369,16 +369,18 @@ class TestGetMySubscription:
         assert plans[1]["slug"] == "premium_monthly"
         assert plans[2]["slug"] == "premium_annual"
 
-    def test_get_subscription_no_prior_record_returns_free(self, client) -> None:
-        """GET /subscriptions/me — returns free defaults when no subscription exists."""
+    def test_get_subscription_new_user_returns_trialing(self, client) -> None:
+        """GET /subscriptions/me — new users start with a 14-day trial (H-PROD-01)."""
         token = _register_and_login(client, prefix="sub-get")
         resp = client.get("/subscriptions/me", headers=_auth_headers(token))
         assert resp.status_code == 200
         body = resp.get_json()
         assert body["success"] is True
         sub = body["data"]["subscription"]
-        assert sub["plan_code"] == "free"
-        assert sub["status"] == "free"
+        # H-PROD-01: new registrations bootstrap a TRIALING subscription
+        assert sub["plan_code"] == "trial"
+        assert sub["status"] == "trialing"
+        assert sub["trial_ends_at"] is not None
 
     def test_get_subscription_returns_401_without_token(self, client) -> None:
         resp = client.get("/subscriptions/me")
