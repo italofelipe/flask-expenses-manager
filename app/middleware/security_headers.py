@@ -21,6 +21,7 @@ class SecurityHeadersPolicy:
     permissions_policy: str
     hsts_value: str
     hsts_enabled: bool
+    csp_value: str
 
 
 def _build_security_headers_policy() -> SecurityHeadersPolicy:
@@ -46,6 +47,11 @@ def _build_security_headers_policy() -> SecurityHeadersPolicy:
             "max-age=31536000; includeSubDomains",
         ).strip(),
         hsts_enabled=_read_bool_env("SECURITY_HSTS_ENABLED", is_production),
+        # API only serves JSON — no scripts, styles, or frames needed.
+        csp_value=os.getenv(
+            "SECURITY_CSP",
+            "default-src 'none'; frame-ancestors 'none'",
+        ).strip(),
     )
 
 
@@ -62,6 +68,7 @@ def register_security_headers(app: Flask) -> None:
 
     @app.after_request
     def attach_security_headers(response: Response) -> Response:
+        response.headers["Content-Security-Policy"] = policy.csp_value
         response.headers["X-Frame-Options"] = policy.frame_options
         response.headers["X-Content-Type-Options"] = policy.content_type_options
         response.headers["Referrer-Policy"] = policy.referrer_policy
