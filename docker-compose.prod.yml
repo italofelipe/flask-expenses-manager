@@ -1,23 +1,35 @@
 services:
-  db:
-    image: ${POSTGRES_IMAGE:-public.ecr.aws/docker/library/postgres:16}
-    restart: unless-stopped
-    environment:
-      POSTGRES_DB: ${POSTGRES_DB}
-      POSTGRES_USER: ${POSTGRES_USER}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
-    volumes:
-      - pgdata_prod:/var/lib/postgresql/data
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
+  # ── [H-INFRA-03] db service commented out for RDS migration ──────────────
+  # After cutover to RDS (see docs/wiki/RDS-Migration-Runbook.md), this
+  # container is no longer needed.  Remove the comment block below only after:
+  #   1. Data migrated and verified via scripts/migrate-to-rds.sh
+  #   2. DATABASE_URL updated in .env.prod to point to RDS endpoint
+  #   3. Application confirmed healthy against RDS for >= 15 min
+  #   4. pgdata_prod volume backed up to S3 (see runbook Step 7)
+  #
+  # To re-enable temporarily for rollback: uncomment and restart.
+  #
+  # db:
+  #   image: ${POSTGRES_IMAGE:-public.ecr.aws/docker/library/postgres:16}
+  #   restart: unless-stopped
+  #   environment:
+  #     POSTGRES_DB: ${POSTGRES_DB}
+  #     POSTGRES_USER: ${POSTGRES_USER}
+  #     POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+  #   volumes:
+  #     - pgdata_prod:/var/lib/postgresql/data
+  #   healthcheck:
+  #     test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+  #     interval: 10s
+  #     timeout: 5s
+  #     retries: 5
 
   redis:
     image: ${REDIS_IMAGE:-public.ecr.aws/docker/library/redis:7-alpine}
     restart: unless-stopped
-    command: ["redis-server", "--appendonly", "yes"]
+    # [H-INFRA-03] Redis persistence: RDB snapshots every 5 min (300s) if >= 5 keys
+    # changed, and every 60s if >= 1000 keys changed. AOF disabled for t2.micro memory budget.
+    command: redis-server --save 300 5 --save 60 1000
     volumes:
       - redis_prod:/data
     healthcheck:
@@ -40,6 +52,10 @@ services:
       DOCS_EXPOSURE_POLICY: "${DOCS_EXPOSURE_POLICY:-disabled}"
       AUTO_CREATE_DB: "${AUTO_CREATE_DB:-false}"
       MIGRATE_ON_START: "${MIGRATE_ON_START:-true}"
+      # [H-INFRA-03] After RDS cutover: remove DB_HOST/DB_PORT/DB_NAME/DB_USER/DB_PASS
+      # and set DATABASE_URL in .env.prod pointing to RDS endpoint instead.
+      # Keep these vars until cutover is complete and verified (they are overridden
+      # by DATABASE_URL in .env.prod when that var is present).
       DB_HOST: db
       DB_PORT: 5432
       DB_NAME: ${POSTGRES_DB}
@@ -47,9 +63,11 @@ services:
       DB_PASS: ${POSTGRES_PASSWORD}
       RATE_LIMIT_REDIS_URL: "${RATE_LIMIT_REDIS_URL:-redis://redis:6379/0}"
       LOGIN_GUARD_REDIS_URL: "${LOGIN_GUARD_REDIS_URL:-redis://redis:6379/0}"
+    # [H-INFRA-03] After RDS cutover: remove the 'db' depends_on entry below.
+    # Only 'redis' dependency remains when running against RDS.
     depends_on:
-      db:
-        condition: service_healthy
+      # db:
+      #   condition: service_healthy
       redis:
         condition: service_healthy
     healthcheck:
