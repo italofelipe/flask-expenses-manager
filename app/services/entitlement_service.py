@@ -1,4 +1,4 @@
-"""Entitlement service — J12 (subscription state & entitlement enforcement).
+"""Entitlement service — J12 / H-PROD-01 (subscription state & entitlement enforcement).
 
 Public surface
 --------------
@@ -7,6 +7,9 @@ require_entitlement(feature_key)       -> Flask decorator (403 on failure)
 grant_entitlement(...)                 -> Entitlement
 revoke_entitlement(user_id, feature_key) -> None
 sync_entitlements_from_subscription(subscription) -> list[Entitlement]
+activate_premium(user_id, expires_at) -> list[Entitlement]
+deactivate_premium(user_id) -> None
+check_access(user_id, feature) -> bool
 """
 
 from __future__ import annotations
@@ -247,6 +250,78 @@ def sync_entitlements_from_subscription(
         )
         .all()
     )
+
+
+# ---------------------------------------------------------------------------
+# H-PROD-01 convenience wrappers (Asaas billing integration)
+# ---------------------------------------------------------------------------
+
+
+def activate_premium(
+    user_id: str | UUID,
+    expires_at: datetime | None = None,
+) -> list[Entitlement]:
+    """Grant all premium feature entitlements to *user_id*.
+
+    Creates or refreshes each entitlement in PLAN_FEATURES["premium"].
+    Returns the resulting list of active entitlements for the user.
+
+    This is a convenience wrapper that does NOT require a Subscription record —
+    useful for webhook-driven activation where we want to be resilient against
+    missing subscription rows.
+    """
+    from app.config.plan_features import PLAN_FEATURES
+
+    features = PLAN_FEATURES.get("premium", [])
+    for feature_key in features:
+        grant_entitlement(
+            user_id=user_id,
+            feature_key=feature_key,
+            source=EntitlementSource.SUBSCRIPTION.value,
+            expires_at=expires_at,
+        )
+    db.session.commit()
+
+    now = utc_now_naive()
+    return list(
+        Entitlement.query.filter_by(user_id=user_id)
+        .filter((Entitlement.expires_at.is_(None)) | (Entitlement.expires_at > now))
+        .all()
+    )
+
+
+def deactivate_premium(user_id: str | UUID) -> None:
+    """Revoke all premium-only feature entitlements for *user_id*.
+
+    Free-tier features are left intact.  Commits the session.
+    """
+    from app.config.plan_features import PLAN_FEATURES, PREMIUM_FEATURES
+
+    _ = PLAN_FEATURES  # imported for completeness; PREMIUM_FEATURES is the set we need
+    for feature_key in PREMIUM_FEATURES:
+        revoke_entitlement(user_id, feature_key)
+    db.session.commit()
+
+
+def check_access(user_id: str | UUID, feature: str) -> bool:
+    """Return True when *user_id* may access *feature*.
+
+    Checks both a live entitlement row *and* the trial window on the user's
+    Subscription record, so callers do not need to join two tables.
+    """
+    if has_entitlement(user_id, feature):
+        return True
+
+    # Secondary check: active trial period on subscription record
+    from app.models.subscription import Subscription, SubscriptionStatus
+
+    now = utc_now_naive()
+    sub: Subscription | None = Subscription.query.filter_by(user_id=user_id).first()
+    if sub is None:
+        return False
+    if sub.status == SubscriptionStatus.TRIALING and sub.trial_ends_at is not None:
+        return bool(sub.trial_ends_at > now)
+    return False
 
 
 # ---------------------------------------------------------------------------

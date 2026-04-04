@@ -12,9 +12,11 @@ from app.docs.openapi_helpers import (
     json_success_response,
 )
 from app.extensions.database import db
+from app.models.subscription import Subscription, SubscriptionStatus
 from app.models.user import User
 from app.schemas.user_schemas import UserRegistrationSchema
 from app.services.captcha_service import get_captcha_service
+from app.utils.datetime_utils import utc_now_naive
 from app.utils.typed_decorators import typed_doc as doc
 from app.utils.typed_decorators import typed_use_kwargs as use_kwargs
 
@@ -121,6 +123,19 @@ class RegisterResource(MethodResource):
             )
             db.session.add(user)
             db.session.flush()
+
+            # H-PROD-01: bootstrap a 14-day trial subscription for every new user
+            from datetime import timedelta
+
+            trial_ends_at = utc_now_naive() + timedelta(days=14)
+            trial_subscription = Subscription(
+                user_id=user.id,
+                plan_code="trial",
+                status=SubscriptionStatus.TRIALING,
+                trial_ends_at=trial_ends_at,
+            )
+            db.session.add(trial_subscription)
+
             db.session.commit()
 
             try:
