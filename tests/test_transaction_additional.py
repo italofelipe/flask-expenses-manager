@@ -314,3 +314,41 @@ def test_transaction_put_compatibility_emits_deprecation_headers(client) -> None
     assert response.headers["Deprecation"] == "true"
     assert response.headers["X-Auraxis-Successor-Method"] == "PATCH"
     assert response.get_json()["data"]["transaction"]["title"] == "Compatibilidade PUT"
+
+
+def test_transaction_patch_null_optional_fields_returns_200(client) -> None:
+    """PATCH with null for optional fields must be accepted (bug #846)."""
+    token = _register_and_login(client, "patch-null-fields")
+    created = client.post(
+        "/transactions",
+        headers=_auth_headers(token, "v2"),
+        json={
+            **_transaction_payload(),
+            "description": "Descrição inicial",
+            "end_date": (date.today() + timedelta(days=30)).isoformat(),
+        },
+    )
+    assert created.status_code == 201
+    transaction_id = created.get_json()["data"]["transaction"][0]["id"]
+
+    response = client.patch(
+        f"/transactions/{transaction_id}",
+        headers=_auth_headers(token, "v2"),
+        json={
+            "description": None,
+            "end_date": None,
+            "tag_id": None,
+            "account_id": None,
+            "credit_card_id": None,
+        },
+    )
+
+    assert response.status_code == 200
+    body = response.get_json()
+    assert body["success"] is True
+    transaction = body["data"]["transaction"]
+    assert transaction["description"] is None
+    assert transaction["end_date"] is None
+    assert transaction["tag_id"] is None
+    assert transaction["account_id"] is None
+    assert transaction["credit_card_id"] is None
