@@ -1,12 +1,15 @@
 from __future__ import annotations
 
 import calendar
+import logging
 from dataclasses import dataclass
 from datetime import date
 from typing import Iterable
 
 from app.extensions.database import db
 from app.models.transaction import Transaction
+
+logger = logging.getLogger(__name__)
 
 
 def _add_months(value: date, months: int) -> date:
@@ -68,6 +71,12 @@ class RecurrenceService:
             deleted=False,
         ).all()
 
+        logger.info(
+            "recurrence: found %d recurring template(s) for reference_date=%s",
+            len(templates),
+            reference,
+        )
+
         created: list[Transaction] = []
         for template in templates:
             window = RecurrenceService._build_window(template, reference)
@@ -123,8 +132,19 @@ class RecurrenceService:
                 )
 
         if not created:
+            logger.info("recurrence: no new occurrences to create")
             return 0
 
-        db.session.add_all(created)
-        db.session.commit()
+        try:
+            db.session.add_all(created)
+            db.session.commit()
+        except Exception:
+            db.session.rollback()
+            logger.exception(
+                "recurrence: failed to persist %d occurrence(s) — session rolled back",
+                len(created),
+            )
+            raise
+
+        logger.info("recurrence: created %d new occurrence(s)", len(created))
         return len(created)

@@ -1,5 +1,22 @@
 # Changelog
 
+## [1.14.0](https://github.com/italofelipe/auraxis-api/compare/v1.13.1...v1.14.0) (2026-04-03)
+
+
+### Features
+
+* **api:** /readiness endpoint, disable GraphQL introspection in prod, add DB indexes (B19/B20/B21) ([#851](https://github.com/italofelipe/auraxis-api/issues/851)) ([1dce441](https://github.com/italofelipe/auraxis-api/commit/1dce441fcf9e986afe214bb5b39ee6f6b180e868))
+* **auth:** add POST /auth/refresh with token rotation (B18) ([#830](https://github.com/italofelipe/auraxis-api/issues/830)) ([0f07dfe](https://github.com/italofelipe/auraxis-api/commit/0f07dfe3e1adad6b00e02fb9277e65cc667f7f9e))
+* **auth:** Redis cache for JWT revocation check — eliminate DB hit per request (B22) ([#847](https://github.com/italofelipe/auraxis-api/issues/847)) ([0056b27](https://github.com/italofelipe/auraxis-api/commit/0056b276d8567e3c977b0e5c22d29f09363196b9))
+* **deploy:** rolling web-only restart preserves db/redis across deploys ([#845](https://github.com/italofelipe/auraxis-api/issues/845)) ([2ebda00](https://github.com/italofelipe/auraxis-api/commit/2ebda00e4128f99663755b64b7d1bf439ed1ae66))
+* **observability:** Prometheus metrics + request_id correlation (API23) ([#850](https://github.com/italofelipe/auraxis-api/issues/850)) ([ba9a5d6](https://github.com/italofelipe/auraxis-api/commit/ba9a5d60a29c64b9170bed5f9ede96e28d3c263f))
+
+
+### Bug Fixes
+
+* **recurrence:** [[#701](https://github.com/italofelipe/auraxis-api/issues/701)] add error handling and non-zero exit on failure ([#848](https://github.com/italofelipe/auraxis-api/issues/848)) ([7a960c5](https://github.com/italofelipe/auraxis-api/commit/7a960c5838e060d4df5400ec13471779b4187734))
+* **transactions:** allow null for optional fields in PATCH schema (closes [#846](https://github.com/italofelipe/auraxis-api/issues/846)) ([#849](https://github.com/italofelipe/auraxis-api/issues/849)) ([040adc4](https://github.com/italofelipe/auraxis-api/commit/040adc4360f0b1cb3f83e8f2c0aa4eb1a3013dd5))
+
 ## [1.13.1](https://github.com/italofelipe/auraxis-api/compare/v1.13.0...v1.13.1) (2026-04-01)
 
 

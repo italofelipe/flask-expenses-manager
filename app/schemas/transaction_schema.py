@@ -26,6 +26,8 @@ class TransactionSchema(Schema):
         },
     )
     description = fields.Str(
+        allow_none=True,
+        load_default=None,
         validate=validate.Length(max=300),
         metadata={
             "description": "Descrição detalhada da transação",
@@ -90,10 +92,12 @@ class TransactionSchema(Schema):
         }
     )
     end_date = fields.Date(
+        allow_none=True,
+        load_default=None,
         metadata={
             "description": "Data de fim (para transações recorrentes)",
             "example": "2024-12-31",
-        }
+        },
     )
     tag_id = fields.UUID(
         allow_none=True,
