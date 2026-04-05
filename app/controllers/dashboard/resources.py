@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import re
+from typing import Any
 
 from flask import Response, request
 from flask_apispec.views import MethodResource
@@ -185,4 +186,129 @@ class DashboardOverviewResource(MethodResource):
         return resp
 
 
-__all__ = ["DashboardOverviewResource"]
+class DashboardTrendsResource(MethodResource):
+    @doc(
+        summary="Tendências mensais do dashboard",
+        description=(
+            "Retorna a série histórica de receitas, despesas e saldo "
+            "para os últimos N meses (apenas transações pagas)."
+        ),
+        tags=["Dashboard"],
+        security=[{"BearerAuth": []}],
+        params={
+            "months": {
+                "description": "Número de meses a incluir (1–24, padrão 6)",
+                "in": "query",
+                "type": "integer",
+                "required": False,
+                "example": 6,
+            },
+            **contract_header_param(supported_version="v2"),
+        },
+        responses={
+            200: json_success_response(
+                description="Série de tendências mensais",
+                message="Tendências calculadas com sucesso",
+                data_example={
+                    "months": 6,
+                    "series": [
+                        {
+                            "month": "2026-04",
+                            "income": 5000.0,
+                            "expenses": 3200.0,
+                            "balance": 1800.0,
+                        }
+                    ],
+                },
+            ),
+            401: json_error_response(
+                description="Token inválido",
+                message="Token revogado",
+                error_code="UNAUTHORIZED",
+                status_code=401,
+            ),
+            422: json_error_response(
+                description="Parâmetro inválido",
+                message="O parâmetro 'months' deve ser um inteiro entre 1 e 24.",
+                error_code="VALIDATION_ERROR",
+                status_code=422,
+            ),
+            500: json_error_response(
+                description="Erro interno",
+                message="Erro ao calcular tendências do dashboard",
+                error_code="INTERNAL_ERROR",
+                status_code=500,
+            ),
+        },
+    )
+    @jwt_required()
+    def get(self) -> Response:
+        token_error = _guard_revoked_token()
+        if token_error is not None:
+            return token_error
+
+        months_raw = request.args.get("months", "6")
+        try:
+            months = int(months_raw)
+        except (ValueError, TypeError):
+            months = -1
+
+        if not (1 <= months <= 24):
+            return compat_error_response(
+                legacy_payload={
+                    "error": "O parâmetro 'months' deve ser um inteiro entre 1 e 24."
+                },
+                status_code=422,
+                message="O parâmetro 'months' deve ser um inteiro entre 1 e 24.",
+                error_code="VALIDATION_ERROR",
+            )
+
+        user_uuid = current_user_id()
+        cache = get_cache_service()
+        cache_key = f"dashboard:trends:{user_uuid}:{months}"
+
+        cached = cache.get(cache_key)
+        if cached is not None:
+            resp = compat_success_response(
+                legacy_payload=cached,
+                status_code=200,
+                message="Tendências calculadas com sucesso",
+                data=cached,
+            )
+            resp.headers["X-Cache"] = "HIT"
+            return resp
+
+        dependencies = get_transaction_dependencies()
+        query_service = dependencies.transaction_query_service_factory(user_uuid)
+
+        try:
+            result = query_service.get_dashboard_trends(months=months)
+        except TransactionApplicationError as exc:
+            return compat_error_response(
+                legacy_payload={"error": exc.message, "details": exc.details},
+                status_code=exc.status_code,
+                message=exc.message,
+                error_code=exc.code,
+                details=exc.details,
+            )
+        except Exception:
+            return compat_error_response(
+                legacy_payload={"error": "Erro ao calcular tendências do dashboard"},
+                status_code=500,
+                message="Erro ao calcular tendências do dashboard",
+                error_code="INTERNAL_ERROR",
+            )
+
+        result_dict: dict[str, Any] = dict(result)
+        cache.set(cache_key, result_dict, ttl=DASHBOARD_CACHE_TTL)
+        resp = compat_success_response(
+            legacy_payload=result_dict,
+            status_code=200,
+            message="Tendências calculadas com sucesso",
+            data=result_dict,
+        )
+        resp.headers["X-Cache"] = "MISS"
+        return resp
+
+
+__all__ = ["DashboardOverviewResource", "DashboardTrendsResource"]
