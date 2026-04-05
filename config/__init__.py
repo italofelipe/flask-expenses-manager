@@ -80,6 +80,17 @@ class Config:
         f"{os.getenv('DB_HOST')}:{os.getenv('DB_PORT')}/{os.getenv('DB_NAME')}"
     )
     SQLALCHEMY_TRACK_MODIFICATIONS = False
+    # Connection pool tuned for t2.micro (1 vCPU, 1 GB RAM).
+    # pool_size=5 keeps 5 persistent connections; max_overflow=2 allows 2 extra
+    # on burst traffic; pool_recycle=300 prevents stale connections after 5 min
+    # of idle time; pool_pre_ping validates each connection before handing it out.
+    SQLALCHEMY_ENGINE_OPTIONS = {
+        "pool_size": 5,
+        "max_overflow": 2,
+        "pool_timeout": 20,
+        "pool_recycle": 300,
+        "pool_pre_ping": True,
+    }
 
     # Brapi config
     BRAPI_KEY = os.getenv("BRAPI_KEY")
