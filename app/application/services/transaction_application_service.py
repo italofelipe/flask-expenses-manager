@@ -252,18 +252,31 @@ class TransactionApplicationService:
             field_name="due_date",
             required=True,
         )
+        effective_start_date = (
+            normalized["start_date"]
+            if "start_date" in normalized
+            else transaction.start_date
+        )
+        effective_end_date = (
+            normalized["end_date"] if "end_date" in normalized else transaction.end_date
+        )
         start_date = self._coerce_date(
-            normalized.get("start_date", transaction.start_date),
+            effective_start_date,
             field_name="start_date",
             required=False,
         )
         end_date = self._coerce_date(
-            normalized.get("end_date", transaction.end_date),
+            effective_end_date,
             field_name="end_date",
             required=False,
         )
+        effective_is_recurring = bool(
+            normalized["is_recurring"]
+            if "is_recurring" in normalized
+            else transaction.is_recurring
+        )
         recurring_error = _validate_recurring_payload(
-            is_recurring=bool(normalized.get("is_recurring", transaction.is_recurring)),
+            is_recurring=effective_is_recurring,
             due_date=due_date,
             start_date=start_date,
             end_date=end_date,
