@@ -1,12 +1,12 @@
 # mypy: disable-error-code="name-defined,no-redef"
 
 import uuid
-from datetime import datetime
 
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.ext.hybrid import hybrid_property
 
 from app.extensions.database import db
+from app.utils.datetime_utils import utc_now_naive
 
 
 class User(db.Model):
@@ -17,8 +17,8 @@ class User(db.Model):
     name = db.Column(db.String(128), nullable=False)
     email = db.Column(db.String(128), nullable=False, unique=True)
     password = db.Column(db.String(256), nullable=False)
-    created_at = db.Column(db.DateTime, default=datetime.now)
-    updated_at = db.Column(db.DateTime, default=datetime.now)
+    created_at = db.Column(db.DateTime, default=utc_now_naive)
+    updated_at = db.Column(db.DateTime, default=utc_now_naive)
     current_jti = db.Column(db.String(128), nullable=True)
     refresh_token_jti = db.Column(db.String(128), nullable=True)
     password_reset_token_hash = db.Column(db.String(128), nullable=True)
