@@ -1,7 +1,26 @@
-title = "auraxis-gitleaks-config"
+title = "Auraxis API — Gitleaks configuration"
 
-[allowlist]
-description = "Allow deterministic local smoke credentials used only in API test fixtures."
+[extend]
+useDefault = true
+
+[[allowlists]]
+description = "Test fixtures — mock credentials are intentional and not real secrets"
 paths = [
-  '''api-tests/postman/environments/local\.postman_environment\.json''',
+  '''tests/.*''',
+  '''.*_test\.py''',
+  '''.*\.spec\.py''',
+]
+
+[[allowlists]]
+description = "Test fixture values — known mock credential patterns"
+regexTarget = "match"
+regexes = [
+  '''Test@\d+''',
+  '''test_secret''',
+  '''mock_token''',
+  '''fake_token''',
+  '''test_password''',
+  '''TestPass\w*''',
+  '''Password@\w*''',
+  '''Senha@\w*''',
 ]
