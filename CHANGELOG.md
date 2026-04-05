@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.16.0](https://github.com/italofelipe/auraxis-api/compare/v1.15.0...v1.16.0) (2026-04-05)
+
+
+### Features
+
+* **cache:** CACHE-01 — Redis caching layer for dashboard, BRAPI & portfolio queries ([#875](https://github.com/italofelipe/auraxis-api/issues/875)) ([e54a362](https://github.com/italofelipe/auraxis-api/commit/e54a3628139940929187f451a9e6f5c8d58bdb1a))
+
 ## [1.15.0](https://github.com/italofelipe/auraxis-api/compare/v1.14.1...v1.15.0) (2026-04-04)
 
 
