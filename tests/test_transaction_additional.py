@@ -453,3 +453,76 @@ def test_transaction_patch_recurring_to_non_recurring_clears_dates(client) -> No
     assert transaction["is_recurring"] is False
     assert transaction["start_date"] is None
     assert transaction["end_date"] is None
+
+
+def test_transaction_patch_observation_null_v2_returns_200(client) -> None:
+    """PATCH with observation=null on v2 contract must clear observation (regression #892)."""  # noqa: E501
+    token = _register_and_login(client, "patch-obs-null-v2")
+    created = client.post(
+        "/transactions",
+        headers=_auth_headers(token, "v2"),
+        json={**_transaction_payload(), "observation": "Observação inicial"},
+    )
+    assert created.status_code == 201
+    transaction_id = created.get_json()["data"]["transaction"][0]["id"]
+
+    response = client.patch(
+        f"/transactions/{transaction_id}",
+        headers=_auth_headers(token, "v2"),
+        json={"observation": None},
+    )
+
+    assert response.status_code == 200
+    body = response.get_json()
+    assert body["success"] is True
+    assert body["data"]["transaction"]["observation"] is None
+
+
+def test_transaction_patch_all_nullable_fields_null_v2_returns_200(client) -> None:
+    """PATCH sending null for every nullable field with v2 contract must return 200.
+
+    This is a regression test for the production bug where description and
+    end_date (and observation) were rejected with VALIDATION_ERROR even though
+    allow_none=True should have been set in TransactionSchema.
+    """
+    token = _register_and_login(client, "patch-all-nullable-v2")
+    today = date.today()
+    created = client.post(
+        "/transactions",
+        headers=_auth_headers(token, "v2"),
+        json={
+            **_transaction_payload(),
+            "description": "Descrição de teste",
+            "observation": "Observação de teste",
+            "end_date": (today + timedelta(days=30)).isoformat(),
+            "start_date": today.isoformat(),
+        },
+    )
+    assert created.status_code == 201
+    transaction_id = created.get_json()["data"]["transaction"][0]["id"]
+
+    response = client.patch(
+        f"/transactions/{transaction_id}",
+        headers=_auth_headers(token, "v2"),
+        json={
+            "description": None,
+            "observation": None,
+            "end_date": None,
+            "start_date": None,
+            "tag_id": None,
+            "account_id": None,
+            "credit_card_id": None,
+        },
+    )
+
+    assert response.status_code == 200, response.get_json()
+    body = response.get_json()
+    assert body["success"] is True
+    transaction = body["data"]["transaction"]
+    assert transaction["description"] is None
+    assert transaction["observation"] is None
+    assert transaction["end_date"] is None
+    assert transaction["start_date"] is None
+    assert transaction["tag_id"] is None
+    assert transaction["account_id"] is None
+    assert transaction["credit_card_id"] is None
