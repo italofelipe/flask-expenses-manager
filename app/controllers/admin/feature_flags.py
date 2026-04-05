@@ -18,6 +18,7 @@ import re
 
 from flask import Blueprint, Response, jsonify, request
 
+from app.auth import get_active_auth_context
 from app.services.feature_flag_service import get_feature_flag_service
 
 admin_feature_flags_bp = Blueprint("admin_feature_flags", __name__)
@@ -25,9 +26,32 @@ admin_feature_flags_bp = Blueprint("admin_feature_flags", __name__)
 _FLAG_NAME_RE = re.compile(r"^[a-zA-Z0-9._-]{1,128}$")
 
 
+def _is_admin() -> bool:
+    """Return True when the JWT 'roles' claim contains 'admin'."""
+    try:
+        ctx = get_active_auth_context()
+        return "admin" in ctx.roles
+    except Exception:
+        return False
+
+
+def _forbidden_response() -> Response:
+    response = jsonify(
+        {
+            "message": "Forbidden",
+            "success": False,
+            "error": {"code": "FORBIDDEN", "details": {}},
+        }
+    )
+    response.status_code = 403
+    return response
+
+
 @admin_feature_flags_bp.get("/feature-flags")
 def list_feature_flags() -> Response:
     """Return all feature flags stored in Redis."""
+    if not _is_admin():
+        return _forbidden_response()
     svc = get_feature_flag_service()
     flags = svc.list_flags()
     payload = {name: cfg.to_dict() for name, cfg in flags.items()}
@@ -37,6 +61,8 @@ def list_feature_flags() -> Response:
 @admin_feature_flags_bp.get("/feature-flags/<string:name>")
 def get_feature_flag(name: str) -> Response:
     """Return a single feature flag by name."""
+    if not _is_admin():
+        return _forbidden_response()
     if not _FLAG_NAME_RE.match(name):
         response = jsonify(
             {
@@ -74,6 +100,8 @@ def create_or_update_feature_flag() -> Response:
             "description": "Enables FGTS simulator for canary users"
         }
     """
+    if not _is_admin():
+        return _forbidden_response()
     body = request.get_json(silent=True) or {}
     name = body.get("name", "")
     if not name or not isinstance(name, str):
@@ -147,6 +175,8 @@ def create_or_update_feature_flag() -> Response:
 @admin_feature_flags_bp.delete("/feature-flags/<string:name>")
 def delete_feature_flag(name: str) -> Response:
     """Delete a feature flag by name (immediate kill switch)."""
+    if not _is_admin():
+        return _forbidden_response()
     if not _FLAG_NAME_RE.match(name):
         response = jsonify(
             {

@@ -8,6 +8,7 @@ Covers:
   unavailable)
 - DELETE /admin/feature-flags/<name> (success, invalid name)
 - Name validation regex
+- 403 Forbidden for non-admin users on all 4 endpoints
 """
 
 from __future__ import annotations
@@ -94,15 +95,75 @@ def _make_svc_mock(
     return svc
 
 
+# ── 403 Forbidden (non-admin) ─────────────────────────────────────────────────
+
+
+class TestAdminRoleEnforcement:
+    """All 4 admin endpoints must return 403 when the caller is not an admin."""
+
+    def test_list_returns_403_for_non_admin(self, client) -> None:
+        with patch(
+            "app.controllers.admin.feature_flags._is_admin",
+            return_value=False,
+        ):
+            resp = client.get("/admin/feature-flags")
+        assert resp.status_code == 403
+        body = resp.get_json()
+        assert body["success"] is False
+        assert body["error"]["code"] == "FORBIDDEN"
+
+    def test_get_returns_403_for_non_admin(self, client) -> None:
+        with patch(
+            "app.controllers.admin.feature_flags._is_admin",
+            return_value=False,
+        ):
+            resp = client.get("/admin/feature-flags/tools.fgts")
+        assert resp.status_code == 403
+        body = resp.get_json()
+        assert body["success"] is False
+        assert body["error"]["code"] == "FORBIDDEN"
+
+    def test_post_returns_403_for_non_admin(self, client) -> None:
+        with patch(
+            "app.controllers.admin.feature_flags._is_admin",
+            return_value=False,
+        ):
+            resp = client.post(
+                "/admin/feature-flags",
+                json={"name": "tools.flag", "enabled": True},
+            )
+        assert resp.status_code == 403
+        body = resp.get_json()
+        assert body["success"] is False
+        assert body["error"]["code"] == "FORBIDDEN"
+
+    def test_delete_returns_403_for_non_admin(self, client) -> None:
+        with patch(
+            "app.controllers.admin.feature_flags._is_admin",
+            return_value=False,
+        ):
+            resp = client.delete("/admin/feature-flags/tools.fgts_simulator")
+        assert resp.status_code == 403
+        body = resp.get_json()
+        assert body["success"] is False
+        assert body["error"]["code"] == "FORBIDDEN"
+
+
 # ── List ──────────────────────────────────────────────────────────────────────
 
 
 class TestListFeatureFlags:
     def test_list_returns_empty_when_no_flags(self, client) -> None:
         svc = _make_svc_mock(list_result={})
-        with patch(
-            "app.controllers.admin.feature_flags.get_feature_flag_service",
-            return_value=svc,
+        with (
+            patch(
+                "app.controllers.admin.feature_flags._is_admin",
+                return_value=True,
+            ),
+            patch(
+                "app.controllers.admin.feature_flags.get_feature_flag_service",
+                return_value=svc,
+            ),
         ):
             resp = client.get("/admin/feature-flags")
         assert resp.status_code == 200
@@ -113,9 +174,15 @@ class TestListFeatureFlags:
     def test_list_returns_flags(self, client) -> None:
         cfg = _flag_config(enabled=True, canary_percentage=10)
         svc = _make_svc_mock(list_result={"tools.fgts": cfg})
-        with patch(
-            "app.controllers.admin.feature_flags.get_feature_flag_service",
-            return_value=svc,
+        with (
+            patch(
+                "app.controllers.admin.feature_flags._is_admin",
+                return_value=True,
+            ),
+            patch(
+                "app.controllers.admin.feature_flags.get_feature_flag_service",
+                return_value=svc,
+            ),
         ):
             resp = client.get("/admin/feature-flags")
         assert resp.status_code == 200
@@ -132,9 +199,15 @@ class TestGetFeatureFlag:
     def test_get_existing_flag(self, client) -> None:
         cfg = _flag_config(enabled=True, canary_percentage=25)
         svc = _make_svc_mock(get_result=cfg)
-        with patch(
-            "app.controllers.admin.feature_flags.get_feature_flag_service",
-            return_value=svc,
+        with (
+            patch(
+                "app.controllers.admin.feature_flags._is_admin",
+                return_value=True,
+            ),
+            patch(
+                "app.controllers.admin.feature_flags.get_feature_flag_service",
+                return_value=svc,
+            ),
         ):
             resp = client.get("/admin/feature-flags/tools.fgts")
         assert resp.status_code == 200
@@ -144,9 +217,15 @@ class TestGetFeatureFlag:
 
     def test_get_returns_404_when_not_found(self, client) -> None:
         svc = _make_svc_mock(get_result=None)
-        with patch(
-            "app.controllers.admin.feature_flags.get_feature_flag_service",
-            return_value=svc,
+        with (
+            patch(
+                "app.controllers.admin.feature_flags._is_admin",
+                return_value=True,
+            ),
+            patch(
+                "app.controllers.admin.feature_flags.get_feature_flag_service",
+                return_value=svc,
+            ),
         ):
             resp = client.get("/admin/feature-flags/nonexistent.flag")
         assert resp.status_code == 404
@@ -157,9 +236,15 @@ class TestGetFeatureFlag:
     def test_get_returns_404_for_invalid_name_chars(self, client) -> None:
         # Path param with injection characters must return 404
         svc = _make_svc_mock(get_result=None)
-        with patch(
-            "app.controllers.admin.feature_flags.get_feature_flag_service",
-            return_value=svc,
+        with (
+            patch(
+                "app.controllers.admin.feature_flags._is_admin",
+                return_value=True,
+            ),
+            patch(
+                "app.controllers.admin.feature_flags.get_feature_flag_service",
+                return_value=svc,
+            ),
         ):
             resp = client.get("/admin/feature-flags/flag%0Ainjected")
         # Either 404 or 400 is acceptable; service should not be called
@@ -174,9 +259,15 @@ class TestCreateOrUpdateFeatureFlag:
         cfg = _flag_config(enabled=True, canary_percentage=0)
         svc = MagicMock()
         svc.get_flag.return_value = cfg
-        with patch(
-            "app.controllers.admin.feature_flags.get_feature_flag_service",
-            return_value=svc,
+        with (
+            patch(
+                "app.controllers.admin.feature_flags._is_admin",
+                return_value=True,
+            ),
+            patch(
+                "app.controllers.admin.feature_flags.get_feature_flag_service",
+                return_value=svc,
+            ),
         ):
             resp = client.post(
                 "/admin/feature-flags",
@@ -194,9 +285,15 @@ class TestCreateOrUpdateFeatureFlag:
 
     def test_create_missing_name_returns_422(self, client) -> None:
         svc = MagicMock()
-        with patch(
-            "app.controllers.admin.feature_flags.get_feature_flag_service",
-            return_value=svc,
+        with (
+            patch(
+                "app.controllers.admin.feature_flags._is_admin",
+                return_value=True,
+            ),
+            patch(
+                "app.controllers.admin.feature_flags.get_feature_flag_service",
+                return_value=svc,
+            ),
         ):
             resp = client.post("/admin/feature-flags", json={"enabled": True})
         assert resp.status_code == 422
@@ -206,9 +303,15 @@ class TestCreateOrUpdateFeatureFlag:
 
     def test_create_invalid_name_chars_returns_422(self, client) -> None:
         svc = MagicMock()
-        with patch(
-            "app.controllers.admin.feature_flags.get_feature_flag_service",
-            return_value=svc,
+        with (
+            patch(
+                "app.controllers.admin.feature_flags._is_admin",
+                return_value=True,
+            ),
+            patch(
+                "app.controllers.admin.feature_flags.get_feature_flag_service",
+                return_value=svc,
+            ),
         ):
             resp = client.post(
                 "/admin/feature-flags",
@@ -221,9 +324,15 @@ class TestCreateOrUpdateFeatureFlag:
 
     def test_create_invalid_canary_pct_returns_422(self, client) -> None:
         svc = MagicMock()
-        with patch(
-            "app.controllers.admin.feature_flags.get_feature_flag_service",
-            return_value=svc,
+        with (
+            patch(
+                "app.controllers.admin.feature_flags._is_admin",
+                return_value=True,
+            ),
+            patch(
+                "app.controllers.admin.feature_flags.get_feature_flag_service",
+                return_value=svc,
+            ),
         ):
             resp = client.post(
                 "/admin/feature-flags",
@@ -237,9 +346,15 @@ class TestCreateOrUpdateFeatureFlag:
     def test_create_redis_unavailable_returns_503(self, client) -> None:
         svc = MagicMock()
         svc.get_flag.return_value = None  # Redis unavailable after set
-        with patch(
-            "app.controllers.admin.feature_flags.get_feature_flag_service",
-            return_value=svc,
+        with (
+            patch(
+                "app.controllers.admin.feature_flags._is_admin",
+                return_value=True,
+            ),
+            patch(
+                "app.controllers.admin.feature_flags.get_feature_flag_service",
+                return_value=svc,
+            ),
         ):
             resp = client.post(
                 "/admin/feature-flags",
@@ -256,9 +371,15 @@ class TestCreateOrUpdateFeatureFlag:
 class TestDeleteFeatureFlag:
     def test_delete_existing_flag(self, client) -> None:
         svc = MagicMock()
-        with patch(
-            "app.controllers.admin.feature_flags.get_feature_flag_service",
-            return_value=svc,
+        with (
+            patch(
+                "app.controllers.admin.feature_flags._is_admin",
+                return_value=True,
+            ),
+            patch(
+                "app.controllers.admin.feature_flags.get_feature_flag_service",
+                return_value=svc,
+            ),
         ):
             resp = client.delete("/admin/feature-flags/tools.fgts_simulator")
         assert resp.status_code == 200
@@ -268,9 +389,15 @@ class TestDeleteFeatureFlag:
 
     def test_delete_invalid_name_returns_404(self, client) -> None:
         svc = MagicMock()
-        with patch(
-            "app.controllers.admin.feature_flags.get_feature_flag_service",
-            return_value=svc,
+        with (
+            patch(
+                "app.controllers.admin.feature_flags._is_admin",
+                return_value=True,
+            ),
+            patch(
+                "app.controllers.admin.feature_flags.get_feature_flag_service",
+                return_value=svc,
+            ),
         ):
             resp = client.delete("/admin/feature-flags/flag%0Ainjected")
         assert resp.status_code in (404, 400)
