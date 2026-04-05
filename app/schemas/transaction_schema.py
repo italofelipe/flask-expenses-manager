@@ -86,10 +86,12 @@ class TransactionSchema(Schema):
         },
     )
     start_date = fields.Date(
+        allow_none=True,
+        load_default=None,
         metadata={
             "description": "Data de início (para transações recorrentes)",
             "example": "2024-01-01",
-        }
+        },
     )
     end_date = fields.Date(
         allow_none=True,

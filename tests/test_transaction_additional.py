@@ -352,3 +352,104 @@ def test_transaction_patch_null_optional_fields_returns_200(client) -> None:
     assert transaction["tag_id"] is None
     assert transaction["account_id"] is None
     assert transaction["credit_card_id"] is None
+
+
+def test_transaction_patch_description_null_only_returns_200(client) -> None:
+    """PATCH with only description=null must clear description (bug #846)."""
+    token = _register_and_login(client, "patch-desc-null")
+    created = client.post(
+        "/transactions",
+        headers=_auth_headers(token, "v2"),
+        json={**_transaction_payload(), "description": "Descrição a limpar"},
+    )
+    assert created.status_code == 201
+    transaction_id = created.get_json()["data"]["transaction"][0]["id"]
+
+    response = client.patch(
+        f"/transactions/{transaction_id}",
+        headers=_auth_headers(token, "v2"),
+        json={"description": None},
+    )
+
+    assert response.status_code == 200
+    assert response.get_json()["data"]["transaction"]["description"] is None
+
+
+def test_transaction_patch_end_date_null_only_returns_200(client) -> None:
+    """PATCH with only end_date=null must clear end_date on non-recurring (bug #846)."""
+    token = _register_and_login(client, "patch-enddate-null")
+    created = client.post(
+        "/transactions",
+        headers=_auth_headers(token, "v2"),
+        json={
+            **_transaction_payload(),
+            "end_date": (date.today() + timedelta(days=60)).isoformat(),
+        },
+    )
+    assert created.status_code == 201
+    transaction_id = created.get_json()["data"]["transaction"][0]["id"]
+
+    response = client.patch(
+        f"/transactions/{transaction_id}",
+        headers=_auth_headers(token, "v2"),
+        json={"end_date": None},
+    )
+
+    assert response.status_code == 200
+    assert response.get_json()["data"]["transaction"]["end_date"] is None
+
+
+def test_transaction_patch_start_date_null_returns_200(client) -> None:
+    """PATCH with start_date=null must be accepted on non-recurring transactions."""
+    token = _register_and_login(client, "patch-startdate-null")
+    created = client.post(
+        "/transactions",
+        headers=_auth_headers(token, "v2"),
+        json={
+            **_transaction_payload(),
+            "start_date": date.today().isoformat(),
+        },
+    )
+    assert created.status_code == 201
+    transaction_id = created.get_json()["data"]["transaction"][0]["id"]
+
+    response = client.patch(
+        f"/transactions/{transaction_id}",
+        headers=_auth_headers(token, "v2"),
+        json={"start_date": None},
+    )
+
+    assert response.status_code == 200
+    assert response.get_json()["data"]["transaction"]["start_date"] is None
+
+
+def test_transaction_patch_recurring_to_non_recurring_clears_dates(client) -> None:
+    """PATCH switching is_recurring=false alongside null dates must succeed."""
+    token = _register_and_login(client, "patch-rec-to-nonrec")
+    today = date.today()
+    created = client.post(
+        "/transactions",
+        headers=_auth_headers(token, "v2"),
+        json={
+            **_transaction_payload(due_date=today.isoformat()),
+            "is_recurring": True,
+            "start_date": today.isoformat(),
+            "end_date": (today + timedelta(days=365)).isoformat(),
+        },
+    )
+    assert created.status_code == 201
+    transaction_id = created.get_json()["data"]["transaction"][0]["id"]
+
+    response = client.patch(
+        f"/transactions/{transaction_id}",
+        headers=_auth_headers(token, "v2"),
+        json={"is_recurring": False, "start_date": None, "end_date": None},
+    )
+
+    assert response.status_code == 200
+    body = response.get_json()
+    assert body["success"] is True
+    transaction = body["data"]["transaction"]
+    assert transaction["is_recurring"] is False
+    assert transaction["start_date"] is None
+    assert transaction["end_date"] is None
