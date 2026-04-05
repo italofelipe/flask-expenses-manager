@@ -35,6 +35,8 @@ class TransactionSchema(Schema):
         },
     )
     observation = fields.Str(
+        allow_none=True,
+        load_default=None,
         validate=validate.Length(max=500),
         metadata={
             "description": "Observações adicionais sobre a transação",
