@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import re
+
 # mypy: disable-error-code=untyped-decorator
 from typing import Any
 from uuid import UUID
@@ -19,6 +21,23 @@ from .blueprint import tag_bp
 MISSING_NAME_MESSAGE = "Field 'name' is required"
 NAME_TOO_LONG_MESSAGE = "Field 'name' must be at most 50 characters"
 TAG_NOT_FOUND_MESSAGE = "Tag not found"
+INVALID_COLOR_MESSAGE = "Field 'color' must be a valid hex color code (e.g. #FF6B6B)"
+_HEX_COLOR_RE = re.compile(r"^#[0-9A-Fa-f]{6}$")
+
+
+def _serialize_tag(t: Tag) -> dict[str, Any]:
+    return {
+        "id": str(t.id),
+        "name": t.name,
+        "color": t.color,
+        "icon": t.icon,
+    }
+
+
+def _validate_color(color: str | None) -> bool:
+    if color is None:
+        return True
+    return bool(_HEX_COLOR_RE.match(color))
 
 
 @tag_bp.route("", methods=["GET"])
@@ -28,7 +47,7 @@ def list_tags() -> tuple[dict[str, Any], int]:
     user_id = current_user_id()
     tags = Tag.query.filter_by(user_id=user_id).order_by(Tag.name).all()
     data = {
-        "tags": [{"id": str(t.id), "name": t.name} for t in tags],
+        "tags": [_serialize_tag(t) for t in tags],
         "total": len(tags),
     }
     return compat_success_tuple(
@@ -62,11 +81,21 @@ def create_tag() -> tuple[dict[str, Any], int]:
             error_code="NAME_TOO_LONG",
         )
 
-    tag = Tag(user_id=user_id, name=name)
+    color = payload.get("color") or None
+    if not _validate_color(color):
+        return compat_error_tuple(
+            legacy_payload={"error": INVALID_COLOR_MESSAGE},
+            status_code=400,
+            message=INVALID_COLOR_MESSAGE,
+            error_code="INVALID_COLOR",
+        )
+    icon = payload.get("icon") or None
+
+    tag = Tag(user_id=user_id, name=name, color=color, icon=icon)
     db.session.add(tag)
     db.session.commit()
 
-    tag_data = {"id": str(tag.id), "name": tag.name}
+    tag_data = _serialize_tag(tag)
     return compat_success_tuple(
         legacy_payload={"message": "Tag criada com sucesso", "tag": tag_data},
         status_code=201,
@@ -106,10 +135,23 @@ def update_tag(tag_id: UUID) -> tuple[dict[str, Any], int]:
             error_code="NAME_TOO_LONG",
         )
 
+    color = payload.get("color") or None
+    if "color" in payload and not _validate_color(color):
+        return compat_error_tuple(
+            legacy_payload={"error": INVALID_COLOR_MESSAGE},
+            status_code=400,
+            message=INVALID_COLOR_MESSAGE,
+            error_code="INVALID_COLOR",
+        )
+
     tag.name = name
+    if "color" in payload:
+        tag.color = color
+    if "icon" in payload:
+        tag.icon = payload.get("icon") or None
     db.session.commit()
 
-    tag_data = {"id": str(tag.id), "name": tag.name}
+    tag_data = _serialize_tag(tag)
     return compat_success_tuple(
         legacy_payload={"message": "Tag atualizada com sucesso", "tag": tag_data},
         status_code=200,
