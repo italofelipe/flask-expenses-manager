@@ -18,6 +18,7 @@ from app.docs.openapi_helpers import (
     json_error_response,
     json_success_response,
 )
+from app.services.cache_service import DASHBOARD_CACHE_TTL, get_cache_service
 from app.utils.typed_decorators import typed_doc as doc
 from app.utils.typed_decorators import typed_jwt_required as jwt_required
 
@@ -107,13 +108,26 @@ class DashboardOverviewResource(MethodResource):
             return token_error
 
         user_uuid = current_user_id()
+        month = str(request.args.get("month", ""))
+        cache = get_cache_service()
+        cache_key = f"dashboard:overview:{user_uuid}:{month}"
+
+        cached = cache.get(cache_key)
+        if cached is not None:
+            resp = compat_success_response(
+                legacy_payload=cached["legacy"],
+                status_code=200,
+                message="Overview do dashboard calculado com sucesso",
+                data=cached["data"],
+            )
+            resp.headers["X-Cache"] = "HIT"
+            return resp
+
         dependencies = get_transaction_dependencies()
         query_service = dependencies.transaction_query_service_factory(user_uuid)
 
         try:
-            result = query_service.get_dashboard_overview(
-                month=str(request.args.get("month", ""))
-            )
+            result = query_service.get_dashboard_overview(month=month)
         except TransactionApplicationError as exc:
             return compat_error_response(
                 legacy_payload={"error": exc.message, "details": exc.details},
@@ -130,32 +144,37 @@ class DashboardOverviewResource(MethodResource):
                 error_code="INTERNAL_ERROR",
             )
 
-        return compat_success_response(
-            legacy_payload={
-                "month": result["month"],
+        legacy = {
+            "month": result["month"],
+            "income_total": result["income_total"],
+            "expense_total": result["expense_total"],
+            "balance": result["balance"],
+            "counts": result["counts"],
+            "top_expense_categories": result["top_expense_categories"],
+            "top_income_categories": result["top_income_categories"],
+        }
+        data = {
+            "month": result["month"],
+            "totals": {
                 "income_total": result["income_total"],
                 "expense_total": result["expense_total"],
                 "balance": result["balance"],
-                "counts": result["counts"],
-                "top_expense_categories": result["top_expense_categories"],
-                "top_income_categories": result["top_income_categories"],
             },
+            "counts": result["counts"],
+            "top_categories": {
+                "expense": result["top_expense_categories"],
+                "income": result["top_income_categories"],
+            },
+        }
+        cache.set(cache_key, {"legacy": legacy, "data": data}, ttl=DASHBOARD_CACHE_TTL)
+        resp = compat_success_response(
+            legacy_payload=legacy,
             status_code=200,
             message="Overview do dashboard calculado com sucesso",
-            data={
-                "month": result["month"],
-                "totals": {
-                    "income_total": result["income_total"],
-                    "expense_total": result["expense_total"],
-                    "balance": result["balance"],
-                },
-                "counts": result["counts"],
-                "top_categories": {
-                    "expense": result["top_expense_categories"],
-                    "income": result["top_income_categories"],
-                },
-            },
+            data=data,
         )
+        resp.headers["X-Cache"] = "MISS"
+        return resp
 
 
 __all__ = ["DashboardOverviewResource"]
