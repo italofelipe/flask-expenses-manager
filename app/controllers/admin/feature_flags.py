@@ -14,11 +14,15 @@ Endpoints
 
 from __future__ import annotations
 
+import re
+
 from flask import Blueprint, Response, jsonify, request
 
 from app.services.feature_flag_service import get_feature_flag_service
 
 admin_feature_flags_bp = Blueprint("admin_feature_flags", __name__)
+
+_FLAG_NAME_RE = re.compile(r"^[a-zA-Z0-9._-]{1,128}$")
 
 
 @admin_feature_flags_bp.get("/feature-flags")
@@ -33,6 +37,16 @@ def list_feature_flags() -> Response:
 @admin_feature_flags_bp.get("/feature-flags/<string:name>")
 def get_feature_flag(name: str) -> Response:
     """Return a single feature flag by name."""
+    if not _FLAG_NAME_RE.match(name):
+        response = jsonify(
+            {
+                "message": "Feature flag not found",
+                "success": False,
+                "error": {"code": "NOT_FOUND", "details": {}},
+            }
+        )
+        response.status_code = 404
+        return response
     svc = get_feature_flag_service()
     config = svc.get_flag(name)
     if config is None:
@@ -68,6 +82,20 @@ def create_or_update_feature_flag() -> Response:
                 "message": "Field 'name' is required and must be a non-empty string.",
                 "success": False,
                 "error": {"code": "VALIDATION_ERROR", "details": {"name": "required"}},
+            }
+        )
+        response.status_code = 422
+        return response
+
+    if not _FLAG_NAME_RE.match(name):
+        response = jsonify(
+            {
+                "message": "Field 'name' contains invalid characters.",
+                "success": False,
+                "error": {
+                    "code": "VALIDATION_ERROR",
+                    "details": {"name": "must match ^[a-zA-Z0-9._-]{1,128}$"},
+                },
             }
         )
         response.status_code = 422
@@ -119,6 +147,16 @@ def create_or_update_feature_flag() -> Response:
 @admin_feature_flags_bp.delete("/feature-flags/<string:name>")
 def delete_feature_flag(name: str) -> Response:
     """Delete a feature flag by name (immediate kill switch)."""
+    if not _FLAG_NAME_RE.match(name):
+        response = jsonify(
+            {
+                "message": "Feature flag not found",
+                "success": False,
+                "error": {"code": "NOT_FOUND", "details": {}},
+            }
+        )
+        response.status_code = 404
+        return response
     svc = get_feature_flag_service()
     svc.delete_flag(name)
     response = jsonify({"message": f"Flag '{name}' deleted.", "success": True})
