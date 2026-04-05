@@ -9,6 +9,8 @@ Covers:
 - DELETE /admin/feature-flags/<name> (success, invalid name)
 - Name validation regex
 - 403 Forbidden for non-admin users on all 4 endpoints
+- _is_admin() exception branch (returns False when get_active_auth_context raises)
+- User.__repr__
 """
 
 from __future__ import annotations
@@ -402,6 +404,112 @@ class TestDeleteFeatureFlag:
             resp = client.delete("/admin/feature-flags/flag%0Ainjected")
         assert resp.status_code in (404, 400)
         svc.delete_flag.assert_not_called()
+
+
+# ── _is_admin() exception branch ──────────────────────────────────────────────
+
+
+class TestIsAdminExceptionBranch:
+    """_is_admin() must return False (not raise) when get_active_auth_context raises."""
+
+    def test_is_admin_returns_false_on_exception(self, client) -> None:
+        """Lines 31-35: except Exception branch returns False, not 500."""
+        with patch(
+            "app.controllers.admin.feature_flags.get_active_auth_context",
+            side_effect=RuntimeError("no auth context"),
+        ):
+            resp = client.get("/admin/feature-flags")
+        assert resp.status_code == 403
+        body = resp.get_json()
+        assert body["error"]["code"] == "FORBIDDEN"
+
+    def test_is_admin_returns_false_on_attribute_error(self, client) -> None:
+        """_is_admin() catches any exception type, including AttributeError."""
+        with patch(
+            "app.controllers.admin.feature_flags.get_active_auth_context",
+            side_effect=AttributeError("roles missing"),
+        ):
+            resp = client.post(
+                "/admin/feature-flags",
+                json={"name": "tools.flag", "enabled": True},
+            )
+        assert resp.status_code == 403
+        body = resp.get_json()
+        assert body["success"] is False
+        assert body["error"]["code"] == "FORBIDDEN"
+
+    def test_is_admin_returns_false_when_roles_missing_admin(self, client) -> None:
+        """Line 33: return 'admin' in ctx.roles — covers the non-admin roles path."""
+        from app.auth.identity import AuthContext
+
+        ctx_no_admin = AuthContext(
+            subject="user-123",
+            email="user@example.com",
+            roles=("user",),
+            permissions=(),
+            jti=None,
+            issued_at=None,
+            expires_at=None,
+            raw_claims={},
+        )
+        svc = _make_svc_mock(list_result={})
+        with (
+            patch(
+                "app.controllers.admin.feature_flags.get_active_auth_context",
+                return_value=ctx_no_admin,
+            ),
+            patch(
+                "app.controllers.admin.feature_flags.get_feature_flag_service",
+                return_value=svc,
+            ),
+        ):
+            resp = client.get("/admin/feature-flags")
+        assert resp.status_code == 403
+        assert resp.get_json()["error"]["code"] == "FORBIDDEN"
+
+    def test_is_admin_returns_true_when_roles_contains_admin(self, client) -> None:
+        """Line 33: return 'admin' in ctx.roles — covers the admin=True path."""
+        from app.auth.identity import AuthContext
+
+        ctx_admin = AuthContext(
+            subject="admin-123",
+            email="admin@example.com",
+            roles=("admin", "user"),
+            permissions=(),
+            jti=None,
+            issued_at=None,
+            expires_at=None,
+            raw_claims={},
+        )
+        svc = _make_svc_mock(list_result={})
+        with (
+            patch(
+                "app.controllers.admin.feature_flags.get_active_auth_context",
+                return_value=ctx_admin,
+            ),
+            patch(
+                "app.controllers.admin.feature_flags.get_feature_flag_service",
+                return_value=svc,
+            ),
+        ):
+            resp = client.get("/admin/feature-flags")
+        assert resp.status_code == 200
+        assert resp.get_json()["count"] == 0
+
+
+# ── User.__repr__ ─────────────────────────────────────────────────────────────
+
+
+class TestUserRepr:
+    """app/models/user.py line 70: User.__repr__ must include the user name."""
+
+    def test_user_repr_contains_name(self, admin_app) -> None:
+        from app.models.user import User
+
+        with admin_app.app_context():
+            user = User()
+            user.name = "Alice"
+            assert "Alice" in repr(user)
 
 
 # ── Name validation regex ─────────────────────────────────────────────────────
