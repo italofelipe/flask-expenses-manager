@@ -182,7 +182,13 @@ def create_app(*, enable_http_runtime: bool = True) -> Flask:
         db_uri = str(app.config.get("SQLALCHEMY_DATABASE_URI", ""))
         if db_uri.startswith("sqlite"):
             app.config.setdefault("SQLALCHEMY_ENGINE_OPTIONS", {})
-            app.config["SQLALCHEMY_ENGINE_OPTIONS"].update({"poolclass": NullPool})
+            opts = app.config["SQLALCHEMY_ENGINE_OPTIONS"]
+            # NullPool is incompatible with pool-sizing options (pool_size,
+            # max_overflow, pool_timeout) — strip them before applying NullPool
+            # so that configs tuned for PostgreSQL don't break SQLite in tests.
+            for _k in ("pool_size", "max_overflow", "pool_timeout"):
+                opts.pop(_k, None)
+            opts["poolclass"] = NullPool
     validate_security_configuration()
 
     # Inicializa extensões

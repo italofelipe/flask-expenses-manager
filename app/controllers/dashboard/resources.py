@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import re
+
 from flask import Response, request
 from flask_apispec.views import MethodResource
 
@@ -21,6 +23,10 @@ from app.docs.openapi_helpers import (
 from app.services.cache_service import DASHBOARD_CACHE_TTL, get_cache_service
 from app.utils.typed_decorators import typed_doc as doc
 from app.utils.typed_decorators import typed_jwt_required as jwt_required
+
+# Month query-param must match YYYY-MM exactly; reject anything else to prevent
+# log-injection attacks (Sonar S5145 / CWE-117).
+_MONTH_RE = re.compile(r"^\d{4}-\d{2}$")
 
 
 class DashboardOverviewResource(MethodResource):
@@ -108,7 +114,9 @@ class DashboardOverviewResource(MethodResource):
             return token_error
 
         user_uuid = current_user_id()
-        month = str(request.args.get("month", ""))
+        month_raw = str(request.args.get("month", ""))
+        # Sanitise: only allow YYYY-MM to prevent log-injection (S5145)
+        month = month_raw if _MONTH_RE.match(month_raw) else ""
         cache = get_cache_service()
         cache_key = f"dashboard:overview:{user_uuid}:{month}"
 
