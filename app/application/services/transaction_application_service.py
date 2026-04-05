@@ -12,6 +12,7 @@ from sqlalchemy import case, func
 from app.extensions.database import db
 from app.models.credit_card import CreditCard
 from app.models.transaction import Transaction, TransactionStatus, TransactionType
+from app.services.cache_service import get_cache_service
 from app.services.transaction_analytics_service import TransactionAnalyticsService
 from app.services.transaction_reference_authorization_service import (
     TransactionReferenceAuthorizationError,
@@ -78,6 +79,10 @@ class TransactionApplicationService:
             user_id=user_id,
             analytics_service_factory=TransactionAnalyticsService,
         )
+
+    def _invalidate_dashboard_cache(self) -> None:
+        """Bust all dashboard overview cache entries for this user."""
+        get_cache_service().invalidate_pattern(f"dashboard:overview:{self._user_id}:*")
 
     def create_transaction(  # noqa: C901
         self,
@@ -194,6 +199,7 @@ class TransactionApplicationService:
             )
             db.session.add(transaction)
             db.session.commit()
+            self._invalidate_dashboard_cache()
         except TransactionApplicationError:
             raise
         except Exception:
@@ -274,6 +280,7 @@ class TransactionApplicationService:
         try:
             _apply_transaction_updates(transaction, normalized)
             db.session.commit()
+            self._invalidate_dashboard_cache()
         except Exception:
             db.session.rollback()
             raise
@@ -302,6 +309,7 @@ class TransactionApplicationService:
         try:
             transaction.deleted = True
             db.session.commit()
+            self._invalidate_dashboard_cache()
         except Exception:
             db.session.rollback()
             raise
