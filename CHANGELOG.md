@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.17.0](https://github.com/italofelipe/auraxis-api/compare/v1.16.1...v1.17.0) (2026-04-05)
+
+
+### Features
+
+* **ci:** H-CI-01 — staging deploy workflow + post-deploy smoke test ([#880](https://github.com/italofelipe/auraxis-api/issues/880)) ([97db2dd](https://github.com/italofelipe/auraxis-api/commit/97db2dd4cd3cbfe0aa0c206ad894fcac21a95247)), closes [#864](https://github.com/italofelipe/auraxis-api/issues/864)
+* **flags:** INFRA-FF — Redis-backed feature flags with canary % deploy ([#882](https://github.com/italofelipe/auraxis-api/issues/882)) ([8a3e8b8](https://github.com/italofelipe/auraxis-api/commit/8a3e8b8c2e46d1396d887d0d9c1d2bb2e6abfd97))
+
 ## [1.16.1](https://github.com/italofelipe/auraxis-api/compare/v1.16.0...v1.16.1) (2026-04-05)
 
 
