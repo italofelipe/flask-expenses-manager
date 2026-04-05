@@ -154,15 +154,77 @@ def test_credit_cards_crud_contract(client) -> None:
 
 
 def test_tags_crud_contract(client) -> None:
-    _exercise_named_crud_resource(
-        client,
-        auth_prefix="tags-crud",
-        base_path="/tags",
-        collection_key="tags",
-        entity_key="tag",
-        create_message="Tag criada com sucesso",
-        update_message="Tag atualizada com sucesso",
-        delete_message="Tag removida com sucesso",
-        not_found_message="Tag not found",
-        name_limit=50,
+    """Tag CRUD contract — accounts for 8 default seed tags created on registration."""
+    from uuid import uuid4 as _uuid4
+
+    token = _register_and_login(client, prefix="tags-crud")
+    headers = _auth_headers(token)
+
+    # Registration now seeds 8 default tags
+    initial = client.get("/tags", headers=headers)
+    assert initial.status_code == 200
+    initial_body = initial.get_json()
+    assert initial_body["success"] is True
+    seed_count = len(initial_body["data"]["tags"])
+    assert seed_count == 8
+    assert initial_body["data"]["total"] == 8
+
+    # Validation errors still work the same
+    missing_name = client.post("/tags", json={}, headers=headers)
+    assert missing_name.status_code == 400
+    assert missing_name.get_json()["error"]["code"] == "MISSING_NAME"
+
+    too_long_name = client.post("/tags", json={"name": "x" * 51}, headers=headers)
+    assert too_long_name.status_code == 400
+    assert too_long_name.get_json()["error"]["code"] == "NAME_TOO_LONG"
+
+    # Create a new tag
+    created = client.post("/tags", json={"name": "Principal"}, headers=headers)
+    assert created.status_code == 201
+    created_body = created.get_json()
+    assert created_body["message"] == "Tag criada com sucesso"
+    tag_id = created_body["data"]["tag"]["id"]
+
+    listed = client.get("/tags", headers=headers)
+    assert listed.status_code == 200
+    listed_body = listed.get_json()
+    assert listed_body["data"]["total"] == seed_count + 1
+
+    # Update
+    missing_update_name = client.put(f"/tags/{tag_id}", json={}, headers=headers)
+    assert missing_update_name.status_code == 400
+    assert missing_update_name.get_json()["error"]["code"] == "MISSING_NAME"
+
+    too_long_update_name = client.put(
+        f"/tags/{tag_id}", json={"name": "y" * 51}, headers=headers
     )
+    assert too_long_update_name.status_code == 400
+    assert too_long_update_name.get_json()["error"]["code"] == "NAME_TOO_LONG"
+
+    missing_id = str(_uuid4())
+    missing_update = client.put(
+        f"/tags/{missing_id}", json={"name": "Updated"}, headers=headers
+    )
+    assert missing_update.status_code == 404
+    assert missing_update.get_json()["message"] == "Tag not found"
+
+    updated = client.put(f"/tags/{tag_id}", json={"name": "Updated"}, headers=headers)
+    assert updated.status_code == 200
+    updated_body = updated.get_json()
+    assert updated_body["message"] == "Tag atualizada com sucesso"
+    assert updated_body["data"]["tag"]["name"] == "Updated"
+
+    # Delete
+    missing_delete = client.delete(f"/tags/{missing_id}", headers=headers)
+    assert missing_delete.status_code == 404
+    assert missing_delete.get_json()["message"] == "Tag not found"
+
+    deleted = client.delete(f"/tags/{tag_id}", headers=headers)
+    assert deleted.status_code == 200
+    assert deleted.get_json()["message"] == "Tag removida com sucesso"
+
+    # Back to seed count
+    final = client.get("/tags", headers=headers)
+    assert final.status_code == 200
+    final_body = final.get_json()
+    assert final_body["data"]["total"] == seed_count

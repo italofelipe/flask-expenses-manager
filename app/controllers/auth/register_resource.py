@@ -136,6 +136,11 @@ class RegisterResource(MethodResource):
             )
             db.session.add(trial_subscription)
 
+            # #890: seed default tags for the new user
+            from app.models.tag import seed_default_tags
+
+            seed_default_tags(user.id)
+
             db.session.commit()
 
             try:

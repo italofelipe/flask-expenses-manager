@@ -19,6 +19,22 @@ from .blueprint import account_bp
 MISSING_NAME_MESSAGE = "Field 'name' is required"
 NAME_TOO_LONG_MESSAGE = "Field 'name' must be at most 100 characters"
 ACCOUNT_NOT_FOUND_MESSAGE = "Account not found"
+ACCOUNT_TYPE_VALUES = ("checking", "savings", "investment", "wallet", "other")
+INVALID_ACCOUNT_TYPE_MESSAGE = (
+    "Field 'account_type' must be one of: checking, savings, investment, wallet, other"
+)
+
+
+def _serialize_account(a: Account) -> dict[str, Any]:
+    return {
+        "id": str(a.id),
+        "name": a.name,
+        "account_type": a.account_type or "checking",
+        "institution": a.institution,
+        "initial_balance": float(a.initial_balance)
+        if a.initial_balance is not None
+        else 0.0,
+    }
 
 
 @account_bp.route("", methods=["GET"])
@@ -28,7 +44,7 @@ def list_accounts() -> tuple[dict[str, Any], int]:
     user_id = current_user_id()
     accounts = Account.query.filter_by(user_id=user_id).order_by(Account.name).all()
     data = {
-        "accounts": [{"id": str(a.id), "name": a.name} for a in accounts],
+        "accounts": [_serialize_account(a) for a in accounts],
         "total": len(accounts),
     }
     return compat_success_tuple(
@@ -62,11 +78,34 @@ def create_account() -> tuple[dict[str, Any], int]:
             error_code="NAME_TOO_LONG",
         )
 
-    account = Account(user_id=user_id, name=name)
+    account_type = payload.get("account_type", "checking") or "checking"
+    if account_type not in ACCOUNT_TYPE_VALUES:
+        return compat_error_tuple(
+            legacy_payload={"error": INVALID_ACCOUNT_TYPE_MESSAGE},
+            status_code=400,
+            message=INVALID_ACCOUNT_TYPE_MESSAGE,
+            error_code="INVALID_ACCOUNT_TYPE",
+        )
+
+    institution = payload.get("institution") or None
+    try:
+        from decimal import Decimal
+
+        initial_balance = Decimal(str(payload.get("initial_balance", 0) or 0))
+    except Exception:
+        initial_balance = Decimal("0")
+
+    account = Account(
+        user_id=user_id,
+        name=name,
+        account_type=account_type,
+        institution=institution,
+        initial_balance=initial_balance,
+    )
     db.session.add(account)
     db.session.commit()
 
-    account_data = {"id": str(account.id), "name": account.name}
+    account_data = _serialize_account(account)
     return compat_success_tuple(
         legacy_payload={"message": "Conta criada com sucesso", "account": account_data},
         status_code=201,
@@ -106,10 +145,29 @@ def update_account(account_id: UUID) -> tuple[dict[str, Any], int]:
             error_code="NAME_TOO_LONG",
         )
 
+    account_type = payload.get("account_type", account.account_type) or "checking"
+    if account_type not in ACCOUNT_TYPE_VALUES:
+        return compat_error_tuple(
+            legacy_payload={"error": INVALID_ACCOUNT_TYPE_MESSAGE},
+            status_code=400,
+            message=INVALID_ACCOUNT_TYPE_MESSAGE,
+            error_code="INVALID_ACCOUNT_TYPE",
+        )
+
     account.name = name
+    account.account_type = account_type
+    if "institution" in payload:
+        account.institution = payload.get("institution") or None
+    if "initial_balance" in payload:
+        try:
+            from decimal import Decimal
+
+            account.initial_balance = Decimal(str(payload["initial_balance"] or 0))
+        except Exception:
+            pass
     db.session.commit()
 
-    account_data = {"id": str(account.id), "name": account.name}
+    account_data = _serialize_account(account)
     return compat_success_tuple(
         legacy_payload={
             "message": "Conta atualizada com sucesso",

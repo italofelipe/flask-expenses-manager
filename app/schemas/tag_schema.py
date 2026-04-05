@@ -1,4 +1,13 @@
-from marshmallow import Schema, fields, validate
+import re
+
+from marshmallow import Schema, ValidationError, fields, validate
+
+_HEX_COLOR_RE = re.compile(r"^#[0-9A-Fa-f]{6}$")
+
+
+def _validate_hex_color(value: str) -> None:
+    if value is not None and not _HEX_COLOR_RE.match(value):
+        raise ValidationError("Color must be a valid hex color code (e.g. #FF6B6B)")
 
 
 class TagSchema(Schema):
@@ -20,6 +29,24 @@ class TagSchema(Schema):
             "example": "Alimentação",
         },
     )
+    color = fields.Str(
+        required=False,
+        allow_none=True,
+        validate=_validate_hex_color,
+        metadata={
+            "description": "Cor da tag no formato hexadecimal",
+            "example": "#FF6B6B",
+        },
+    )
+    icon = fields.Str(
+        required=False,
+        allow_none=True,
+        validate=validate.Length(max=50),
+        metadata={
+            "description": "Ícone da tag (emoji ou chave de ícone)",
+            "example": "🍔",
+        },
+    )
 
 
 class TagResponseSchema(Schema):
@@ -28,6 +55,8 @@ class TagResponseSchema(Schema):
     id = fields.UUID(metadata={"description": "ID único da tag"})
     user_id = fields.UUID(metadata={"description": "ID do usuário"})
     name = fields.Str(metadata={"description": "Nome da tag"})
+    color = fields.Str(allow_none=True, metadata={"description": "Cor da tag"})
+    icon = fields.Str(allow_none=True, metadata={"description": "Ícone da tag"})
 
 
 class TagListSchema(Schema):

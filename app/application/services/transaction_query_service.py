@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import date
+from datetime import date, timedelta
 from typing import Any, Callable, TypedDict, cast
 from uuid import UUID
 
@@ -11,7 +11,7 @@ from app.application.services.transaction_application_service import (
     TransactionApplicationService,
 )
 from app.extensions.database import db
-from app.models.transaction import Transaction, TransactionType
+from app.models.transaction import Transaction, TransactionStatus, TransactionType
 from app.services.transaction_analytics_service import TransactionAnalyticsService
 from app.services.transaction_serialization import (
     TransactionPayload,
@@ -74,6 +74,18 @@ class TransactionDashboardResult(TypedDict):
     counts: TransactionDashboardCountsPayload
     top_expense_categories: list[TransactionDashboardCategoryPayload]
     top_income_categories: list[TransactionDashboardCategoryPayload]
+
+
+class TransactionTrendsMonthEntry(TypedDict):
+    month: str
+    income: float
+    expenses: float
+    balance: float
+
+
+class TransactionTrendsResult(TypedDict):
+    months: int
+    series: list[TransactionTrendsMonthEntry]
 
 
 class TransactionDueRangeResult(TypedDict):
@@ -170,6 +182,88 @@ class TransactionQueryService:
             TransactionDashboardResult,
             self._application_service().get_month_dashboard(month=month),
         )
+
+    def get_dashboard_trends(self, *, months: int) -> TransactionTrendsResult:
+        """Compute monthly income/expense/balance for the last N months.
+
+        Only months that have at least one paid transaction are included.
+        Results are ordered most-recent first.
+        """
+        today = date.today()
+        # Build the first day of each of the last `months` calendar months.
+        month_starts: list[date] = []
+        for i in range(months):
+            # Walk back month by month from current month
+            year = today.year
+            month = today.month - i
+            while month <= 0:
+                month += 12
+                year -= 1
+            month_starts.append(date(year, month, 1))
+
+        # Compute last-day of month helper
+        def _last_day(d: date) -> date:
+            next_month = d.replace(day=28) + timedelta(days=4)
+            return next_month.replace(day=1) - timedelta(days=1)
+
+        series: list[TransactionTrendsMonthEntry] = []
+        for ms in month_starts:
+            me = _last_day(ms)
+            month_label = ms.strftime("%Y-%m")
+
+            row = (
+                db.session.query(
+                    func.coalesce(
+                        func.sum(
+                            case(
+                                (
+                                    Transaction.type == TransactionType.INCOME,
+                                    Transaction.amount,
+                                ),
+                                else_=0,
+                            )
+                        ),
+                        0,
+                    ).label("income"),
+                    func.coalesce(
+                        func.sum(
+                            case(
+                                (
+                                    Transaction.type == TransactionType.EXPENSE,
+                                    Transaction.amount,
+                                ),
+                                else_=0,
+                            )
+                        ),
+                        0,
+                    ).label("expenses"),
+                    func.count(Transaction.id).label("tx_count"),
+                )
+                .filter(
+                    Transaction.user_id == self._user_id,
+                    Transaction.deleted.is_(False),
+                    Transaction.status == TransactionStatus.PAID,
+                    Transaction.due_date >= ms,
+                    Transaction.due_date <= me,
+                )
+                .one()
+            )
+
+            if int(row.tx_count or 0) == 0:
+                continue
+
+            income = float(row.income or 0)
+            expenses = float(row.expenses or 0)
+            series.append(
+                {
+                    "month": month_label,
+                    "income": income,
+                    "expenses": expenses,
+                    "balance": round(income - expenses, 2),
+                }
+            )
+
+        return {"months": months, "series": series}
 
     def get_due_transactions(
         self,
@@ -302,4 +396,6 @@ __all__ = [
     "TransactionQueryDependencies",
     "TransactionQueryService",
     "TransactionSummaryResult",
+    "TransactionTrendsMonthEntry",
+    "TransactionTrendsResult",
 ]
