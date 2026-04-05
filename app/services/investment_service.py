@@ -11,11 +11,17 @@ from requests.exceptions import RequestException
 
 from app.extensions.integration_metrics import increment_metric
 from app.http.runtime import runtime_logger
+from app.services.circuit_breaker import CircuitBreaker
 from config import Config
 
 
 class InvestmentService:
     _cache: dict[str, tuple[float, Any]] = {}
+    _circuit_breaker: CircuitBreaker = CircuitBreaker(
+        failure_threshold=3,
+        recovery_timeout=30.0,
+        name="brapi",
+    )
     _ticker_pattern = re.compile(r"^[A-Z0-9]{4,10}$")
 
     @staticmethod
@@ -47,6 +53,7 @@ class InvestmentService:
     @classmethod
     def _clear_cache_for_tests(cls) -> None:
         cls._cache.clear()
+        cls._circuit_breaker.reset()
 
     @staticmethod
     def _record_brapi_event(event: str, *, detail: str | None = None) -> None:
@@ -172,9 +179,17 @@ class InvestmentService:
         if cached_price is not None:
             return float(cached_price)
 
-        payload = InvestmentService._request_json(
-            f"https://brapi.dev/api/quote/{normalized_ticker}"
+        payload = InvestmentService._circuit_breaker.call(
+            InvestmentService._request_json,
+            f"https://brapi.dev/api/quote/{normalized_ticker}",
         )
+        if (
+            payload is None
+            and InvestmentService._circuit_breaker.state != CircuitBreaker.CLOSED
+        ):
+            InvestmentService._record_brapi_event(
+                "circuit_open", detail=normalized_ticker
+            )
         price = InvestmentService._extract_market_price(payload)
         if price is None:
             InvestmentService._record_brapi_event(
@@ -199,7 +214,8 @@ class InvestmentService:
         if cached is not None:
             return dict(cached)
 
-        payload = InvestmentService._request_json(
+        payload = InvestmentService._circuit_breaker.call(
+            InvestmentService._request_json,
             f"https://brapi.dev/api/quote/{normalized_ticker}",
             params={
                 "range": "5y",
