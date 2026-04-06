@@ -58,6 +58,10 @@ class User(db.Model):
     # Incremented atomically on subscription_status_changed events.
     entitlements_version = db.Column(db.Integer, nullable=False, default=0)
 
+    # LGPD — soft-delete / account erasure.
+    # When set, this account has been anonymised and must be treated as deleted.
+    deleted_at = db.Column(db.DateTime, nullable=True)
+
     tickers = db.relationship("UserTicker", back_populates="user")
     goals = db.relationship(
         "Goal",
