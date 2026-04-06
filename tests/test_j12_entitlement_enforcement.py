@@ -391,6 +391,148 @@ def test_plan_features_matrix_structure() -> None:
 
 
 # ---------------------------------------------------------------------------
+# Entitlement cache behaviour (HARD-05)
+# ---------------------------------------------------------------------------
+
+
+def test_has_entitlement_uses_cache_on_second_call(app, mocker) -> None:
+    """Second call to has_entitlement returns cached value without hitting the DB."""
+    from app.services import entitlement_service
+    from app.services.cache_service import ENTITLEMENT_CACHE_TTL, RedisCacheService
+
+    user_id = uuid.uuid4()
+    feature_key = "export_pdf"
+
+    # Mock a cache that initially returns None then returns the cached value
+    mock_cache = mocker.MagicMock(spec=RedisCacheService)
+    mock_cache.available = True
+    # First call: cache miss → DB hit
+    # Second call: cache hit → no DB hit
+    mock_cache.get.side_effect = [None, True]
+
+    mocker.patch.object(
+        entitlement_service, "get_cache_service", return_value=mock_cache
+    )
+
+    db_query_spy = mocker.patch(
+        "app.models.entitlement.Entitlement.query",
+        wraps=None,
+    )
+    # Simulate DB returning None (no entitlement)
+    filter_chain = mocker.MagicMock()
+    filter_chain.first.return_value = None
+    db_query_spy.filter_by.return_value = mocker.MagicMock(
+        filter=mocker.MagicMock(return_value=filter_chain)
+    )
+
+    with app.app_context():
+        # First call: cache miss
+        result1 = entitlement_service.has_entitlement(user_id, feature_key)
+        # Cache should have been set with False
+        mock_cache.set.assert_called_once_with(
+            f"entitlement:{user_id}:{feature_key}", False, ttl=ENTITLEMENT_CACHE_TTL
+        )
+        assert result1 is False
+
+        # Second call: cache hit (returns True from mock)
+        result2 = entitlement_service.has_entitlement(user_id, feature_key)
+        # DB should NOT have been called again
+        assert mock_cache.get.call_count == 2
+        assert result2 is True
+
+
+def test_grant_entitlement_invalidates_cache(app, mocker) -> None:
+    """grant_entitlement invalidates the entitlement cache for the user."""
+    from app.services import entitlement_service
+    from app.services.cache_service import RedisCacheService
+
+    mock_cache = mocker.MagicMock(spec=RedisCacheService)
+    mock_cache.available = True
+    mock_cache.get.return_value = None
+    mocker.patch.object(
+        entitlement_service, "get_cache_service", return_value=mock_cache
+    )
+
+    suffix = uuid.uuid4().hex[:6]
+    with app.app_context():
+        user = User(
+            name=f"j12-grant-cache-{suffix}",
+            email=f"j12-grant-cache-{suffix}@auraxis.test",
+            password="StrongPass@123",
+        )
+        db.session.add(user)
+        db.session.commit()
+
+        entitlement_service.grant_entitlement(user.id, "export_pdf", source="manual")
+        db.session.commit()
+
+        # invalidate_pattern should have been called with the user's pattern
+        mock_cache.invalidate_pattern.assert_called_with(f"entitlement:{user.id}:*")
+
+
+def test_revoke_entitlement_invalidates_cache(app, mocker) -> None:
+    """revoke_entitlement invalidates the entitlement cache for the user."""
+    from app.services import entitlement_service
+    from app.services.cache_service import RedisCacheService
+
+    mock_cache = mocker.MagicMock(spec=RedisCacheService)
+    mock_cache.available = True
+    mock_cache.get.return_value = None
+    mocker.patch.object(
+        entitlement_service, "get_cache_service", return_value=mock_cache
+    )
+
+    suffix = uuid.uuid4().hex[:6]
+    with app.app_context():
+        user = User(
+            name=f"j12-revoke-cache-{suffix}",
+            email=f"j12-revoke-cache-{suffix}@auraxis.test",
+            password="StrongPass@123",
+        )
+        db.session.add(user)
+        db.session.commit()
+
+        entitlement_service.revoke_entitlement(user.id, "export_pdf")
+        db.session.flush()
+
+        mock_cache.invalidate_pattern.assert_called_with(f"entitlement:{user.id}:*")
+
+
+def test_has_entitlement_falls_back_to_db_when_cache_unavailable(app, mocker) -> None:
+    """When Redis is down (no-op cache), has_entitlement falls through to the DB."""
+    from app.services import entitlement_service
+    from app.services.cache_service import _NoOpCacheService
+
+    noop_cache = _NoOpCacheService()
+    mocker.patch.object(
+        entitlement_service, "get_cache_service", return_value=noop_cache
+    )
+
+    suffix = uuid.uuid4().hex[:6]
+    with app.app_context():
+        user = User(
+            name=f"j12-noop-{suffix}",
+            email=f"j12-noop-{suffix}@auraxis.test",
+            password="StrongPass@123",
+        )
+        db.session.add(user)
+        db.session.commit()
+
+        ent = Entitlement(
+            user_id=user.id,
+            feature_key="wallet_read",
+            source=EntitlementSource.MANUAL,
+            expires_at=None,
+        )
+        db.session.add(ent)
+        db.session.commit()
+
+        # Even with no-op cache, result should come from DB
+        result = entitlement_service.has_entitlement(user.id, "wallet_read")
+        assert result is True
+
+
+# ---------------------------------------------------------------------------
 # Entitlement endpoints
 # ---------------------------------------------------------------------------
 
