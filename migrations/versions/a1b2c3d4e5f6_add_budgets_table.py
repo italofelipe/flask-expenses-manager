@@ -13,7 +13,7 @@ from alembic import op
 
 # revision identifiers, used by Alembic.
 revision = "a1b2c3d4e5f6"
-down_revision = "bloco2_color_icon_tags"
+down_revision = "b885_add_deleted_at_to_users"
 branch_labels = None
 depends_on = None
 
