@@ -121,6 +121,10 @@ exec gunicorn \
   --workers "${GUNICORN_WORKERS:-2}" \
   --threads "${GUNICORN_THREADS:-2}" \
   --timeout "${GUNICORN_TIMEOUT:-60}" \
+  --graceful-timeout "${GUNICORN_GRACEFUL_TIMEOUT:-10}" \
+  --max-requests "${GUNICORN_MAX_REQUESTS:-1000}" \
+  --max-requests-jitter "${GUNICORN_MAX_REQUESTS_JITTER:-100}" \
+  --log-level "${GUNICORN_LOG_LEVEL:-info}" \
   --access-logfile - \
   --error-logfile - \
   run:app
