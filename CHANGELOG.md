@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.19.0](https://github.com/italofelipe/auraxis-api/compare/v1.18.0...v1.19.0) (2026-04-06)
+
+
+### Features
+
+* **budget:** Budget model + CRUD endpoints + spent calculation ([#898](https://github.com/italofelipe/auraxis-api/issues/898)) ([39ce8f5](https://github.com/italofelipe/auraxis-api/commit/39ce8f53bf05518cd435c8d8ee36c718b3d42251))
+* **user:** LGPD-compliant account deletion (DELETE /user/me) ([#897](https://github.com/italofelipe/auraxis-api/issues/897)) ([a05304c](https://github.com/italofelipe/auraxis-api/commit/a05304c94635c9a7d3c8fc47cc04bd0e244f97a8))
+
 ## [1.18.0](https://github.com/italofelipe/auraxis-api/compare/v1.17.0...v1.18.0) (2026-04-05)
 
 
