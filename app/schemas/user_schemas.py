@@ -367,3 +367,16 @@ class SalaryIncreaseSimulationResponseSchema(Schema):
         as_string=True,
         metadata={"description": "Salário alvo calculado", "example": "5500.00"},
     )
+
+
+class DeleteAccountSchema(Schema):
+    """Schema para confirmação de exclusão de conta (LGPD)"""
+
+    password = fields.String(
+        required=True,
+        load_only=True,
+        metadata={
+            "description": "Senha atual do usuário para confirmar a exclusão da conta",
+            "example": "MinhaSenha@123",
+        },
+    )

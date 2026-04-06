@@ -1022,6 +1022,49 @@
               }
             }
           ]
+        },
+        {
+          "name": "20 - Delete account (REST v2)",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\"password\": \"{{userPassword}}\"}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/user/me",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "user",
+                "me"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('delete account status 200 or 401', function () { pm.expect(pm.response.code).to.be.oneOf([200, 401]); });"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
         }
       ]
     },
