@@ -1,5 +1,27 @@
 # Changelog
 
+## [1.19.0](https://github.com/italofelipe/auraxis-api/compare/v1.18.0...v1.19.0) (2026-04-06)
+
+
+### Features
+
+* **budget:** Budget model + CRUD endpoints + spent calculation ([#898](https://github.com/italofelipe/auraxis-api/issues/898)) ([39ce8f5](https://github.com/italofelipe/auraxis-api/commit/39ce8f53bf05518cd435c8d8ee36c718b3d42251))
+* **user:** LGPD-compliant account deletion (DELETE /user/me) ([#897](https://github.com/italofelipe/auraxis-api/issues/897)) ([a05304c](https://github.com/italofelipe/auraxis-api/commit/a05304c94635c9a7d3c8fc47cc04bd0e244f97a8))
+
+## [1.18.0](https://github.com/italofelipe/auraxis-api/compare/v1.17.0...v1.18.0) (2026-04-05)
+
+
+### Features
+
+* **bloco2:** dashboard trends + enriched Account/CreditCard + Tags color/icon ([#895](https://github.com/italofelipe/auraxis-api/issues/895)) ([dc276fe](https://github.com/italofelipe/auraxis-api/commit/dc276fe7041eed12433681aebd8e4ea3507a7fe0))
+
+
+### Bug Fixes
+
+* **security:** enforce admin role on feature flags admin endpoints ([#891](https://github.com/italofelipe/auraxis-api/issues/891)) ([1efedbe](https://github.com/italofelipe/auraxis-api/commit/1efedbe2dc1c5db503d57dba1f73a3cc4e8bce68))
+* **transactions:** PATCH accepts null for description, end_date and start_date ([#892](https://github.com/italofelipe/auraxis-api/issues/892)) ([36180b5](https://github.com/italofelipe/auraxis-api/commit/36180b5d4e7226b70ef737aee3602dbe90dd50c1)), closes [#846](https://github.com/italofelipe/auraxis-api/issues/846)
+* **transactions:** PATCH null fields for all contract versions (v1/v2/v3) ([#896](https://github.com/italofelipe/auraxis-api/issues/896)) ([ba594ce](https://github.com/italofelipe/auraxis-api/commit/ba594ce4c8453e04f41331bc8ef5df3cf0afa2cf))
+
 ## [1.17.0](https://github.com/italofelipe/auraxis-api/compare/v1.16.1...v1.17.0) (2026-04-05)
 
 
