@@ -1,8 +1,8 @@
-ruff==0.15.8
+ruff==0.15.9
 mypy==1.19.1
 pre-commit==4.5.1
 bandit==1.9.4
-cosmic-ray==8.4.4
+cosmic-ray==8.4.6
 pip-audit==2.9.0
 pydantic>=2.0
 schemathesis==3.39.16
