@@ -18,6 +18,7 @@ from app.controllers.admin.feature_flags import admin_feature_flags_bp
 from app.controllers.alert_controller import alert_bp, register_alert_dependencies
 from app.controllers.auth_controller import auth_bp, register_auth_dependencies
 from app.controllers.bank_statement import bank_statement_bp
+from app.controllers.budget import budget_bp
 from app.controllers.credit_card import credit_card_bp
 from app.controllers.dashboard import dashboard_bp
 from app.controllers.entitlement import (
@@ -61,6 +62,7 @@ from app.middleware.docs_access import register_docs_access_guard
 from app.middleware.security_headers import register_security_headers
 from app.models.account import Account  # noqa: F401
 from app.models.audit_event import AuditEvent  # noqa: F401
+from app.models.budget import Budget  # noqa: F401
 from app.models.credit_card import CreditCard  # noqa: F401
 from app.models.entitlement import Entitlement  # noqa: F401
 from app.models.fiscal import (  # noqa: F401
@@ -280,6 +282,7 @@ def create_app(*, enable_http_runtime: bool = True) -> Flask:
     app.register_blueprint(shared_entries_bp)
     app.register_blueprint(fiscal_bp)
     app.register_blueprint(tag_bp)
+    app.register_blueprint(budget_bp)
     app.register_blueprint(admin_feature_flags_bp, url_prefix="/admin")
 
     # Registra os endpoints documentados no Swagger com base no mapa real de rotas.

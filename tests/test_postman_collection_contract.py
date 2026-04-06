@@ -255,6 +255,7 @@ def test_postman_collection_uses_domain_folders() -> None:
         "09 - Tags, Accounts and Credit Cards",
         "10 - GraphQL",
         "11 - Observability",
+        "12 - Budgets",
     ]
 
 
