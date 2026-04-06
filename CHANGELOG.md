@@ -1,5 +1,17 @@
 # Changelog
 
+## [1.20.0](https://github.com/italofelipe/auraxis-api/compare/v1.19.0...v1.20.0) (2026-04-06)
+
+
+### Features
+
+* **cache:** entitlement + JWT revocation Redis cache [HARD-05, B22] ([#906](https://github.com/italofelipe/auraxis-api/issues/906)) ([6b96ca5](https://github.com/italofelipe/auraxis-api/commit/6b96ca53aeb34cceb3f6c7feff8927709197a426))
+
+
+### Bug Fixes
+
+* **infra:** nginx security headers + gunicorn hardening [HARD-02, HARD-03] ([#905](https://github.com/italofelipe/auraxis-api/issues/905)) ([f4282f8](https://github.com/italofelipe/auraxis-api/commit/f4282f8980ff53c36c6d07bd74035ba82af06e2d))
+
 ## [1.19.0](https://github.com/italofelipe/auraxis-api/compare/v1.18.0...v1.19.0) (2026-04-06)
 
 
