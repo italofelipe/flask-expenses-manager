@@ -10,12 +10,14 @@ TTLs
 * Dashboard overview  : 300 s  (5 min) — invalidated on any transaction write
 * BRAPI quotes        : 900 s  (15 min) — invalidated by TTL only
 * Portfolio valuation : 600 s  (10 min) — invalidated on investment operation
+* Entitlements        : 300 s  (5 min) — invalidated on grant/revoke/sync
 
 Key patterns
 ------------
 * ``dashboard:overview:{user_id}:{month}``
 * ``brapi:quote:{ticker}``
 * ``portfolio:valuation:{user_id}``
+* ``entitlement:{user_id}:{feature_key}``
 
 Usage
 -----
@@ -46,6 +48,7 @@ logger = logging.getLogger(__name__)
 DASHBOARD_CACHE_TTL = 300  # 5 minutes
 BRAPI_CACHE_TTL = 900  # 15 minutes
 PORTFOLIO_CACHE_TTL = 600  # 10 minutes
+ENTITLEMENT_CACHE_TTL = 300  # 5 minutes — invalidated on grant/revoke/sync
 
 
 # ── No-op fallback ────────────────────────────────────────────────────────────

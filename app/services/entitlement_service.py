@@ -27,9 +27,30 @@ from app.config.plan_features import PLAN_FEATURES
 from app.extensions.database import db
 from app.models.entitlement import Entitlement, EntitlementSource
 from app.models.subscription import Subscription, SubscriptionStatus
+from app.services.cache_service import ENTITLEMENT_CACHE_TTL, get_cache_service
 from app.utils.datetime_utils import utc_now_naive
 
 logger = logging.getLogger(__name__)
+
+_ENTITLEMENT_KEY_PREFIX = "entitlement"
+
+
+def _entitlement_cache_key(user_id: str | UUID, feature_key: str) -> str:
+    return f"{_ENTITLEMENT_KEY_PREFIX}:{user_id}:{feature_key}"
+
+
+def _entitlement_user_pattern(user_id: str | UUID) -> str:
+    return f"{_ENTITLEMENT_KEY_PREFIX}:{user_id}:*"
+
+
+def _invalidate_entitlement_cache(user_id: str | UUID) -> None:
+    """Invalidate all cached entitlement checks for *user_id*."""
+    try:
+        get_cache_service().invalidate_pattern(_entitlement_user_pattern(user_id))
+    except Exception:
+        logger.warning(
+            "entitlement_cache: invalidate_pattern failed for user_id=%s", user_id
+        )
 
 
 # ---------------------------------------------------------------------------
@@ -38,7 +59,20 @@ logger = logging.getLogger(__name__)
 
 
 def has_entitlement(user_id: str | UUID, feature_key: str) -> bool:
-    """Return True when *user_id* holds a non-expired entitlement for *feature_key*."""
+    """Return True when *user_id* holds a non-expired entitlement for *feature_key*.
+
+    Results are cached in Redis for ``ENTITLEMENT_CACHE_TTL`` seconds and
+    invalidated whenever an entitlement is granted, revoked, or synced.  When
+    Redis is unavailable the function falls through to the database query so
+    that a cache outage never incorrectly blocks a legitimate user.
+    """
+    cache = get_cache_service()
+    cache_key = _entitlement_cache_key(user_id, feature_key)
+
+    cached = cache.get(cache_key)
+    if cached is not None:
+        return bool(cached)
+
     now = utc_now_naive()
     ent = (
         Entitlement.query.filter_by(
@@ -48,7 +82,9 @@ def has_entitlement(user_id: str | UUID, feature_key: str) -> bool:
         .filter((Entitlement.expires_at.is_(None)) | (Entitlement.expires_at > now))
         .first()
     )
-    return ent is not None
+    result = ent is not None
+    cache.set(cache_key, result, ttl=ENTITLEMENT_CACHE_TTL)
+    return result
 
 
 # ---------------------------------------------------------------------------
@@ -130,6 +166,7 @@ def grant_entitlement(
         existing.expires_at = expires_at
         existing.granted_at = utc_now_naive()
         db.session.flush()
+        _invalidate_entitlement_cache(user_id)
         return cast(Entitlement, existing)
 
     ent = Entitlement(
@@ -140,6 +177,7 @@ def grant_entitlement(
     )
     db.session.add(ent)
     db.session.flush()
+    _invalidate_entitlement_cache(user_id)
     return ent
 
 
@@ -149,6 +187,7 @@ def revoke_entitlement(user_id: str | UUID, feature_key: str) -> None:
         synchronize_session="fetch"
     )
     db.session.flush()
+    _invalidate_entitlement_cache(user_id)
 
 
 # ---------------------------------------------------------------------------
@@ -240,6 +279,7 @@ def sync_entitlements_from_subscription(
             ent.source = source
 
     db.session.flush()
+    _invalidate_entitlement_cache(user_id)
 
     # Return full active list (managed + manual)
     return list(
@@ -281,6 +321,7 @@ def activate_premium(
             expires_at=expires_at,
         )
     db.session.commit()
+    _invalidate_entitlement_cache(user_id)
 
     now = utc_now_naive()
     return list(
@@ -301,6 +342,7 @@ def deactivate_premium(user_id: str | UUID) -> None:
     for feature_key in PREMIUM_FEATURES:
         revoke_entitlement(user_id, feature_key)
     db.session.commit()
+    _invalidate_entitlement_cache(user_id)
 
 
 def check_access(user_id: str | UUID, feature: str) -> bool:
