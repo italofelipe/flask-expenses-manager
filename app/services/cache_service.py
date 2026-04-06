@@ -93,22 +93,23 @@ class RedisCacheService:
             )
             return json.loads(decoded)
         except Exception:
-            logger.warning(
-                "cache_service: GET failed key=%s — cache miss", key, exc_info=True
-            )
+            # key is user-controlled — do not include in log output (S5145).
+            logger.warning("cache_service: GET failed — cache miss", exc_info=True)
             return None
 
     def set(self, key: str, value: Any, *, ttl: int) -> None:
         try:
             self._client.setex(key, ttl, json.dumps(value, default=str))
         except Exception:
-            logger.warning("cache_service: SET failed key=%s", key, exc_info=True)
+            # key is user-controlled — do not include in log output (S5145).
+            logger.warning("cache_service: SET failed", exc_info=True)
 
     def invalidate(self, key: str) -> None:
         try:
             self._client.delete(key)
         except Exception:
-            logger.warning("cache_service: DELETE failed key=%s", key, exc_info=True)
+            # key is user-controlled — do not include in log output (S5145).
+            logger.warning("cache_service: DELETE failed", exc_info=True)
 
     def invalidate_pattern(self, pattern: str) -> None:
         """Delete all keys matching a glob pattern (uses SCAN to avoid blocking)."""
@@ -121,11 +122,8 @@ class RedisCacheService:
                 if cursor == 0:
                     break
         except Exception:
-            logger.warning(
-                "cache_service: invalidate_pattern failed pattern=%s",
-                pattern,
-                exc_info=True,
-            )
+            # pattern is user-controlled — do not include in log output (S5145).
+            logger.warning("cache_service: invalidate_pattern failed", exc_info=True)
 
     @property
     def available(self) -> bool:
