@@ -31,34 +31,31 @@ def is_token_revoked(jti: str) -> bool:
         identity = current_user_id(optional=True)
         if identity is None:
             return True
-        cache = get_jwt_revocation_cache()
-        user_id_str = str(identity)
-        cached_jti = cache.get_current_jti(user_id_str)
-        if cached_jti is not None:
-            return cached_jti != jti
-        # Cache miss — fall through to DB.
         user = db.session.get(User, identity)
-        if not user:
-            return True
-        cache.set_current_jti(user_id_str, user.current_jti)
-        return bool(user.current_jti != jti)
+        return not user or user.current_jti != jti
     except InvalidAuthContextError:
         return True
 
 
 def _is_access_token_revoked(user_id: str, jti: str) -> bool:
-    """Check whether an access token is revoked (cache-first, DB fallback)."""
+    """Check access token revocation using Redis cache (DB fallback on miss)."""
     cache = get_jwt_revocation_cache()
     cached_jti = cache.get_current_jti(user_id)
     if cached_jti is not None:
         return cached_jti != jti
-
-    # Cache miss — query DB and populate cache.
     user = db.session.get(User, UUID(user_id))
     if not user:
         return True
     cache.set_current_jti(user_id, user.current_jti)
     return bool(user.current_jti != jti)
+
+
+def _is_refresh_token_revoked(user_id: str, jti: str) -> bool:
+    """Check refresh token revocation directly against the DB (not cached)."""
+    user = db.session.get(User, UUID(user_id))
+    if not user:
+        return True
+    return bool(user.refresh_token_jti != jti)
 
 
 def register_jwt_callbacks(jwt: JWTManager) -> None:
@@ -74,12 +71,7 @@ def register_jwt_callbacks(jwt: JWTManager) -> None:
             return True
 
         if token_type == "refresh":
-            # Refresh token check always goes to DB (replay attack guard).
-            user = db.session.get(User, UUID(user_id))
-            if not user:
-                return True
-            return bool(user.refresh_token_jti != jti)
-
+            return _is_refresh_token_revoked(user_id, jti)
         return _is_access_token_revoked(user_id, jti)
 
     @jwt.revoked_token_loader
