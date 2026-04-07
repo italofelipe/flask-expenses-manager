@@ -56,7 +56,8 @@ PREMIUM_MONTHLY_PLAN = BillingPlanOffer(
     tier="premium",
     display_name="Premium Mensal",
     description="Analises com IA, alertas e briefing semanal.",
-    price_cents=3990,
+    # DEC-168: R$27,90/mês — founder-confirmed 2026-04-05
+    price_cents=2790,
     billing_cycle=BillingCycle.MONTHLY,
     trial_days=7,
     highlighted=True,
@@ -69,7 +70,8 @@ PREMIUM_ANNUAL_PLAN = BillingPlanOffer(
     tier="premium",
     display_name="Premium Anual",
     description="Mesmo pacote premium com desconto anual.",
-    price_cents=35880,
+    # DEC-168: R$220,00/ano (equiv. R$18,33/mês) — founder-confirmed 2026-04-05
+    price_cents=22000,
     billing_cycle=BillingCycle.ANNUAL,
     trial_days=7,
     legacy_aliases=("pro_annual",),

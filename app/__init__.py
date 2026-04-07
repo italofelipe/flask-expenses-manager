@@ -56,6 +56,7 @@ from app.extensions.http_observability import register_http_observability
 from app.extensions.integration_metrics_cli import register_integration_metrics_commands
 from app.extensions.prometheus_metrics import register_prometheus_middleware
 from app.extensions.sentry import init_sentry
+from app.extensions.trial_expiry_cli import register_trial_expiry_cli
 from app.http.request_context import register_request_context_adapter
 from app.middleware.cors import register_cors
 from app.middleware.docs_access import register_docs_access_guard
@@ -255,6 +256,7 @@ def create_app(*, enable_http_runtime: bool = True) -> Flask:
         _register_http_runtime(app)
     register_audit_trail(app)
     register_audit_retention_commands(app)
+    register_trial_expiry_cli(app)
     register_integration_metrics_commands(app)
     app.cli.add_command(features_cli_group, "features")
     register_wallet_dependencies(app)
