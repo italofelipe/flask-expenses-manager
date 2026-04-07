@@ -427,11 +427,22 @@ if ! docker info >/dev/null 2>&1; then
   exit 24
 fi
 
-# Pre-flight: disk space (Docker build needs at least 5GB free)
+# Pre-flight: proactive Docker cleanup when disk is low.
+# Run BEFORE the hard 5GB check so there's a chance to reclaim space.
 DISK_FREE_GB=$(df / --output=avail -BG | tail -1 | tr -d 'G ')
+echo "[i6] disk: ${{DISK_FREE_GB}}GB free"
+if [ "${{DISK_FREE_GB}}" -lt 8 ]; then
+  echo "[i6] disk < 8GB — pruning Docker cache and stopped containers..."
+  docker system prune -f >/dev/null 2>&1 || true
+  docker builder prune --force >/dev/null 2>&1 || true
+  DISK_FREE_GB=$(df / --output=avail -BG | tail -1 | tr -d 'G ')
+  echo "[i6] disk after prune: ${{DISK_FREE_GB}}GB free"
+fi
+
+# Pre-flight: disk space hard floor (Docker build needs at least 5GB free)
 if [ "${{DISK_FREE_GB}}" -lt 5 ]; then
-  echo "[i6] ABORT: only ${{DISK_FREE_GB}}GB free. Need 5GB for Docker build."
-  echo "[i6] Fix: docker system prune -af && docker builder prune -af"
+  echo "[i6] ABORT: only ${{DISK_FREE_GB}}GB free even after pruning. Need 5GB for Docker build."
+  echo "[i6] Fix: ssh into EC2 and run: docker system prune -af --volumes"
   exit 25
 fi
 echo "[i6] disk OK: ${{DISK_FREE_GB}}GB free"
@@ -447,14 +458,6 @@ if [ "${{SWAP_TOTAL}}" -lt 512 ]; then
   mkswap /swapfile >/dev/null 2>&1 || true
   swapon /swapfile 2>/dev/null || true
   echo "[i6] swap: $(free -m | awk '/^Swap:/ {{print $2}}')MB"
-fi
-
-# Pre-flight: prune builder cache if disk < 8GB to reclaim space before build
-if [ "${{DISK_FREE_GB}}" -lt 8 ]; then
-  echo "[i6] disk < 8GB — pruning Docker builder cache..."
-  docker builder prune --force >/dev/null 2>&1 || true
-  DISK_FREE_GB=$(df / --output=avail -BG | tail -1 | tr -d 'G ')
-  echo "[i6] disk after prune: ${{DISK_FREE_GB}}GB free"
 fi
 
 ensure_env_default() {{
@@ -878,12 +881,27 @@ dump_compose_diagnostics() {{
 # Phase 1: Ensure infrastructure services are up (never force-recreate if healthy).
 # Restarting db/redis during a web-only deploy drops in-flight DB connections
 # and increases risk unnecessarily — keep them alive across deploys.
+# Only start services that are actually defined in the compose file — db may be
+# commented out when using RDS or a managed postgres host.
 echo "[i6] ensuring infrastructure services (db, redis)..."
-if ! docker compose --env-file "$ENV_FILE" -f docker-compose.prod.yml \\
-  up -d --no-recreate db redis; then
-  echo "[i6] failed to start infrastructure services"
-  dump_compose_diagnostics
-  exit 30
+_INFRA_UP=""
+for _svc in db redis; do
+  if docker compose --env-file "$ENV_FILE" -f docker-compose.prod.yml \\
+      config --services 2>/dev/null | grep -qx "${{_svc}}"; then
+    _INFRA_UP="${{_INFRA_UP}} ${{_svc}}"
+  fi
+done
+_INFRA_UP="${{_INFRA_UP# }}"
+if [ -n "${{_INFRA_UP}}" ]; then
+  if ! docker compose --env-file "$ENV_FILE" -f docker-compose.prod.yml \\
+    up -d --no-recreate ${{_INFRA_UP}}; then
+    echo "[i6] failed to start infrastructure services: ${{_INFRA_UP}}"
+    dump_compose_diagnostics
+    exit 30
+  fi
+  echo "[i6] infrastructure services started: ${{_INFRA_UP}}"
+else
+  echo "[i6] no local db/redis services in compose (RDS/managed-cache mode) — skipping Phase 1."
 fi
 
 # Phase 2: Wait for db to accept connections before starting web.
