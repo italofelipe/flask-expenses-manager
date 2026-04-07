@@ -172,7 +172,9 @@ class AsaasBillingProvider:
     """Real billing provider backed by Asaas hosted checkout and webhooks."""
 
     def __init__(self) -> None:
-        self._api_key = _env("BILLING_ASAAS_API_KEY")
+        # Accept both BILLING_ASAAS_API_KEY (canonical) and AURAXIS_ASAAS_API_KEY
+        # (platform-level alias set in auraxis-platform .env).
+        self._api_key = _env("BILLING_ASAAS_API_KEY") or _env("AURAXIS_ASAAS_API_KEY")
         self._base_url = _env("BILLING_ASAAS_BASE_URL", _DEFAULT_ASAAS_BASE_URL)
         self._session = requests.Session()
         self._session.headers.update(
@@ -186,7 +188,8 @@ class AsaasBillingProvider:
     def _ensure_enabled(self) -> None:
         if not self._api_key:
             raise BillingProviderError(
-                "BILLING_ASAAS_API_KEY is required when BILLING_PROVIDER=asaas"
+                "BILLING_ASAAS_API_KEY (or AURAXIS_ASAAS_API_KEY) is required "
+                "when BILLING_PROVIDER=asaas"
             )
 
     def _request(
@@ -323,7 +326,15 @@ class AsaasBillingProvider:
 
 
 def get_default_billing_provider() -> BillingProvider:
-    """Factory that returns the active billing provider."""
-    if _env("BILLING_PROVIDER", _STUB_PROVIDER).lower() == _ASAAS_PROVIDER:
+    """Factory that returns the active billing provider.
+
+    Reads ``BILLING_PROVIDER`` (canonical).  When unset, falls back to
+    ``AURAXIS_BILLING_PROVIDER`` so the platform-level ``.env`` can drive
+    the provider without duplicating config into each service env file.
+    """
+    provider_name = (
+        _env("BILLING_PROVIDER") or _env("AURAXIS_BILLING_PROVIDER") or _STUB_PROVIDER
+    ).lower()
+    if provider_name == _ASAAS_PROVIDER:
         return AsaasBillingProvider()
     return StubBillingProvider()
