@@ -72,10 +72,10 @@ jobs:
         run: |
           INPUT_REF="${{ inputs.git_ref }}"
           REF="${INPUT_REF}"
-          if [ "${{ github.event_name }}" = "push" ]; then
-            REF="origin/master"
-          elif [ -z "${REF}" ]; then
-            REF="origin/${GITHUB_REF_NAME}"
+          if [ -z "${REF}" ]; then
+            # Use absolute SHA — avoids stale origin/master on EC2 if git fetch
+            # fails to update remote tracking refs (root cause of 9cc86c9 regression).
+            REF="${{ github.sha }}"
           fi
           if [ -z "${REF}" ]; then
             echo "Unable to resolve deploy ref for DEV." >&2
@@ -221,7 +221,9 @@ jobs:
           INPUT_REF="${{ inputs.git_ref }}"
           REF="${INPUT_REF}"
           if [ -z "${REF}" ]; then
-            REF="origin/master"
+            # Use absolute SHA — avoids stale origin/master on EC2 if git fetch
+            # fails to update remote tracking refs (root cause of 9cc86c9 regression).
+            REF="${{ github.sha }}"
           fi
           if [ -z "${REF}" ]; then
             echo "Unable to resolve deploy ref for PROD." >&2
