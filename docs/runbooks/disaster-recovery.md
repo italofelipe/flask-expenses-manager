@@ -1,7 +1,7 @@
 # Disaster Recovery Runbook — Auraxis API
 
 > **Audience:** On-call engineer / platform owner
-> **Last updated:** 2026-04-05
+> **Last updated:** 2026-04-07
 > **Infra reference:** `.context/09_infra_map.md` (canonical AWS resource map)
 
 ---
@@ -21,7 +21,7 @@
 | Target | Value | Rationale |
 |:-------|:------|:----------|
 | **RTO** (Recovery Time Objective) | 4 hours | Single-person on-call; no SLA commitments in MVP phase |
-| **RPO** (Recovery Point Objective) | 24 hours | Daily S3 backup at 03:00 UTC via `scripts/backup-db-to-s3.sh` |
+| **RPO** (Recovery Point Objective) | 24 hours | Daily S3 backup at 05:00 UTC via GH Actions workflow `db-backup.yml` (SSM → `scripts/backup-db-to-s3.sh`) |
 
 > EBS snapshots via AWS Backup provide a secondary recovery point. Check AWS Console
 > → AWS Backup → Recovery Points for the most recent snapshot of `vol-07f0258e289bc680f`.

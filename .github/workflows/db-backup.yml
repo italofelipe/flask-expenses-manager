@@ -1,0 +1,234 @@
+name: DB Backup
+
+on:
+  schedule:
+    - cron: "0 5 * * *" # 05:00 UTC = 02:00 BRT, daily
+  workflow_dispatch:
+    inputs:
+      verify_only:
+        description: "Only verify the latest backup (skip backup run)"
+        type: boolean
+        default: false
+
+concurrency:
+  group: db-backup
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  backup:
+    name: PostgreSQL → S3
+    runs-on: ubuntu-latest
+    environment: prod
+    if: ${{ !inputs.verify_only }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Validate required variables
+        run: |
+          [ -n "${AWS_REGION:-}" ]            || { echo "Missing var AWS_REGION"; exit 1; }
+          [ -n "${AWS_ROLE_ARN_PROD:-}" ]     || { echo "Missing var AWS_ROLE_ARN_PROD"; exit 1; }
+          [ -n "${PROD_INSTANCE_ID:-}" ]      || { echo "Missing var AURAXIS_PROD_INSTANCE_ID"; exit 1; }
+        env:
+          AWS_REGION: ${{ vars.AWS_REGION }}
+          AWS_ROLE_ARN_PROD: ${{ vars.AWS_ROLE_ARN_PROD }}
+          PROD_INSTANCE_ID: ${{ vars.AURAXIS_PROD_INSTANCE_ID }}
+
+      - name: Configure AWS credentials (OIDC)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.AWS_ROLE_ARN_PROD }}
+          aws-region: ${{ vars.AWS_REGION }}
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+
+      - name: Trigger backup via SSM
+        id: trigger_backup
+        env:
+          AWS_REGION: ${{ vars.AWS_REGION }}
+          PROD_INSTANCE_ID: ${{ vars.AURAXIS_PROD_INSTANCE_ID }}
+        run: |
+          set -euo pipefail
+
+          COMMAND_ID=$(aws ssm send-command \
+            --region "${AWS_REGION}" \
+            --instance-ids "${PROD_INSTANCE_ID}" \
+            --document-name "AWS-RunShellScript" \
+            --comment "Auraxis daily DB backup (GH Actions run ${{ github.run_id }})" \
+            --parameters '{"commands":["cd /opt/auraxis && bash scripts/backup-db-to-s3.sh 2>&1"]}' \
+            --timeout-seconds 600 \
+            --query "Command.CommandId" \
+            --output text)
+
+          echo "command_id=${COMMAND_ID}" >> "$GITHUB_OUTPUT"
+          echo "SSM CommandId: ${COMMAND_ID}"
+
+      - name: Wait for backup to complete
+        id: wait_backup
+        env:
+          AWS_REGION: ${{ vars.AWS_REGION }}
+          PROD_INSTANCE_ID: ${{ vars.AURAXIS_PROD_INSTANCE_ID }}
+          COMMAND_ID: ${{ steps.trigger_backup.outputs.command_id }}
+        run: |
+          set -euo pipefail
+
+          MAX_WAIT=120  # 120 * 5s = 10 minutes
+          ATTEMPT=0
+
+          while [ "${ATTEMPT}" -lt "${MAX_WAIT}" ]; do
+            STATUS=$(aws ssm get-command-invocation \
+              --region "${AWS_REGION}" \
+              --command-id "${COMMAND_ID}" \
+              --instance-id "${PROD_INSTANCE_ID}" \
+              --query "Status" \
+              --output text 2>/dev/null || echo "Pending")
+
+            echo "Attempt ${ATTEMPT}/${MAX_WAIT} — Status: ${STATUS}"
+
+            case "${STATUS}" in
+              Success)
+                echo "status=success" >> "$GITHUB_OUTPUT"
+                # Capture output
+                aws ssm get-command-invocation \
+                  --region "${AWS_REGION}" \
+                  --command-id "${COMMAND_ID}" \
+                  --instance-id "${PROD_INSTANCE_ID}" \
+                  --query "StandardOutputContent" \
+                  --output text >> /tmp/backup_output.txt 2>&1 || true
+                echo "Backup succeeded."
+                cat /tmp/backup_output.txt || true
+                exit 0
+                ;;
+              Failed|Cancelled|TimedOut|DeliveryTimedOut|ExecutionTimedOut|Undeliverable|Terminated)
+                # Capture error output
+                aws ssm get-command-invocation \
+                  --region "${AWS_REGION}" \
+                  --command-id "${COMMAND_ID}" \
+                  --instance-id "${PROD_INSTANCE_ID}" \
+                  --query "StandardErrorContent" \
+                  --output text >> /tmp/backup_error.txt 2>&1 || true
+                echo "status=failed" >> "$GITHUB_OUTPUT"
+                echo "Backup FAILED with status: ${STATUS}"
+                cat /tmp/backup_error.txt || true
+                exit 1
+                ;;
+              *)
+                ATTEMPT=$((ATTEMPT + 1))
+                sleep 5
+                ;;
+            esac
+          done
+
+          echo "Timed out waiting for SSM command to complete." >&2
+          exit 1
+
+      - name: Verify backup in S3
+        id: verify_s3
+        env:
+          AWS_REGION: ${{ vars.AWS_REGION }}
+        run: |
+          set -euo pipefail
+
+          DATE=$(date -u +%Y-%m-%d)
+          S3_KEY="daily/${DATE}.sql.gz"
+          BUCKET="auraxis-db-backups"
+
+          echo "Checking s3://${BUCKET}/${S3_KEY} ..."
+
+          META=$(aws s3api head-object \
+            --region "${AWS_REGION}" \
+            --bucket "${BUCKET}" \
+            --key "${S3_KEY}" 2>/dev/null) || {
+            echo "ERROR: Backup file not found in S3 for date ${DATE}" >&2
+            exit 1
+          }
+
+          SIZE=$(echo "${META}" | python3 -c "import sys,json; print(json.load(sys.stdin).get('ContentLength',0))")
+          LAST_MOD=$(echo "${META}" | python3 -c "import sys,json; print(json.load(sys.stdin).get('LastModified','unknown'))")
+
+          if [ "${SIZE}" -lt 1000 ]; then
+            echo "ERROR: Backup file is suspiciously small (${SIZE} bytes)" >&2
+            exit 1
+          fi
+
+          echo "s3_key=${S3_KEY}" >> "$GITHUB_OUTPUT"
+          echo "s3_size=${SIZE}" >> "$GITHUB_OUTPUT"
+          echo "s3_last_modified=${LAST_MOD}" >> "$GITHUB_OUTPUT"
+          echo "S3 backup verified: ${SIZE} bytes, last modified ${LAST_MOD}"
+
+      - name: Backup summary
+        if: always()
+        env:
+          COMMAND_ID: ${{ steps.trigger_backup.outputs.command_id }}
+          S3_KEY: ${{ steps.verify_s3.outputs.s3_key }}
+          S3_SIZE: ${{ steps.verify_s3.outputs.s3_size }}
+          S3_LAST_MOD: ${{ steps.verify_s3.outputs.s3_last_modified }}
+          BACKUP_STATUS: ${{ steps.wait_backup.outputs.status }}
+        run: |
+          {
+            echo "## DB Backup Report"
+            echo ""
+            echo "| Field | Value |"
+            echo "|:------|:------|"
+            echo "| Date (UTC) | $(date -u +%Y-%m-%d) |"
+            echo "| Run ID | \`${{ github.run_id }}\` |"
+            echo "| SSM Command ID | \`${COMMAND_ID}\` |"
+            echo "| S3 Key | \`${S3_KEY}\` |"
+            echo "| S3 Size | ${S3_SIZE} bytes |"
+            echo "| Last Modified | ${S3_LAST_MOD} |"
+            echo "| Status | **${BACKUP_STATUS:-unknown}** |"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  verify-backup:
+    name: Verify Latest Backup
+    runs-on: ubuntu-latest
+    environment: prod
+    if: ${{ inputs.verify_only == true }}
+
+    steps:
+      - name: Configure AWS credentials (OIDC)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.AWS_ROLE_ARN_PROD }}
+          aws-region: ${{ vars.AWS_REGION }}
+
+      - name: Check latest backup age
+        env:
+          AWS_REGION: ${{ vars.AWS_REGION }}
+        run: |
+          set -euo pipefail
+
+          BUCKET="auraxis-db-backups"
+          LATEST=$(aws s3 ls "s3://${BUCKET}/daily/" \
+            --region "${AWS_REGION}" \
+            | sort | tail -n1 | awk '{print $4}')
+
+          if [ -z "${LATEST}" ]; then
+            echo "ERROR: No backups found in s3://${BUCKET}/daily/" >&2
+            exit 1
+          fi
+
+          echo "Latest backup: ${LATEST}"
+
+          # Check age — parse date from filename YYYY-MM-DD.sql.gz
+          BACKUP_DATE="${LATEST%.sql.gz}"
+          BACKUP_TS=$(date -d "${BACKUP_DATE}" +%s 2>/dev/null || date -j -f "%Y-%m-%d" "${BACKUP_DATE}" +%s 2>/dev/null)
+          NOW_TS=$(date +%s)
+          AGE_HOURS=$(( (NOW_TS - BACKUP_TS) / 3600 ))
+
+          echo "Backup date: ${BACKUP_DATE} | Age: ${AGE_HOURS} hours"
+
+          if [ "${AGE_HOURS}" -gt 25 ]; then
+            echo "WARNING: Latest backup is ${AGE_HOURS}h old (expected < 25h)" >&2
+            exit 1
+          fi
+
+          echo "Backup age is acceptable (${AGE_HOURS}h < 25h threshold)"

@@ -1,0 +1,160 @@
+name: TLS Cert Monitor
+
+on:
+  schedule:
+    - cron: "0 8 * * 1" # Monday 08:00 UTC
+  workflow_dispatch:
+    inputs:
+      warning_days:
+        description: "Warn if cert expires in fewer than N days"
+        type: number
+        default: 30
+      fail_days:
+        description: "Fail if cert expires in fewer than N days"
+        type: number
+        default: 14
+
+concurrency:
+  group: tls-cert-monitor
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  check-tls:
+    name: Check TLS Cert Expiry
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check cert expiry — api.auraxis.com.br
+        id: api_cert
+        env:
+          HOST: api.auraxis.com.br
+          PORT: "443"
+          WARN_DAYS: ${{ inputs.warning_days || 30 }}
+          FAIL_DAYS: ${{ inputs.fail_days || 14 }}
+        run: |
+          set -euo pipefail
+
+          echo "Checking TLS certificate for ${HOST}:${PORT}..."
+
+          # Retrieve cert expiry date
+          EXPIRY_RAW=$(echo | timeout 10 openssl s_client \
+            -connect "${HOST}:${PORT}" \
+            -servername "${HOST}" \
+            2>/dev/null \
+            | openssl x509 -noout -enddate 2>/dev/null \
+            | cut -d= -f2)
+
+          if [ -z "${EXPIRY_RAW}" ]; then
+            echo "ERROR: Could not retrieve TLS certificate from ${HOST}:${PORT}" >&2
+            exit 1
+          fi
+
+          echo "Raw expiry: ${EXPIRY_RAW}"
+
+          # Compute expiry timestamp and days remaining
+          EXPIRY_TS=$(date -d "${EXPIRY_RAW}" +%s 2>/dev/null \
+            || date -j -f "%b %d %T %Y %Z" "${EXPIRY_RAW}" +%s 2>/dev/null)
+          NOW_TS=$(date +%s)
+          DAYS_LEFT=$(( (EXPIRY_TS - NOW_TS) / 86400 ))
+
+          echo "host=${HOST}"         >> "$GITHUB_OUTPUT"
+          echo "expiry=${EXPIRY_RAW}" >> "$GITHUB_OUTPUT"
+          echo "days_left=${DAYS_LEFT}" >> "$GITHUB_OUTPUT"
+
+          echo ""
+          echo "Host       : ${HOST}"
+          echo "Expires    : ${EXPIRY_RAW}"
+          echo "Days left  : ${DAYS_LEFT}"
+          echo "Warn at    : ${WARN_DAYS} days"
+          echo "Fail at    : ${FAIL_DAYS} days"
+
+          if [ "${DAYS_LEFT}" -le "${FAIL_DAYS}" ]; then
+            echo ""
+            echo "CRITICAL: Certificate expires in ${DAYS_LEFT} days (threshold: ${FAIL_DAYS})" >&2
+            echo "ACTION REQUIRED: Run certbot renew on prod EC2 immediately." >&2
+            echo "cert_status=CRITICAL" >> "$GITHUB_OUTPUT"
+            exit 1
+          elif [ "${DAYS_LEFT}" -le "${WARN_DAYS}" ]; then
+            echo ""
+            echo "WARNING: Certificate expires in ${DAYS_LEFT} days (threshold: ${WARN_DAYS})"
+            echo "Monitor closely. Cron at '/etc/cron.d/auraxis-certbot-renew' should auto-renew."
+            echo "cert_status=WARNING" >> "$GITHUB_OUTPUT"
+            # Do not fail — warning only
+          else
+            echo ""
+            echo "OK: Certificate valid for ${DAYS_LEFT} more days."
+            echo "cert_status=OK" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Check cert expiry — app.auraxis.com.br
+        id: web_cert
+        env:
+          HOST: app.auraxis.com.br
+          PORT: "443"
+          WARN_DAYS: ${{ inputs.warning_days || 30 }}
+          FAIL_DAYS: ${{ inputs.fail_days || 14 }}
+        run: |
+          set -euo pipefail
+
+          echo "Checking TLS certificate for ${HOST}:${PORT}..."
+
+          EXPIRY_RAW=$(echo | timeout 10 openssl s_client \
+            -connect "${HOST}:${PORT}" \
+            -servername "${HOST}" \
+            2>/dev/null \
+            | openssl x509 -noout -enddate 2>/dev/null \
+            | cut -d= -f2)
+
+          if [ -z "${EXPIRY_RAW}" ]; then
+            echo "WARNING: Could not retrieve TLS cert from ${HOST} (CloudFront/ACM cert)"
+            echo "cert_status=SKIPPED" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          EXPIRY_TS=$(date -d "${EXPIRY_RAW}" +%s 2>/dev/null \
+            || date -j -f "%b %d %T %Y %Z" "${EXPIRY_RAW}" +%s 2>/dev/null)
+          NOW_TS=$(date +%s)
+          DAYS_LEFT=$(( (EXPIRY_TS - NOW_TS) / 86400 ))
+
+          echo "host=${HOST}"           >> "$GITHUB_OUTPUT"
+          echo "expiry=${EXPIRY_RAW}"   >> "$GITHUB_OUTPUT"
+          echo "days_left=${DAYS_LEFT}" >> "$GITHUB_OUTPUT"
+
+          echo "Host: ${HOST} | Expires: ${EXPIRY_RAW} | Days left: ${DAYS_LEFT}"
+
+          if [ "${DAYS_LEFT}" -le "${FAIL_DAYS}" ]; then
+            echo "cert_status=CRITICAL" >> "$GITHUB_OUTPUT"
+            echo "CRITICAL: ACM cert expiring in ${DAYS_LEFT} days" >&2
+            exit 1
+          elif [ "${DAYS_LEFT}" -le "${WARN_DAYS}" ]; then
+            echo "cert_status=WARNING" >> "$GITHUB_OUTPUT"
+          else
+            echo "cert_status=OK" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: TLS summary
+        if: always()
+        env:
+          API_HOST: ${{ steps.api_cert.outputs.host }}
+          API_EXPIRY: ${{ steps.api_cert.outputs.expiry }}
+          API_DAYS: ${{ steps.api_cert.outputs.days_left }}
+          API_STATUS: ${{ steps.api_cert.outputs.cert_status }}
+          WEB_HOST: ${{ steps.web_cert.outputs.host }}
+          WEB_EXPIRY: ${{ steps.web_cert.outputs.expiry }}
+          WEB_DAYS: ${{ steps.web_cert.outputs.days_left }}
+          WEB_STATUS: ${{ steps.web_cert.outputs.cert_status }}
+        run: |
+          {
+            echo "## TLS Certificate Monitor"
+            echo ""
+            echo "| Host | Expiry | Days Left | Status |"
+            echo "|:-----|:-------|:---------:|:------:|"
+            echo "| \`${API_HOST}\` | ${API_EXPIRY} | ${API_DAYS} | **${API_STATUS}** |"
+            echo "| \`${WEB_HOST:-app.auraxis.com.br}\` | ${WEB_EXPIRY:-ACM managed} | ${WEB_DAYS:---} | **${WEB_STATUS:-SKIPPED}** |"
+            echo ""
+            echo "> Cron renewal: \`/etc/cron.d/auraxis-certbot-renew\` (1st and 15th, 03:00 UTC)"
+            echo "> Manual renewal: \`bash scripts/renew_tls_cert.sh\` via SSM on prod EC2"
+          } >> "$GITHUB_STEP_SUMMARY"

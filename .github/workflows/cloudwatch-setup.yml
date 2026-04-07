@@ -1,0 +1,146 @@
+name: CloudWatch Alarms Setup
+
+# Idempotent — safe to run multiple times.
+# Creates/updates CloudWatch alarms and dashboard for API prod.
+# Uses the existing scripts/aws_api_observability_obs2.py script.
+
+on:
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: "Dry run (print changes, do not apply)"
+        type: boolean
+        default: false
+  schedule:
+    - cron: "0 6 * * 1" # Monday 06:00 UTC — weekly drift check
+
+concurrency:
+  group: cloudwatch-setup
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  setup-alarms:
+    name: Apply CloudWatch Alarms & Dashboard
+    runs-on: ubuntu-latest
+    environment: prod
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials (OIDC)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.AWS_ROLE_ARN_PROD }}
+          aws-region: ${{ vars.AWS_REGION }}
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+          cache: pip
+          cache-dependency-path: requirements.txt
+
+      - name: Install dependencies
+        run: pip install boto3 2>/dev/null || pip install boto3 --quiet
+
+      - name: Apply observability baseline (OBS-02)
+        id: obs
+        env:
+          AWS_REGION: ${{ vars.AWS_REGION }}
+          PROD_INSTANCE_ID: ${{ vars.AURAXIS_PROD_INSTANCE_ID }}
+          DEV_INSTANCE_ID: ${{ vars.AURAXIS_DEV_INSTANCE_ID }}
+          DRY_RUN: ${{ inputs.dry_run || false }}
+        run: |
+          set -euo pipefail
+
+          DRY_FLAG=""
+          if [ "${DRY_RUN}" = "true" ]; then
+            DRY_FLAG="--dry-run"
+          fi
+
+          python scripts/aws_api_observability_obs2.py \
+            --profile "" \
+            --region "${AWS_REGION}" \
+            --prod-instance-id "${PROD_INSTANCE_ID}" \
+            --dev-instance-id "${DEV_INSTANCE_ID}" \
+            ${DRY_FLAG} \
+            2>&1 | tee /tmp/obs_output.txt
+
+          echo "exit_code=$?" >> "$GITHUB_OUTPUT"
+
+      - name: Verify critical alarms exist
+        id: verify_alarms
+        env:
+          AWS_REGION: ${{ vars.AWS_REGION }}
+        run: |
+          set -euo pipefail
+
+          MISSING=0
+          FOUND=0
+
+          # These are the minimum alarms we expect to exist
+          EXPECTED_ALARMS=(
+            "auraxis-api-cpu-prod"
+            "auraxis-billing-webhook-invalid-signature-prod"
+          )
+
+          for ALARM in "${EXPECTED_ALARMS[@]}"; do
+            STATE=$(aws cloudwatch describe-alarms \
+              --region "${AWS_REGION}" \
+              --alarm-names "${ALARM}" \
+              --query "MetricAlarms[0].StateValue" \
+              --output text 2>/dev/null || echo "MISSING")
+
+            if [ "${STATE}" = "MISSING" ] || [ "${STATE}" = "None" ]; then
+              echo "MISSING alarm: ${ALARM}" >&2
+              MISSING=$((MISSING + 1))
+            else
+              echo "OK alarm: ${ALARM} (state: ${STATE})"
+              FOUND=$((FOUND + 1))
+            fi
+          done
+
+          echo "alarms_found=${FOUND}" >> "$GITHUB_OUTPUT"
+          echo "alarms_missing=${MISSING}" >> "$GITHUB_OUTPUT"
+
+          if [ "${MISSING}" -gt 0 ]; then
+            echo "WARNING: ${MISSING} expected alarm(s) not found." >&2
+            # Non-fatal — first run may need AWS infrastructure setup
+          fi
+
+      - name: CloudWatch summary
+        if: always()
+        env:
+          DRY_RUN: ${{ inputs.dry_run || false }}
+          ALARMS_FOUND: ${{ steps.verify_alarms.outputs.alarms_found }}
+          ALARMS_MISSING: ${{ steps.verify_alarms.outputs.alarms_missing }}
+        run: |
+          {
+            echo "## CloudWatch Alarms Setup"
+            echo ""
+            echo "| Field | Value |"
+            echo "|:------|:------|"
+            echo "| Dry run | ${DRY_RUN} |"
+            echo "| Alarms verified | ${ALARMS_FOUND} |"
+            echo "| Alarms missing | ${ALARMS_MISSING} |"
+            echo "| Region | \`${{ vars.AWS_REGION }}\` |"
+            echo "| Prod instance | \`${{ vars.AURAXIS_PROD_INSTANCE_ID }}\` |"
+            echo ""
+            echo "### Monitored Signals"
+            echo "- CPU utilization (EC2 prod/dev)"
+            echo "- Billing webhook invalid signatures (log-derived metric)"
+            echo "- CloudWatch dashboard: \`Auraxis-API-Operations\`"
+            echo ""
+            echo "### Next Steps"
+            if [ "${ALARMS_MISSING:-0}" -gt 0 ]; then
+              echo "- ⚠️ Run without dry-run to create missing alarms"
+              echo "- Ensure IAM role has \`cloudwatch:PutMetricAlarm\` and \`cloudwatch:PutDashboard\`"
+            else
+              echo "- ✅ All expected alarms present"
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
