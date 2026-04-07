@@ -139,13 +139,35 @@ class RateLimiterService:
         self.fail_closed = settings.fail_closed
         self.backend_failure_reason = backend_failure_reason
         self._route_rule_order: tuple[tuple[str, str], ...] = (
+            # ── strict auth tier (IP-keyed) ──────────────────────────────
             ("/auth/refresh", "token_refresh"),
             ("/auth/login", "auth"),
             ("/auth/register", "auth"),
             ("/auth/password", "auth"),
+            # ── GraphQL (user/IP-keyed) ──────────────────────────────────
             ("/graphql", "graphql"),
+            # ── high-volume CRUD tiers (user/IP-keyed) ───────────────────
             ("/transactions", "transactions"),
             ("/wallet", "wallet"),
+            # ── read-heavy endpoints: 120 req/window (user/IP-keyed) ─────
+            # Explicit tier prevents accidental fall-through to the very
+            # lenient `default` (300 req/window) rule.
+            ("/dashboard", "read"),
+            ("/goals", "read"),
+            ("/alerts", "read"),
+            ("/budget", "read"),
+            ("/income", "read"),
+            ("/portfolio", "read"),
+            ("/shared-entries", "read"),
+            ("/simulation", "read"),
+            # ── settings-like endpoints: 60 req/window (user/IP-keyed) ───
+            # Low-churn resources where bursts beyond 60 req/min indicate
+            # scraping or abuse rather than normal usage.
+            ("/account", "settings"),
+            ("/credit-card", "settings"),
+            ("/tag", "settings"),
+            ("/user", "settings"),
+            ("/investor-profile", "settings"),
         )
 
     @classmethod
@@ -189,6 +211,26 @@ class RateLimiterService:
                 limit=_read_int_env("RATE_LIMIT_WALLET_LIMIT", 180),
                 window_seconds=_read_int_env(
                     "RATE_LIMIT_WALLET_WINDOW_SECONDS", default_window
+                ),
+                key_scope=KEY_SCOPE_USER_OR_IP,
+            ),
+            # read-heavy endpoints: dashboard, goals, alerts, budget, etc.
+            # 120 req/window — same cadence as GraphQL, user/IP-keyed.
+            "read": RateLimitRule(
+                name="read",
+                limit=_read_int_env("RATE_LIMIT_READ_LIMIT", 120),
+                window_seconds=_read_int_env(
+                    "RATE_LIMIT_READ_WINDOW_SECONDS", default_window
+                ),
+                key_scope=KEY_SCOPE_USER_OR_IP,
+            ),
+            # settings-like endpoints: account, credit-card, tag, user, etc.
+            # 60 req/window — low-churn resources; bursts signal abuse.
+            "settings": RateLimitRule(
+                name="settings",
+                limit=_read_int_env("RATE_LIMIT_SETTINGS_LIMIT", 60),
+                window_seconds=_read_int_env(
+                    "RATE_LIMIT_SETTINGS_WINDOW_SECONDS", default_window
                 ),
                 key_scope=KEY_SCOPE_USER_OR_IP,
             ),

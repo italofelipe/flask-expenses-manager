@@ -8,6 +8,7 @@ from uuid import UUID
 
 from marshmallow import ValidationError
 from sqlalchemy import extract, func
+from sqlalchemy.orm import joinedload
 
 from app.extensions.database import db
 from app.models.budget import Budget
@@ -49,7 +50,12 @@ class BudgetService:
         return budget
 
     def list_budgets(self, *, active_only: bool = True) -> list[Budget]:
-        query = Budget.query.filter_by(user_id=self.user_id)
+        # joinedload(Budget.tag) prevents N+1: serialize() accesses budget.tag.name
+        # and budget.tag.color for every budget in the list, so we load the
+        # relationship eagerly in a single JOIN instead of one query per budget.
+        query = Budget.query.options(joinedload(Budget.tag)).filter_by(  # type: ignore[arg-type]
+            user_id=self.user_id
+        )
         if active_only:
             query = query.filter_by(is_active=True)
         return cast(list[Budget], query.order_by(Budget.created_at.desc()).all())

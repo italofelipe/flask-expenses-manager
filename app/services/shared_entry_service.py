@@ -74,8 +74,15 @@ def revoke_share(shared_entry_id: UUID, owner_id: UUID) -> SharedEntry:
 
 def list_shared_by_me(owner_id: UUID) -> list[SharedEntry]:
     """Return all shared entries owned by the given user."""
+    # selectinload(SharedEntry.invitations) prevents N+1: the serializer
+    # iterates entry.invitations for every entry in the list.
+    # selectinload is preferred over joinedload for one-to-many collections
+    # to avoid row-multiplication in the result set.
+    from sqlalchemy.orm import selectinload
+
     return list(
-        SharedEntry.query.filter_by(owner_id=owner_id)
+        SharedEntry.query.options(selectinload(SharedEntry.invitations))  # type: ignore[arg-type]
+        .filter_by(owner_id=owner_id)
         .order_by(SharedEntry.created_at.desc())
         .all()
     )
@@ -98,8 +105,11 @@ def list_shared_with_me(user_id: UUID) -> list[SharedEntry]:
         )
         .scalar_subquery()
     )
+    from sqlalchemy.orm import selectinload
+
     return list(
-        SharedEntry.query.filter(SharedEntry.id.in_(subquery))
+        SharedEntry.query.options(selectinload(SharedEntry.invitations))  # type: ignore[arg-type]
+        .filter(SharedEntry.id.in_(subquery))
         .order_by(SharedEntry.created_at.desc())
         .all()
     )
