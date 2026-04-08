@@ -4,7 +4,7 @@ import secrets
 from typing import Any
 from uuid import UUID
 
-from flask import Response
+from flask import Response, current_app
 from flask_apispec.views import MethodResource
 from werkzeug.security import generate_password_hash
 
@@ -20,6 +20,8 @@ from app.docs.openapi_helpers import (
 from app.extensions.database import db
 from app.models.user import User
 from app.schemas.user_schemas import DeleteAccountSchema
+from app.services.email_provider import EmailMessage, get_default_email_provider
+from app.services.email_templates import render_account_deletion_email
 from app.utils.datetime_utils import utc_now_naive
 from app.utils.typed_decorators import typed_doc as doc
 from app.utils.typed_decorators import typed_jwt_required as jwt_required
@@ -138,8 +140,29 @@ class DeleteMeResource(MethodResource):
                 error_code="INVALID_CREDENTIALS",
             )
 
+        # Capture the real email address before PII erasure.
+        original_email = user.email
+
         _anonymise_user(user)
         db.session.commit()
+
+        # Send deletion confirmation — best-effort; never block the response.
+        try:
+            html, text = render_account_deletion_email()
+            get_default_email_provider().send(
+                EmailMessage(
+                    to_email=original_email,
+                    subject="Sua conta Auraxis foi excluída",
+                    html=html,
+                    text=text,
+                    tag="account_deletion",
+                )
+            )
+        except Exception:
+            current_app.logger.exception(
+                "account_deletion: failed to dispatch confirmation email to %s",
+                original_email,
+            )
 
         return compat_success(
             legacy_payload={"message": "Account deleted.", "success": True},
