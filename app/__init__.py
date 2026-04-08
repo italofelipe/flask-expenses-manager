@@ -50,6 +50,7 @@ from app.docs.api_documentation import API_INFO, TAGS
 from app.docs.schema_name_resolver import resolve_openapi_schema_name
 from app.extensions.audit_retention_cli import register_audit_retention_commands
 from app.extensions.audit_trail import register_audit_trail
+from app.extensions.billing_webhooks_cli import register_billing_webhooks_commands
 from app.extensions.database import db
 from app.extensions.error_handlers import register_error_handlers
 from app.extensions.http_observability import register_http_observability
@@ -79,6 +80,7 @@ from app.models.sharing_audit import SharingAuditEvent  # noqa: F401
 from app.models.simulation import Simulation  # noqa: F401
 from app.models.subscription import Subscription  # noqa: F401
 from app.models.tag import Tag  # noqa: F401
+from app.models.webhook_event import WebhookEvent  # noqa: F401
 
 jwt = JWTManager()
 ma = Marshmallow()
@@ -258,6 +260,7 @@ def create_app(*, enable_http_runtime: bool = True) -> Flask:
     register_audit_retention_commands(app)
     register_trial_expiry_cli(app)
     register_integration_metrics_commands(app)
+    register_billing_webhooks_commands(app)
     app.cli.add_command(features_cli_group, "features")
     register_wallet_dependencies(app)
     register_entitlement_dependencies(app)

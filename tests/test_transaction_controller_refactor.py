@@ -177,7 +177,7 @@ def test_transaction_expenses_masks_unexpected_value_error(client, monkeypatch) 
         raise ValueError("sqlalchemy internal failure: select * from users")
 
     monkeypatch.setattr(
-        "app.controllers.transaction.report_resources._resolve_transaction_ordering",
+        "app.controllers.transaction.analytics_resources._resolve_transaction_ordering",
         _raise_unexpected_value_error,
     )
 

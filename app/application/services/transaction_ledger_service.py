@@ -10,19 +10,50 @@ This module is the canonical owner of:
 - list (active + due)
 - payload normalization and validation helpers
 - ``TransactionApplicationError`` (re-exported for back-compat)
+
+Domain helpers are split across sub-modules to keep each file under 600 lines:
+- ``transaction.errors``      — ``TransactionApplicationError``
+- ``transaction.validators``  — validators and normalisation helpers
+- ``transaction.query_helpers``— ordering, update, serialisation, month helpers
 """
 
 from __future__ import annotations
 
-from dataclasses import dataclass
 from datetime import date, datetime
-from decimal import Decimal, InvalidOperation
 from typing import Any, Callable, cast
 from uuid import UUID, uuid4
 
 from dateutil.relativedelta import relativedelta
-from sqlalchemy import case, func
 
+from app.application.services.transaction.errors import (
+    TransactionApplicationError as TransactionApplicationError,  # re-export
+)
+from app.application.services.transaction.query_helpers import (
+    _apply_transaction_updates,
+    _resolve_due_ordering,
+)
+from app.application.services.transaction.query_helpers import (
+    _resolve_month_summary_page as _resolve_month_summary_page,  # re-export
+)
+from app.application.services.transaction.query_helpers import (
+    _serialize_transaction as _serialize_transaction,  # re-export
+)
+from app.application.services.transaction.validators import (
+    _START_END_DATE_ORDER_MESSAGE,
+    _START_END_DATE_REQUIRED_MESSAGE,
+    _normalize_installment_count,
+    _validate_recurring_payload,
+    _validation_error,
+    coerce_date,
+    coerce_datetime,
+    normalize_currency,
+    normalize_decimal_amount,
+    normalize_transaction_status,
+    normalize_transaction_type,
+)
+from app.application.services.transaction.validators import (
+    _parse_month as _parse_month,  # re-export
+)
 from app.extensions.database import db
 from app.models.credit_card import CreditCard
 from app.models.transaction import Transaction, TransactionStatus, TransactionType
@@ -32,57 +63,14 @@ from app.services.transaction_reference_authorization_service import (
     TransactionReferenceAuthorizationError,
     enforce_transaction_reference_ownership,
 )
-from app.services.transaction_serialization import (
-    TransactionPayload,
-    serialize_transaction_payload,
-)
+from app.services.transaction_serialization import TransactionPayload
 from app.utils.datetime_utils import utc_now_compatible_with
 
 # ---------------------------------------------------------------------------
 # Constants
 # ---------------------------------------------------------------------------
 
-_MUTABLE_TRANSACTION_FIELDS = frozenset(
-    {
-        "title",
-        "description",
-        "observation",
-        "is_recurring",
-        "is_installment",
-        "installment_count",
-        "amount",
-        "currency",
-        "status",
-        "type",
-        "due_date",
-        "start_date",
-        "end_date",
-        "tag_id",
-        "account_id",
-        "credit_card_id",
-        "paid_at",
-    }
-)
 _TRANSACTION_NOT_FOUND_MESSAGE = "Transação não encontrada."
-_START_END_DATE_REQUIRED_MESSAGE = (
-    "Informe ao menos um parâmetro: 'start_date' ou 'end_date'."
-)
-_START_END_DATE_ORDER_MESSAGE = (
-    "Parâmetro 'start_date' não pode ser maior que 'end_date'."
-)
-
-
-# ---------------------------------------------------------------------------
-# Domain error
-# ---------------------------------------------------------------------------
-
-
-@dataclass(frozen=True)
-class TransactionApplicationError(Exception):
-    message: str
-    code: str
-    status_code: int
-    details: dict[str, Any] | None = None
 
 
 # ---------------------------------------------------------------------------
@@ -125,7 +113,7 @@ class TransactionLedgerService:
         self,
         payload: dict[str, Any],
         *,
-        installment_amount_builder: Callable[[Decimal, int], list[Decimal]],
+        installment_amount_builder: Callable[[Any, int], list[Any]],
     ) -> dict[str, Any]:
         normalized = dict(payload)
         tx_type = self._normalize_transaction_type(normalized.get("type"))
@@ -543,45 +531,24 @@ class TransactionLedgerService:
             raise _validation_error(message) from exc
 
     # ------------------------------------------------------------------
-    # Normalization helpers (static)
+    # Normalization helpers — thin wrappers around module-level functions
     # ------------------------------------------------------------------
 
     @staticmethod
     def _normalize_transaction_type(raw_value: Any) -> TransactionType:
-        value = str(raw_value or "").strip().lower()
-        try:
-            return TransactionType(value)
-        except ValueError as exc:
-            raise _validation_error(
-                "Parâmetro 'type' inválido. Use 'income' ou 'expense'."
-            ) from exc
+        return normalize_transaction_type(raw_value)
 
     @staticmethod
     def _normalize_transaction_status(raw_value: Any) -> TransactionStatus:
-        value = str(raw_value or "pending").strip().lower()
-        try:
-            return TransactionStatus(value)
-        except ValueError as exc:
-            raise _validation_error(
-                "Parâmetro 'status' inválido. "
-                "Use paid, pending, cancelled, postponed ou overdue."
-            ) from exc
+        return normalize_transaction_status(raw_value)
 
     @staticmethod
     def _normalize_currency(raw_value: Any) -> str:
-        value = str(raw_value or "BRL").strip().upper()
-        if not value:
-            return "BRL"
-        return value
+        return normalize_currency(raw_value)
 
     @staticmethod
-    def _normalize_decimal_amount(raw_value: Any) -> Decimal:
-        try:
-            return Decimal(str(raw_value))
-        except (InvalidOperation, TypeError, ValueError) as exc:
-            raise _validation_error(
-                "Parâmetro 'amount' inválido. Informe um valor numérico válido."
-            ) from exc
+    def _normalize_decimal_amount(raw_value: Any) -> Any:
+        return normalize_decimal_amount(raw_value)
 
     @staticmethod
     def _coerce_date(
@@ -590,42 +557,11 @@ class TransactionLedgerService:
         field_name: str,
         required: bool,
     ) -> date | None:
-        if raw_value in (None, ""):
-            if required:
-                raise _validation_error(
-                    f"Parâmetro '{field_name}' é obrigatório no formato YYYY-MM-DD."
-                )
-            return None
-        if isinstance(raw_value, date):
-            return raw_value
-        if isinstance(raw_value, datetime):
-            return raw_value.date()
-        if isinstance(raw_value, str):
-            try:
-                return datetime.strptime(raw_value, "%Y-%m-%d").date()
-            except ValueError as exc:
-                raise _validation_error(
-                    f"Parâmetro '{field_name}' inválido. Use o formato YYYY-MM-DD."
-                ) from exc
-        raise _validation_error(
-            f"Parâmetro '{field_name}' inválido. Use o formato YYYY-MM-DD."
-        )
+        return coerce_date(raw_value, field_name=field_name, required=required)
 
     @staticmethod
     def _coerce_datetime(raw_value: Any, *, field_name: str) -> datetime:
-        if isinstance(raw_value, datetime):
-            return raw_value
-        if isinstance(raw_value, str):
-            normalized = raw_value.replace("Z", "+00:00")
-            try:
-                return datetime.fromisoformat(normalized)
-            except ValueError as exc:
-                raise _validation_error(
-                    f"Parâmetro '{field_name}' inválido. Use formato datetime ISO-8601."
-                ) from exc
-        raise _validation_error(
-            f"Parâmetro '{field_name}' inválido. Use formato datetime ISO-8601."
-        )
+        return coerce_datetime(raw_value, field_name=field_name)
 
     def _normalize_paid_at_for_update(self, normalized: dict[str, Any]) -> None:
         status = str(normalized.get("status", "")).strip().lower()
@@ -647,181 +583,3 @@ class TransactionLedgerService:
         if parsed_paid_at > utc_now_compatible_with(parsed_paid_at):
             raise _validation_error("'paid_at' não pode ser uma data futura.")
         normalized["paid_at"] = parsed_paid_at
-
-
-# ---------------------------------------------------------------------------
-# Module-level helpers (shared with analytics facade)
-# ---------------------------------------------------------------------------
-
-
-def _validation_error(message: str) -> TransactionApplicationError:
-    return TransactionApplicationError(
-        message=message,
-        code="VALIDATION_ERROR",
-        status_code=400,
-    )
-
-
-def _normalize_installment_count(raw_count: Any) -> int:
-    try:
-        count = int(raw_count)
-    except (TypeError, ValueError) as exc:
-        raise _validation_error("'installment_count' deve ser maior que zero.") from exc
-    if count < 1:
-        raise _validation_error("'installment_count' deve ser maior que zero.")
-    return count
-
-
-def _parse_month(value: str) -> tuple[int, int, str]:
-    if not value:
-        raise _validation_error("Parâmetro 'month' é obrigatório no formato YYYY-MM.")
-    try:
-        year, month_number = map(int, value.split("-"))
-    except ValueError as exc:
-        raise _validation_error("Formato de mês inválido. Use YYYY-MM.") from exc
-
-    if month_number < 1 or month_number > 12:
-        raise _validation_error("Formato de mês inválido. Use YYYY-MM.")
-
-    return year, month_number, f"{year:04d}-{month_number:02d}"
-
-
-def _resolve_due_ordering(order_by: str) -> list[Any]:
-    today = date.today()
-    title_order = func.lower(func.coalesce(Transaction.title, ""))
-    card_order = func.lower(func.coalesce(CreditCard.name, ""))
-    overdue_bucket = case((Transaction.due_date < today, 0), else_=1)
-    upcoming_bucket = case((Transaction.due_date >= today, 0), else_=1)
-
-    if order_by == "overdue_first":
-        return [
-            overdue_bucket.asc(),
-            Transaction.due_date.asc(),
-            title_order.asc(),
-            card_order.asc(),
-            Transaction.created_at.asc(),
-        ]
-    if order_by == "upcoming_first":
-        return [
-            upcoming_bucket.asc(),
-            Transaction.due_date.asc(),
-            title_order.asc(),
-            card_order.asc(),
-            Transaction.created_at.asc(),
-        ]
-    if order_by == "date":
-        return [
-            Transaction.due_date.asc(),
-            title_order.asc(),
-            card_order.asc(),
-            Transaction.created_at.asc(),
-        ]
-    if order_by == "title":
-        return [
-            title_order.asc(),
-            Transaction.due_date.asc(),
-            card_order.asc(),
-            Transaction.created_at.asc(),
-        ]
-    if order_by == "card":
-        return [
-            card_order.asc(),
-            Transaction.due_date.asc(),
-            title_order.asc(),
-            Transaction.created_at.asc(),
-        ]
-    raise _validation_error(
-        "Parâmetro 'order_by' inválido. "
-        "Use overdue_first, upcoming_first, date, title ou card."
-    )
-
-
-def _validate_recurring_payload(
-    *,
-    is_recurring: bool,
-    due_date: date | None,
-    start_date: date | None,
-    end_date: date | None,
-) -> str | None:
-    if not is_recurring:
-        if start_date and end_date and start_date > end_date:
-            return _START_END_DATE_ORDER_MESSAGE
-        return None
-
-    if not start_date or not end_date:
-        return (
-            "Transações recorrentes exigem 'start_date' e 'end_date' "
-            "no formato YYYY-MM-DD."
-        )
-
-    if start_date > end_date:
-        return _START_END_DATE_ORDER_MESSAGE
-
-    if due_date is None:
-        return "Transações recorrentes exigem 'due_date' no formato YYYY-MM-DD."
-
-    if due_date < start_date or due_date > end_date:
-        return "Parâmetro 'due_date' deve estar entre 'start_date' e 'end_date'."
-
-    return None
-
-
-def _apply_transaction_updates(
-    transaction: Transaction, updates: dict[str, Any]
-) -> None:
-    for field, value in updates.items():
-        if field not in _MUTABLE_TRANSACTION_FIELDS:
-            continue
-        if field == "type" and value is not None:
-            setattr(transaction, field, TransactionType(str(value).lower()))
-            continue
-        if field == "status" and value is not None:
-            setattr(transaction, field, TransactionStatus(str(value).lower()))
-            continue
-        setattr(transaction, field, value)
-
-
-def _serialize_transaction(transaction: Transaction) -> TransactionPayload:
-    return serialize_transaction_payload(transaction)
-
-
-def _resolve_month_summary_page(
-    *,
-    analytics: TransactionAnalyticsService,
-    year: int,
-    month_number: int,
-    page: int,
-    page_size: int,
-) -> tuple[int, list[Transaction]]:
-    analytics_type = type(analytics)
-    supports_paginated_path = (
-        getattr(analytics_type, "get_month_transaction_count", None)
-        is not TransactionAnalyticsService.get_month_transaction_count
-        and getattr(analytics_type, "get_month_transactions_page", None)
-        is not TransactionAnalyticsService.get_month_transactions_page
-    )
-    paginated_count = getattr(analytics, "get_month_transaction_count", None)
-    paginated_page = getattr(analytics, "get_month_transactions_page", None)
-    if (
-        supports_paginated_path
-        and callable(paginated_count)
-        and callable(paginated_page)
-    ):
-        total_transactions = int(paginated_count(year=year, month_number=month_number))
-        transactions = cast(
-            list[Transaction],
-            paginated_page(
-                year=year,
-                month_number=month_number,
-                page=page,
-                per_page=page_size,
-            ),
-        )
-        return total_transactions, transactions
-
-    transactions = analytics.get_month_transactions(
-        year=year, month_number=month_number
-    )
-    start_index = max(0, (page - 1) * page_size)
-    end_index = start_index + page_size
-    return len(transactions), transactions[start_index:end_index]
