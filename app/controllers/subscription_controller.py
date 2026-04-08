@@ -34,6 +34,7 @@ from app.extensions.database import db
 from app.http.request_context import current_request_id
 from app.models.subscription import Subscription, SubscriptionStatus
 from app.models.user import User
+from app.models.webhook_event import WebhookEvent, WebhookEventStatus
 from app.services.billing_adapter import (
     BillingCheckoutCustomer,
     BillingProvider,
@@ -47,6 +48,7 @@ from app.services.subscription_service import (
     get_or_create_subscription,
     sync_subscription_from_provider,
 )
+from app.utils.datetime_utils import utc_now_naive
 
 logger = logging.getLogger(__name__)
 
@@ -546,6 +548,7 @@ def _process_webhook_snapshot(
     event_type: str,
     event_id: str | None,
     snapshot: BillingSubscriptionSnapshot,
+    webhook_ev: WebhookEvent,
 ) -> ResponseReturnValue:
     subscription = _find_subscription_for_snapshot(snapshot)
     if subscription is None:
@@ -554,14 +557,21 @@ def _process_webhook_snapshot(
             event_type,
             snapshot.get("provider_id"),
         )
+        webhook_ev.mark_skipped(reason="unknown_subscription")
+        db.session.commit()
         return _ok({"received": True, "processed": False})
 
     if event_id and subscription.provider_event_id == event_id:
+        webhook_ev.mark_skipped(reason="duplicate")
+        db.session.commit()
         return _ok({"received": True, "processed": False, "reason": "duplicate"})
 
     if event_id:
         subscription.provider_event_id = event_id
-    apply_subscription_snapshot(subscription, snapshot)
+
+    # Mark processed before the commit inside apply_subscription_snapshot.
+    webhook_ev.mark_processed(now=utc_now_naive())
+    apply_subscription_snapshot(subscription, snapshot)  # commits all session objects
 
     user = User.query.filter_by(id=subscription.user_id).first()
     if user is not None:
@@ -589,18 +599,60 @@ def handle_webhook() -> ResponseReturnValue:
     directly. Payload authenticity is validated via HMAC signature. Unsigned
     requests are only accepted when the environment explicitly enables them.
 
+    Every request — authorised or not — is persisted to ``webhook_events`` for
+    full auditability.  Failed events can be retried via the
+    ``flask billing-webhooks retry-failed`` CLI command.
+
     Supported events
     ----------------
     subscription.activated   — set status to ACTIVE
     subscription.canceled    — set status to CANCELED
     subscription.past_due    — set status to PAST_DUE
+    PAYMENT_RECEIVED         — set status to ACTIVE
+    PAYMENT_CONFIRMED        — set status to ACTIVE
+    PAYMENT_OVERDUE          — set status to PAST_DUE
+    SUBSCRIPTION_DELETED     — set status to CANCELED
     <any other event>        — 200 no-op
     """
     raw_body: bytes = request.get_data()
     signature = request.headers.get(_WEBHOOK_SIGNATURE_HEADER, "")
     asaas_token = request.headers.get(_ASAAS_WEBHOOK_TOKEN_HEADER, "")
+    sig_verified = _is_webhook_request_authorized(raw_body, signature, asaas_token)
 
-    if not _is_webhook_request_authorized(raw_body, signature, asaas_token):
+    payload: dict[str, Any] = request.get_json(silent=True) or {}
+    event_type: str = payload.get("event", "")
+    event_id = _extract_event_id(payload)
+
+    # Best-effort identifier extraction for the audit record.
+    try:
+        (
+            provider_subscription_id,
+            provider_customer_id,
+            *_,
+        ) = _extract_subscription_identifiers(payload)
+    except Exception:
+        provider_subscription_id = None
+        provider_customer_id = None
+
+    # Persist audit record before any processing — capture every attempt.
+    now = utc_now_naive()
+    raw_text = raw_body.decode("utf-8", errors="replace")[:50_000]
+    webhook_ev = WebhookEvent(
+        event_id=event_id,
+        event_type=event_type or "unknown",
+        provider="asaas",
+        provider_subscription_id=provider_subscription_id,
+        provider_customer_id=provider_customer_id,
+        raw_payload=raw_text,
+        signature_verified=sig_verified,
+        received_at=now,
+        status=WebhookEventStatus.RECEIVED.value,
+    )
+    db.session.add(webhook_ev)
+
+    if not sig_verified:
+        webhook_ev.mark_skipped(reason="invalid_signature")
+        db.session.commit()
         logger.warning(
             "Billing webhook invalid signature request_id=%s",
             current_request_id(),
@@ -612,23 +664,28 @@ def handle_webhook() -> ResponseReturnValue:
             details={"request_id": current_request_id()},
         )
 
-    payload: dict[str, Any] = request.get_json(silent=True) or {}
-    event_type: str = payload.get("event", "")
-    event_id = _extract_event_id(payload)
-    snapshot = _extract_provider_snapshot(payload)
-
     if not _is_supported_webhook_event(event_type):
+        webhook_ev.mark_skipped(reason=f"unsupported_event:{event_type}")
+        db.session.commit()
         logger.info("Unhandled billing webhook event: %s — ignoring", event_type)
         return _ok({"received": True, "processed": False})
 
+    snapshot = _extract_provider_snapshot(payload)
     if snapshot is None:
+        webhook_ev.mark_skipped(reason="unresolvable_subscription")
+        db.session.commit()
         return _err(
             "Unable to resolve subscription from webhook payload",
             "VALIDATION_ERROR",
             400,
         )
 
-    return _process_webhook_snapshot(event_type, event_id, snapshot)
+    try:
+        return _process_webhook_snapshot(event_type, event_id, snapshot, webhook_ev)
+    except Exception as exc:
+        webhook_ev.mark_failed(reason=str(exc), now=utc_now_naive())
+        db.session.commit()
+        raise
 
 
 def register_subscription_dependencies(app: Any) -> None:  # noqa: ANN401

@@ -144,6 +144,10 @@ class RateLimiterService:
             ("/auth/login", "auth"),
             ("/auth/register", "auth"),
             ("/auth/password", "auth"),
+            # ── billing webhook (IP-keyed) ───────────────────────────────
+            # Provider callback — no JWT. Capped at 60/min per IP to absorb
+            # legitimate retry bursts while blocking automated abuse.
+            ("/subscriptions/webhook", "webhook"),
             # ── GraphQL (user/IP-keyed) ──────────────────────────────────
             ("/graphql", "graphql"),
             # ── high-volume CRUD tiers (user/IP-keyed) ───────────────────
@@ -187,6 +191,16 @@ class RateLimiterService:
                 limit=_read_int_env("RATE_LIMIT_TOKEN_REFRESH_LIMIT", 10),
                 window_seconds=_read_int_env(
                     "RATE_LIMIT_TOKEN_REFRESH_WINDOW_SECONDS", default_window
+                ),
+                key_scope=KEY_SCOPE_IP,
+            ),
+            # Billing webhook: IP-keyed, generous for provider retry bursts.
+            # Providers typically send at most a handful of retries per event.
+            "webhook": RateLimitRule(
+                name="webhook",
+                limit=_read_int_env("RATE_LIMIT_WEBHOOK_LIMIT", 60),
+                window_seconds=_read_int_env(
+                    "RATE_LIMIT_WEBHOOK_WINDOW_SECONDS", default_window
                 ),
                 key_scope=KEY_SCOPE_IP,
             ),

@@ -846,3 +846,113 @@ class TestWebhook:
         ]
         assert len(logs) == 1
         assert "request_id=" in logs[0]
+
+
+# ---------------------------------------------------------------------------
+# WebhookEvent audit log (PAY-03)
+# ---------------------------------------------------------------------------
+
+
+class TestWebhookEventAuditLog:
+    """Verify that every webhook attempt is persisted to webhook_events."""
+
+    def test_processed_event_creates_webhook_event_record(self, client, app) -> None:
+        token = _register_and_login(client, prefix="we-proc")
+        r = client.get("/subscriptions/me", headers=_auth_headers(token))
+        sub_id = r.get_json()["data"]["subscription"]["id"]
+
+        with app.app_context():
+            from app.extensions.database import db
+
+            sub: Subscription = Subscription.query.filter_by(
+                id=uuid.UUID(sub_id)
+            ).first()  # type: ignore[assignment]
+            sub.provider_subscription_id = "we_test_sub_1"
+            db.session.commit()
+
+        resp = client.post(
+            "/subscriptions/webhook",
+            json={
+                "event": "PAYMENT_CONFIRMED",
+                "id": "evt_we_001",
+                "subscription": {"id": "we_test_sub_1", "customer": "cus_001"},
+            },
+        )
+        assert resp.status_code == 200
+        assert resp.get_json()["data"]["processed"] is True
+
+        with app.app_context():
+            from app.models.webhook_event import WebhookEvent
+
+            ev = WebhookEvent.query.filter_by(event_id="evt_we_001").first()
+            assert ev is not None, "WebhookEvent must be persisted"
+            assert ev.status == "processed"
+            assert ev.event_type == "PAYMENT_CONFIRMED"
+            assert ev.provider == "asaas"
+            assert ev.signature_verified is True  # test env allows unsigned
+            assert ev.processed_at is not None
+
+    def test_invalid_signature_creates_skipped_record(
+        self, client, app, monkeypatch
+    ) -> None:
+        import hashlib as _hashlib
+        import hmac as _hmac
+
+        monkeypatch.setenv("BILLING_WEBHOOK_SECRET", "test_secret_key")
+        payload = b'{"event": "PAYMENT_CONFIRMED"}'
+        wrong_sig = _hmac.new(b"wrong_key", payload, _hashlib.sha256).hexdigest()
+
+        resp = client.post(
+            "/subscriptions/webhook",
+            data=payload,
+            content_type="application/json",
+            headers={"X-Billing-Signature": wrong_sig},
+        )
+        assert resp.status_code == 401
+
+        with app.app_context():
+            from app.models.webhook_event import WebhookEvent
+
+            ev = WebhookEvent.query.order_by(WebhookEvent.received_at.desc()).first()
+            assert ev is not None
+            assert ev.status == "skipped"
+            assert ev.signature_verified is False
+            assert ev.failure_reason == "invalid_signature"
+
+    def test_duplicate_event_creates_skipped_record(self, client, app) -> None:
+        token = _register_and_login(client, prefix="we-dup")
+        r = client.get("/subscriptions/me", headers=_auth_headers(token))
+        sub_id = r.get_json()["data"]["subscription"]["id"]
+
+        with app.app_context():
+            from app.extensions.database import db
+
+            sub: Subscription = Subscription.query.filter_by(
+                id=uuid.UUID(sub_id)
+            ).first()  # type: ignore[assignment]
+            sub.provider_subscription_id = "we_dup_sub"
+            db.session.commit()
+
+        payload = {
+            "event": "PAYMENT_CONFIRMED",
+            "id": "evt_dup_999",
+            "subscription": {"id": "we_dup_sub", "customer": "cus_dup"},
+        }
+        # First call — should process.
+        resp1 = client.post("/subscriptions/webhook", json=payload)
+        assert resp1.status_code == 200
+        assert resp1.get_json()["data"]["processed"] is True
+
+        # Second call — should be skipped as duplicate.
+        resp2 = client.post("/subscriptions/webhook", json=payload)
+        assert resp2.status_code == 200
+        assert resp2.get_json()["data"]["processed"] is False
+
+        with app.app_context():
+            from app.models.webhook_event import WebhookEvent
+
+            events = WebhookEvent.query.filter_by(event_id="evt_dup_999").all()
+            assert len(events) == 2
+            statuses = {e.status for e in events}
+            assert "processed" in statuses
+            assert "skipped" in statuses
