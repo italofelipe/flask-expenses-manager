@@ -3,10 +3,13 @@ from __future__ import annotations
 from dataclasses import dataclass
 from datetime import date, timedelta
 from decimal import Decimal
-from typing import Any, cast
+from typing import Any
 from uuid import UUID
 
+from sqlalchemy.orm import selectinload
+
 from app.application.errors import PublicValidationError
+from app.extensions.database import db
 from app.models.investment_operation import InvestmentOperation
 from app.models.wallet import Wallet
 from app.services.investment_service import InvestmentService
@@ -40,7 +43,12 @@ class PortfolioHistoryService:
         end_date: date | None,
     ) -> dict[str, Any]:
         history_range = self._resolve_range(start_date=start_date, end_date=end_date)
-        wallets = cast(list[Wallet], Wallet.query.filter_by(user_id=self.user_id).all())
+        wallets: list[Wallet] = (
+            db.session.query(Wallet)
+            .filter_by(user_id=self.user_id)
+            .options(selectinload(Wallet.operations))
+            .all()
+        )
         ticker_prices = self._load_ticker_prices(wallets, history_range)
         opening_invested = self._build_opening_events(wallets, history_range.start_date)
         events = self._build_events(history_range=history_range, wallets=wallets)
