@@ -130,3 +130,48 @@ def test_delete_me_already_deleted_rejects_second_attempt(client) -> None:
     # Second attempt with the same (now revoked) token must fail.
     second = _delete_me(client, token)
     assert second.status_code == 401
+
+
+# ---------------------------------------------------------------------------
+# LGPD login gate
+# ---------------------------------------------------------------------------
+
+
+def test_deleted_user_cannot_login(client) -> None:
+    """Deleted accounts must be rejected at login with 401 Invalid credentials."""
+    token, email = _register_and_login(client)
+    _delete_me(client, token)
+
+    # Attempt to log back in — must be rejected.
+    resp = client.post(
+        "/auth/login",
+        json={"email": email, "password": _PASSWORD},
+    )
+    assert resp.status_code == 401
+
+
+# ---------------------------------------------------------------------------
+# Deletion confirmation email
+# ---------------------------------------------------------------------------
+
+
+def test_delete_me_sends_confirmation_email(client, app) -> None:
+    """A deletion confirmation email must be dispatched after anonymisation."""
+    from app.services.email_provider import get_email_outbox
+
+    token, email = _register_and_login(client)
+
+    # Flush any prior outbox entries.
+    with app.app_context():
+        get_email_outbox().clear()
+
+    resp = _delete_me(client, token)
+    assert resp.status_code == 200
+
+    with app.app_context():
+        outbox = get_email_outbox()
+        deletion_emails = [m for m in outbox if m.get("tag") == "account_deletion"]
+        assert len(deletion_emails) == 1, (
+            f"Expected 1 deletion email, got {deletion_emails}"
+        )
+        assert deletion_emails[0]["email"] == email

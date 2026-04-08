@@ -198,7 +198,10 @@ class AuthResource(MethodResource):
 
         password_hash = identity.user.password if identity.user is not None else None
         is_valid_password = dependencies.verify_password(password_hash, str(password))
-        if not identity.user or not is_valid_password:
+        # Treat soft-deleted accounts as invalid credentials (LGPD — do not
+        # reveal whether the account ever existed).
+        is_deleted = identity.user is not None and identity.user.deleted_at is not None
+        if not identity.user or not is_valid_password or is_deleted:
             return _invalid_credentials_response(
                 login_guard=login_guard,
                 login_context=login_context,

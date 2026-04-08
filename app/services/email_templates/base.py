@@ -301,7 +301,71 @@ def render_password_reset_email(*, reset_url: str) -> tuple[str, str]:
     return html, text
 
 
+def render_account_deletion_email() -> tuple[str, str]:
+    """Render the LGPD account deletion confirmation email.
+
+    Returns:
+        (html, text) tuple ready to pass to EmailMessage.
+    """
+    body_html = f"""
+      <h1 style="font-family: {_FONT_HEADING}; font-size: 26px; font-weight: 700;
+                 color: {_COLOR_TEXT_PRIMARY}; margin: 0 0 8px; line-height: 1.2;">
+        Sua conta foi excluída
+      </h1>
+      <p style="font-family: {_FONT_BODY}; font-size: 13px; font-weight: 600;
+                color: {_COLOR_BRAND}; margin: 0 0 24px; text-transform: uppercase;
+                letter-spacing: 1px;">
+        Auraxis &mdash; Finanças pessoais
+      </p>
+
+      <div style="border-top: 1px solid {_COLOR_BG_ELEVATED}; margin: 0 0 28px;"></div>
+
+      <p style="font-family: {_FONT_BODY}; font-size: 15px; color: {_COLOR_TEXT_SECONDARY};
+                line-height: 1.65; margin: 0 0 16px;">
+        Confirmamos que sua conta Auraxis foi excluída com sucesso.
+        Todos os seus dados pessoais foram anonimizados em conformidade com a
+        <strong style="color: {_COLOR_TEXT_PRIMARY};">Lei Geral de Proteção de Dados (LGPD)</strong>.
+      </p>
+
+      <p style="font-family: {_FONT_BODY}; font-size: 15px; color: {_COLOR_TEXT_SECONDARY};
+                line-height: 1.65; margin: 0 0 24px;">
+        Se você não solicitou a exclusão da sua conta ou acredita que isso ocorreu
+        por engano, entre em contato com nossa equipe de suporte imediatamente.
+      </p>
+
+      <div style="border-top: 1px solid {_COLOR_BG_ELEVATED}; margin: 0 0 20px;"></div>
+
+      <p style="font-family: {_FONT_BODY}; font-size: 13px; color: {_COLOR_TEXT_MUTED};
+                line-height: 1.6; margin: 0;">
+        Obrigado por ter utilizado a Auraxis. Esperamos ter contribuído positivamente
+        para o seu gerenciamento financeiro.
+      </p>
+    """
+
+    html = _base_layout(
+        title="Conta excluída — Auraxis",
+        preview_text="Sua conta Auraxis foi excluída com sucesso (LGPD).",
+        body_html=body_html,
+    )
+
+    text = (
+        "Conta excluída — Auraxis\n"
+        "========================\n\n"
+        "Confirmamos que sua conta Auraxis foi excluída com sucesso.\n\n"
+        "Todos os seus dados pessoais foram anonimizados em conformidade com a\n"
+        "Lei Geral de Proteção de Dados (LGPD).\n\n"
+        "Se você não solicitou a exclusão da sua conta ou acredita que isso ocorreu\n"
+        "por engano, entre em contato com nossa equipe de suporte imediatamente.\n\n"
+        "Obrigado por ter utilizado a Auraxis.\n\n"
+        "— Equipe Auraxis\n"
+        "https://app.auraxis.com.br\n"
+    )
+
+    return html, text
+
+
 __all__ = [
+    "render_account_deletion_email",
     "render_confirmation_email",
     "render_password_reset_email",
 ]
