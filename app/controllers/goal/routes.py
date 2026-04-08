@@ -4,6 +4,7 @@ from .blueprint import goal_bp
 from .resources import (
     GoalCollectionResource,
     GoalPlanResource,
+    GoalProjectionResource,
     GoalResource,
     GoalSimulationResource,
 )
@@ -34,6 +35,11 @@ def register_goal_routes() -> None:
     goal_bp.add_url_rule(
         "/<uuid:goal_id>/plan",
         view_func=GoalPlanResource.as_view("goal_plan"),
+        methods=["GET"],
+    )
+    goal_bp.add_url_rule(
+        "/<uuid:goal_id>/projection",
+        view_func=GoalProjectionResource.as_view("goal_projection"),
         methods=["GET"],
     )
 

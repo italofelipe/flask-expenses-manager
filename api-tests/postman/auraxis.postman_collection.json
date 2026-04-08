@@ -2402,6 +2402,52 @@
               }
             }
           ]
+        },
+        {
+          "name": "09 - Goal projection by id (REST v2)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{authToken}}"
+              },
+              {
+                "key": "X-API-Contract",
+                "value": "v2"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/goals/{{goalId}}/projection",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "goals",
+                "{{goalId}}",
+                "projection"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('goal projection returns 200', function () { pm.response.to.have.status(200); });",
+                  "var body = pm.response.json();",
+                  "pm.test('goal projection includes projection payload', function () {",
+                  "  pm.expect(body.success).to.eql(true);",
+                  "  pm.expect(body.data).to.have.property('goal');",
+                  "  pm.expect(body.data).to.have.property('projection');",
+                  "  pm.expect(body.data.projection).to.have.property('months_to_completion');",
+                  "  pm.expect(body.data.projection).to.have.property('on_track');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
         }
       ]
     },
@@ -6505,7 +6551,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\"name\": \"Alimentação\", \"amount\": 500, \"period\": \"monthly\"}"
+              "raw": "{\"name\": \"Alimenta\u00e7\u00e3o\", \"amount\": 500, \"period\": \"monthly\"}"
             },
             "url": {
               "raw": "{{baseUrl}}/budgets",
