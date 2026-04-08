@@ -1,5 +1,18 @@
 # Changelog
 
+## [1.21.0](https://github.com/italofelipe/auraxis-api/compare/v1.20.0...v1.21.0) (2026-04-07)
+
+
+### Features
+
+* **billing:** align prices, add trial-expiry CLI, document billing env vars ([#914](https://github.com/italofelipe/auraxis-api/issues/914)) ([04909d0](https://github.com/italofelipe/auraxis-api/commit/04909d0a76cafca35e3f1c5d6fdd8d9efbd11360))
+* **billing:** H-PROD-01 — price alignment, trial CLI, env docs, Asaas fallback ([#915](https://github.com/italofelipe/auraxis-api/issues/915)) ([8dd27f7](https://github.com/italofelipe/auraxis-api/commit/8dd27f700f1f202a719bfdb935eeef37efd29d7f))
+
+
+### Bug Fixes
+
+* **deploy:** Phase 1 skips missing db service + proactive disk prune ([#911](https://github.com/italofelipe/auraxis-api/issues/911)) ([8f1e59d](https://github.com/italofelipe/auraxis-api/commit/8f1e59d04a00c30f526b5bda8ad37948c822b6e3))
+
 ## [1.20.0](https://github.com/italofelipe/auraxis-api/compare/v1.19.0...v1.20.0) (2026-04-06)
 
 
