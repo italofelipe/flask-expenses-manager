@@ -46,4 +46,9 @@ USER app
 
 EXPOSE 8000
 
+# Liveness probe: lightweight check — always returns 200 when the process is up.
+# 30s start period lets Gunicorn finish booting before health is evaluated.
+HEALTHCHECK --interval=30s --timeout=5s --start-period=30s --retries=3 \
+    CMD python -c "import urllib.request, sys; urllib.request.urlopen('http://localhost:8000/healthz', timeout=4)" || exit 1
+
 ENTRYPOINT ["/app/scripts/entrypoint_prod.sh"]
