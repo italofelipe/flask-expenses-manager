@@ -36,14 +36,16 @@ strict = true
 plugins = []
 disallow_subclassing_any = false
 
+# ARC-10 mypy strict migration — override list.
+# Fase 1+2 (13 modules) migrated to per-decorator # type: ignore[misc].
+# Remaining: schemas wildcard + 7 controller/auth modules (Fase 3).
 [[tool.mypy.overrides]]
 module = [
+    # Marshmallow schemas — @pre_load/@post_load/@validates decorators.
+    # Deferred to Fase 3 (schema type-safety refactor).
     "app.schemas.*",
-    "app.middleware.security_headers",
-    "app.middleware.cors",
-    "app.http.request_context",
-    "app.middleware.docs_access",
-    "app.controllers.health_controller",
+    # Controllers with mixed typed_jwt_required + route decorators.
+    # Deferred to Fase 3 (after typed_decorators.py stubs are added).
     "app.controllers.subscription_controller",
     "app.controllers.shared_entries.resources",
     "app.controllers.fiscal.resources",
@@ -51,14 +53,6 @@ module = [
     "app.controllers.wallet.operation_resources",
     "app.controllers.wallet.entry_resources",
     "app.controllers.auth.error_handlers",
-    "app.extensions.integration_metrics_cli",
-    "app.extensions.audit_retention_cli",
-    "app.extensions.jwt_callbacks",
-    "app.extensions.audit_trail",
-    "app.extensions.http_observability",
-    "app.extensions.error_handlers",
-    "app.extensions.prometheus_metrics",
-    "app.controllers.observability_controller",
 ]
 disable_error_code = ["untyped-decorator"]
 
