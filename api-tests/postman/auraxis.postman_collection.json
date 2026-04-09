@@ -1054,7 +1054,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\"password\": \"{{userPassword}}\"}"
+              "raw": "{\"password\": \"{{testPassword}}\"}"
             },
             "url": {
               "raw": "{{baseUrl}}/user/me",
@@ -6748,6 +6748,11 @@
                 "key": "Authorization",
                 "value": "Bearer {{authToken}}",
                 "type": "text"
+              },
+              {
+                "key": "X-API-Contract",
+                "value": "v2",
+                "type": "text"
               }
             ],
             "url": {
@@ -6792,6 +6797,11 @@
                 "key": "Content-Type",
                 "value": "application/json",
                 "type": "text"
+              },
+              {
+                "key": "X-API-Contract",
+                "value": "v2",
+                "type": "text"
               }
             ],
             "body": {
@@ -6834,6 +6844,11 @@
               {
                 "key": "Authorization",
                 "value": "Bearer {{authToken}}",
+                "type": "text"
+              },
+              {
+                "key": "X-API-Contract",
+                "value": "v2",
                 "type": "text"
               }
             ],
@@ -6880,6 +6895,11 @@
                 "key": "Content-Type",
                 "value": "application/json",
                 "type": "text"
+              },
+              {
+                "key": "X-API-Contract",
+                "value": "v2",
+                "type": "text"
               }
             ],
             "body": {
@@ -6923,6 +6943,11 @@
                 "key": "Authorization",
                 "value": "Bearer {{authToken}}",
                 "type": "text"
+              },
+              {
+                "key": "X-API-Contract",
+                "value": "v2",
+                "type": "text"
               }
             ],
             "url": {
@@ -6960,6 +6985,11 @@
               {
                 "key": "Authorization",
                 "value": "Bearer {{authToken}}",
+                "type": "text"
+              },
+              {
+                "key": "X-API-Contract",
+                "value": "v2",
                 "type": "text"
               }
             ],
