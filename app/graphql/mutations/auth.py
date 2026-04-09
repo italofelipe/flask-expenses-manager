@@ -28,6 +28,7 @@ from app.application.services.password_verification_service import (
 from app.application.services.user_profile_service import update_user_profile
 from app.extensions.database import db
 from app.extensions.integration_metrics import increment_metric
+from app.extensions.jwt_revocation_cache import get_jwt_revocation_cache
 from app.graphql.auth import get_current_user_required
 from app.graphql.errors import (
     GRAPHQL_ERROR_CODE_AUTH_BACKEND_UNAVAILABLE,
@@ -275,8 +276,10 @@ class LogoutMutation(graphene.Mutation):
 
     def mutate(self, info: graphene.ResolveInfo) -> "LogoutMutation":
         user = get_current_user_required()
+        user_id = str(user.id)
         user.current_jti = None
         db.session.commit()
+        get_jwt_revocation_cache().invalidate(user_id)
         return LogoutMutation(ok=True, message="Logout successful")
 
 
