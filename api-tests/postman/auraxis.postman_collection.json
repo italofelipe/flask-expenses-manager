@@ -1035,54 +1035,6 @@
               }
             }
           ]
-        },
-        {
-          "name": "20 - Delete account (REST v2)",
-          "request": {
-            "method": "DELETE",
-            "header": [
-              {
-                "key": "Authorization",
-                "value": "Bearer {{authToken}}",
-                "type": "text"
-              },
-              {
-                "key": "Content-Type",
-                "value": "application/json",
-                "type": "text"
-              }
-            ],
-            "body": {
-              "mode": "raw",
-              "raw": "{\"password\": \"{{testPassword}}\"}"
-            },
-            "url": {
-              "raw": "{{baseUrl}}/user/me",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "user",
-                "me"
-              ]
-            }
-          },
-          "event": [
-            {
-              "listen": "test",
-              "script": {
-                "exec": [
-                  "pm.test('account deletion returns 200', function () { pm.response.to.have.status(200); });",
-                  "pm.test('account deletion v2 contract', function () {",
-                  "  var body = pm.response.json();",
-                  "  pm.expect(body.success).to.eql(true);",
-                  "  pm.expect(body.message).to.be.a('string').and.not.empty;",
-                  "});"
-                ],
-                "type": "text/javascript"
-              }
-            }
-          ]
         }
       ]
     },
@@ -7022,6 +6974,69 @@
           ]
         }
       ]
+    },
+    {
+      "name": "99 - Terminal (Account Lifecycle)",
+      "item": [
+        {
+          "name": "20 - Delete account (REST v2)",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{authToken}}",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\"password\": \"{{testPassword}}\"}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/user/me",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "user",
+                "me"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "exec": [
+                  "var p = pm.environment.get(\"suiteProfile\") || pm.collectionVariables.get(\"suiteProfile\") || \"full\"; if (p === \"smoke\") { pm.execution.skipRequest(); }"
+                ],
+                "type": "text/javascript"
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('account deletion returns 200', function () { pm.response.to.have.status(200); });",
+                  "pm.test('account deletion v2 contract', function () {",
+                  "  var body = pm.response.json();",
+                  "  pm.expect(body.success).to.eql(true);",
+                  "  pm.expect(body.message).to.be.a('string').and.not.empty;",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        }
+      ],
+      "description": "Destructive teardown — runs last so prior sections remain authenticated."
     }
   ],
   "variable": [
