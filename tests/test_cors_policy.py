@@ -336,7 +336,7 @@ def test_register_cors_allows_preflight_for_production_origins(
     monkeypatch: pytest.MonkeyPatch,
     origin: str,
 ) -> None:
-    """OPTIONS preflight must echo Access-Control-Allow-Origin for each prod origin."""
+    """OPTIONS preflight must echo Access-Control-Allow-Origin for each origin."""
     monkeypatch.setenv("FLASK_DEBUG", "true")
     monkeypatch.setenv("FLASK_TESTING", "true")
     allowed = ",".join(_PRODUCTION_ORIGINS)
