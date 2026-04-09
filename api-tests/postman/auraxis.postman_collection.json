@@ -3344,6 +3344,11 @@
               {
                 "key": "Authorization",
                 "value": "Bearer {{authToken}}"
+              },
+              {
+                "key": "X-API-Contract",
+                "value": "v2",
+                "type": "text"
               }
             ],
             "url": {
@@ -3530,6 +3535,11 @@
               {
                 "key": "Authorization",
                 "value": "Bearer {{authToken}}"
+              },
+              {
+                "key": "X-API-Contract",
+                "value": "v2",
+                "type": "text"
               }
             ],
             "url": {
@@ -3717,6 +3727,11 @@
               {
                 "key": "Authorization",
                 "value": "Bearer {{authToken}}"
+              },
+              {
+                "key": "X-API-Contract",
+                "value": "v2",
+                "type": "text"
               }
             ],
             "url": {
@@ -6590,6 +6605,54 @@
                   "  pm.expect(body.errors).to.eql(undefined);",
                   "  pm.expect(body.data.logout.ok).to.eql(true);",
                   "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "13 - Re-login after GraphQL logout (REST v2)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "X-API-Contract",
+                "value": "v2"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/auth/login",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "login"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\"email\": \"{{runEmail}}\", \"password\": \"{{testPassword}}\"}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('re-login after GraphQL logout returns 200', function () { pm.response.to.have.status(200); });",
+                  "var body = pm.response.json();",
+                  "pm.test('re-login restores valid auth token', function () {",
+                  "  pm.expect(body.success).to.eql(true);",
+                  "  pm.expect(body.data.token).to.be.a('string').and.not.empty;",
+                  "});",
+                  "pm.collectionVariables.set('authToken', body.data.token);",
+                  "pm.collectionVariables.set('userId', body.data.user.id);"
                 ],
                 "type": "text/javascript"
               }
