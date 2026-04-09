@@ -747,8 +747,8 @@
                   "pm.test('re-login returns 200', function () { pm.response.to.have.status(200); });",
                   "pm.test('re-login response refreshes authToken', function () {",
                   "  var body = pm.response.json();",
-                  "  pm.expect(body.token).to.be.a('string').and.not.empty;",
-                  "  pm.collectionVariables.set('authToken', body.token);",
+                  "  pm.expect(body.data.token).to.be.a('string').and.not.empty;",
+                  "  pm.collectionVariables.set('authToken', body.data.token);",
                   "});"
                 ],
                 "type": "text/javascript"
@@ -1043,7 +1043,7 @@
             "header": [
               {
                 "key": "Authorization",
-                "value": "Bearer {{accessToken}}",
+                "value": "Bearer {{authToken}}",
                 "type": "text"
               },
               {
@@ -6746,7 +6746,7 @@
             "header": [
               {
                 "key": "Authorization",
-                "value": "Bearer {{accessToken}}",
+                "value": "Bearer {{authToken}}",
                 "type": "text"
               }
             ],
@@ -6785,7 +6785,7 @@
             "header": [
               {
                 "key": "Authorization",
-                "value": "Bearer {{accessToken}}",
+                "value": "Bearer {{authToken}}",
                 "type": "text"
               },
               {
@@ -6796,7 +6796,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\"name\": \"Alimenta\u00e7\u00e3o\", \"amount\": 500, \"period\": \"monthly\"}"
+              "raw": "{\"name\": \"Alimentação\", \"amount\": 500, \"period\": \"monthly\"}"
             },
             "url": {
               "raw": "{{baseUrl}}/budgets",
@@ -6833,7 +6833,7 @@
             "header": [
               {
                 "key": "Authorization",
-                "value": "Bearer {{accessToken}}",
+                "value": "Bearer {{authToken}}",
                 "type": "text"
               }
             ],
@@ -6873,7 +6873,7 @@
             "header": [
               {
                 "key": "Authorization",
-                "value": "Bearer {{accessToken}}",
+                "value": "Bearer {{authToken}}",
                 "type": "text"
               },
               {
@@ -6921,7 +6921,7 @@
             "header": [
               {
                 "key": "Authorization",
-                "value": "Bearer {{accessToken}}",
+                "value": "Bearer {{authToken}}",
                 "type": "text"
               }
             ],
@@ -6959,7 +6959,7 @@
             "header": [
               {
                 "key": "Authorization",
-                "value": "Bearer {{accessToken}}",
+                "value": "Bearer {{authToken}}",
                 "type": "text"
               }
             ],
@@ -7110,6 +7110,11 @@
     {
       "key": "adminToken",
       "value": ""
+    },
+    {
+      "key": "budgetId",
+      "value": "",
+      "type": "string"
     }
   ]
 }
