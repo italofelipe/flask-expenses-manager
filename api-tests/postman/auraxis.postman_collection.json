@@ -1226,12 +1226,13 @@
               "script": {
                 "exec": [
                   "pm.test('income transaction create returns 201', function () { pm.response.to.have.status(201); });",
+                  "var body = pm.response.json();",
+                  "var transaction = Array.isArray(body.data.transaction) ? body.data.transaction[0] : body.data.transaction;",
                   "pm.test('income transaction v2 contract and captures id', function () {",
-                  "  var body = pm.response.json();",
                   "  pm.expect(body.success).to.eql(true);",
-                  "  pm.expect(body.data.transaction.id).to.be.a('string').and.not.empty;",
-                  "  pm.collectionVariables.set('incomeTransactionId', body.data.transaction.id);",
-                  "});"
+                  "  pm.expect(transaction.id).to.be.a('string').and.not.empty;",
+                  "});",
+                  "pm.collectionVariables.set('incomeTransactionId', transaction.id);"
                 ],
                 "type": "text/javascript"
               }
@@ -4484,8 +4485,9 @@
                   "pm.test('webhook invalid signature returns 401', function () { pm.response.to.have.status(401); });",
                   "pm.test('webhook rejection has error message', function () {",
                   "  var body = pm.response.json();",
-                  "  pm.expect(body).to.have.property('message');",
-                  "  pm.expect(body.message).to.be.a('string').and.not.empty;",
+                  "  pm.expect(body.success).to.eql(false);",
+                  "  var message = body.message || (body.error && body.error.message) || '';",
+                  "  pm.expect(message).to.be.a('string').and.not.empty;",
                   "});"
                 ],
                 "type": "text/javascript"
