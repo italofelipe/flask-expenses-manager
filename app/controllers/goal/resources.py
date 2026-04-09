@@ -305,6 +305,47 @@ class GoalPlanResource(MethodResource):
         )
 
 
+class GoalProjectionResource(MethodResource):
+    @doc(
+        description=(
+            "Retorna a projeção de conclusão da meta com base na taxa de retorno "
+            "do portfólio do usuário e no aporte mensal configurado. "
+            "Usa juros compostos para calcular o prazo e o aporte sugerido."
+        ),
+        tags=["Metas"],
+        security=[{"BearerAuth": []}],
+        params={"goal_id": {"in": "path", "type": "string", "required": True}},
+        responses={
+            200: {"description": "Projeção calculada com sucesso"},
+            401: {"description": "Token inválido"},
+            403: {"description": "Sem permissão"},
+            404: {"description": "Meta não encontrada"},
+        },
+    )
+    @jwt_required()
+    def get(self, goal_id: UUID) -> Any:
+        user_id = current_user_id()
+        dependencies = get_goal_dependencies()
+        service = dependencies.goal_application_service_factory(user_id)
+        try:
+            result = service.get_goal_projection(goal_id)
+        except GoalApplicationError as exc:
+            return goal_application_error_response(exc)
+
+        return compat_success(
+            legacy_payload={
+                "goal": result["goal"],
+                "projection": result["projection"],
+            },
+            status_code=200,
+            message="Projeção da meta calculada com sucesso",
+            data={
+                "goal": result["goal"],
+                "projection": result["projection"],
+            },
+        )
+
+
 class GoalSimulationResource(MethodResource):
     @doc(
         description=(

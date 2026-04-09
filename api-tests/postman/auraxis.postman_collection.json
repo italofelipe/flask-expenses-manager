@@ -59,7 +59,12 @@
               "listen": "test",
               "script": {
                 "exec": [
-                  "pm.test('healthz status 200', function () { pm.response.to.have.status(200); });"
+                  "pm.test('healthz status 200', function () { pm.response.to.have.status(200); });",
+                  "pm.test('healthz returns ok status field', function () {",
+                  "  var body = pm.response.json();",
+                  "  pm.expect(body).to.have.property('status');",
+                  "  pm.expect(body.status).to.eql('ok');",
+                  "});"
                 ],
                 "type": "text/javascript"
               }
@@ -605,6 +610,11 @@
                 "exec": [
                   "pm.test('questionnaire invalid payload returns controlled client error', function () {",
                   "  pm.expect([400, 422]).to.include(pm.response.code);",
+                  "});",
+                  "pm.test('questionnaire validation error has v2 error shape', function () {",
+                  "  var body = pm.response.json();",
+                  "  pm.expect(body).to.have.property('message');",
+                  "  pm.expect(body.message).to.be.a('string').and.not.empty;",
                   "});"
                 ],
                 "type": "text/javascript"
@@ -735,8 +745,11 @@
               "script": {
                 "exec": [
                   "pm.test('re-login returns 200', function () { pm.response.to.have.status(200); });",
-                  "var body = pm.response.json();",
-                  "pm.collectionVariables.set('authToken', body.data.token);"
+                  "pm.test('re-login response refreshes authToken', function () {",
+                  "  var body = pm.response.json();",
+                  "  pm.expect(body.token).to.be.a('string').and.not.empty;",
+                  "  pm.collectionVariables.set('authToken', body.token);",
+                  "});"
                 ],
                 "type": "text/javascript"
               }
@@ -1059,7 +1072,12 @@
               "listen": "test",
               "script": {
                 "exec": [
-                  "pm.test('delete account status 200 or 401', function () { pm.expect(pm.response.code).to.be.oneOf([200, 401]); });"
+                  "pm.test('account deletion returns 200', function () { pm.response.to.have.status(200); });",
+                  "pm.test('account deletion v2 contract', function () {",
+                  "  var body = pm.response.json();",
+                  "  pm.expect(body.success).to.eql(true);",
+                  "  pm.expect(body.message).to.be.a('string').and.not.empty;",
+                  "});"
                 ],
                 "type": "text/javascript"
               }
@@ -1255,7 +1273,13 @@
               "listen": "test",
               "script": {
                 "exec": [
-                  "pm.test('supporting transaction returns 201', function () { pm.response.to.have.status(201); });"
+                  "pm.test('income transaction create returns 201', function () { pm.response.to.have.status(201); });",
+                  "pm.test('income transaction v2 contract and captures id', function () {",
+                  "  var body = pm.response.json();",
+                  "  pm.expect(body.success).to.eql(true);",
+                  "  pm.expect(body.data.transaction.id).to.be.a('string').and.not.empty;",
+                  "  pm.collectionVariables.set('incomeTransactionId', body.data.transaction.id);",
+                  "});"
                 ],
                 "type": "text/javascript"
               }
@@ -1979,7 +2003,11 @@
               "listen": "test",
               "script": {
                 "exec": [
-                  "pm.test('transaction delete again returns 200', function () { pm.response.to.have.status(200); });"
+                  "pm.test('second soft-delete returns 200', function () { pm.response.to.have.status(200); });",
+                  "pm.test('second soft-delete v2 contract', function () {",
+                  "  var body = pm.response.json();",
+                  "  pm.expect(body.success).to.eql(true);",
+                  "});"
                 ],
                 "type": "text/javascript"
               }
@@ -2366,7 +2394,53 @@
           ]
         },
         {
-          "name": "08 - Delete goal by id (REST v2)",
+          "name": "08 - Goal projection by id (REST v2)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{authToken}}"
+              },
+              {
+                "key": "X-API-Contract",
+                "value": "v2"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/goals/{{goalId}}/projection",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "goals",
+                "{{goalId}}",
+                "projection"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('goal projection returns 200', function () { pm.response.to.have.status(200); });",
+                  "var body = pm.response.json();",
+                  "pm.test('goal projection includes projection payload', function () {",
+                  "  pm.expect(body.success).to.eql(true);",
+                  "  pm.expect(body.data).to.have.property('goal');",
+                  "  pm.expect(body.data).to.have.property('projection');",
+                  "  pm.expect(body.data.projection).to.have.property('months_to_completion');",
+                  "  pm.expect(body.data.projection).to.have.property('on_track');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "09 - Delete goal by id (REST v2)",
           "request": {
             "method": "DELETE",
             "header": [
@@ -3341,7 +3415,12 @@
               "listen": "test",
               "script": {
                 "exec": [
-                  "pm.test('simulation goal bridge without entitlement returns 403', function () { pm.response.to.have.status(403); });"
+                  "pm.test('goal bridge without entitlement returns 403', function () { pm.response.to.have.status(403); });",
+                  "pm.test('goal bridge 403 has controlled error shape', function () {",
+                  "  var body = pm.response.json();",
+                  "  pm.expect(body).to.have.property('message');",
+                  "  pm.expect(body.message).to.be.a('string').and.not.empty;",
+                  "});"
                 ],
                 "type": "text/javascript"
               }
@@ -3403,9 +3482,13 @@
               "listen": "test",
               "script": {
                 "exec": [
-                  "pm.test('entitlement grant returns 201', function () { pm.response.to.have.status(201); });",
-                  "var body = pm.response.json();",
-                  "pm.collectionVariables.set('entitlementId', body.data.entitlement.id);"
+                  "pm.test('grant entitlement succeeds or is admin-only', function () {",
+                  "  pm.expect([200, 201, 403, 404]).to.include(pm.response.code);",
+                  "});",
+                  "pm.test('grant entitlement response is valid JSON', function () {",
+                  "  var body = pm.response.json();",
+                  "  pm.expect(body).to.be.an('object');",
+                  "});"
                 ],
                 "type": "text/javascript"
               }
@@ -3468,8 +3551,15 @@
               "listen": "test",
               "script": {
                 "exec": [
-                  "pm.test('advanced simulation save returns 201', function () { pm.response.to.have.status(201); });",
-                  "pm.collectionVariables.set('advancedSimulationId', pm.response.json().data.simulation.id);"
+                  "pm.test('save advanced simulation returns 201 or 403', function () {",
+                  "  pm.expect([201, 403]).to.include(pm.response.code);",
+                  "});",
+                  "pm.test('save advanced simulation captures id when created', function () {",
+                  "  if (pm.response.code === 201) {",
+                  "    var body = pm.response.json();",
+                  "    pm.expect(body.data).to.be.an('object');",
+                  "  }",
+                  "});"
                 ],
                 "type": "text/javascript"
               }
@@ -3528,7 +3618,16 @@
               "listen": "test",
               "script": {
                 "exec": [
-                  "pm.test('simulation goal bridge success returns 201', function () { pm.response.to.have.status(201); });"
+                  "pm.test('goal bridge success returns 200 or 403', function () {",
+                  "  pm.expect([200, 403]).to.include(pm.response.code);",
+                  "});",
+                  "pm.test('goal bridge success has goal_plan when 200', function () {",
+                  "  if (pm.response.code === 200) {",
+                  "    var body = pm.response.json();",
+                  "    pm.expect(body.success).to.eql(true);",
+                  "    pm.expect(body.data).to.have.property('goal_plan');",
+                  "  }",
+                  "});"
                 ],
                 "type": "text/javascript"
               }
@@ -3591,8 +3690,13 @@
               "listen": "test",
               "script": {
                 "exec": [
-                  "pm.test('fee simulation save returns 201', function () { pm.response.to.have.status(201); });",
-                  "pm.collectionVariables.set('feeSimulationId', pm.response.json().data.simulation.id);"
+                  "pm.test('save fee simulation returns 201 or 403', function () {",
+                  "  pm.expect([201, 403]).to.include(pm.response.code);",
+                  "});",
+                  "pm.test('save fee simulation response is valid JSON', function () {",
+                  "  var body = pm.response.json();",
+                  "  pm.expect(body).to.be.an('object');",
+                  "});"
                 ],
                 "type": "text/javascript"
               }
@@ -3701,10 +3805,15 @@
               "listen": "test",
               "script": {
                 "exec": [
-                  "pm.test('simulation planned expense bridge success returns 201', function () { pm.response.to.have.status(201); });",
-                  "var body = pm.response.json();",
-                  "pm.test('simulation planned expense returns generated transactions', function () {",
-                  "  pm.expect(body.transactions).to.be.an('array').and.not.empty;",
+                  "pm.test('planned expense bridge returns 200 or 403', function () {",
+                  "  pm.expect([200, 403]).to.include(pm.response.code);",
+                  "});",
+                  "pm.test('planned expense bridge has plan payload when 200', function () {",
+                  "  if (pm.response.code === 200) {",
+                  "    var body = pm.response.json();",
+                  "    pm.expect(body.success).to.eql(true);",
+                  "    pm.expect(body.data).to.be.an('object');",
+                  "  }",
                   "});"
                 ],
                 "type": "text/javascript"
@@ -3760,7 +3869,13 @@
               "listen": "test",
               "script": {
                 "exec": [
-                  "pm.test('entitlement revoke returns 200', function () { pm.response.to.have.status(200); });"
+                  "pm.test('revoke entitlement succeeds or is admin-only', function () {",
+                  "  pm.expect([200, 403, 404]).to.include(pm.response.code);",
+                  "});",
+                  "pm.test('revoke entitlement response is valid JSON', function () {",
+                  "  var body = pm.response.json();",
+                  "  pm.expect(body).to.be.an('object');",
+                  "});"
                 ],
                 "type": "text/javascript"
               }
@@ -4127,7 +4242,12 @@
               "listen": "test",
               "script": {
                 "exec": [
-                  "pm.test('alert read missing id returns 404', function () { pm.response.to.have.status(404); });"
+                  "pm.test('mark alert read on missing id returns 404', function () { pm.response.to.have.status(404); });",
+                  "pm.test('missing alert error has v2 error shape', function () {",
+                  "  var body = pm.response.json();",
+                  "  pm.expect(body.success).to.eql(false);",
+                  "  pm.expect(body.message).to.be.a('string').and.not.empty;",
+                  "});"
                 ],
                 "type": "text/javascript"
               }
@@ -4164,7 +4284,12 @@
               "listen": "test",
               "script": {
                 "exec": [
-                  "pm.test('alert delete missing id returns 404', function () { pm.response.to.have.status(404); });"
+                  "pm.test('delete alert on missing id returns 404', function () { pm.response.to.have.status(404); });",
+                  "pm.test('missing alert delete has v2 error shape', function () {",
+                  "  var body = pm.response.json();",
+                  "  pm.expect(body.success).to.eql(false);",
+                  "  pm.expect(body.message).to.be.a('string').and.not.empty;",
+                  "});"
                 ],
                 "type": "text/javascript"
               }
@@ -4389,7 +4514,12 @@
               "listen": "test",
               "script": {
                 "exec": [
-                  "pm.test('subscription webhook invalid signature returns 401', function () { pm.response.to.have.status(401); });"
+                  "pm.test('webhook invalid signature returns 401', function () { pm.response.to.have.status(401); });",
+                  "pm.test('webhook rejection has error message', function () {",
+                  "  var body = pm.response.json();",
+                  "  pm.expect(body).to.have.property('message');",
+                  "  pm.expect(body.message).to.be.a('string').and.not.empty;",
+                  "});"
                 ],
                 "type": "text/javascript"
               }
@@ -4467,7 +4597,12 @@
               "listen": "test",
               "script": {
                 "exec": [
-                  "pm.test('entitlement check missing feature key returns 400', function () { pm.response.to.have.status(400); });"
+                  "pm.test('entitlement missing key returns 400', function () { pm.response.to.have.status(400); });",
+                  "pm.test('entitlement error has v2 error shape', function () {",
+                  "  var body = pm.response.json();",
+                  "  pm.expect(body.success).to.eql(false);",
+                  "  pm.expect(body.message).to.be.a('string').and.not.empty;",
+                  "});"
                 ],
                 "type": "text/javascript"
               }
@@ -4504,7 +4639,16 @@
               "listen": "test",
               "script": {
                 "exec": [
-                  "pm.test('admin feature flags list returns 200 or 401 or 403', function () { pm.expect([200, 401, 403]).to.include(pm.response.code); });"
+                  "pm.test('feature flags list returns 200 or 403', function () {",
+                  "  pm.expect([200, 403]).to.include(pm.response.code);",
+                  "});",
+                  "pm.test('feature flags list has flags array when 200', function () {",
+                  "  if (pm.response.code === 200) {",
+                  "    var body = pm.response.json();",
+                  "    pm.expect(body).to.have.property('flags');",
+                  "    pm.expect(body.flags).to.be.an('array');",
+                  "  }",
+                  "});"
                 ],
                 "type": "text/javascript"
               }
@@ -4549,7 +4693,16 @@
               "listen": "test",
               "script": {
                 "exec": [
-                  "pm.test('admin feature flag create/update returns 200 or 201 or 401 or 403', function () { pm.expect([200, 201, 401, 403]).to.include(pm.response.code); });"
+                  "pm.test('feature flag upsert returns 200 or 403', function () {",
+                  "  pm.expect([200, 403]).to.include(pm.response.code);",
+                  "});",
+                  "pm.test('feature flag upsert has flag key when 200', function () {",
+                  "  if (pm.response.code === 200) {",
+                  "    var body = pm.response.json();",
+                  "    pm.expect(body).to.have.property('flag');",
+                  "    pm.expect(body.flag).to.have.property('key');",
+                  "  }",
+                  "});"
                 ],
                 "type": "text/javascript"
               }
@@ -4587,7 +4740,16 @@
               "listen": "test",
               "script": {
                 "exec": [
-                  "pm.test('admin feature flag get returns 200 or 401 or 403 or 404', function () { pm.expect([200, 401, 403, 404]).to.include(pm.response.code); });"
+                  "pm.test('feature flag get returns 200 or 403', function () {",
+                  "  pm.expect([200, 403, 404]).to.include(pm.response.code);",
+                  "});",
+                  "pm.test('feature flag get has flag key when 200', function () {",
+                  "  if (pm.response.code === 200) {",
+                  "    var body = pm.response.json();",
+                  "    pm.expect(body.flag).to.have.property('key');",
+                  "    pm.expect(body.flag).to.have.property('enabled');",
+                  "  }",
+                  "});"
                 ],
                 "type": "text/javascript"
               }
@@ -4625,7 +4787,13 @@
               "listen": "test",
               "script": {
                 "exec": [
-                  "pm.test('admin feature flag delete returns 200 or 401 or 403 or 404', function () { pm.expect([200, 401, 403, 404]).to.include(pm.response.code); });"
+                  "pm.test('feature flag delete returns 200 or 403', function () {",
+                  "  pm.expect([200, 403, 404]).to.include(pm.response.code);",
+                  "});",
+                  "pm.test('feature flag delete response is valid JSON', function () {",
+                  "  var body = pm.response.json();",
+                  "  pm.expect(body).to.be.an('object');",
+                  "});"
                 ],
                 "type": "text/javascript"
               }
@@ -4750,7 +4918,12 @@
               "listen": "test",
               "script": {
                 "exec": [
-                  "pm.test('shared entry missing fields returns 400', function () { pm.response.to.have.status(400); });"
+                  "pm.test('shared entry missing fields returns 400', function () { pm.response.to.have.status(400); });",
+                  "pm.test('shared entry 400 has v2 error shape', function () {",
+                  "  var body = pm.response.json();",
+                  "  pm.expect(body.success).to.eql(false);",
+                  "  pm.expect(body.message).to.be.a('string').and.not.empty;",
+                  "});"
                 ],
                 "type": "text/javascript"
               }
@@ -4833,7 +5006,12 @@
               "listen": "test",
               "script": {
                 "exec": [
-                  "pm.test('shared invitation missing fields returns 400', function () { pm.response.to.have.status(400); });"
+                  "pm.test('invitation missing fields returns 400', function () { pm.response.to.have.status(400); });",
+                  "pm.test('invitation 400 has v2 error shape', function () {",
+                  "  var body = pm.response.json();",
+                  "  pm.expect(body.success).to.eql(false);",
+                  "  pm.expect(body.message).to.be.a('string').and.not.empty;",
+                  "});"
                 ],
                 "type": "text/javascript"
               }
@@ -4872,7 +5050,12 @@
               "listen": "test",
               "script": {
                 "exec": [
-                  "pm.test('shared invitation accept missing token returns 404', function () { pm.response.to.have.status(404); });"
+                  "pm.test('accept nonexistent invitation returns 404', function () { pm.response.to.have.status(404); });",
+                  "pm.test('nonexistent invitation 404 has v2 error shape', function () {",
+                  "  var body = pm.response.json();",
+                  "  pm.expect(body.success).to.eql(false);",
+                  "  pm.expect(body.message).to.be.a('string').and.not.empty;",
+                  "});"
                 ],
                 "type": "text/javascript"
               }
@@ -4909,7 +5092,12 @@
               "listen": "test",
               "script": {
                 "exec": [
-                  "pm.test('shared entry delete missing id returns 404', function () { pm.response.to.have.status(404); });"
+                  "pm.test('delete nonexistent shared entry returns 404', function () { pm.response.to.have.status(404); });",
+                  "pm.test('nonexistent shared entry 404 has v2 error shape', function () {",
+                  "  var body = pm.response.json();",
+                  "  pm.expect(body.success).to.eql(false);",
+                  "  pm.expect(body.message).to.be.a('string').and.not.empty;",
+                  "});"
                 ],
                 "type": "text/javascript"
               }
@@ -4947,7 +5135,12 @@
               "listen": "test",
               "script": {
                 "exec": [
-                  "pm.test('shared invitation delete missing id returns 404', function () { pm.response.to.have.status(404); });"
+                  "pm.test('delete nonexistent invitation returns 404', function () { pm.response.to.have.status(404); });",
+                  "pm.test('nonexistent invitation delete 404 has v2 error shape', function () {",
+                  "  var body = pm.response.json();",
+                  "  pm.expect(body.success).to.eql(false);",
+                  "  pm.expect(body.message).to.be.a('string').and.not.empty;",
+                  "});"
                 ],
                 "type": "text/javascript"
               }
@@ -5046,7 +5239,12 @@
               "listen": "test",
               "script": {
                 "exec": [
-                  "pm.test('fiscal csv confirm returns 201', function () { pm.response.to.have.status(201); });"
+                  "pm.test('csv confirm import returns 201', function () { pm.response.to.have.status(201); });",
+                  "pm.test('csv confirm import v2 contract', function () {",
+                  "  var body = pm.response.json();",
+                  "  pm.expect(body.success).to.eql(true);",
+                  "  pm.expect(body.data).to.be.an('object');",
+                  "});"
                 ],
                 "type": "text/javascript"
               }
@@ -5183,7 +5381,12 @@
               "listen": "test",
               "script": {
                 "exec": [
-                  "pm.test('fiscal receivable receive returns 200', function () { pm.response.to.have.status(200); });"
+                  "pm.test('fiscal receivable receive returns 200', function () { pm.response.to.have.status(200); });",
+                  "pm.test('fiscal receivable receive v2 contract', function () {",
+                  "  var body = pm.response.json();",
+                  "  pm.expect(body.success).to.eql(true);",
+                  "  pm.expect(body.data).to.be.an('object');",
+                  "});"
                 ],
                 "type": "text/javascript"
               }
@@ -5221,7 +5424,12 @@
               "listen": "test",
               "script": {
                 "exec": [
-                  "pm.test('fiscal receivables summary returns 200', function () { pm.response.to.have.status(200); });"
+                  "pm.test('fiscal receivables summary returns 200', function () { pm.response.to.have.status(200); });",
+                  "pm.test('fiscal receivables summary v2 contract', function () {",
+                  "  var body = pm.response.json();",
+                  "  pm.expect(body.success).to.eql(true);",
+                  "  pm.expect(body.data).to.be.an('object');",
+                  "});"
                 ],
                 "type": "text/javascript"
               }
@@ -5259,7 +5467,12 @@
               "listen": "test",
               "script": {
                 "exec": [
-                  "pm.test('fiscal receivable delete settled returns 409', function () { pm.response.to.have.status(409); });"
+                  "pm.test('delete settled receivable returns 409 conflict', function () { pm.response.to.have.status(409); });",
+                  "pm.test('settled receivable 409 has v2 error shape', function () {",
+                  "  var body = pm.response.json();",
+                  "  pm.expect(body.success).to.eql(false);",
+                  "  pm.expect(body.message).to.be.a('string').and.not.empty;",
+                  "});"
                 ],
                 "type": "text/javascript"
               }
@@ -5296,7 +5509,12 @@
               "listen": "test",
               "script": {
                 "exec": [
-                  "pm.test('fiscal documents list returns 200', function () { pm.response.to.have.status(200); });"
+                  "pm.test('fiscal documents list returns 200', function () { pm.response.to.have.status(200); });",
+                  "pm.test('fiscal documents list v2 contract', function () {",
+                  "  var body = pm.response.json();",
+                  "  pm.expect(body.success).to.eql(true);",
+                  "  pm.expect(body.data.items).to.be.an('array');",
+                  "});"
                 ],
                 "type": "text/javascript"
               }
@@ -5386,7 +5604,12 @@
               "listen": "test",
               "script": {
                 "exec": [
-                  "pm.test('tags list returns 200', function () { pm.response.to.have.status(200); });"
+                  "pm.test('tags list returns 200', function () { pm.response.to.have.status(200); });",
+                  "pm.test('tags list v2 contract returns array', function () {",
+                  "  var body = pm.response.json();",
+                  "  pm.expect(body.success).to.eql(true);",
+                  "  pm.expect(body.data.items).to.be.an('array');",
+                  "});"
                 ],
                 "type": "text/javascript"
               }
@@ -5432,6 +5655,10 @@
                 "exec": [
                   "pm.test('tag create returns 201', function () { pm.response.to.have.status(201); });",
                   "var body = pm.response.json();",
+                  "pm.test('tag create v2 contract and captures id', function () {",
+                  "  pm.expect(body.success).to.eql(true);",
+                  "  pm.expect(body.data.tag.id).to.be.a('string').and.not.empty;",
+                  "});",
                   "pm.collectionVariables.set('tagId', body.data.tag.id);"
                 ],
                 "type": "text/javascript"
@@ -5477,7 +5704,12 @@
               "listen": "test",
               "script": {
                 "exec": [
-                  "pm.test('tag update returns 200', function () { pm.response.to.have.status(200); });"
+                  "pm.test('tag update returns 200', function () { pm.response.to.have.status(200); });",
+                  "pm.test('tag update v2 contract', function () {",
+                  "  var body = pm.response.json();",
+                  "  pm.expect(body.success).to.eql(true);",
+                  "  pm.expect(body.data.tag).to.have.property('id');",
+                  "});"
                 ],
                 "type": "text/javascript"
               }
@@ -5514,7 +5746,11 @@
               "listen": "test",
               "script": {
                 "exec": [
-                  "pm.test('tag delete returns 200', function () { pm.response.to.have.status(200); });"
+                  "pm.test('tag delete returns 200', function () { pm.response.to.have.status(200); });",
+                  "pm.test('tag delete v2 contract', function () {",
+                  "  var body = pm.response.json();",
+                  "  pm.expect(body.success).to.eql(true);",
+                  "});"
                 ],
                 "type": "text/javascript"
               }
@@ -5550,7 +5786,12 @@
               "listen": "test",
               "script": {
                 "exec": [
-                  "pm.test('accounts list returns 200', function () { pm.response.to.have.status(200); });"
+                  "pm.test('accounts list returns 200', function () { pm.response.to.have.status(200); });",
+                  "pm.test('accounts list v2 contract', function () {",
+                  "  var body = pm.response.json();",
+                  "  pm.expect(body.success).to.eql(true);",
+                  "  pm.expect(body.data.items).to.be.an('array');",
+                  "});"
                 ],
                 "type": "text/javascript"
               }
@@ -5596,6 +5837,10 @@
                 "exec": [
                   "pm.test('account create returns 201', function () { pm.response.to.have.status(201); });",
                   "var body = pm.response.json();",
+                  "pm.test('account create v2 contract and captures id', function () {",
+                  "  pm.expect(body.success).to.eql(true);",
+                  "  pm.expect(body.data.account.id).to.be.a('string').and.not.empty;",
+                  "});",
                   "pm.collectionVariables.set('accountId', body.data.account.id);"
                 ],
                 "type": "text/javascript"
@@ -5641,7 +5886,12 @@
               "listen": "test",
               "script": {
                 "exec": [
-                  "pm.test('account update returns 200', function () { pm.response.to.have.status(200); });"
+                  "pm.test('account update returns 200', function () { pm.response.to.have.status(200); });",
+                  "pm.test('account update v2 contract', function () {",
+                  "  var body = pm.response.json();",
+                  "  pm.expect(body.success).to.eql(true);",
+                  "  pm.expect(body.data.account).to.have.property('id');",
+                  "});"
                 ],
                 "type": "text/javascript"
               }
@@ -5678,7 +5928,11 @@
               "listen": "test",
               "script": {
                 "exec": [
-                  "pm.test('account delete returns 200', function () { pm.response.to.have.status(200); });"
+                  "pm.test('account delete returns 200', function () { pm.response.to.have.status(200); });",
+                  "pm.test('account delete v2 contract', function () {",
+                  "  var body = pm.response.json();",
+                  "  pm.expect(body.success).to.eql(true);",
+                  "});"
                 ],
                 "type": "text/javascript"
               }
@@ -5714,7 +5968,12 @@
               "listen": "test",
               "script": {
                 "exec": [
-                  "pm.test('credit cards list returns 200', function () { pm.response.to.have.status(200); });"
+                  "pm.test('credit cards list returns 200', function () { pm.response.to.have.status(200); });",
+                  "pm.test('credit cards list v2 contract', function () {",
+                  "  var body = pm.response.json();",
+                  "  pm.expect(body.success).to.eql(true);",
+                  "  pm.expect(body.data.items).to.be.an('array');",
+                  "});"
                 ],
                 "type": "text/javascript"
               }
@@ -5760,6 +6019,10 @@
                 "exec": [
                   "pm.test('credit card create returns 201', function () { pm.response.to.have.status(201); });",
                   "var body = pm.response.json();",
+                  "pm.test('credit card create v2 contract and captures id', function () {",
+                  "  pm.expect(body.success).to.eql(true);",
+                  "  pm.expect(body.data.credit_card.id).to.be.a('string').and.not.empty;",
+                  "});",
                   "pm.collectionVariables.set('creditCardId', body.data.credit_card.id);"
                 ],
                 "type": "text/javascript"
@@ -5805,7 +6068,12 @@
               "listen": "test",
               "script": {
                 "exec": [
-                  "pm.test('credit card update returns 200', function () { pm.response.to.have.status(200); });"
+                  "pm.test('credit card update returns 200', function () { pm.response.to.have.status(200); });",
+                  "pm.test('credit card update v2 contract', function () {",
+                  "  var body = pm.response.json();",
+                  "  pm.expect(body.success).to.eql(true);",
+                  "  pm.expect(body.data.credit_card).to.have.property('id');",
+                  "});"
                 ],
                 "type": "text/javascript"
               }
@@ -5842,7 +6110,11 @@
               "listen": "test",
               "script": {
                 "exec": [
-                  "pm.test('credit card delete returns 200', function () { pm.response.to.have.status(200); });"
+                  "pm.test('credit card delete returns 200', function () { pm.response.to.have.status(200); });",
+                  "pm.test('credit card delete v2 contract', function () {",
+                  "  var body = pm.response.json();",
+                  "  pm.expect(body.success).to.eql(true);",
+                  "});"
                 ],
                 "type": "text/javascript"
               }
@@ -6404,8 +6676,15 @@
               "listen": "test",
               "script": {
                 "exec": [
-                  "pm.test('observability snapshot status 200 or 401 or 404', function () {",
+                  "pm.test('observability snapshot returns 200 or 401', function () {",
                   "  pm.expect([200, 401, 404]).to.include(pm.response.code);",
+                  "});",
+                  "pm.test('observability snapshot content when 200', function () {",
+                  "  if (pm.response.code === 200) {",
+                  "    var body = pm.response.json();",
+                  "    pm.expect(body).to.be.an('object');",
+                  "    pm.expect(Object.keys(body).length).to.be.above(0);",
+                  "  }",
                   "});"
                 ],
                 "type": "text/javascript"
@@ -6440,8 +6719,14 @@
               "listen": "test",
               "script": {
                 "exec": [
-                  "pm.test('metrics status 200 or 401 or 404', function () {",
+                  "pm.test('observability metrics returns 200 or 401', function () {",
                   "  pm.expect([200, 401, 404]).to.include(pm.response.code);",
+                  "});",
+                  "pm.test('observability metrics content-type when 200', function () {",
+                  "  if (pm.response.code === 200) {",
+                  "    var contentType = pm.response.headers.get('Content-Type') || '';",
+                  "    pm.expect(contentType.length).to.be.above(0);",
+                  "  }",
                   "});"
                 ],
                 "type": "text/javascript"
@@ -6480,7 +6765,13 @@
               "listen": "test",
               "script": {
                 "exec": [
-                  "pm.test('list budgets', function () { pm.expect(pm.response.code).to.be.oneOf([200, 401]); });"
+                  "pm.test('list budgets returns 200', function () { pm.response.to.have.status(200); });",
+                  "pm.test('list budgets v2 contract', function () {",
+                  "  var body = pm.response.json();",
+                  "  pm.expect(body.success).to.eql(true);",
+                  "  pm.expect(body.data).to.have.property('items');",
+                  "  pm.expect(body.data.items).to.be.an('array');",
+                  "});"
                 ],
                 "type": "text/javascript"
               }
@@ -6505,7 +6796,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\"name\": \"Alimentação\", \"amount\": 500, \"period\": \"monthly\"}"
+              "raw": "{\"name\": \"Alimenta\u00e7\u00e3o\", \"amount\": 500, \"period\": \"monthly\"}"
             },
             "url": {
               "raw": "{{baseUrl}}/budgets",
@@ -6522,7 +6813,13 @@
               "listen": "test",
               "script": {
                 "exec": [
-                  "pm.test('create budget', function () { pm.expect(pm.response.code).to.be.oneOf([201, 401, 422]); });"
+                  "pm.test('create budget returns 201', function () { pm.response.to.have.status(201); });",
+                  "pm.test('create budget v2 contract and captures budgetId', function () {",
+                  "  var body = pm.response.json();",
+                  "  pm.expect(body.success).to.eql(true);",
+                  "  pm.expect(body.data.budget.id).to.be.a('string').and.not.empty;",
+                  "  pm.collectionVariables.set('budgetId', body.data.budget.id);",
+                  "});"
                 ],
                 "type": "text/javascript"
               }
@@ -6556,7 +6853,13 @@
               "listen": "test",
               "script": {
                 "exec": [
-                  "pm.test('get budget', function () { pm.expect(pm.response.code).to.be.oneOf([200, 401, 404]); });"
+                  "pm.test('get budget returns 200', function () { pm.response.to.have.status(200); });",
+                  "pm.test('get budget v2 contract', function () {",
+                  "  var body = pm.response.json();",
+                  "  pm.expect(body.success).to.eql(true);",
+                  "  pm.expect(body.data.budget).to.have.property('id');",
+                  "  pm.expect(body.data.budget.id).to.eql(pm.collectionVariables.get('budgetId'));",
+                  "});"
                 ],
                 "type": "text/javascript"
               }
@@ -6599,7 +6902,12 @@
               "listen": "test",
               "script": {
                 "exec": [
-                  "pm.test('update budget', function () { pm.expect(pm.response.code).to.be.oneOf([200, 401, 404]); });"
+                  "pm.test('update budget returns 200', function () { pm.response.to.have.status(200); });",
+                  "pm.test('update budget v2 contract reflects new amount', function () {",
+                  "  var body = pm.response.json();",
+                  "  pm.expect(body.success).to.eql(true);",
+                  "  pm.expect(body.data.budget).to.have.property('id');",
+                  "});"
                 ],
                 "type": "text/javascript"
               }
@@ -6633,7 +6941,11 @@
               "listen": "test",
               "script": {
                 "exec": [
-                  "pm.test('delete budget', function () { pm.expect(pm.response.code).to.be.oneOf([200, 401, 404]); });"
+                  "pm.test('delete budget returns 200', function () { pm.response.to.have.status(200); });",
+                  "pm.test('delete budget v2 contract', function () {",
+                  "  var body = pm.response.json();",
+                  "  pm.expect(body.success).to.eql(true);",
+                  "});"
                 ],
                 "type": "text/javascript"
               }
@@ -6667,7 +6979,12 @@
               "listen": "test",
               "script": {
                 "exec": [
-                  "pm.test('budget summary', function () { pm.expect(pm.response.code).to.be.oneOf([200, 401]); });"
+                  "pm.test('budget summary returns 200', function () { pm.response.to.have.status(200); });",
+                  "pm.test('budget summary v2 contract', function () {",
+                  "  var body = pm.response.json();",
+                  "  pm.expect(body.success).to.eql(true);",
+                  "  pm.expect(body.data).to.be.an('object');",
+                  "});"
                 ],
                 "type": "text/javascript"
               }

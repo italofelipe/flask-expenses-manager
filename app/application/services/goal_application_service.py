@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from decimal import Decimal
 from typing import Any, Callable, cast
 from uuid import UUID
 
@@ -9,6 +10,7 @@ from marshmallow import ValidationError
 from app.models.user import User
 from app.schemas.goal_planning_schema import GoalSimulationSchema
 from app.services.goal_planning_service import GoalPlanningInput, GoalPlanningService
+from app.services.goal_projection_service import GoalProjectionService
 from app.services.goal_service import GoalService, GoalServiceError
 
 
@@ -119,6 +121,34 @@ class GoalApplicationService:
             "goal_plan": planning_service.serialize_plan(
                 planning_service.build_plan(planning_input)
             ),
+        }
+
+    def get_goal_projection(self, goal_id: UUID) -> dict[str, Any]:
+        try:
+            goal = self._goal_service.get_goal(goal_id)
+        except GoalServiceError as exc:
+            raise _to_goal_application_error(exc) from exc
+
+        user = self._get_user_by_id(self._user_id)
+        monthly_contribution = (
+            Decimal(str(user.monthly_investment))
+            if user is not None and user.monthly_investment is not None
+            else Decimal("0")
+        )
+
+        projection_service = GoalProjectionService(
+            monthly_contribution=monthly_contribution,
+        )
+        projection = projection_service.project(
+            goal_id=goal.id,
+            user_id=self._user_id,
+            current_amount=goal.current_amount,
+            target_amount=goal.target_amount,
+            target_date=goal.target_date,
+        )
+        return {
+            "goal": self._goal_service.serialize(goal),
+            "projection": projection_service.serialize(projection),
         }
 
     def simulate_goal_plan(self, payload: dict[str, Any]) -> dict[str, Any]:
