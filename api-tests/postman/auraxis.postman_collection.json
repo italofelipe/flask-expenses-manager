@@ -5480,7 +5480,7 @@
                   "pm.test('fiscal documents list v2 contract', function () {",
                   "  var body = pm.response.json();",
                   "  pm.expect(body.success).to.eql(true);",
-                  "  pm.expect(body.data.items).to.be.an('array');",
+                  "  pm.expect(body.data.fiscal_documents).to.be.an('array');",
                   "});"
                 ],
                 "type": "text/javascript"
@@ -5575,7 +5575,7 @@
                   "pm.test('tags list v2 contract returns array', function () {",
                   "  var body = pm.response.json();",
                   "  pm.expect(body.success).to.eql(true);",
-                  "  pm.expect(body.data.items).to.be.an('array');",
+                  "  pm.expect(body.data.tags).to.be.an('array');",
                   "});"
                 ],
                 "type": "text/javascript"
@@ -5757,7 +5757,7 @@
                   "pm.test('accounts list v2 contract', function () {",
                   "  var body = pm.response.json();",
                   "  pm.expect(body.success).to.eql(true);",
-                  "  pm.expect(body.data.items).to.be.an('array');",
+                  "  pm.expect(body.data.accounts).to.be.an('array');",
                   "});"
                 ],
                 "type": "text/javascript"
@@ -5939,7 +5939,7 @@
                   "pm.test('credit cards list v2 contract', function () {",
                   "  var body = pm.response.json();",
                   "  pm.expect(body.success).to.eql(true);",
-                  "  pm.expect(body.data.items).to.be.an('array');",
+                  "  pm.expect(body.data.credit_cards).to.be.an('array');",
                   "});"
                 ],
                 "type": "text/javascript"
