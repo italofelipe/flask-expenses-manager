@@ -11,8 +11,8 @@
       "script": {
         "exec": [
           "var smokeRequests = [\"01 - Healthz\", \"02 - Register user (REST v2)\", \"03 - Login user (REST v2)\", \"04 - Login invalid credentials returns safe error\", \"05 - Me (REST v2)\", \"06 - User bootstrap (REST v2)\", \"01 - Create transaction (REST v2)\", \"04 - List active transactions (REST v2)\", \"05 - Transaction summary by month (REST v2)\", \"06 - Dashboard overview (REST v2)\", \"01 - Create goal (REST v2)\", \"02 - List goals (REST v2)\", \"05 - Goal simulate (REST v2)\", \"01 - Create wallet investment (REST v2)\", \"02 - List wallet investments (REST v2)\", \"10 - Create wallet operation (REST v2)\", \"12 - Wallet operation summary (REST v2)\", \"01 - Installment vs cash calculate (REST public)\", \"02 - Installment vs cash save (REST auth required)\", \"03 - Simulation goal bridge without entitlement returns 403\", \"02 - GraphQL login invalid credentials (safe error)\", \"03 - GraphQL me query (auth required)\", \"04 - GraphQL installment vs cash calculate (public)\", \"01 - List alert preferences (REST v2)\", \"01 - Get my subscription (REST v2)\", \"01 - List entitlements (REST v2)\", \"01 - List shared entries by me (REST v2)\", \"01 - CSV upload preview (REST v2)\"];",
-          "var privilegedOnlyRequests = [\"04 - Grant advanced simulations entitlement (optional admin)\", \"05 - Save advanced simulation for success bridges (optional admin)\", \"06 - Simulation goal bridge success (optional admin)\", \"07 - Save fee simulation for planned expense bridge (optional admin)\", \"08 - Simulation planned expense bridge success (optional admin)\", \"09 - Revoke advanced simulations entitlement (optional admin)\"];",
-          "var privilegedProfileRequests = [\"01 - Healthz\", \"02 - Register user (REST v2)\", \"03 - Login user (REST v2)\", \"05 - Me (REST v2)\", \"06 - User bootstrap (REST v2)\", \"01 - Installment vs cash calculate (REST public)\", \"02 - Installment vs cash save (REST auth required)\", \"03 - Simulation goal bridge without entitlement returns 403\", \"04 - Grant advanced simulations entitlement (optional admin)\", \"05 - Save advanced simulation for success bridges (optional admin)\", \"06 - Simulation goal bridge success (optional admin)\", \"07 - Save fee simulation for planned expense bridge (optional admin)\", \"08 - Simulation planned expense bridge success (optional admin)\", \"09 - Revoke advanced simulations entitlement (optional admin)\"];",
+          "var privilegedOnlyRequests = [\"04 - Grant advanced simulations entitlement (optional admin)\", \"05 - Save advanced simulation for success bridges (optional admin)\", \"06 - Simulation goal bridge success (optional admin)\", \"07 - Save fee simulation for planned expense bridge (optional admin)\", \"08 - Simulation planned expense bridge success (optional admin)\", \"09 - Revoke advanced simulations entitlement (optional admin)\", \"01 - List feature flags (admin REST)\", \"02 - Create or update feature flag (admin REST)\", \"03 - Get feature flag (admin REST)\", \"04 - Delete feature flag (admin REST)\"];",
+          "var privilegedProfileRequests = [\"01 - Healthz\", \"02 - Register user (REST v2)\", \"03 - Login user (REST v2)\", \"05 - Me (REST v2)\", \"06 - User bootstrap (REST v2)\", \"01 - Installment vs cash calculate (REST public)\", \"02 - Installment vs cash save (REST auth required)\", \"03 - Simulation goal bridge without entitlement returns 403\", \"04 - Grant advanced simulations entitlement (optional admin)\", \"05 - Save advanced simulation for success bridges (optional admin)\", \"06 - Simulation goal bridge success (optional admin)\", \"07 - Save fee simulation for planned expense bridge (optional admin)\", \"08 - Simulation planned expense bridge success (optional admin)\", \"09 - Revoke advanced simulations entitlement (optional admin)\", \"01 - List feature flags (admin REST)\", \"02 - Create or update feature flag (admin REST)\", \"03 - Get feature flag (admin REST)\", \"04 - Delete feature flag (admin REST)\"];",
           "var activeProfile = String(pm.environment.get('suiteProfile') || pm.collectionVariables.get('suiteProfile') || 'full').toLowerCase();",
           "if (!['smoke', 'full', 'privileged'].includes(activeProfile)) {",
           "  throw new Error('Unsupported suiteProfile: ' + activeProfile + '. Use smoke, full or privileged.');",
@@ -747,8 +747,8 @@
                   "pm.test('re-login returns 200', function () { pm.response.to.have.status(200); });",
                   "pm.test('re-login response refreshes authToken', function () {",
                   "  var body = pm.response.json();",
-                  "  pm.expect(body.token).to.be.a('string').and.not.empty;",
-                  "  pm.collectionVariables.set('authToken', body.token);",
+                  "  pm.expect(body.data.token).to.be.a('string').and.not.empty;",
+                  "  pm.collectionVariables.set('authToken', body.data.token);",
                   "});"
                 ],
                 "type": "text/javascript"
@@ -1035,54 +1035,6 @@
               }
             }
           ]
-        },
-        {
-          "name": "20 - Delete account (REST v2)",
-          "request": {
-            "method": "DELETE",
-            "header": [
-              {
-                "key": "Authorization",
-                "value": "Bearer {{accessToken}}",
-                "type": "text"
-              },
-              {
-                "key": "Content-Type",
-                "value": "application/json",
-                "type": "text"
-              }
-            ],
-            "body": {
-              "mode": "raw",
-              "raw": "{\"password\": \"{{userPassword}}\"}"
-            },
-            "url": {
-              "raw": "{{baseUrl}}/user/me",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "user",
-                "me"
-              ]
-            }
-          },
-          "event": [
-            {
-              "listen": "test",
-              "script": {
-                "exec": [
-                  "pm.test('account deletion returns 200', function () { pm.response.to.have.status(200); });",
-                  "pm.test('account deletion v2 contract', function () {",
-                  "  var body = pm.response.json();",
-                  "  pm.expect(body.success).to.eql(true);",
-                  "  pm.expect(body.message).to.be.a('string').and.not.empty;",
-                  "});"
-                ],
-                "type": "text/javascript"
-              }
-            }
-          ]
         }
       ]
     },
@@ -1274,12 +1226,13 @@
               "script": {
                 "exec": [
                   "pm.test('income transaction create returns 201', function () { pm.response.to.have.status(201); });",
+                  "var body = pm.response.json();",
+                  "var transaction = Array.isArray(body.data.transaction) ? body.data.transaction[0] : body.data.transaction;",
                   "pm.test('income transaction v2 contract and captures id', function () {",
-                  "  var body = pm.response.json();",
                   "  pm.expect(body.success).to.eql(true);",
-                  "  pm.expect(body.data.transaction.id).to.be.a('string').and.not.empty;",
-                  "  pm.collectionVariables.set('incomeTransactionId', body.data.transaction.id);",
-                  "});"
+                  "  pm.expect(transaction.id).to.be.a('string').and.not.empty;",
+                  "});",
+                  "pm.collectionVariables.set('incomeTransactionId', transaction.id);"
                 ],
                 "type": "text/javascript"
               }
@@ -3392,6 +3345,11 @@
               {
                 "key": "Authorization",
                 "value": "Bearer {{authToken}}"
+              },
+              {
+                "key": "X-API-Contract",
+                "value": "v2",
+                "type": "text"
               }
             ],
             "url": {
@@ -3578,6 +3536,11 @@
               {
                 "key": "Authorization",
                 "value": "Bearer {{authToken}}"
+              },
+              {
+                "key": "X-API-Contract",
+                "value": "v2",
+                "type": "text"
               }
             ],
             "url": {
@@ -3765,6 +3728,11 @@
               {
                 "key": "Authorization",
                 "value": "Bearer {{authToken}}"
+              },
+              {
+                "key": "X-API-Contract",
+                "value": "v2",
+                "type": "text"
               }
             ],
             "url": {
@@ -4517,8 +4485,9 @@
                   "pm.test('webhook invalid signature returns 401', function () { pm.response.to.have.status(401); });",
                   "pm.test('webhook rejection has error message', function () {",
                   "  var body = pm.response.json();",
-                  "  pm.expect(body).to.have.property('message');",
-                  "  pm.expect(body.message).to.be.a('string').and.not.empty;",
+                  "  pm.expect(body.success).to.eql(false);",
+                  "  var message = body.message || (body.error && body.error.message) || '';",
+                  "  pm.expect(message).to.be.a('string').and.not.empty;",
                   "});"
                 ],
                 "type": "text/javascript"
@@ -4652,6 +4621,23 @@
                 ],
                 "type": "text/javascript"
               }
+            },
+            {
+              "listen": "prerequest",
+              "script": {
+                "exec": [
+                  "var activeProfile = String(pm.environment.get('suiteProfile') || pm.collectionVariables.get('suiteProfile') || 'full').toLowerCase();",
+                  "var enabled = String(pm.environment.get('enablePrivilegedFlows') || pm.collectionVariables.get('enablePrivilegedFlows') || 'false').toLowerCase();",
+                  "var adminToken = pm.environment.get('adminToken') || pm.collectionVariables.get('adminToken') || '';",
+                  "if (activeProfile !== 'privileged') {",
+                  "  pm.execution.skipRequest();",
+                  "}",
+                  "if (enabled !== 'true' || !adminToken) {",
+                  "  throw new Error('Privileged profile requires enablePrivilegedFlows=true and adminToken configured.');",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
             }
           ]
         },
@@ -4701,8 +4687,26 @@
                   "    var body = pm.response.json();",
                   "    pm.expect(body).to.have.property('flag');",
                   "    pm.expect(body.flag).to.have.property('key');",
+                  "    pm.collectionVariables.set('featureFlagKey', body.flag.key);",
                   "  }",
                   "});"
+                ],
+                "type": "text/javascript"
+              }
+            },
+            {
+              "listen": "prerequest",
+              "script": {
+                "exec": [
+                  "var activeProfile = String(pm.environment.get('suiteProfile') || pm.collectionVariables.get('suiteProfile') || 'full').toLowerCase();",
+                  "var enabled = String(pm.environment.get('enablePrivilegedFlows') || pm.collectionVariables.get('enablePrivilegedFlows') || 'false').toLowerCase();",
+                  "var adminToken = pm.environment.get('adminToken') || pm.collectionVariables.get('adminToken') || '';",
+                  "if (activeProfile !== 'privileged') {",
+                  "  pm.execution.skipRequest();",
+                  "}",
+                  "if (enabled !== 'true' || !adminToken) {",
+                  "  throw new Error('Privileged profile requires enablePrivilegedFlows=true and adminToken configured.');",
+                  "}"
                 ],
                 "type": "text/javascript"
               }
@@ -4753,6 +4757,23 @@
                 ],
                 "type": "text/javascript"
               }
+            },
+            {
+              "listen": "prerequest",
+              "script": {
+                "exec": [
+                  "var activeProfile = String(pm.environment.get('suiteProfile') || pm.collectionVariables.get('suiteProfile') || 'full').toLowerCase();",
+                  "var enabled = String(pm.environment.get('enablePrivilegedFlows') || pm.collectionVariables.get('enablePrivilegedFlows') || 'false').toLowerCase();",
+                  "var adminToken = pm.environment.get('adminToken') || pm.collectionVariables.get('adminToken') || '';",
+                  "if (activeProfile !== 'privileged') {",
+                  "  pm.execution.skipRequest();",
+                  "}",
+                  "if (enabled !== 'true' || !adminToken) {",
+                  "  throw new Error('Privileged profile requires enablePrivilegedFlows=true and adminToken configured.');",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
             }
           ]
         },
@@ -4794,6 +4815,23 @@
                   "  var body = pm.response.json();",
                   "  pm.expect(body).to.be.an('object');",
                   "});"
+                ],
+                "type": "text/javascript"
+              }
+            },
+            {
+              "listen": "prerequest",
+              "script": {
+                "exec": [
+                  "var activeProfile = String(pm.environment.get('suiteProfile') || pm.collectionVariables.get('suiteProfile') || 'full').toLowerCase();",
+                  "var enabled = String(pm.environment.get('enablePrivilegedFlows') || pm.collectionVariables.get('enablePrivilegedFlows') || 'false').toLowerCase();",
+                  "var adminToken = pm.environment.get('adminToken') || pm.collectionVariables.get('adminToken') || '';",
+                  "if (activeProfile !== 'privileged') {",
+                  "  pm.execution.skipRequest();",
+                  "}",
+                  "if (enabled !== 'true' || !adminToken) {",
+                  "  throw new Error('Privileged profile requires enablePrivilegedFlows=true and adminToken configured.');",
+                  "}"
                 ],
                 "type": "text/javascript"
               }
@@ -5513,7 +5551,7 @@
                   "pm.test('fiscal documents list v2 contract', function () {",
                   "  var body = pm.response.json();",
                   "  pm.expect(body.success).to.eql(true);",
-                  "  pm.expect(body.data.items).to.be.an('array');",
+                  "  pm.expect(body.data.fiscal_documents).to.be.an('array');",
                   "});"
                 ],
                 "type": "text/javascript"
@@ -5608,7 +5646,7 @@
                   "pm.test('tags list v2 contract returns array', function () {",
                   "  var body = pm.response.json();",
                   "  pm.expect(body.success).to.eql(true);",
-                  "  pm.expect(body.data.items).to.be.an('array');",
+                  "  pm.expect(body.data.tags).to.be.an('array');",
                   "});"
                 ],
                 "type": "text/javascript"
@@ -5790,7 +5828,7 @@
                   "pm.test('accounts list v2 contract', function () {",
                   "  var body = pm.response.json();",
                   "  pm.expect(body.success).to.eql(true);",
-                  "  pm.expect(body.data.items).to.be.an('array');",
+                  "  pm.expect(body.data.accounts).to.be.an('array');",
                   "});"
                 ],
                 "type": "text/javascript"
@@ -5972,7 +6010,7 @@
                   "pm.test('credit cards list v2 contract', function () {",
                   "  var body = pm.response.json();",
                   "  pm.expect(body.success).to.eql(true);",
-                  "  pm.expect(body.data.items).to.be.an('array');",
+                  "  pm.expect(body.data.credit_cards).to.be.an('array');",
                   "});"
                 ],
                 "type": "text/javascript"
@@ -6643,6 +6681,54 @@
               }
             }
           ]
+        },
+        {
+          "name": "13 - Re-login after GraphQL logout (REST v2)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "X-API-Contract",
+                "value": "v2"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/auth/login",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "login"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\"email\": \"{{runEmail}}\", \"password\": \"{{testPassword}}\"}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('re-login after GraphQL logout returns 200', function () { pm.response.to.have.status(200); });",
+                  "var body = pm.response.json();",
+                  "pm.test('re-login restores valid auth token', function () {",
+                  "  pm.expect(body.success).to.eql(true);",
+                  "  pm.expect(body.data.token).to.be.a('string').and.not.empty;",
+                  "});",
+                  "pm.collectionVariables.set('authToken', body.data.token);",
+                  "pm.collectionVariables.set('userId', body.data.user.id);"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
         }
       ]
     },
@@ -6746,7 +6832,12 @@
             "header": [
               {
                 "key": "Authorization",
-                "value": "Bearer {{accessToken}}",
+                "value": "Bearer {{authToken}}",
+                "type": "text"
+              },
+              {
+                "key": "X-API-Contract",
+                "value": "v2",
                 "type": "text"
               }
             ],
@@ -6785,18 +6876,23 @@
             "header": [
               {
                 "key": "Authorization",
-                "value": "Bearer {{accessToken}}",
+                "value": "Bearer {{authToken}}",
                 "type": "text"
               },
               {
                 "key": "Content-Type",
                 "value": "application/json",
                 "type": "text"
+              },
+              {
+                "key": "X-API-Contract",
+                "value": "v2",
+                "type": "text"
               }
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\"name\": \"Alimenta\u00e7\u00e3o\", \"amount\": 500, \"period\": \"monthly\"}"
+              "raw": "{\"name\": \"Alimentação\", \"amount\": 500, \"period\": \"monthly\"}"
             },
             "url": {
               "raw": "{{baseUrl}}/budgets",
@@ -6833,7 +6929,12 @@
             "header": [
               {
                 "key": "Authorization",
-                "value": "Bearer {{accessToken}}",
+                "value": "Bearer {{authToken}}",
+                "type": "text"
+              },
+              {
+                "key": "X-API-Contract",
+                "value": "v2",
                 "type": "text"
               }
             ],
@@ -6873,12 +6974,17 @@
             "header": [
               {
                 "key": "Authorization",
-                "value": "Bearer {{accessToken}}",
+                "value": "Bearer {{authToken}}",
                 "type": "text"
               },
               {
                 "key": "Content-Type",
                 "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "X-API-Contract",
+                "value": "v2",
                 "type": "text"
               }
             ],
@@ -6921,7 +7027,12 @@
             "header": [
               {
                 "key": "Authorization",
-                "value": "Bearer {{accessToken}}",
+                "value": "Bearer {{authToken}}",
+                "type": "text"
+              },
+              {
+                "key": "X-API-Contract",
+                "value": "v2",
                 "type": "text"
               }
             ],
@@ -6959,7 +7070,12 @@
             "header": [
               {
                 "key": "Authorization",
-                "value": "Bearer {{accessToken}}",
+                "value": "Bearer {{authToken}}",
+                "type": "text"
+              },
+              {
+                "key": "X-API-Contract",
+                "value": "v2",
                 "type": "text"
               }
             ],
@@ -6992,6 +7108,128 @@
           ]
         }
       ]
+    },
+    {
+      "name": "99 - Terminal (Account Lifecycle)",
+      "item": [
+        {
+          "name": "19 - Re-login for account deletion (REST v2)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "X-API-Contract",
+                "value": "v2"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/auth/login",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "login"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\"email\": \"{{runEmail}}\", \"password\": \"{{testPassword}}\"}"
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "exec": [
+                  "var p = pm.environment.get(\"suiteProfile\") || pm.collectionVariables.get(\"suiteProfile\") || \"full\"; if (p === \"smoke\") { pm.execution.skipRequest(); }"
+                ],
+                "type": "text/javascript"
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('re-login for deletion returns 200', function () { pm.response.to.have.status(200); });",
+                  "var body = pm.response.json();",
+                  "if (body.success && body.data && body.data.token) {",
+                  "  pm.collectionVariables.set('authToken', body.data.token);",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "20 - Delete account (REST v2)",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{authToken}}",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "X-API-Contract",
+                "value": "v2",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\"password\": \"{{testPassword}}\"}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/user/me",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "user",
+                "me"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "exec": [
+                  "var p = pm.environment.get(\"suiteProfile\") || pm.collectionVariables.get(\"suiteProfile\") || \"full\"; if (p === \"smoke\") { pm.execution.skipRequest(); }"
+                ],
+                "type": "text/javascript"
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('account deletion returns 200', function () { pm.response.to.have.status(200); });",
+                  "pm.test('account deletion v2 contract', function () {",
+                  "  var body = pm.response.json();",
+                  "  pm.expect(body.success).to.eql(true);",
+                  "  pm.expect(body.message).to.be.a('string').and.not.empty;",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        }
+      ],
+      "description": "Destructive teardown — runs last so prior sections remain authenticated."
     }
   ],
   "variable": [
@@ -7110,6 +7348,16 @@
     {
       "key": "adminToken",
       "value": ""
+    },
+    {
+      "key": "budgetId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "featureFlagKey",
+      "value": "example_flag",
+      "type": "string"
     }
   ]
 }
