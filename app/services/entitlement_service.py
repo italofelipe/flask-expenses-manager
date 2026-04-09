@@ -115,15 +115,14 @@ def require_entitlement(feature_key: str) -> Any:
 
             uid = _current_user_id()
             if not has_entitlement(uid, feature_key):
+                _msg = f"Feature '{feature_key}' requires an active entitlement."
                 body: Response = jsonify(
                     {
                         "success": False,
+                        "message": _msg,
                         "error": {
                             "code": "ENTITLEMENT_REQUIRED",
-                            "message": (
-                                f"Feature '{feature_key}' requires an active"
-                                " entitlement."
-                            ),
+                            "message": _msg,
                         },
                     }
                 )
