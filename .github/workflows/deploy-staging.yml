@@ -149,7 +149,8 @@ jobs:
           python scripts/http_smoke_check.py \
             --env-name staging \
             --base-url "${BASE_URL}" \
-            --timeout 20
+            --timeout 20 \
+            --cors-origin https://pilot.auraxis.com.br
 
       - name: Auto-rollback Staging on deploy failure
         if: ${{ failure() }}

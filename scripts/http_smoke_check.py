@@ -37,7 +37,7 @@ class SmokeCheckError(RuntimeError):
 class _MethodPreservingNoRedirect(urllib.request.HTTPRedirectHandler):
     """Disable urllib auto-redirect to preserve method/body on manual follow."""
 
-    def redirect_request(  # type: ignore[override]
+    def redirect_request(
         self,
         req: urllib.request.Request,
         fp: object,
@@ -192,6 +192,67 @@ def _check_rest_invalid_login(base_url: str, timeout: int) -> None:
     print(f"[smoke] PASS rest-invalid-login status={result.status}")
 
 
+def _check_cors_preflight(base_url: str, timeout: int, origin: str) -> None:
+    """Send an OPTIONS preflight to /auth/login and verify the CORS response headers."""
+    url = _build_url(base_url, "/auth/login")
+    result = _request_json(
+        method="OPTIONS",
+        url=url,
+        timeout=timeout,
+        headers={
+            "Origin": origin,
+            "Access-Control-Request-Method": "POST",
+        },
+    )
+    actual = result.body_text  # not used for header checks, but kept for context
+    _ = actual  # suppress unused-variable warning
+    # urllib does not expose response headers from HTTPError bodies easily,
+    # so we need to perform the OPTIONS request using a lower-level approach.
+    # Re-issue the request and capture the real response headers.
+    import http.client
+    import urllib.parse as _urlparse
+
+    parsed = _urlparse.urlparse(url)
+    host = parsed.netloc
+    path = parsed.path or "/"
+    use_https = parsed.scheme == "https"
+
+    conn: http.client.HTTPConnection
+    if use_https:
+        import ssl
+
+        ctx = ssl.create_default_context()
+        conn = http.client.HTTPSConnection(host, timeout=timeout, context=ctx)
+    else:
+        conn = http.client.HTTPConnection(host, timeout=timeout)
+
+    try:
+        conn.request(
+            "OPTIONS",
+            path,
+            headers={
+                "Origin": origin,
+                "Access-Control-Request-Method": "POST",
+            },
+        )
+        response = conn.getresponse()
+        allow_origin = response.getheader("Access-Control-Allow-Origin")
+    finally:
+        conn.close()
+
+    if not allow_origin:
+        raise SmokeCheckError(
+            f"CORS preflight for origin={origin!r}: "
+            "Access-Control-Allow-Origin header is missing."
+        )
+    if allow_origin != origin:
+        raise SmokeCheckError(
+            f"CORS preflight for origin={origin!r}: "
+            f"Access-Control-Allow-Origin={allow_origin!r} (expected {origin!r})."
+        )
+    print(f"[smoke] PASS cors-preflight origin={origin}")
+
+
 def _check_graphql_invalid_login(base_url: str, timeout: int) -> None:
     url = _build_url(base_url, "/graphql")
     mutation = (
@@ -341,6 +402,23 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--timeout", type=int, default=15, help="HTTP timeout in seconds"
     )
+    parser.add_argument(
+        "--cors-origin",
+        default="https://app.auraxis.com.br",
+        help=(
+            "Origin to use for the CORS preflight check "
+            "(default: https://app.auraxis.com.br)"
+        ),
+    )
+    parser.add_argument(
+        "--skip-cors",
+        action="store_true",
+        default=False,
+        help=(
+            "Skip the CORS preflight check. Useful for internal health checks "
+            "where a browser origin is not expected."
+        ),
+    )
     return parser.parse_args()
 
 
@@ -350,6 +428,8 @@ def main() -> int:
     _check_health(args.base_url, args.timeout)
     _check_graphql_empty_query(args.base_url, args.timeout)
     _check_rest_invalid_login(args.base_url, args.timeout)
+    if not args.skip_cors:
+        _check_cors_preflight(args.base_url, args.timeout, args.cors_origin)
     _check_graphql_invalid_login(args.base_url, args.timeout)
     _check_installment_vs_cash_rest_calculate(args.base_url, args.timeout)
     _check_installment_vs_cash_graphql_calculate(args.base_url, args.timeout)

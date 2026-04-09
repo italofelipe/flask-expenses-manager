@@ -126,7 +126,8 @@ jobs:
           python scripts/http_smoke_check.py \
             --env-name dev \
             --base-url "${BASE_URL}" \
-            --timeout 20
+            --timeout 20 \
+            --skip-cors
 
       - name: Auto-rollback DEV on deploy failure
         if: ${{ failure() }}
@@ -274,7 +275,8 @@ jobs:
           python scripts/http_smoke_check.py \
             --env-name prod \
             --base-url "${BASE_URL}" \
-            --timeout 20
+            --timeout 20 \
+            --cors-origin https://app.auraxis.com.br
 
       - name: Readiness gate (PROD)
         env:
