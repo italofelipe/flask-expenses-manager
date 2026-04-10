@@ -4371,6 +4371,11 @@
               {
                 "key": "X-API-Contract",
                 "value": "v2"
+              },
+              {
+                "key": "Idempotency-Key",
+                "value": "{{$guid}}",
+                "description": "Required for POST mutators — prevents duplicate mutations (SEC-GAP-05)"
               }
             ],
             "url": {
@@ -4418,6 +4423,11 @@
               {
                 "key": "X-API-Contract",
                 "value": "v2"
+              },
+              {
+                "key": "Idempotency-Key",
+                "value": "{{$guid}}",
+                "description": "Required for POST mutators — prevents duplicate mutations (SEC-GAP-05)"
               }
             ],
             "url": {
