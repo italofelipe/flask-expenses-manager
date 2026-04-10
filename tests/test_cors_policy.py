@@ -304,3 +304,61 @@ def test_create_app_still_requires_cors_policy_for_http_runtime(
 
     with pytest.raises(RuntimeError, match="CORS_ALLOWED_ORIGINS"):
         create_app()
+
+
+# ---------------------------------------------------------------------------
+# Production domain coverage tests
+# ---------------------------------------------------------------------------
+
+_PRODUCTION_ORIGINS = [
+    "https://app.auraxis.com.br",
+    "https://pilot.auraxis.com.br",
+    "https://www.auraxis.com.br",
+]
+
+
+@pytest.mark.parametrize("origin", _PRODUCTION_ORIGINS)
+def test_production_origins_are_allowed(
+    monkeypatch: pytest.MonkeyPatch,
+    origin: str,
+) -> None:
+    """Each canonical production origin must be accepted by the CORS policy."""
+    monkeypatch.setenv("FLASK_DEBUG", "true")
+    monkeypatch.setenv("FLASK_TESTING", "true")
+    allowed = ",".join(_PRODUCTION_ORIGINS)
+    monkeypatch.setenv("CORS_ALLOWED_ORIGINS", allowed)
+
+    assert _is_allowed_origin(origin, set(_PRODUCTION_ORIGINS)) is True
+
+
+@pytest.mark.parametrize("origin", _PRODUCTION_ORIGINS)
+def test_register_cors_allows_preflight_for_production_origins(
+    monkeypatch: pytest.MonkeyPatch,
+    origin: str,
+) -> None:
+    """OPTIONS preflight must echo Access-Control-Allow-Origin for each origin."""
+    monkeypatch.setenv("FLASK_DEBUG", "true")
+    monkeypatch.setenv("FLASK_TESTING", "true")
+    allowed = ",".join(_PRODUCTION_ORIGINS)
+    monkeypatch.setenv("CORS_ALLOWED_ORIGINS", allowed)
+
+    app = _build_app()
+    register_cors(app)
+    client = app.test_client()
+
+    response = client.options(
+        "/ping",
+        headers={"Origin": origin},
+    )
+    assert response.status_code == 204
+    assert response.headers.get("Access-Control-Allow-Origin") == origin
+
+
+def test_parse_allowed_origins_includes_pilot_domain() -> None:
+    """pilot.auraxis.com.br must be parseable as a valid CORS origin."""
+    origins = _parse_allowed_origins(
+        "https://app.auraxis.com.br,https://pilot.auraxis.com.br,https://www.auraxis.com.br"
+    )
+    assert "https://pilot.auraxis.com.br" in origins
+    assert "https://app.auraxis.com.br" in origins
+    assert "https://www.auraxis.com.br" in origins
