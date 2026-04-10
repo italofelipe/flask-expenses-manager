@@ -68,8 +68,26 @@ class Config:
     SECRET_KEY = os.getenv("SECRET_KEY", "dev")
     # JWT config
     JWT_SECRET_KEY = os.getenv("JWT_SECRET_KEY", "super-secret-key")
-    JWT_TOKEN_LOCATION = ["headers"]
+    # Access token continues to be delivered via Authorization header.
+    # Refresh token is delivered via httpOnly cookie (SEC-GAP-01 — split-token
+    # pattern). Legacy clients can still read the refresh token from the response
+    # body during the transition period.
+    JWT_TOKEN_LOCATION = ["headers", "cookies"]
     JWT_HEADER_TYPE = "Bearer"
+    JWT_REFRESH_COOKIE_NAME = "auraxis_refresh"
+    JWT_REFRESH_COOKIE_PATH = "/auth/refresh"
+    # Secure flag is enabled in non-dev/test runtimes. HTTPS is required for
+    # Secure cookies to be sent, so we disable it locally to avoid silently
+    # dropping the cookie on http://localhost during development.
+    JWT_COOKIE_SECURE = _read_bool_env(
+        "JWT_COOKIE_SECURE",
+        not _read_bool_env("FLASK_DEBUG", False)
+        and not _read_bool_env("FLASK_TESTING", False),
+    )
+    JWT_COOKIE_SAMESITE = os.getenv("JWT_COOKIE_SAMESITE", "Lax")
+    # CSRF protection for cookie-based JWTs is deferred to a follow-up issue
+    # (double-submit token + per-request header). Keep disabled for now.
+    JWT_COOKIE_CSRF_PROTECT = False
 
     DEBUG = _read_bool_env("FLASK_DEBUG", False)
 
