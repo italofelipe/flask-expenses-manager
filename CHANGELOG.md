@@ -1,5 +1,22 @@
 # Changelog
 
+## [1.22.0](https://github.com/italofelipe/auraxis-api/compare/v1.21.0...v1.22.0) (2026-04-10)
+
+
+### Features
+
+* **billing:** webhook audit log, rate limit, retry CLI — PAY-02/PAY-03 ([#916](https://github.com/italofelipe/auraxis-api/issues/916) [#917](https://github.com/italofelipe/auraxis-api/issues/917)) ([#931](https://github.com/italofelipe/auraxis-api/issues/931)) ([b79082c](https://github.com/italofelipe/auraxis-api/commit/b79082caf41a5a53ae5c64d0a0e184f8eb68f380))
+* **goals:** portfolio-aware compound-interest goal projection ([#861](https://github.com/italofelipe/auraxis-api/issues/861)) ([#932](https://github.com/italofelipe/auraxis-api/issues/932)) ([d129587](https://github.com/italofelipe/auraxis-api/commit/d129587bfb4eb8993b9c72a7295005f0668fd377))
+* **lgpd:** complete account deletion flow — [#885](https://github.com/italofelipe/auraxis-api/issues/885) ([#930](https://github.com/italofelipe/auraxis-api/issues/930)) ([e8f5ce8](https://github.com/italofelipe/auraxis-api/commit/e8f5ce8b8ec6d8ef1e16d720d672724dc4caacc3))
+
+
+### Bug Fixes
+
+* **auth:** SEC-GAP-01 — httpOnly refresh cookie (split-token) ([#944](https://github.com/italofelipe/auraxis-api/issues/944)) ([4638681](https://github.com/italofelipe/auraxis-api/commit/463868143cf0332af52eb1508eac73b95f90c559))
+* **cors:** add pilot origin and preflight smoke test ([#933](https://github.com/italofelipe/auraxis-api/issues/933)) ([16d9b02](https://github.com/italofelipe/auraxis-api/commit/16d9b020490d60d99d41d12a4dd690778560975e))
+* **hardening:** HARD-01 Dockerfile HEALTHCHECK + HARD-04 N+1 portfolio history ([#927](https://github.com/italofelipe/auraxis-api/issues/927)) ([5a17a07](https://github.com/italofelipe/auraxis-api/commit/5a17a075429e206a6b0ab6a4d3c73d4dab3c9cb3))
+* **newman:** repair full suite regressions — v2 token read and accessToken variable ([#935](https://github.com/italofelipe/auraxis-api/issues/935)) ([5b3c848](https://github.com/italofelipe/auraxis-api/commit/5b3c8485459434dac9bf4237f620ca7642b5cbab))
+
 ## [1.21.0](https://github.com/italofelipe/auraxis-api/compare/v1.20.0...v1.21.0) (2026-04-07)
 
 
