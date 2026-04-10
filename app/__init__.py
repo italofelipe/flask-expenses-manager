@@ -294,11 +294,13 @@ def create_app(*, enable_http_runtime: bool = True) -> Flask:
     _register_documented_endpoints(app, docs)
     from app.extensions.jwt_callbacks import register_jwt_callbacks
     from app.middleware.auth_guard import register_auth_guard
+    from app.middleware.idempotency_key import register_idempotency_guard
     from app.middleware.rate_limit import register_rate_limit_guard
 
     if enable_http_runtime:
         register_rate_limit_guard(app)
         register_auth_guard(app)
+        register_idempotency_guard(app)
     register_jwt_callbacks(jwt)
 
     return app

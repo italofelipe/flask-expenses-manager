@@ -75,7 +75,10 @@ def test_build_cors_policy_from_env_respects_defaults(
     assert policy.allowed_origins == {"https://api.auraxis.com.br"}
     assert policy.allow_credentials is True
     assert policy.allow_methods == "GET,POST,PUT,PATCH,DELETE,OPTIONS"
-    assert policy.allow_headers == "Authorization,Content-Type,X-API-Contract"
+    assert (
+        policy.allow_headers
+        == "Authorization,Content-Type,X-API-Contract,Idempotency-Key"
+    )
     assert policy.max_age_seconds == 600
     assert policy.is_production is True
 

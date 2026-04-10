@@ -40,7 +40,7 @@ def _build_cors_policy_from_env() -> CorsPolicy:
     ).strip()
     allowed_headers = os.getenv(
         "CORS_ALLOWED_HEADERS",
-        "Authorization,Content-Type,X-API-Contract",
+        "Authorization,Content-Type,X-API-Contract,Idempotency-Key",
     ).strip()
     return CorsPolicy(
         allowed_origins=_parse_allowed_origins(os.getenv("CORS_ALLOWED_ORIGINS")),
