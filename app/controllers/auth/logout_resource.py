@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from flask import Response
 from flask_apispec.views import MethodResource
+from flask_jwt_extended import unset_jwt_cookies
 
 from app.auth import current_user_id
 from app.docs.openapi_helpers import (
@@ -42,12 +43,18 @@ class LogoutResource(MethodResource):
         identity = current_user_id()
         user = dependencies.get_user_by_id(identity)
         if user:
+            # SEC-GAP-01 — invalidate both the access JTI and the refresh JTI
+            # so a leaked refresh cookie cannot be reused after logout.
             user.current_jti = None
+            user.refresh_token_jti = None
             db.session.commit()
             get_jwt_revocation_cache().invalidate(str(identity))
-        return compat_success(
+        response = compat_success(
             legacy_payload={"message": "Logout successful"},
             status_code=200,
             message="Logout successful",
             data={},
         )
+        # SEC-GAP-01 — clear the httpOnly refresh cookie on the client.
+        unset_jwt_cookies(response)
+        return response

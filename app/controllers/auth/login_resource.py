@@ -4,6 +4,7 @@ from typing import Any
 
 from flask import Response, current_app
 from flask_apispec.views import MethodResource
+from flask_jwt_extended import set_refresh_cookies
 
 from app.application.services.login_identity_service import resolve_login_identity
 from app.docs.openapi_helpers import (
@@ -234,7 +235,7 @@ class AuthResource(MethodResource):
                 "email_confirmed": identity.user.email_verified_at is not None,
             }
             record_auth_login(status="success")
-            return compat_success(
+            response = compat_success(
                 legacy_payload={
                     "message": "Login successful",
                     "token": token,
@@ -249,6 +250,11 @@ class AuthResource(MethodResource):
                     "user": user_data,
                 },
             )
+            # SEC-GAP-01 — emit refresh token as httpOnly cookie. The body still
+            # carries refresh_token for dual-mode backward compatibility during
+            # the client-side migration window.
+            set_refresh_cookies(response, refresh_token)
+            return response
         except Exception:
             current_app.logger.exception("Login failed due to unexpected error.")
             return compat_error(
