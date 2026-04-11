@@ -12,6 +12,11 @@ from app.graphql.mutations.auth import (
     ResetPasswordMutation,
     UpdateUserProfileMutation,
 )
+from app.graphql.mutations.budget import (
+    CreateBudgetMutation,
+    DeleteBudgetMutation,
+    UpdateBudgetMutation,
+)
 from app.graphql.mutations.goal import (
     CreateGoalMutation,
     DeleteGoalMutation,
@@ -23,10 +28,15 @@ from app.graphql.mutations.investment_operation import (
     DeleteInvestmentOperationMutation,
     UpdateInvestmentOperationMutation,
 )
+from app.graphql.mutations.notification import UpdateNotificationPreferencesMutation
 from app.graphql.mutations.simulation import (
     CreateGoalFromInstallmentVsCashSimulationMutation,
     CreatePlannedExpenseFromInstallmentVsCashSimulationMutation,
     SaveInstallmentVsCashSimulationMutation,
+)
+from app.graphql.mutations.subscription import (
+    CancelSubscriptionMutation,
+    CreateCheckoutSessionMutation,
 )
 from app.graphql.mutations.ticker import AddTickerMutation, DeleteTickerMutation
 from app.graphql.mutations.transaction import (
@@ -74,6 +84,12 @@ class Mutation(graphene.ObjectType):
     delete_investment_operation = DeleteInvestmentOperationMutation.Field()
     add_ticker = AddTickerMutation.Field()
     delete_ticker = DeleteTickerMutation.Field()
+    create_budget = CreateBudgetMutation.Field()
+    update_budget = UpdateBudgetMutation.Field()
+    delete_budget = DeleteBudgetMutation.Field()
+    create_checkout_session = CreateCheckoutSessionMutation.Field()
+    cancel_subscription = CancelSubscriptionMutation.Field()
+    update_notification_preferences = UpdateNotificationPreferencesMutation.Field()
 
 
 __all__ = ["Mutation"]

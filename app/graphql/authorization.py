@@ -14,6 +14,7 @@ GRAPHQL_AUTH_PARSE_ERROR = "GRAPHQL_AUTH_PARSE_ERROR"
 DEFAULT_GRAPHQL_PUBLIC_QUERIES = frozenset(
     {
         "__typename",
+        "billingPlans",
         "installmentVsCashCalculate",
     }
 )
