@@ -1,5 +1,19 @@
 # Changelog
 
+## [1.23.0](https://github.com/italofelipe/auraxis-api/compare/v1.22.0...v1.23.0) (2026-04-11)
+
+
+### Features
+
+* **mvp1:** consolidate MVP-1 backend issues ([#886](https://github.com/italofelipe/auraxis-api/issues/886) [#835](https://github.com/italofelipe/auraxis-api/issues/835) [#836](https://github.com/italofelipe/auraxis-api/issues/836) [#840](https://github.com/italofelipe/auraxis-api/issues/840) [#841](https://github.com/italofelipe/auraxis-api/issues/841) [#839](https://github.com/italofelipe/auraxis-api/issues/839) [#838](https://github.com/italofelipe/auraxis-api/issues/838) [#701](https://github.com/italofelipe/auraxis-api/issues/701)) ([#953](https://github.com/italofelipe/auraxis-api/issues/953)) ([a19746e](https://github.com/italofelipe/auraxis-api/commit/a19746ecf8bf5750fded7045753de14da60695d7))
+
+
+### Performance Improvements
+
+* **db:** PERF-GAP-01 — composite indexes on hot query paths ([#948](https://github.com/italofelipe/auraxis-api/issues/948)) ([ce15bb0](https://github.com/italofelipe/auraxis-api/commit/ce15bb0562c0ce09799613c62448907f4470c2d9))
+* **db:** PERF-GAP-02 — eager-load Wallet.operations in portfolio valuation ([#949](https://github.com/italofelipe/auraxis-api/issues/949)) ([6cf13c5](https://github.com/italofelipe/auraxis-api/commit/6cf13c5d01be1a7c197044a636a2c62da758aa28)), closes [#940](https://github.com/italofelipe/auraxis-api/issues/940)
+* **services:** PERF-GAP-04 — retry + exponential backoff for BRAPI, Resend, Asaas ([#950](https://github.com/italofelipe/auraxis-api/issues/950)) ([0c2611a](https://github.com/italofelipe/auraxis-api/commit/0c2611a8124752449cd47482d06baf452e235300)), closes [#942](https://github.com/italofelipe/auraxis-api/issues/942)
+
 ## [1.22.0](https://github.com/italofelipe/auraxis-api/compare/v1.21.0...v1.22.0) (2026-04-10)
 
 
