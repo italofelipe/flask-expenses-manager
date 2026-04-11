@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from flask import Response, current_app
+from flask import Response, current_app, request
 from flask_apispec.views import MethodResource
 from flask_jwt_extended import set_refresh_cookies
 
@@ -28,6 +28,7 @@ from app.utils.typed_decorators import typed_doc as doc
 from app.utils.typed_decorators import typed_use_kwargs as use_kwargs
 
 from .contracts import compat_error, compat_success
+from .cookie_only_policy import COOKIE_ONLY_HEADER, should_omit_refresh_token_in_body
 from .dependencies import AuthDependencies, get_auth_dependencies
 from .guard import guard_login_check, guard_register_failure, guard_register_success
 
@@ -259,24 +260,32 @@ class AuthResource(MethodResource):
                 "email_confirmed": identity.user.email_verified_at is not None,
             }
             record_auth_login(status="success")
+            omit_refresh_in_body = should_omit_refresh_token_in_body(
+                header_value=request.headers.get(COOKIE_ONLY_HEADER),
+            )
+            legacy_payload: dict[str, Any] = {
+                "message": "Login successful",
+                "token": token,
+                "user": user_data,
+            }
+            data_payload: dict[str, Any] = {
+                "token": token,
+                "user": user_data,
+            }
+            if not omit_refresh_in_body:
+                legacy_payload["refresh_token"] = refresh_token
+                data_payload["refresh_token"] = refresh_token
             response = compat_success(
-                legacy_payload={
-                    "message": "Login successful",
-                    "token": token,
-                    "refresh_token": refresh_token,
-                    "user": user_data,
-                },
+                legacy_payload=legacy_payload,
                 status_code=200,
                 message="Login successful",
-                data={
-                    "token": token,
-                    "refresh_token": refresh_token,
-                    "user": user_data,
-                },
+                data=data_payload,
             )
             # SEC-GAP-01 — emit refresh token as httpOnly cookie. The body still
             # carries refresh_token for dual-mode backward compatibility during
-            # the client-side migration window.
+            # the client-side migration window, unless the request opted into
+            # cookie-only mode via the AURAXIS_REFRESH_COOKIE_ONLY flag or the
+            # X-Refresh-Cookie-Only header (SEC-1 close-out).
             set_refresh_cookies(response, refresh_token)
             return response
         except Exception:

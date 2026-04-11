@@ -88,6 +88,11 @@ class Config:
     # CSRF protection for cookie-based JWTs is deferred to a follow-up issue
     # (double-submit token + per-request header). Keep disabled for now.
     JWT_COOKIE_CSRF_PROTECT = False
+    # SEC-1 — close dual-mode: when True, login/refresh responses stop echoing
+    # refresh_token in the JSON body; clients must rely on the httpOnly cookie.
+    # Keep False until legacy clients have migrated. Header X-Refresh-Cookie-Only
+    # lets individual requests opt in without flipping the global switch.
+    AURAXIS_REFRESH_COOKIE_ONLY = _read_bool_env("AURAXIS_REFRESH_COOKIE_ONLY", False)
 
     DEBUG = _read_bool_env("FLASK_DEBUG", False)
 
