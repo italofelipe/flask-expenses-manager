@@ -32,18 +32,22 @@ def upgrade() -> None:
     # -----------------------------------------------------------------------
     # Transactions — all list queries filter on (user_id, deleted)
     # The due_date suffix serves the date-range filter and monthly aggregates.
+    # if_not_exists=True: CI uses a persistent PostgreSQL volume; a prior
+    # migration (b21_perf_indexes) may have already created these indexes.
     # -----------------------------------------------------------------------
     op.create_index(
         "ix_transactions_user_deleted",
         "transactions",
         ["user_id", "deleted"],
         unique=False,
+        if_not_exists=True,
     )
     op.create_index(
         "ix_transactions_user_deleted_due_date",
         "transactions",
         ["user_id", "deleted", "due_date"],
         unique=False,
+        if_not_exists=True,
     )
 
     # -----------------------------------------------------------------------
@@ -55,12 +59,14 @@ def upgrade() -> None:
         "goals",
         ["user_id", "status"],
         unique=False,
+        if_not_exists=True,
     )
     op.create_index(
         "ix_goals_user_priority_created_at",
         "goals",
         ["user_id", "priority", "created_at"],
         unique=False,
+        if_not_exists=True,
     )
 
     # -----------------------------------------------------------------------
@@ -72,12 +78,14 @@ def upgrade() -> None:
         "wallets",
         ["user_id"],
         unique=False,
+        if_not_exists=True,
     )
     op.create_index(
         "ix_wallets_user_should_be_on_wallet",
         "wallets",
         ["user_id", "should_be_on_wallet"],
         unique=False,
+        if_not_exists=True,
     )
 
 
