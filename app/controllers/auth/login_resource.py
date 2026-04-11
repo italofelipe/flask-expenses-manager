@@ -7,6 +7,7 @@ from flask_apispec.views import MethodResource
 from flask_jwt_extended import set_refresh_cookies
 
 from app.application.services.login_identity_service import resolve_login_identity
+from app.application.services.password_verification_service import needs_rehash
 from app.docs.openapi_helpers import (
     contract_header_param,
     json_error_response,
@@ -53,6 +54,27 @@ def _invalid_credentials_response(
         message="Invalid credentials",
         error_code="UNAUTHORIZED",
     )
+
+
+def _persist_session(
+    *,
+    user: Any,
+    jti: str,
+    refresh_jti: str,
+    pending_new_hash: str | None,
+) -> None:
+    needs_commit = (
+        user.current_jti != jti
+        or user.refresh_token_jti != refresh_jti
+        or pending_new_hash is not None
+    )
+    if not needs_commit:
+        return
+    user.current_jti = jti
+    user.refresh_token_jti = refresh_jti
+    if pending_new_hash is not None:
+        user.password = pending_new_hash
+    db.session.commit()
 
 
 def _too_many_attempts_response(*, retry_after: int | None) -> Response:
@@ -199,6 +221,10 @@ class AuthResource(MethodResource):
 
         password_hash = identity.user.password if identity.user is not None else None
         is_valid_password = dependencies.verify_password(password_hash, str(password))
+        # SEC-GAP-06: transparent Argon2id upgrade for PBKDF2 legacy hashes.
+        _pending_new_hash: str | None = None
+        if is_valid_password and password_hash and needs_rehash(password_hash):
+            _pending_new_hash = dependencies.hash_password(str(password))
         # Treat soft-deleted accounts as invalid credentials (LGPD — do not
         # reveal whether the account ever existed).
         is_deleted = identity.user is not None and identity.user.deleted_at is not None
@@ -220,14 +246,12 @@ class AuthResource(MethodResource):
             refresh_token = dependencies.create_refresh_token(str(identity.user.id))
             jti = dependencies.get_token_jti(token)
             refresh_jti = dependencies.get_token_jti(refresh_token)
-            needs_commit = (
-                identity.user.current_jti != jti
-                or identity.user.refresh_token_jti != refresh_jti
+            _persist_session(
+                user=identity.user,
+                jti=jti,
+                refresh_jti=refresh_jti,
+                pending_new_hash=_pending_new_hash,
             )
-            if needs_commit:
-                identity.user.current_jti = jti
-                identity.user.refresh_token_jti = refresh_jti
-                db.session.commit()
             user_data = {
                 "id": str(identity.user.id),
                 "name": identity.user.name,

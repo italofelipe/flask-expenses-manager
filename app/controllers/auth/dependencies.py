@@ -7,7 +7,6 @@ from uuid import UUID
 
 from flask import Flask, current_app
 from flask_jwt_extended import create_access_token, create_refresh_token, get_jti
-from werkzeug.security import generate_password_hash
 
 from app.application.dto.auth_security_policy_dto import AuthSecurityPolicyDTO
 from app.application.services.auth_security_policy_service import (
@@ -23,6 +22,9 @@ from app.application.services.password_reset_service import (
     PasswordResetResult,
     request_password_reset,
     reset_password,
+)
+from app.application.services.password_verification_service import (
+    hash_password as _hash_password_argon2id,
 )
 from app.application.services.password_verification_service import (
     verify_password_with_timing_protection,
@@ -118,7 +120,7 @@ def _default_dependencies() -> AuthDependencies:
         get_login_attempt_guard=get_login_attempt_guard,
         build_login_attempt_context=build_login_attempt_context,
         verify_password=_verify_password,
-        hash_password=generate_password_hash,
+        hash_password=_hash_password_argon2id,
         create_access_token=_create_access_token_with_default_expiry,
         create_refresh_token=_create_refresh_token_with_default_expiry,
         get_token_jti=_get_token_jti,
