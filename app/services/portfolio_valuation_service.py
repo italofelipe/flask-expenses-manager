@@ -2,9 +2,12 @@ from __future__ import annotations
 
 from datetime import date
 from decimal import Decimal
-from typing import Any, cast
+from typing import Any
 from uuid import UUID
 
+from sqlalchemy.orm import selectinload
+
+from app.extensions.database import db
 from app.models.wallet import Wallet
 from app.services.investment_operation_service import (
     InvestmentOperationError,
@@ -25,7 +28,14 @@ class PortfolioValuationService:
         return self._build_item(wallet)
 
     def get_portfolio_current_valuation(self) -> dict[str, Any]:
-        wallets = cast(list[Wallet], Wallet.query.filter_by(user_id=self.user_id).all())
+        # PERF-GAP-02: selectinload avoids N+1 — _build_item accesses
+        # wallet.operations for every wallet in the list.
+        wallets: list[Wallet] = (
+            db.session.query(Wallet)
+            .filter_by(user_id=self.user_id)
+            .options(selectinload(Wallet.operations))
+            .all()
+        )
         items = [self._build_item(wallet) for wallet in wallets]
         total_current_value = sum(
             (Decimal(item["current_value"]) for item in items), Decimal("0")
