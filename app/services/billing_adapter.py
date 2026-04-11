@@ -18,6 +18,7 @@ from requests.exceptions import RequestException
 
 from app.config.billing_plans import BillingPlanOffer, resolve_checkout_plan_offer
 from app.models.subscription import BillingCycle
+from app.services.retry_wrapper import with_retry
 
 _ASAAS_PROVIDER = "asaas"
 _STUB_PROVIDER = "stub"
@@ -197,17 +198,24 @@ class AsaasBillingProvider:
     ) -> dict[str, object]:
         self._ensure_enabled()
         url = f"{self._base_url.rstrip('/')}/{path.lstrip('/')}"
-        try:
+
+        @with_retry(provider="asaas")
+        def _do() -> dict[str, object]:
+            # Let RequestException propagate so tenacity can retry on
+            # transient failures. Caught and wrapped after retries exhaust.
             response = self._session.request(
                 method=method,
                 url=url,
                 json=json_payload,
                 timeout=_REQUEST_TIMEOUT_SECONDS,
             )
+            _raise_for_error_response(response)
+            return cast(dict[str, object], response.json())
+
+        try:
+            return _do()
         except RequestException as exc:
             raise BillingProviderError("Asaas request failed") from exc
-        _raise_for_error_response(response)
-        return cast(dict[str, object], response.json())
 
     def _ensure_customer(self, customer: BillingCheckoutCustomer) -> str:
         payload = self._request(
