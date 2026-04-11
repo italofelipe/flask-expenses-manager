@@ -102,6 +102,8 @@ Resposta de sucesso:
 - `GET /user/bootstrap`
 - `PUT /user/profile`
 - `GET /user/me`
+- `GET /user/notification-preferences`
+- `PATCH /user/notification-preferences`
 
 Contrato de resposta:
 - Padrão legado (default): sem envelope `success/data/meta`.
@@ -150,6 +152,45 @@ Erros comuns:
 - `400` validação
 - `401` token revogado/ausente
 - `404` usuário não encontrado
+
+### `GET /user/notification-preferences`
+Lista as preferências de notificação do usuário autenticado.
+
+Requer autenticação (`Authorization: Bearer <JWT>` + `X-API-Contract: v2`).
+
+Resposta de sucesso:
+- `200` com `data.preferences` — lista de objetos `{category, enabled, global_opt_out}`
+- Retorna lista vazia para usuário sem preferências cadastradas
+
+Categorias válidas: `due_soon`, `wallet`, `goals`, `transactions`, `subscription`.
+
+### `PATCH /user/notification-preferences`
+Atualiza (upsert) preferências de notificação do usuário autenticado.
+
+Requer autenticação (`Authorization: Bearer <JWT>` + `X-API-Contract: v2`).
+
+Corpo da requisição:
+```json
+{
+  "preferences": [
+    { "category": "due_soon", "enabled": true, "global_opt_out": false }
+  ]
+}
+```
+
+Regras:
+- Campo `preferences` é obrigatório e deve ser uma lista.
+- Cada item exige `category` (string, em `_VALID_CATEGORIES`) e `enabled` (booleano).
+- `global_opt_out` é opcional (padrão `false`).
+- Operação é upsert: cria ou sobrescreve a preferência da categoria informada.
+
+Resposta de sucesso:
+- `200` com `data.preferences` contendo os itens atualizados
+
+Erros comuns:
+- `400` campo `preferences` ausente ou tipo inválido (`VALIDATION_ERROR`)
+- `400` categoria inválida (`VALIDATION_ERROR`)
+- `401` token ausente/inválido
 
 ### `GET /user/me`
 Com `X-API-Contract: v3`, retorna apenas contexto autenticado canônico:
@@ -282,6 +323,14 @@ Lista transações ativas do usuário.
   - `start_date`, `end_date` (`YYYY-MM-DD`, aplicados em `due_date`)
   - `tag_id`, `account_id`, `credit_card_id` (UUID)
 - Com `X-API-Contract: v2`, itens em `data.transactions` e paginação em `meta.pagination`.
+
+Compatibilidade transitória:
+- Esta rota emite headers de deprecação a partir da branch `feat/mvp1-backend-consolidation`:
+  - `Deprecation: true`
+  - `Sunset: Sat, 31 Dec 2026 23:59:59 GMT`
+  - `Link: </transactions>; rel="successor-version"`
+  - `X-Auraxis-Successor-Endpoint: /transactions`
+- Sucessor canônico: `GET /transactions` (com os mesmos query params de filtragem).
 
 ### `GET /transactions/expenses`
 Lista despesas por período (`due_date`) com métricas agregadas do período.
@@ -509,6 +558,12 @@ Queries disponíveis:
 - `portfolioValuation`
 - `portfolioValuationHistory`
 - `tickers`
+- `budgets` — lista orçamentos ativos com gasto calculado no período (auth)
+- `budget` — busca orçamento por `id` (auth)
+- `budgetSummary` — totais orçado vs gasto no período atual (auth)
+- `billingPlans` — catálogo público de planos de assinatura (**público, sem auth**)
+- `mySubscription` — estado atual da assinatura do usuário (auth)
+- `notificationPreferences` — preferências de notificação do usuário (auth)
 
 Mutations disponíveis:
 - `registerUser`
@@ -529,13 +584,162 @@ Mutations disponíveis:
 - `deleteInvestmentOperation`
 - `addTicker`
 - `deleteTicker`
+- `createBudget` — cria novo orçamento (auth); retorna `budget` criado
+- `updateBudget` — atualiza orçamento por `id` (auth); retorna `budget` atualizado
+- `deleteBudget` — remove orçamento por `id` (auth); retorna `message`
+- `createCheckoutSession` — inicia sessão de checkout para upgrade de plano (auth); recebe `planSlug`, retorna `checkoutUrl`
+- `cancelSubscription` — cancela assinatura ativa do usuário (auth)
+- `updateNotificationPreferences` — upsert de preferências de notificação (auth); recebe lista `preferences: [PreferenceInput]`
 
-Observação:
+Tipos de entrada:
+- `PreferenceInput`: `{ category: String!, enabled: Boolean!, globalOptOut: Boolean }`
+- Categorias válidas para `PreferenceInput.category`: `due_soon`, `wallet`, `goals`, `transactions`, `subscription`
+
+Observações:
 - operações de ticker estão disponíveis no GraphQL; o controller REST legado de ticker foi removido para evitar superfície não suportada.
+- `billingPlans` é a única query GraphQL completamente pública; todas as demais exigem `Authorization: Bearer <JWT>`.
+- As stubs de billing (`mySubscription`, `createCheckoutSession`, `cancelSubscription`) retornam dados reais do banco mas dependem da integração Asaas para operar end-to-end (issue #835 — pendente).
 
 Autenticação:
 - operações protegidas usam `Authorization: Bearer <JWT>`.
-- `registerUser` e `login` são públicas.
+- `registerUser`, `login`, `forgotPassword`, `resetPassword`, `resendConfirmationEmail`, `confirmEmail` e `billingPlans` são públicas.
+
+## 7) Budgets
+- `GET /budgets`
+- `POST /budgets`
+- `GET /budgets/summary`
+- `GET /budgets/{budget_id}`
+- `PATCH /budgets/{budget_id}`
+- `DELETE /budgets/{budget_id}`
+
+Todos os endpoints requerem `Authorization: Bearer <JWT>` + `X-API-Contract: v2`.
+
+### `GET /budgets`
+Lista todos os orçamentos ativos do usuário com gasto calculado no período corrente.
+
+Resposta de sucesso:
+- `200` com `data.items` — lista de orçamentos serializados com `spent_amount`
+
+### `POST /budgets`
+Cria um novo orçamento.
+
+Campos suportados:
+- `name` (obrigatório) — nome descritivo do orçamento
+- `amount` (obrigatório) — valor-limite do orçamento
+- `period` — período de apuração: `monthly` (padrão), `weekly`, `custom`
+- `start_date`, `end_date` — obrigatórios quando `period=custom` (`YYYY-MM-DD`)
+- `tag_id` — UUID opcional para associar ao orçamento uma tag de transações
+
+Resposta de sucesso:
+- `201` com `data.budget`
+
+Erros comuns:
+- `400` campos obrigatórios ausentes / `period=custom` sem datas (`VALIDATION_ERROR`)
+- `401` token ausente/inválido
+
+### `GET /budgets/summary`
+Retorna totais consolidados de orçamento vs gasto no período atual de todos os orçamentos ativos.
+
+Resposta de sucesso:
+- `200` com `data.summary` contendo `total_budgeted`, `total_spent`, `remaining`
+
+### `GET /budgets/{budget_id}`
+Retorna um orçamento específico com gasto calculado.
+
+Erros comuns:
+- `403` orçamento pertence a outro usuário
+- `404` orçamento não encontrado
+
+### `PATCH /budgets/{budget_id}`
+Atualiza parcialmente um orçamento.
+
+Mesmos campos que `POST /budgets` (todos opcionais na edição).
+
+Resposta de sucesso:
+- `200` com `data.budget` atualizado
+
+### `DELETE /budgets/{budget_id}`
+Remove um orçamento.
+
+Resposta de sucesso:
+- `200` com `data` vazio e `message: "Orçamento removido com sucesso"`
+
+## 8) Subscriptions / Billing
+- `GET /subscriptions/plans`
+- `GET /subscriptions/me`
+- `POST /subscriptions/checkout`
+- `POST /subscriptions/cancel`
+- `POST /subscriptions/webhook`
+
+### `GET /subscriptions/plans`
+Catálogo público de planos de assinatura. **Não requer autenticação.**
+
+Resposta de sucesso:
+- `200` com `data.plans` — lista de planos disponíveis com `plan_code`, `billing_cycle`, `price`, `features`
+
+### `GET /subscriptions/me`
+Retorna o estado atual da assinatura do usuário autenticado.
+
+Requer autenticação.
+
+Resposta de sucesso:
+- `200` com `data.subscription` contendo: `id`, `plan_code`, `offer_code`, `status`, `billing_cycle`, `provider`, `trial_ends_at`, `current_period_start`, `current_period_end`, `canceled_at`
+
+Status possíveis: `free`, `trial`, `active`, `past_due`, `canceled`
+
+### `POST /subscriptions/checkout`
+Cria sessão de checkout para upgrade de plano.
+
+Requer autenticação.
+
+Corpo da requisição:
+```json
+{ "plan_slug": "pro_monthly", "billing_cycle": "monthly" }
+```
+
+- `plan_slug` obrigatório — slug canônico do plano (ex: `pro_monthly`, `pro_annual`)
+- `billing_cycle` opcional — quando enviado junto com slug simples, é composto automaticamente
+
+Resposta de sucesso:
+- `201` com `data.checkout_url`, `data.plan_slug`, `data.plan_code`, `data.billing_cycle`, `data.provider`
+
+Erros comuns:
+- `400` `plan_slug` ausente ou inválido (`VALIDATION_ERROR`)
+- `502` falha no provider de billing (`UPSTREAM_ERROR`)
+
+### `POST /subscriptions/cancel`
+Cancela a assinatura ativa do usuário autenticado.
+
+Requer autenticação.
+
+Resposta de sucesso:
+- `200` com `data.subscription` no estado `canceled`
+
+Erros comuns:
+- `409` assinatura já está cancelada (`ALREADY_CANCELED`)
+
+### `POST /subscriptions/webhook`
+Endpoint receptor de eventos do provider de billing (Asaas). **Não usa JWT.**
+
+Autenticação via HMAC signature (`X-Auraxis-Signature`) ou token Asaas (`asaas-access-token`).
+
+Eventos suportados:
+- `subscription.activated` → status `ACTIVE`
+- `subscription.canceled` / `SUBSCRIPTION_DELETED` → status `CANCELED`
+- `subscription.past_due` / `PAYMENT_OVERDUE` → status `PAST_DUE`
+- `PAYMENT_RECEIVED` / `PAYMENT_CONFIRMED` → status `ACTIVE`
+- Outros eventos → 200 no-op
+
+Todos os eventos são persistidos na tabela `webhook_events` para auditoria e reprocessamento.
+
+Resposta de sucesso:
+- `200` com `data.received: true` e `data.processed: true|false`
+
+Erros comuns:
+- `401` assinatura inválida (`UNAUTHORIZED`)
+- `400` payload não mapeável para assinatura (`VALIDATION_ERROR`)
+
+> **Nota:** A integração end-to-end com Asaas está pendente (issue #835). Os endpoints estão operacionais com o adapter stub; a lógica real de cobrança requer configuração do `ASAAS_API_KEY` e adapter concreto.
 
 ## Contratos e status code
 A API ainda não está 100% padronizada em payload de sucesso/erro entre todos os controllers.
