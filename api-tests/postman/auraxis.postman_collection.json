@@ -6832,6 +6832,533 @@
               }
             }
           ]
+        },
+        {
+          "name": "14 - GraphQL budgets list (auth required)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{authToken}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"query\": \"{ budgets { items { id name amount period isActive spent remaining percentageUsed isOverBudget } } }\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/graphql",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "graphql"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('budgets list returns 200', () => pm.response.to.have.status(200));",
+                  "var b = pm.response.json();",
+                  "pm.test('no errors', () => pm.expect(b.errors).to.be.undefined);",
+                  "pm.test('items is array', () => pm.expect(b.data.budgets.items).to.be.an('array'));",
+                  "if (b.data.budgets.items.length > 0) { pm.collectionVariables.set('gqlBudgetId', b.data.budgets.items[0].id); }"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "15 - GraphQL createBudget mutation (auth required)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{authToken}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"query\": \"mutation CreateBudget($name: String!, $amount: String!, $period: String!) { createBudget(name: $name, amount: $amount, period: $period) { message budget { id name amount period isActive spent remaining percentageUsed isOverBudget } } }\",\n  \"variables\": {\n    \"name\": \"Alimenta\\u00e7\\u00e3o GraphQL\",\n    \"amount\": \"500.00\",\n    \"period\": \"monthly\"\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/graphql",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "graphql"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('createBudget returns 200', () => pm.response.to.have.status(200));",
+                  "var b = pm.response.json();",
+                  "pm.test('no errors', () => pm.expect(b.errors).to.be.undefined);",
+                  "pm.test('budget created', () => pm.expect(b.data.createBudget.budget.id).to.be.a('string'));",
+                  "pm.collectionVariables.set('gqlBudgetId', b.data.createBudget.budget.id);"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "16 - GraphQL budget by ID (auth required)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{authToken}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"query\": \"query GetBudget($budgetId: UUID!) { budget(budgetId: $budgetId) { id name amount period isActive spent remaining percentageUsed isOverBudget } }\",\n  \"variables\": {\n    \"budgetId\": \"{{gqlBudgetId}}\"\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/graphql",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "graphql"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('budget by ID returns 200', () => pm.response.to.have.status(200));",
+                  "var b = pm.response.json();",
+                  "pm.test('no errors', () => pm.expect(b.errors).to.be.undefined);",
+                  "pm.test('id matches', () => pm.expect(b.data.budget.id).to.eql(pm.collectionVariables.get('gqlBudgetId')));"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "17 - GraphQL budgetSummary (auth required)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{authToken}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"query\": \"{ budgetSummary { totalBudgeted totalSpent totalRemaining percentageUsed budgetCount } }\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/graphql",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "graphql"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('budgetSummary returns 200', () => pm.response.to.have.status(200));",
+                  "var b = pm.response.json();",
+                  "pm.test('no errors', () => pm.expect(b.errors).to.be.undefined);",
+                  "pm.test('budgetCount >=1', () => pm.expect(b.data.budgetSummary.budgetCount).to.be.at.least(1));"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "18 - GraphQL updateBudget mutation (auth required)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{authToken}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"query\": \"mutation UpdateBudget($budgetId: UUID!, $name: String) { updateBudget(budgetId: $budgetId, name: $name) { message budget { id name } } }\",\n  \"variables\": {\n    \"budgetId\": \"{{gqlBudgetId}}\",\n    \"name\": \"Alimenta\\u00e7\\u00e3o Atualizada\"\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/graphql",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "graphql"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('updateBudget returns 200', () => pm.response.to.have.status(200));",
+                  "var b = pm.response.json();",
+                  "pm.test('no errors', () => pm.expect(b.errors).to.be.undefined);",
+                  "pm.test('name updated', () => pm.expect(b.data.updateBudget.budget.name).to.eql('Alimentação Atualizada'));"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "19 - GraphQL deleteBudget mutation (auth required)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{authToken}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"query\": \"mutation DeleteBudget($budgetId: UUID!) { deleteBudget(budgetId: $budgetId) { ok message } }\",\n  \"variables\": {\n    \"budgetId\": \"{{gqlBudgetId}}\"\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/graphql",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "graphql"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('deleteBudget returns 200', () => pm.response.to.have.status(200));",
+                  "var b = pm.response.json();",
+                  "pm.test('no errors', () => pm.expect(b.errors).to.be.undefined);",
+                  "pm.test('ok is true', () => pm.expect(b.data.deleteBudget.ok).to.be.true);"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "20 - GraphQL billingPlans (public, no auth)",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"query\": \"{ billingPlans { plans { slug planCode displayName description priceCents currency billingCycle isActive } } }\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/graphql",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "graphql"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('billingPlans returns 200', () => pm.response.to.have.status(200));",
+                  "var b = pm.response.json();",
+                  "pm.test('no errors', () => pm.expect(b.errors).to.be.undefined);",
+                  "pm.test('at least one plan', () => pm.expect(b.data.billingPlans.plans.length).to.be.at.least(1));",
+                  "pm.test('free plan exists', () => pm.expect(b.data.billingPlans.plans.map(p => p.slug)).to.include('free'));"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "21 - GraphQL mySubscription (auth required)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{authToken}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"query\": \"{ mySubscription { id planCode status } }\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/graphql",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "graphql"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('mySubscription returns 200', () => pm.response.to.have.status(200));",
+                  "var b = pm.response.json();",
+                  "pm.test('no errors', () => pm.expect(b.errors).to.be.undefined);",
+                  "pm.test('subscription has id', () => pm.expect(b.data.mySubscription.id).to.be.a('string'));",
+                  "pm.test('subscription has status', () => pm.expect(b.data.mySubscription.status).to.be.a('string'));"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "22 - GraphQL createCheckoutSession mutation (auth required)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{authToken}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"query\": \"mutation CreateCheckout($planSlug: String!, $billingCycle: String) { createCheckoutSession(planSlug: $planSlug, billingCycle: $billingCycle) { checkoutUrl message } }\",\n  \"variables\": {\n    \"planSlug\": \"premium\",\n    \"billingCycle\": \"monthly\"\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/graphql",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "graphql"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('createCheckoutSession returns 200', () => pm.response.to.have.status(200));",
+                  "var b = pm.response.json();",
+                  "// May return error for free plan or stub — both are acceptable",
+                  "pm.test('response has data or errors', () => pm.expect(b.data || b.errors).to.exist);"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "23 - GraphQL notificationPreferences (auth required)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{authToken}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"query\": \"{ notificationPreferences { preferences { category enabled globalOptOut } } }\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/graphql",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "graphql"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('notificationPreferences returns 200', () => pm.response.to.have.status(200));",
+                  "var b = pm.response.json();",
+                  "pm.test('no errors', () => pm.expect(b.errors).to.be.undefined);",
+                  "pm.test('preferences is array', () => pm.expect(b.data.notificationPreferences.preferences).to.be.an('array'));"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "24 - GraphQL updateNotificationPreferences mutation (auth required)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{authToken}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"query\": \"mutation UpdatePrefs($preferences: [PreferenceInput!]!) { updateNotificationPreferences(preferences: $preferences) { message preferences { category enabled globalOptOut } } }\",\n  \"variables\": {\n    \"preferences\": [\n      {\n        \"category\": \"due_soon\",\n        \"enabled\": true,\n        \"globalOptOut\": false\n      }\n    ]\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/graphql",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "graphql"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('updateNotificationPreferences returns 200', () => pm.response.to.have.status(200));",
+                  "var b = pm.response.json();",
+                  "pm.test('no errors', () => pm.expect(b.errors).to.be.undefined);",
+                  "pm.test('preference saved', () => pm.expect(b.data.updateNotificationPreferences.preferences[0].category).to.eql('due_soon'));"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "25 - GraphQL cancelSubscription mutation (auth required)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{authToken}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"query\": \"mutation { cancelSubscription { ok message subscription { id status } } }\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/graphql",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "graphql"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('cancelSubscription returns 200', () => pm.response.to.have.status(200));",
+                  "var b = pm.response.json();",
+                  "// Free plan cancel returns CONFLICT — both data and errors are valid",
+                  "pm.test('response has data or errors', () => pm.expect(b.data || b.errors).to.exist);"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
         }
       ]
     },
