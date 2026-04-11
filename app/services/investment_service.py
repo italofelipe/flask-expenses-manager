@@ -12,6 +12,7 @@ from requests.exceptions import RequestException
 from app.extensions.integration_metrics import increment_metric
 from app.http.runtime import runtime_logger
 from app.services.circuit_breaker import CircuitBreaker
+from app.services.retry_wrapper import with_retry
 from config import Config
 
 
@@ -69,36 +70,32 @@ class InvestmentService:
     def _request_json(
         endpoint: str, *, params: dict[str, Any] | None = None
     ) -> Any | None:
-        timeout_seconds, max_retries, _ = InvestmentService._settings()
+        # PERF-GAP-04: tenacity handles retry + backoff; circuit breaker wraps
+        # the call at the get_market_price level to fail fast when BRAPI is down.
+        timeout_seconds, _, _ = InvestmentService._settings()
         config = Config()
-        attempts = max_retries + 1
-        for attempt in range(attempts):
-            try:
-                resp = requests.get(
-                    endpoint,
-                    headers={"Authorization": f"Bearer {config.BRAPI_KEY}"},
-                    params=params,
-                    timeout=timeout_seconds,
-                )
-                resp.raise_for_status()
-                return resp.json()
-            except RequestException as exc:
-                if isinstance(exc, requests.exceptions.Timeout):
-                    InvestmentService._record_brapi_event("timeout", detail=endpoint)
-                elif isinstance(exc, requests.exceptions.HTTPError):
-                    InvestmentService._record_brapi_event(
-                        "http_error",
-                        detail=endpoint,
-                    )
-                else:
-                    InvestmentService._record_brapi_event(
-                        "request_error",
-                        detail=endpoint,
-                    )
-                if attempt == attempts - 1:
-                    return None
-                time.sleep(0.15 * (attempt + 1))
-        return None
+
+        @with_retry(provider="brapi")
+        def _fetch() -> Any:
+            resp = requests.get(
+                endpoint,
+                headers={"Authorization": f"Bearer {config.BRAPI_KEY}"},
+                params=params,
+                timeout=timeout_seconds,
+            )
+            resp.raise_for_status()
+            return resp.json()
+
+        try:
+            return _fetch()
+        except RequestException as exc:
+            if isinstance(exc, requests.exceptions.Timeout):
+                InvestmentService._record_brapi_event("timeout", detail=endpoint)
+            elif isinstance(exc, requests.exceptions.HTTPError):
+                InvestmentService._record_brapi_event("http_error", detail=endpoint)
+            else:
+                InvestmentService._record_brapi_event("request_error", detail=endpoint)
+            return None
 
     @classmethod
     def _normalize_ticker(cls, ticker: str) -> str | None:

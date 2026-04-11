@@ -15,6 +15,7 @@ from app.http.runtime import (
     runtime_extension,
     set_runtime_extension,
 )
+from app.services.retry_wrapper import with_retry
 
 _DEFAULT_RESEND_BASE_URL = "https://api.resend.com"
 _REQUEST_TIMEOUT_SECONDS = 15.0
@@ -129,20 +130,29 @@ class ResendEmailProvider:
             "text": message.text,
             "tags": [{"name": "kind", "value": message.tag}],
         }
-        try:
+
+        @with_retry(provider="resend")
+        def _post() -> EmailDeliveryResult:
+            # Let RequestException propagate so tenacity can retry on
+            # transient failures (Timeout, ConnectionError, HTTPError).
+            # After retries are exhausted, the exception is caught below
+            # and re-raised as EmailProviderError.
             response = self._session.post(
                 f"{self._base_url.rstrip('/')}/emails",
                 json=payload,
                 timeout=_REQUEST_TIMEOUT_SECONDS,
             )
+            _raise_for_error_response(response)
+            body = cast(dict[str, object], response.json())
+            return EmailDeliveryResult(
+                provider=_RESEND_PROVIDER,
+                provider_message_id=str(body.get("id") or "").strip() or None,
+            )
+
+        try:
+            return _post()
         except RequestException as exc:
             raise EmailProviderError("Resend request failed") from exc
-        _raise_for_error_response(response)
-        body = cast(dict[str, object], response.json())
-        return EmailDeliveryResult(
-            provider=_RESEND_PROVIDER,
-            provider_message_id=str(body.get("id") or "").strip() or None,
-        )
 
 
 def get_default_email_provider() -> EmailProvider:
