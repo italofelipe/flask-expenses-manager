@@ -83,7 +83,7 @@ check_contains "app/graphql/security.py" "GRAPHQL_DEPTH_LIMIT_EXCEEDED" "GraphQL
 check_contains "app/graphql/security.py" "GRAPHQL_COMPLEXITY_LIMIT_EXCEEDED" "GraphQL complexity limit guard implemented"
 check_contains "app/middleware/auth_guard.py" "verify_jwt_in_request\(\)|get_active_auth_context\(\)" "Global auth guard verifies JWT for protected routes"
 check_contains "app/controllers/auth/register_resource.py" "dependencies\.hash_password\(" "User registration hashes password via auth dependency"
-check_contains "app/controllers/auth/dependencies.py" "generate_password_hash" "Auth dependency provider uses Werkzeug password hashing"
+check_contains "app/controllers/auth/dependencies.py" "_hash_password_argon2id" "Auth dependency provider uses Argon2id password hashing"
 
 {
   echo
