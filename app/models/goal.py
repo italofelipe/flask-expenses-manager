@@ -52,6 +52,11 @@ class Goal(db.Model):
             name="ck_goals_current_amount_nonneg",
         ),
         db.CheckConstraint("priority >= 1 AND priority <= 5", name="ck_goals_priority"),
+        # PERF-GAP-01: composite indexes for filtered list and order-by queries.
+        db.Index("ix_goals_user_status", "user_id", "status"),
+        db.Index(
+            "ix_goals_user_priority_created_at", "user_id", "priority", "created_at"
+        ),
     )
 
     def __repr__(self) -> str:
