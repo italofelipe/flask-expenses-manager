@@ -7196,7 +7196,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"query\": \"mutation CreateCheckout($planSlug: String!, $billingCycle: String) { createCheckoutSession(planSlug: $planSlug, billingCycle: $billingCycle) { checkoutUrl message } }\",\n  \"variables\": {\n    \"planSlug\": \"premium\",\n    \"billingCycle\": \"monthly\"\n  }\n}",
+              "raw": "{\n  \"query\": \"mutation CreateCheckout($planSlug: String!, $billingCycle: String) { createCheckoutSession(planSlug: $planSlug, billingCycle: $billingCycle) { message checkout { checkoutUrl provider } } }\",\n  \"variables\": {\n    \"planSlug\": \"premium\",\n    \"billingCycle\": \"monthly\"\n  }\n}",
               "options": {
                 "raw": {
                   "language": "json"
@@ -7220,7 +7220,7 @@
                 "exec": [
                   "pm.test('createCheckoutSession returns 200', () => pm.response.to.have.status(200));",
                   "var b = pm.response.json();",
-                  "// May return error for free plan or stub — both are acceptable",
+                  "// Stub provider returns checkout URL; may contain errors if plan unavailable",
                   "pm.test('response has data or errors', () => pm.expect(b.data || b.errors).to.exist);"
                 ],
                 "type": "text/javascript"
