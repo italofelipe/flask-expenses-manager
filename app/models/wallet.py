@@ -37,5 +37,13 @@ class Wallet(db.Model):
     # Relacionamento (opcional, útil para backref no User)
     user = db.relationship("User", backref="wallet_entries")
 
+    __table_args__ = (
+        # PERF-GAP-01: indexes for per-user portfolio and goal-projection queries.
+        db.Index("ix_wallets_user_id", "user_id"),
+        db.Index(
+            "ix_wallets_user_should_be_on_wallet", "user_id", "should_be_on_wallet"
+        ),
+    )
+
     def __repr__(self) -> str:
         return f"<Wallet {self.name} ({self.value})>"

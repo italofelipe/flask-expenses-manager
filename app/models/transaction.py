@@ -79,6 +79,11 @@ class Transaction(db.Model):
             "user_id", "external_id", name="uq_transactions_user_external_id"
         ),
         db.Index("ix_transactions_user_source", "user_id", "source"),
+        # PERF-GAP-01: composite indexes for hot list/filter/date-range queries.
+        db.Index("ix_transactions_user_deleted", "user_id", "deleted"),
+        db.Index(
+            "ix_transactions_user_deleted_due_date", "user_id", "deleted", "due_date"
+        ),
     )
 
     def __repr__(self) -> str:
