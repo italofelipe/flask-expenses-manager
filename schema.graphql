@@ -1,4 +1,10 @@
 type Query {
+  notificationPreferences: NotificationPreferencesType
+  billingPlans: BillingPlanListPayloadType
+  mySubscription: SubscriptionType
+  budgets: BudgetListPayloadType
+  budget(budgetId: UUID!): BudgetType
+  budgetSummary: BudgetSummaryType
   investmentOperations(investmentId: UUID!, page: Int = 1, perPage: Int = 10): InvestmentOperationListPayloadType
   investmentOperationSummary(investmentId: UUID!): InvestmentOperationSummaryType
   investmentPosition(investmentId: UUID!): InvestmentPositionType
@@ -20,6 +26,85 @@ type Query {
   transaction(transactionId: UUID!): TransactionTypeObject
   dashboardOverview(month: String!): TransactionDashboardPayloadType
   me: UserType
+}
+
+type NotificationPreferencesType {
+  preferences: [AlertPreferenceType]!
+}
+
+type AlertPreferenceType {
+  category: String!
+  enabled: Boolean!
+  globalOptOut: Boolean!
+}
+
+type BillingPlanListPayloadType {
+  plans: [BillingPlanType]!
+}
+
+type BillingPlanType {
+  slug: String!
+  planCode: String!
+  displayName: String!
+  description: String!
+  priceCents: Int!
+  currency: String!
+  billingCycle: String!
+  isActive: Boolean!
+  features: [String]!
+}
+
+type SubscriptionType {
+  id: ID!
+  planCode: String!
+  offerCode: String
+  status: String!
+  billingCycle: String
+  provider: String
+  providerSubscriptionId: String
+  trialEndsAt: String
+  currentPeriodStart: String
+  currentPeriodEnd: String
+  canceledAt: String
+  createdAt: String
+  updatedAt: String
+}
+
+type BudgetListPayloadType {
+  items: [BudgetType]!
+}
+
+type BudgetType {
+  id: ID!
+  name: String!
+  amount: String!
+  period: String!
+  tagId: String
+  tagName: String
+  tagColor: String
+  startDate: String
+  endDate: String
+  isActive: Boolean!
+  spent: String!
+  remaining: String!
+  percentageUsed: Float!
+  isOverBudget: Boolean!
+  createdAt: String
+  updatedAt: String
+}
+
+"""
+Leverages the internal Python implementation of UUID (uuid.UUID) to provide native UUID objects
+in fields, resolvers and input.
+"""
+scalar UUID
+
+type BudgetSummaryType {
+  totalBudgeted: String!
+  totalSpent: String!
+  totalRemaining: String!
+  percentageUsed: Float!
+  budgetCount: Int!
 }
 
 type InvestmentOperationListPayloadType {
@@ -47,12 +132,6 @@ type PaginationType {
   perPage: Int!
   pages: Int
 }
-
-"""
-Leverages the internal Python implementation of UUID (uuid.UUID) to provide native UUID objects
-in fields, resolvers and input.
-"""
-scalar UUID
 
 type InvestmentOperationSummaryType {
   totalOperations: Int!
@@ -466,6 +545,12 @@ type Mutation {
   deleteInvestmentOperation(investmentId: UUID!, operationId: UUID!): DeleteInvestmentOperationMutation
   addTicker(quantity: Float!, symbol: String!, type: String): AddTickerMutation
   deleteTicker(symbol: String!): DeleteTickerMutation
+  createBudget(amount: String!, endDate: String, isActive: Boolean, name: String!, period: String!, startDate: String, tagId: String): CreateBudgetMutation
+  updateBudget(amount: String, budgetId: UUID!, endDate: String, isActive: Boolean, name: String, period: String, startDate: String, tagId: String): UpdateBudgetMutation
+  deleteBudget(budgetId: UUID!): DeleteBudgetMutation
+  createCheckoutSession(billingCycle: String, planSlug: String!): CreateCheckoutSessionMutation
+  cancelSubscription: CancelSubscriptionMutation
+  updateNotificationPreferences(preferences: [PreferenceInput!]!): UpdateNotificationPreferencesMutation
 }
 
 type AuthPayloadType {
@@ -583,4 +668,48 @@ type AddTickerMutation {
 type DeleteTickerMutation {
   ok: Boolean!
   message: String!
+}
+
+type CreateBudgetMutation {
+  message: String!
+  budget: BudgetType!
+}
+
+type UpdateBudgetMutation {
+  message: String!
+  budget: BudgetType!
+}
+
+type DeleteBudgetMutation {
+  ok: Boolean!
+  message: String!
+}
+
+type CreateCheckoutSessionMutation {
+  message: String!
+  checkout: CheckoutSessionType!
+}
+
+type CheckoutSessionType {
+  checkoutUrl: String!
+  provider: String!
+  providerCustomerId: String
+  providerSubscriptionId: String
+}
+
+type CancelSubscriptionMutation {
+  ok: Boolean!
+  message: String!
+  subscription: SubscriptionType!
+}
+
+type UpdateNotificationPreferencesMutation {
+  message: String!
+  preferences: [AlertPreferenceType!]!
+}
+
+input PreferenceInput {
+  category: String!
+  enabled: Boolean!
+  globalOptOut: Boolean
 }

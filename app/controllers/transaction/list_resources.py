@@ -25,6 +25,7 @@ from .openapi import (
     TRANSACTION_ACTIVE_LIST_LEGACY_DOC,
 )
 from .utils import (
+    _apply_deprecation_headers,
     _compat_error,
     _compat_success,
     _guard_revoked_token,
@@ -276,4 +277,8 @@ class TransactionListActiveResource(MethodResource):
     @doc(**TRANSACTION_ACTIVE_LIST_LEGACY_DOC)
     @jwt_required()
     def get(self) -> Response:
-        return _handle_active_transactions_request()
+        return _apply_deprecation_headers(
+            _handle_active_transactions_request(),
+            successor_endpoint="/transactions",
+            successor_method="GET",
+        )

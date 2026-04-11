@@ -7,9 +7,11 @@ GraphQLOperationType = Literal["query", "mutation"]
 GraphQLOperationAccess = Literal["public", "auth_required"]
 GraphQLDomain = Literal[
     "auth",
+    "billing",
     "dashboard",
     "goals",
     "investments",
+    "notifications",
     "simulations",
     "transactions",
     "user",
@@ -30,6 +32,12 @@ MUTATION_SIMULATION_MODULE = "app.graphql.mutations.simulation"
 MUTATION_WALLET_MODULE = "app.graphql.mutations.wallet"
 MUTATION_INVESTMENT_MODULE = "app.graphql.mutations.investment_operation"
 MUTATION_TICKER_MODULE = "app.graphql.mutations.ticker"
+QUERY_BUDGET_MODULE = "app.graphql.queries.budget"
+QUERY_SUBSCRIPTION_MODULE = "app.graphql.queries.subscription"
+QUERY_NOTIFICATION_MODULE = "app.graphql.queries.notification"
+MUTATION_BUDGET_MODULE = "app.graphql.mutations.budget"
+MUTATION_SUBSCRIPTION_MODULE = "app.graphql.mutations.subscription"
+MUTATION_NOTIFICATION_MODULE = "app.graphql.mutations.notification"
 ADVANCED_SIMULATIONS = "advanced_simulations"
 
 
@@ -439,6 +447,107 @@ GRAPHQL_OPERATION_CATALOG: tuple[GraphQLOperationDoc, ...] = (
         access="auth_required",
         summary="Remove um ticker do acompanhamento do usuário.",
         source_module=MUTATION_TICKER_MODULE,
+    ),
+    # Budget queries
+    GraphQLOperationDoc(
+        name="budgets",
+        operation_type="query",
+        domain="billing",
+        access="auth_required",
+        summary="Lista os orçamentos ativos do usuário com métricas de gasto.",
+        source_module=QUERY_BUDGET_MODULE,
+    ),
+    GraphQLOperationDoc(
+        name="budget",
+        operation_type="query",
+        domain="billing",
+        access="auth_required",
+        summary="Retorna um orçamento específico do usuário.",
+        source_module=QUERY_BUDGET_MODULE,
+    ),
+    GraphQLOperationDoc(
+        name="budgetSummary",
+        operation_type="query",
+        domain="billing",
+        access="auth_required",
+        summary="Retorna o resumo consolidado dos orçamentos do usuário.",
+        source_module=QUERY_BUDGET_MODULE,
+    ),
+    # Budget mutations
+    GraphQLOperationDoc(
+        name="createBudget",
+        operation_type="mutation",
+        domain="billing",
+        access="auth_required",
+        summary="Cria um novo orçamento para o usuário.",
+        source_module=MUTATION_BUDGET_MODULE,
+    ),
+    GraphQLOperationDoc(
+        name="updateBudget",
+        operation_type="mutation",
+        domain="billing",
+        access="auth_required",
+        summary="Atualiza um orçamento existente do usuário.",
+        source_module=MUTATION_BUDGET_MODULE,
+    ),
+    GraphQLOperationDoc(
+        name="deleteBudget",
+        operation_type="mutation",
+        domain="billing",
+        access="auth_required",
+        summary="Remove um orçamento do usuário.",
+        source_module=MUTATION_BUDGET_MODULE,
+    ),
+    # Subscription/billing queries
+    GraphQLOperationDoc(
+        name="billingPlans",
+        operation_type="query",
+        domain="billing",
+        access="public",
+        summary="Retorna o catálogo público de planos de assinatura.",
+        source_module=QUERY_SUBSCRIPTION_MODULE,
+    ),
+    GraphQLOperationDoc(
+        name="mySubscription",
+        operation_type="query",
+        domain="billing",
+        access="auth_required",
+        summary="Retorna o estado atual da assinatura do usuário autenticado.",
+        source_module=QUERY_SUBSCRIPTION_MODULE,
+    ),
+    # Subscription mutations
+    GraphQLOperationDoc(
+        name="createCheckoutSession",
+        operation_type="mutation",
+        domain="billing",
+        access="auth_required",
+        summary="Cria uma sessão de checkout para assinatura de um plano.",
+        source_module=MUTATION_SUBSCRIPTION_MODULE,
+    ),
+    GraphQLOperationDoc(
+        name="cancelSubscription",
+        operation_type="mutation",
+        domain="billing",
+        access="auth_required",
+        summary="Cancela a assinatura ativa do usuário autenticado.",
+        source_module=MUTATION_SUBSCRIPTION_MODULE,
+    ),
+    # Notification preferences
+    GraphQLOperationDoc(
+        name="notificationPreferences",
+        operation_type="query",
+        domain="notifications",
+        access="auth_required",
+        summary="Retorna as preferências de notificação do usuário autenticado.",
+        source_module=QUERY_NOTIFICATION_MODULE,
+    ),
+    GraphQLOperationDoc(
+        name="updateNotificationPreferences",
+        operation_type="mutation",
+        domain="notifications",
+        access="auth_required",
+        summary="Atualiza as preferências de notificação do usuário autenticado.",
+        source_module=MUTATION_NOTIFICATION_MODULE,
     ),
 )
 

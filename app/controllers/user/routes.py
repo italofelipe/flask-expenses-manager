@@ -18,6 +18,7 @@ from .contracts import compat_success
 from .delete_me_resource import DeleteMeResource
 from .helpers import validate_user_token
 from .me_resource import UserMeResource
+from .notification_preferences_resource import NotificationPreferencesResource
 from .profile_resource import UserProfileResource
 from .questionnaire_resource import UserQuestionnaireResource
 
@@ -94,6 +95,11 @@ def register_user_routes() -> None:
         "/me",
         view_func=DeleteMeResource.as_view("delete_me"),
         methods=["DELETE"],
+    )
+    user_bp.add_url_rule(
+        "/notification-preferences",
+        view_func=NotificationPreferencesResource.as_view("notification_preferences"),
+        methods=["GET", "PATCH"],
     )
     _ROUTES_REGISTERED = True
 

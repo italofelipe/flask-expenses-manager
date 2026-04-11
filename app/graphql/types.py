@@ -460,3 +460,103 @@ class TickerType(graphene.ObjectType):
     symbol = graphene.String(required=True)
     quantity = graphene.Float(required=True)
     type = graphene.String()
+
+
+# ---------------------------------------------------------------------------
+# Budget types (H-PROD-04 / #886)
+# ---------------------------------------------------------------------------
+
+
+class BudgetType(graphene.ObjectType):
+    id = graphene.ID(required=True)
+    name = graphene.String(required=True)
+    amount = graphene.String(required=True)
+    period = graphene.String(required=True)
+    tag_id = graphene.String()
+    tag_name = graphene.String()
+    tag_color = graphene.String()
+    start_date = graphene.String()
+    end_date = graphene.String()
+    is_active = graphene.Boolean(required=True)
+    spent = graphene.String(required=True)
+    remaining = graphene.String(required=True)
+    percentage_used = graphene.Float(required=True)
+    is_over_budget = graphene.Boolean(required=True)
+    created_at = graphene.String()
+    updated_at = graphene.String()
+
+
+class BudgetListPayloadType(graphene.ObjectType):
+    items = graphene.List(BudgetType, required=True)
+
+
+class BudgetSummaryType(graphene.ObjectType):
+    total_budgeted = graphene.String(required=True)
+    total_spent = graphene.String(required=True)
+    total_remaining = graphene.String(required=True)
+    percentage_used = graphene.Float(required=True)
+    budget_count = graphene.Int(required=True)
+
+
+# ---------------------------------------------------------------------------
+# Subscription types (H-P3.1 / #835)
+# ---------------------------------------------------------------------------
+
+
+class PlanFeatureType(graphene.ObjectType):
+    key = graphene.String(required=True)
+    label = graphene.String(required=True)
+
+
+class BillingPlanType(graphene.ObjectType):
+    slug = graphene.String(required=True)
+    plan_code = graphene.String(required=True)
+    display_name = graphene.String(required=True)
+    description = graphene.String(required=True)
+    price_cents = graphene.Int(required=True)
+    currency = graphene.String(required=True)
+    billing_cycle = graphene.String(required=True)
+    is_active = graphene.Boolean(required=True)
+    features = graphene.List(graphene.String, required=True)
+
+
+class BillingPlanListPayloadType(graphene.ObjectType):
+    plans = graphene.List(BillingPlanType, required=True)
+
+
+class SubscriptionType(graphene.ObjectType):
+    id = graphene.ID(required=True)
+    plan_code = graphene.String(required=True)
+    offer_code = graphene.String()
+    status = graphene.String(required=True)
+    billing_cycle = graphene.String()
+    provider = graphene.String()
+    provider_subscription_id = graphene.String()
+    trial_ends_at = graphene.String()
+    current_period_start = graphene.String()
+    current_period_end = graphene.String()
+    canceled_at = graphene.String()
+    created_at = graphene.String()
+    updated_at = graphene.String()
+
+
+class CheckoutSessionType(graphene.ObjectType):
+    checkout_url = graphene.String(required=True)
+    provider = graphene.String(required=True)
+    provider_customer_id = graphene.String()
+    provider_subscription_id = graphene.String()
+
+
+# ---------------------------------------------------------------------------
+# Notification preference types (H-P3.3 / #836)
+# ---------------------------------------------------------------------------
+
+
+class AlertPreferenceType(graphene.ObjectType):
+    category = graphene.String(required=True)
+    enabled = graphene.Boolean(required=True)
+    global_opt_out = graphene.Boolean(required=True)
+
+
+class NotificationPreferencesType(graphene.ObjectType):
+    preferences = graphene.List(AlertPreferenceType, required=True)

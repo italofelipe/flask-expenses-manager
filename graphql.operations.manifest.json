@@ -381,5 +381,101 @@
     "operation_type": "mutation",
     "source_module": "app.graphql.mutations.ticker",
     "summary": "Remove um ticker do acompanhamento do usuário."
+  },
+  {
+    "access": "auth_required",
+    "domain": "billing",
+    "name": "budgets",
+    "operation_type": "query",
+    "source_module": "app.graphql.queries.budget",
+    "summary": "Lista os orçamentos ativos do usuário com métricas de gasto."
+  },
+  {
+    "access": "auth_required",
+    "domain": "billing",
+    "name": "budget",
+    "operation_type": "query",
+    "source_module": "app.graphql.queries.budget",
+    "summary": "Retorna um orçamento específico do usuário."
+  },
+  {
+    "access": "auth_required",
+    "domain": "billing",
+    "name": "budgetSummary",
+    "operation_type": "query",
+    "source_module": "app.graphql.queries.budget",
+    "summary": "Retorna o resumo consolidado dos orçamentos do usuário."
+  },
+  {
+    "access": "auth_required",
+    "domain": "billing",
+    "name": "createBudget",
+    "operation_type": "mutation",
+    "source_module": "app.graphql.mutations.budget",
+    "summary": "Cria um novo orçamento para o usuário."
+  },
+  {
+    "access": "auth_required",
+    "domain": "billing",
+    "name": "updateBudget",
+    "operation_type": "mutation",
+    "source_module": "app.graphql.mutations.budget",
+    "summary": "Atualiza um orçamento existente do usuário."
+  },
+  {
+    "access": "auth_required",
+    "domain": "billing",
+    "name": "deleteBudget",
+    "operation_type": "mutation",
+    "source_module": "app.graphql.mutations.budget",
+    "summary": "Remove um orçamento do usuário."
+  },
+  {
+    "access": "public",
+    "domain": "billing",
+    "name": "billingPlans",
+    "operation_type": "query",
+    "source_module": "app.graphql.queries.subscription",
+    "summary": "Retorna o catálogo público de planos de assinatura."
+  },
+  {
+    "access": "auth_required",
+    "domain": "billing",
+    "name": "mySubscription",
+    "operation_type": "query",
+    "source_module": "app.graphql.queries.subscription",
+    "summary": "Retorna o estado atual da assinatura do usuário autenticado."
+  },
+  {
+    "access": "auth_required",
+    "domain": "billing",
+    "name": "createCheckoutSession",
+    "operation_type": "mutation",
+    "source_module": "app.graphql.mutations.subscription",
+    "summary": "Cria uma sessão de checkout para assinatura de um plano."
+  },
+  {
+    "access": "auth_required",
+    "domain": "billing",
+    "name": "cancelSubscription",
+    "operation_type": "mutation",
+    "source_module": "app.graphql.mutations.subscription",
+    "summary": "Cancela a assinatura ativa do usuário autenticado."
+  },
+  {
+    "access": "auth_required",
+    "domain": "notifications",
+    "name": "notificationPreferences",
+    "operation_type": "query",
+    "source_module": "app.graphql.queries.notification",
+    "summary": "Retorna as preferências de notificação do usuário autenticado."
+  },
+  {
+    "access": "auth_required",
+    "domain": "notifications",
+    "name": "updateNotificationPreferences",
+    "operation_type": "mutation",
+    "source_module": "app.graphql.mutations.notification",
+    "summary": "Atualiza as preferências de notificação do usuário autenticado."
   }
 ]
