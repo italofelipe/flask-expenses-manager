@@ -57,6 +57,7 @@ from app.extensions.http_observability import register_http_observability
 from app.extensions.integration_metrics_cli import register_integration_metrics_commands
 from app.extensions.prometheus_metrics import register_prometheus_middleware
 from app.extensions.sentry import init_sentry
+from app.extensions.slow_query_log import install_slow_query_log
 from app.extensions.trial_expiry_cli import register_trial_expiry_cli
 from app.http.request_context import register_request_context_adapter
 from app.middleware.cors import register_cors
@@ -204,6 +205,9 @@ def create_app(*, enable_http_runtime: bool = True) -> Flask:
     ma.init_app(app)
     Migrate(app, db)
     jwt.init_app(app)
+
+    # PERF-3 — slow query log listeners on the default SQLAlchemy engine.
+    install_slow_query_log(app)
 
     # Schema bootstrap deve ser explicito para evitar drift em runtime seguro.
     auto_create_db = os.getenv("AUTO_CREATE_DB", "false").lower() == "true"
