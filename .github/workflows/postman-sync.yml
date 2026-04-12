@@ -1,0 +1,86 @@
+name: Postman Sync
+
+on:
+  push:
+    branches: [master]
+    paths:
+      - "app/controllers/**"
+      - "app/graphql/**"
+      - "app/schemas/**"
+      - "openapi.json"
+      - "api-tests/postman/**"
+      - "scripts/openapi_to_postman.py"
+      - "scripts/check-openapi-drift.sh"
+
+concurrency:
+  group: postman-sync-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  sync:
+    name: Regenerate & Validate Postman Collection
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: test
+          POSTGRES_PASSWORD: test
+          POSTGRES_DB: testdb
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+          cache: pip
+          cache-dependency-path: |
+            requirements.txt
+            requirements-dev.txt
+
+      - name: Install Python dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -r requirements.txt -r requirements-dev.txt
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+
+      - name: Install Node dependencies
+        run: npm ci
+
+      - name: Check OpenAPI drift
+        env:
+          FLASK_TESTING: "true"
+          SECURITY_ENFORCE_STRONG_SECRETS: "false"
+          DOCS_EXPOSURE_POLICY: public
+          DATABASE_URL: "sqlite:///tmp/drift-check.sqlite3"
+          SECRET_KEY: "drift-check-key-with-64-chars-minimum-for-jwt-signing-000001"
+          JWT_SECRET_KEY: "drift-check-jwt-key-with-64-chars-minimum-for-signing-002"
+        run: bash scripts/check-openapi-drift.sh
+
+      - name: Regenerate Postman collection
+        run: python3 scripts/openapi_to_postman.py
+
+      - name: Verify collection is up to date
+        run: |
+          if ! git diff --quiet api-tests/postman/auraxis.postman_collection.json; then
+            echo "::error::Postman collection is stale. Run 'npm run postman:build' and commit."
+            git diff --stat api-tests/postman/auraxis.postman_collection.json
+            exit 1
+          fi
+          echo "Postman collection is up to date."
