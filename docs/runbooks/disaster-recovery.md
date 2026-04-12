@@ -1,8 +1,9 @@
 # Disaster Recovery Runbook — Auraxis API
 
 > **Audience:** On-call engineer / platform owner
-> **Last updated:** 2026-04-07
+> **Last updated:** 2026-04-11
 > **Infra reference:** `.context/09_infra_map.md` (canonical AWS resource map)
+> **Drill cadence:** monthly (first Monday, 10:00 BRT). See [Restore Dry-Run Drill](#restore-dry-run-drill).
 
 ---
 
@@ -324,6 +325,114 @@ Run these checks after completing any recovery scenario:
 
 ---
 
+## Restore Dry-Run Drill
+
+A monthly drill validates that the latest backup is both **downloadable** and
+**restorable** into a scratch database. The drill is **non-destructive** — it
+restores into `auraxis_restore_drill` (a separate DB inside the DEV postgres
+container) and never touches `auraxis_prod` or `auraxis_dev`.
+
+### Cadence
+
+- **Frequency:** monthly, first Monday at 10:00 BRT.
+- **Owner:** on-call engineer.
+- **Duration target:** ≤ 30 minutes end-to-end.
+- **Evidence:** append a row to the [Drill Log](#drill-log) below with
+  timestamp, backup date restored, row count sampled, and elapsed time.
+
+### Step 1 — Verify the target backup
+
+```bash
+bash scripts/verify-backup.sh
+```
+
+Expect exit code `0`. If the backup is missing or corrupt, pick a prior date:
+
+```bash
+aws s3 ls s3://auraxis-db-backups/daily/ | sort -r | head -5
+BACKUP_DATE=2026-04-10 bash scripts/verify-backup.sh
+```
+
+### Step 2 — Run the restore drill on DEV
+
+The drill uses `aws_backups_s3.py restore-drill-dev`, which:
+
+1. SSMs into the DEV EC2 instance.
+2. Downloads the latest object under `dev/<instance-id>/` from S3.
+3. Drops and recreates `auraxis_restore_drill` inside the DEV postgres container.
+4. Restores the gzipped SQL dump with `gunzip -c | psql`.
+5. Leaves `auraxis_dev` and `auraxis_prod` untouched.
+
+```bash
+./scripts/python_exec.sh scripts/aws_backups_s3.py \
+  --profile auraxis-admin \
+  --region us-east-1 \
+  restore-drill-dev
+```
+
+The command prints an SSM CommandId. Capture the output with:
+
+```bash
+./scripts/python_exec.sh scripts/aws_backups_s3.py \
+  --profile auraxis-admin \
+  --region us-east-1 \
+  ssm-output \
+  --command-id <command-id> \
+  --instance-id i-0bddcfc8ea56c2ba3
+```
+
+### Step 3 — Validate the restored database
+
+Connect to the DEV instance via SSM and inspect `auraxis_restore_drill`:
+
+```bash
+aws ssm start-session \
+  --target i-0bddcfc8ea56c2ba3 \
+  --region us-east-1 \
+  --profile auraxis-admin
+```
+
+Inside the session:
+
+```bash
+# Table inventory
+docker exec auraxis-db-1 psql -U "${POSTGRES_USER}" -d auraxis_restore_drill -c '\dt'
+
+# Row count on core tables (sample)
+docker exec auraxis-db-1 psql -U "${POSTGRES_USER}" -d auraxis_restore_drill -c \
+  "SELECT 'users' AS table, count(*) FROM users
+   UNION ALL SELECT 'transactions', count(*) FROM transactions
+   UNION ALL SELECT 'accounts', count(*) FROM accounts;"
+
+# Alembic head check
+docker exec auraxis-db-1 psql -U "${POSTGRES_USER}" -d auraxis_restore_drill -c \
+  "SELECT version_num FROM alembic_version;"
+```
+
+### Step 4 — Clean up (optional)
+
+The drill DB remains on DEV after the drill so you can inspect it. To drop it:
+
+```bash
+docker exec auraxis-db-1 psql -U "${POSTGRES_USER}" -d postgres -c \
+  "DROP DATABASE auraxis_restore_drill;"
+```
+
+### Drill Log
+
+Record each monthly drill here. Append new rows at the top.
+
+| Date (UTC) | Backup restored | Rows sampled | Elapsed | Result | Operator | Notes |
+|:-----------|:----------------|:-------------|:--------|:-------|:---------|:------|
+| _pending_ | _first drill scheduled after this PR merges_ | — | — | — | — | Drill will be run on the next first-Monday window and logged here. |
+
+> **Note:** This runbook captures the *procedure*; the live drill is
+> performed by the on-call engineer during the scheduled window because
+> it requires SSM access to the DEV EC2 instance and AWS SSO credentials
+> that are not available inside the CI environment.
+
+---
+
 ## Related Resources
 
 | Resource | Path / URL |
@@ -331,6 +440,7 @@ Run these checks after completing any recovery scenario:
 | S3 backup script | `scripts/backup-db-to-s3.sh` |
 | S3 restore script | `scripts/restore-db-from-s3.sh` |
 | Backup verification | `scripts/verify-backup.sh` |
+| Restore drill (SSM orchestrator) | `scripts/aws_backups_s3.py restore-drill-dev` |
 | API rollback procedure | `docs/runbooks/api-rollback.md` |
 | AWS infra map | `.context/09_infra_map.md` |
 | General operational runbook | `docs/RUNBOOK.md` |
