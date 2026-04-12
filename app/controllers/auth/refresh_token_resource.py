@@ -1,8 +1,9 @@
 from __future__ import annotations
 
+from typing import Any
 from uuid import UUID
 
-from flask import Response, current_app
+from flask import Response, current_app, request
 from flask_apispec.views import MethodResource
 from flask_jwt_extended import get_jwt, get_jwt_identity, set_refresh_cookies
 
@@ -18,6 +19,7 @@ from app.utils.typed_decorators import typed_doc as doc
 from app.utils.typed_decorators import typed_jwt_required as jwt_required
 
 from .contracts import compat_error, compat_success
+from .cookie_only_policy import COOKIE_ONLY_HEADER, should_omit_refresh_token_in_body
 from .dependencies import get_auth_dependencies
 
 
@@ -97,22 +99,28 @@ class RefreshTokenResource(MethodResource):
             db.session.commit()
             get_jwt_revocation_cache().set_current_jti(user_id, new_access_jti)
 
+            omit_refresh_in_body = should_omit_refresh_token_in_body(
+                header_value=request.headers.get(COOKIE_ONLY_HEADER),
+            )
+            legacy_payload: dict[str, Any] = {
+                "message": "Token refreshed",
+                "token": new_access_token,
+            }
+            data_payload: dict[str, Any] = {
+                "token": new_access_token,
+            }
+            if not omit_refresh_in_body:
+                legacy_payload["refresh_token"] = new_refresh_token
+                data_payload["refresh_token"] = new_refresh_token
             response = compat_success(
-                legacy_payload={
-                    "message": "Token refreshed",
-                    "token": new_access_token,
-                    "refresh_token": new_refresh_token,
-                },
+                legacy_payload=legacy_payload,
                 status_code=200,
                 message="Token refreshed",
-                data={
-                    "token": new_access_token,
-                    "refresh_token": new_refresh_token,
-                },
+                data=data_payload,
             )
-            # SEC-GAP-01 — rotate the httpOnly refresh cookie alongside the
-            # body payload (dual-mode backward compat during the client
-            # migration window).
+            # SEC-1 — rotate the httpOnly refresh cookie; the JSON body stops
+            # echoing refresh_token once AURAXIS_REFRESH_COOKIE_ONLY=true or the
+            # X-Refresh-Cookie-Only header opts this request into cookie-only.
             set_refresh_cookies(response, new_refresh_token)
             return response
         except Exception:

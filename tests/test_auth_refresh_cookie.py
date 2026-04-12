@@ -193,3 +193,70 @@ class TestLogoutClearsCookie:
 def app_context_for(client):
     """Return the application context from the test client's app."""
     return client.application.app_context()
+
+
+# ─── SEC-1 — close dual-mode refresh_token in JSON body ──────────────────────
+
+
+class TestCookieOnlyLoginBody:
+    def test_login_body_omits_refresh_token_when_global_flag_on(self, app, client):
+        _create_user(app, email="cookie-only-login@test.com")
+        app.config["AURAXIS_REFRESH_COOKIE_ONLY"] = True
+        try:
+            resp = _login(client, email="cookie-only-login@test.com")
+            assert resp.status_code == 200, resp.get_json()
+            body = resp.get_json()
+            data = body.get("data") or body
+            assert "refresh_token" not in data
+            assert "token" in data
+            assert _find_set_cookie(resp, REFRESH_COOKIE_NAME) is not None
+        finally:
+            app.config["AURAXIS_REFRESH_COOKIE_ONLY"] = False
+
+    def test_login_body_omits_refresh_token_when_header_opt_in(self, app, client):
+        _create_user(app, email="cookie-only-header-login@test.com")
+        resp = client.post(
+            "/auth/login",
+            json={
+                "email": "cookie-only-header-login@test.com",
+                "password": "Pass123!",
+                "captcha_token": "test",
+            },
+            headers={"X-Refresh-Cookie-Only": "1"},
+        )
+        assert resp.status_code == 200, resp.get_json()
+        body = resp.get_json()
+        data = body.get("data") or body
+        assert "refresh_token" not in data
+        assert body.get("refresh_token") is None
+        assert _find_set_cookie(resp, REFRESH_COOKIE_NAME) is not None
+
+
+class TestCookieOnlyRefreshBody:
+    def test_refresh_body_omits_refresh_token_when_global_flag_on(self, app, client):
+        _create_user(app, email="cookie-only-refresh@test.com")
+        _login(client, email="cookie-only-refresh@test.com")
+
+        app.config["AURAXIS_REFRESH_COOKIE_ONLY"] = True
+        try:
+            resp = client.post("/auth/refresh")
+            assert resp.status_code == 200, resp.get_json()
+            body = resp.get_json()
+            data = body.get("data") or body
+            assert "refresh_token" not in data
+            assert "token" in data
+            assert _find_set_cookie(resp, REFRESH_COOKIE_NAME) is not None
+        finally:
+            app.config["AURAXIS_REFRESH_COOKIE_ONLY"] = False
+
+    def test_refresh_body_omits_refresh_token_when_header_opt_in(self, app, client):
+        _create_user(app, email="cookie-only-refresh-header@test.com")
+        _login(client, email="cookie-only-refresh-header@test.com")
+
+        resp = client.post("/auth/refresh", headers={"X-Refresh-Cookie-Only": "1"})
+        assert resp.status_code == 200, resp.get_json()
+        body = resp.get_json()
+        data = body.get("data") or body
+        assert "refresh_token" not in data
+        assert body.get("refresh_token") is None
+        assert _find_set_cookie(resp, REFRESH_COOKIE_NAME) is not None
