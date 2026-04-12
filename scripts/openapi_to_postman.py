@@ -60,6 +60,38 @@ PATH_FOLDER_FALLBACK: dict[str, str] = {
     "/user": "02 - User",
 }
 
+# Explicit operation ordering within folders.
+# Operations listed here are placed first (in given order);
+# remaining operations sort alphabetically after them.
+OPERATION_ORDER: dict[str, list[str]] = {
+    "01 - Auth": [
+        "POST /auth/register",
+        "POST /auth/login",
+        "POST /auth/refresh",
+        "GET /user/me",
+        "POST /auth/logout",
+    ],
+    "03 - Transactions": [
+        "POST /transactions",
+        "GET /transactions",
+        "GET /transactions/summary",
+        "GET /dashboard/overview",
+    ],
+    "05 - Goals": [
+        "POST /goals",
+        "GET /goals",
+    ],
+    "06 - Wallet": [
+        "POST /wallet",
+        "GET /wallet",
+        "GET /wallet/valuation",
+    ],
+    "04 - Budgets": [
+        "POST /budgets",
+        "GET /budgets",
+    ],
+}
+
 # Folder ordering for deterministic output
 FOLDER_ORDER = [
     "00 - Health",
@@ -262,9 +294,9 @@ ENRICHMENT: dict[str, dict[str, Any]] = {
     "POST /simulations/installment-vs-cash/calculate": {
         "body_override": json.dumps(
             {
-                "total_value": 1200,
-                "installments": 12,
-                "annual_rate": 12.0,
+                "cash_price": 1200,
+                "installment_count": 12,
+                "inflation_rate_annual": 6.5,
             },
             indent=2,
         ),
@@ -557,13 +589,31 @@ def build_collection(spec: dict[str, Any]) -> dict[str, Any]:
                 "event": events,
             }
 
-            # Internal markers for profile classification (stripped before output)
+            # Internal markers (stripped before output)
+            item["_op_key"] = op_key
             if op_key in SMOKE_OPERATIONS:
                 item["_smoke"] = True
             if op_key in PRIVILEGED_OPERATIONS:
                 item["_privileged"] = True
 
             folders.setdefault(folder_name, []).append(item)
+
+    # --- Sort items within each folder using OPERATION_ORDER ---
+    for folder_name, folder_items in folders.items():
+        priority = OPERATION_ORDER.get(folder_name, [])
+        priority_index = {op_key: i for i, op_key in enumerate(priority)}
+
+        def _sort_key(
+            item: dict[str, Any],
+            _pi: dict[str, int] = priority_index,
+            _plen: int = len(priority),
+        ) -> tuple[int, str]:
+            op_key = item.get("_op_key", "")
+            if op_key in _pi:
+                return (_pi[op_key], op_key)
+            return (_plen, item.get("name", ""))
+
+        folder_items.sort(key=_sort_key)
 
     # --- Assemble folder items in order ---
     ordered_items: list[dict[str, Any]] = []
@@ -584,6 +634,7 @@ def build_collection(spec: dict[str, Any]) -> dict[str, Any]:
         for item in folder.get("item", []):
             item.pop("_smoke", None)
             item.pop("_privileged", None)
+            item.pop("_op_key", None)
 
     # --- Collection-level events ---
     collection_events = [

@@ -152,7 +152,7 @@
       "name": "01 - Auth",
       "item": [
         {
-          "name": "POST — Confirmar conta",
+          "name": "POST — Registrar usuário",
           "request": {
             "method": "POST",
             "header": [
@@ -166,19 +166,18 @@
               }
             ],
             "url": {
-              "raw": "{{baseUrl}}/auth/email/confirm",
+              "raw": "{{baseUrl}}/auth/register",
               "host": [
                 "{{baseUrl}}"
               ],
               "path": [
                 "auth",
-                "email",
-                "confirm"
+                "register"
               ]
             },
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"token\": \"G9Q7zJ6lQ4Vwm6dXj6nQjzH8QqfUuBqbMTe4PmS7p8Q\"\n}"
+              "raw": "{\n  \"name\": \"{{runName}}\",\n  \"email\": \"{{runEmail}}\",\n  \"password\": \"{{testPassword}}\"\n}"
             }
           },
           "event": [
@@ -186,45 +185,13 @@
               "listen": "test",
               "script": {
                 "exec": [
-                  "pm.test('Confirmar conta — status 200', function () {",
-                  "  pm.response.to.have.status(200);",
-                  "});"
-                ],
-                "type": "text/javascript"
-              }
-            }
-          ]
-        },
-        {
-          "name": "POST — Reenviar confirmacao de conta",
-          "request": {
-            "method": "POST",
-            "header": [
-              {
-                "key": "X-API-Contract",
-                "value": "v2"
-              }
-            ],
-            "url": {
-              "raw": "{{baseUrl}}/auth/email/resend",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "auth",
-                "email",
-                "resend"
-              ]
-            }
-          },
-          "event": [
-            {
-              "listen": "test",
-              "script": {
-                "exec": [
-                  "pm.test('Reenviar confirmacao de conta — status 200', function () {",
-                  "  pm.response.to.have.status(200);",
-                  "});"
+                  "pm.test('Register returns 201', function () {",
+                  "  pm.response.to.have.status(201);",
+                  "});",
+                  "var json = pm.response.json();",
+                  "if (json.data && json.data.user) {",
+                  "  pm.collectionVariables.set('userId', json.data.user.id);",
+                  "}"
                 ],
                 "type": "text/javascript"
               }
@@ -275,133 +242,6 @@
                   "if (json.data && json.data.refresh_token) {",
                   "  pm.collectionVariables.set('refreshToken', json.data.refresh_token);",
                   "}"
-                ],
-                "type": "text/javascript"
-              }
-            }
-          ]
-        },
-        {
-          "name": "POST — Revogar sessão atual",
-          "request": {
-            "method": "POST",
-            "header": [
-              {
-                "key": "X-API-Contract",
-                "value": "v2"
-              },
-              {
-                "key": "Authorization",
-                "value": "Bearer {{authToken}}"
-              }
-            ],
-            "url": {
-              "raw": "{{baseUrl}}/auth/logout",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "auth",
-                "logout"
-              ]
-            }
-          },
-          "event": [
-            {
-              "listen": "test",
-              "script": {
-                "exec": [
-                  "pm.test('Revogar sessão atual — status 200', function () {",
-                  "  pm.response.to.have.status(200);",
-                  "});"
-                ],
-                "type": "text/javascript"
-              }
-            }
-          ]
-        },
-        {
-          "name": "POST — Solicitar recuperação de senha",
-          "request": {
-            "method": "POST",
-            "header": [
-              {
-                "key": "Content-Type",
-                "value": "application/json"
-              },
-              {
-                "key": "X-API-Contract",
-                "value": "v2"
-              }
-            ],
-            "url": {
-              "raw": "{{baseUrl}}/auth/password/forgot",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "auth",
-                "password",
-                "forgot"
-              ]
-            },
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"email\": \"italo@auraxis.com.br\"\n}"
-            }
-          },
-          "event": [
-            {
-              "listen": "test",
-              "script": {
-                "exec": [
-                  "pm.test('Solicitar recuperação de senha — status 200', function () {",
-                  "  pm.response.to.have.status(200);",
-                  "});"
-                ],
-                "type": "text/javascript"
-              }
-            }
-          ]
-        },
-        {
-          "name": "POST — Redefinir senha",
-          "request": {
-            "method": "POST",
-            "header": [
-              {
-                "key": "Content-Type",
-                "value": "application/json"
-              },
-              {
-                "key": "X-API-Contract",
-                "value": "v2"
-              }
-            ],
-            "url": {
-              "raw": "{{baseUrl}}/auth/password/reset",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "auth",
-                "password",
-                "reset"
-              ]
-            },
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"new_password\": \"NovaSenha@123\",\n  \"token\": \"G9Q7zJ6lQ4Vwm6dXj6nQjzH8QqfUuBqbMTe4PmS7p8Q\"\n}"
-            }
-          },
-          "event": [
-            {
-              "listen": "test",
-              "script": {
-                "exec": [
-                  "pm.test('Redefinir senha — status 200', function () {",
-                  "  pm.response.to.have.status(200);",
-                  "});"
                 ],
                 "type": "text/javascript"
               }
@@ -460,7 +300,46 @@
           ]
         },
         {
-          "name": "POST — Registrar usuário",
+          "name": "POST — Revogar sessão atual",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "X-API-Contract",
+                "value": "v2"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{authToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/auth/logout",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "logout"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Revogar sessão atual — status 200', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "POST — Confirmar conta",
           "request": {
             "method": "POST",
             "header": [
@@ -474,18 +353,19 @@
               }
             ],
             "url": {
-              "raw": "{{baseUrl}}/auth/register",
+              "raw": "{{baseUrl}}/auth/email/confirm",
               "host": [
                 "{{baseUrl}}"
               ],
               "path": [
                 "auth",
-                "register"
+                "email",
+                "confirm"
               ]
             },
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"name\": \"{{runName}}\",\n  \"email\": \"{{runEmail}}\",\n  \"password\": \"{{testPassword}}\"\n}"
+              "raw": "{\n  \"token\": \"G9Q7zJ6lQ4Vwm6dXj6nQjzH8QqfUuBqbMTe4PmS7p8Q\"\n}"
             }
           },
           "event": [
@@ -493,13 +373,133 @@
               "listen": "test",
               "script": {
                 "exec": [
-                  "pm.test('Register returns 201', function () {",
-                  "  pm.response.to.have.status(201);",
-                  "});",
-                  "var json = pm.response.json();",
-                  "if (json.data && json.data.user) {",
-                  "  pm.collectionVariables.set('userId', json.data.user.id);",
-                  "}"
+                  "pm.test('Confirmar conta — status 200', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "POST — Redefinir senha",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "X-API-Contract",
+                "value": "v2"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/auth/password/reset",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "password",
+                "reset"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"new_password\": \"NovaSenha@123\",\n  \"token\": \"G9Q7zJ6lQ4Vwm6dXj6nQjzH8QqfUuBqbMTe4PmS7p8Q\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Redefinir senha — status 200', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "POST — Reenviar confirmacao de conta",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "X-API-Contract",
+                "value": "v2"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/auth/email/resend",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "email",
+                "resend"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Reenviar confirmacao de conta — status 200', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "POST — Solicitar recuperação de senha",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "X-API-Contract",
+                "value": "v2"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/auth/password/forgot",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "password",
+                "forgot"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"italo@auraxis.com.br\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Solicitar recuperação de senha — status 200', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "});"
                 ],
                 "type": "text/javascript"
               }
@@ -511,45 +511,6 @@
     {
       "name": "02 - User",
       "item": [
-        {
-          "name": "GET — Obter bootstrap da home do usuário",
-          "request": {
-            "method": "GET",
-            "header": [
-              {
-                "key": "X-API-Contract",
-                "value": "v2"
-              },
-              {
-                "key": "Authorization",
-                "value": "Bearer {{authToken}}"
-              }
-            ],
-            "url": {
-              "raw": "{{baseUrl}}/user/bootstrap",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "user",
-                "bootstrap"
-              ]
-            }
-          },
-          "event": [
-            {
-              "listen": "test",
-              "script": {
-                "exec": [
-                  "pm.test('Obter bootstrap da home do usuário — status 200', function () {",
-                  "  pm.response.to.have.status(200);",
-                  "});"
-                ],
-                "type": "text/javascript"
-              }
-            }
-          ]
-        },
         {
           "name": "DELETE — Excluir conta do usuário (LGPD)",
           "request": {
@@ -598,45 +559,6 @@
           ]
         },
         {
-          "name": "GET — Obter contexto do usuário autenticado",
-          "request": {
-            "method": "GET",
-            "header": [
-              {
-                "key": "X-API-Contract",
-                "value": "v2"
-              },
-              {
-                "key": "Authorization",
-                "value": "Bearer {{authToken}}"
-              }
-            ],
-            "url": {
-              "raw": "{{baseUrl}}/user/me",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "user",
-                "me"
-              ]
-            }
-          },
-          "event": [
-            {
-              "listen": "test",
-              "script": {
-                "exec": [
-                  "pm.test('Obter contexto do usuário autenticado — status 200', function () {",
-                  "  pm.response.to.have.status(200);",
-                  "});"
-                ],
-                "type": "text/javascript"
-              }
-            }
-          ]
-        },
-        {
           "name": "GET /user/notification-preferences",
           "request": {
             "method": "GET",
@@ -676,9 +598,9 @@
           ]
         },
         {
-          "name": "PATCH /user/notification-preferences",
+          "name": "GET — Listar questionário de perfil de investidor",
           "request": {
-            "method": "PATCH",
+            "method": "GET",
             "header": [
               {
                 "key": "X-API-Contract",
@@ -690,13 +612,14 @@
               }
             ],
             "url": {
-              "raw": "{{baseUrl}}/user/notification-preferences",
+              "raw": "{{baseUrl}}/user/profile/questionnaire",
               "host": [
                 "{{baseUrl}}"
               ],
               "path": [
                 "user",
-                "notification-preferences"
+                "profile",
+                "questionnaire"
               ]
             }
           },
@@ -705,7 +628,85 @@
               "listen": "test",
               "script": {
                 "exec": [
-                  "pm.test('PATCH /user/notification-preferences — status 200', function () {",
+                  "pm.test('Listar questionário de perfil de investidor — status 200', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "GET — Obter bootstrap da home do usuário",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "X-API-Contract",
+                "value": "v2"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{authToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/user/bootstrap",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "user",
+                "bootstrap"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Obter bootstrap da home do usuário — status 200', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "GET — Obter contexto do usuário autenticado",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "X-API-Contract",
+                "value": "v2"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{authToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/user/me",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "user",
+                "me"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Obter contexto do usuário autenticado — status 200', function () {",
                   "  pm.response.to.have.status(200);",
                   "});"
                 ],
@@ -754,9 +755,48 @@
           ]
         },
         {
-          "name": "PUT — Atualizar perfil do usuário",
+          "name": "PATCH /user/notification-preferences",
           "request": {
-            "method": "PUT",
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "X-API-Contract",
+                "value": "v2"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{authToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/user/notification-preferences",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "user",
+                "notification-preferences"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('PATCH /user/notification-preferences — status 200', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "POST /user/simulate-salary-increase",
+          "request": {
+            "method": "POST",
             "header": [
               {
                 "key": "Content-Type",
@@ -772,18 +812,18 @@
               }
             ],
             "url": {
-              "raw": "{{baseUrl}}/user/profile",
+              "raw": "{{baseUrl}}/user/simulate-salary-increase",
               "host": [
                 "{{baseUrl}}"
               ],
               "path": [
                 "user",
-                "profile"
+                "simulate-salary-increase"
               ]
             },
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"birth_date\": \"1990-05-15\",\n  \"gender\": \"masculino\",\n  \"investor_profile\": \"conservador\",\n  \"monthly_expenses\": \"2000.00\",\n  \"monthly_income_net\": \"5000.00\",\n  \"net_worth\": \"100000.00\",\n  \"occupation\": \"Founder\",\n  \"state_uf\": \"SP\"\n}"
+              "raw": "{\n  \"base_date\": \"2022-01-01\",\n  \"base_salary\": \"5000.00\",\n  \"discounts\": \"500.00\",\n  \"target_real_increase\": \"5.00\"\n}"
             }
           },
           "event": [
@@ -791,47 +831,7 @@
               "listen": "test",
               "script": {
                 "exec": [
-                  "pm.test('Atualizar perfil do usuário — status 200', function () {",
-                  "  pm.response.to.have.status(200);",
-                  "});"
-                ],
-                "type": "text/javascript"
-              }
-            }
-          ]
-        },
-        {
-          "name": "GET — Listar questionário de perfil de investidor",
-          "request": {
-            "method": "GET",
-            "header": [
-              {
-                "key": "X-API-Contract",
-                "value": "v2"
-              },
-              {
-                "key": "Authorization",
-                "value": "Bearer {{authToken}}"
-              }
-            ],
-            "url": {
-              "raw": "{{baseUrl}}/user/profile/questionnaire",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "user",
-                "profile",
-                "questionnaire"
-              ]
-            }
-          },
-          "event": [
-            {
-              "listen": "test",
-              "script": {
-                "exec": [
-                  "pm.test('Listar questionário de perfil de investidor — status 200', function () {",
+                  "pm.test('POST /user/simulate-salary-increase — status 200', function () {",
                   "  pm.response.to.have.status(200);",
                   "});"
                 ],
@@ -889,9 +889,9 @@
           ]
         },
         {
-          "name": "POST /user/simulate-salary-increase",
+          "name": "PUT — Atualizar perfil do usuário",
           "request": {
-            "method": "POST",
+            "method": "PUT",
             "header": [
               {
                 "key": "Content-Type",
@@ -907,18 +907,18 @@
               }
             ],
             "url": {
-              "raw": "{{baseUrl}}/user/simulate-salary-increase",
+              "raw": "{{baseUrl}}/user/profile",
               "host": [
                 "{{baseUrl}}"
               ],
               "path": [
                 "user",
-                "simulate-salary-increase"
+                "profile"
               ]
             },
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"base_date\": \"2022-01-01\",\n  \"base_salary\": \"5000.00\",\n  \"discounts\": \"500.00\",\n  \"target_real_increase\": \"5.00\"\n}"
+              "raw": "{\n  \"birth_date\": \"1990-05-15\",\n  \"gender\": \"masculino\",\n  \"investor_profile\": \"conservador\",\n  \"monthly_expenses\": \"2000.00\",\n  \"monthly_income_net\": \"5000.00\",\n  \"net_worth\": \"100000.00\",\n  \"occupation\": \"Founder\",\n  \"state_uf\": \"SP\"\n}"
             }
           },
           "event": [
@@ -926,7 +926,7 @@
               "listen": "test",
               "script": {
                 "exec": [
-                  "pm.test('POST /user/simulate-salary-increase — status 200', function () {",
+                  "pm.test('Atualizar perfil do usuário — status 200', function () {",
                   "  pm.response.to.have.status(200);",
                   "});"
                 ],
@@ -940,122 +940,6 @@
     {
       "name": "03 - Transactions",
       "item": [
-        {
-          "name": "GET — Obter overview mensal do dashboard",
-          "request": {
-            "method": "GET",
-            "header": [
-              {
-                "key": "X-API-Contract",
-                "value": "v2"
-              },
-              {
-                "key": "Authorization",
-                "value": "Bearer {{authToken}}"
-              }
-            ],
-            "url": {
-              "raw": "{{baseUrl}}/dashboard/overview",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "dashboard",
-                "overview"
-              ]
-            }
-          },
-          "event": [
-            {
-              "listen": "test",
-              "script": {
-                "exec": [
-                  "pm.test('Obter overview mensal do dashboard — status 200', function () {",
-                  "  pm.response.to.have.status(200);",
-                  "});"
-                ],
-                "type": "text/javascript"
-              }
-            }
-          ]
-        },
-        {
-          "name": "GET — Tendências mensais do dashboard",
-          "request": {
-            "method": "GET",
-            "header": [
-              {
-                "key": "X-API-Contract",
-                "value": "v2"
-              },
-              {
-                "key": "Authorization",
-                "value": "Bearer {{authToken}}"
-              }
-            ],
-            "url": {
-              "raw": "{{baseUrl}}/dashboard/trends",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "dashboard",
-                "trends"
-              ]
-            }
-          },
-          "event": [
-            {
-              "listen": "test",
-              "script": {
-                "exec": [
-                  "pm.test('Tendências mensais do dashboard — status 200', function () {",
-                  "  pm.response.to.have.status(200);",
-                  "});"
-                ],
-                "type": "text/javascript"
-              }
-            }
-          ]
-        },
-        {
-          "name": "GET — Listar transações",
-          "request": {
-            "method": "GET",
-            "header": [
-              {
-                "key": "X-API-Contract",
-                "value": "v2"
-              },
-              {
-                "key": "Authorization",
-                "value": "Bearer {{authToken}}"
-              }
-            ],
-            "url": {
-              "raw": "{{baseUrl}}/transactions",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "transactions"
-              ]
-            }
-          },
-          "event": [
-            {
-              "listen": "test",
-              "script": {
-                "exec": [
-                  "pm.test('Listar transações — status 200', function () {",
-                  "  pm.response.to.have.status(200);",
-                  "});"
-                ],
-                "type": "text/javascript"
-              }
-            }
-          ]
-        },
         {
           "name": "POST — Criar transação",
           "request": {
@@ -1107,7 +991,7 @@
           ]
         },
         {
-          "name": "GET — Obter dashboard mensal legado de transações",
+          "name": "GET — Listar transações",
           "request": {
             "method": "GET",
             "header": [
@@ -1121,13 +1005,12 @@
               }
             ],
             "url": {
-              "raw": "{{baseUrl}}/transactions/dashboard",
+              "raw": "{{baseUrl}}/transactions",
               "host": [
                 "{{baseUrl}}"
               ],
               "path": [
-                "transactions",
-                "dashboard"
+                "transactions"
               ]
             }
           },
@@ -1136,7 +1019,7 @@
               "listen": "test",
               "script": {
                 "exec": [
-                  "pm.test('Obter dashboard mensal legado de transações — status 200', function () {",
+                  "pm.test('Listar transações — status 200', function () {",
                   "  pm.response.to.have.status(200);",
                   "});"
                 ],
@@ -1146,7 +1029,7 @@
           ]
         },
         {
-          "name": "GET — Listar transações deletadas",
+          "name": "GET — Obter resumo mensal de transações",
           "request": {
             "method": "GET",
             "header": [
@@ -1160,13 +1043,13 @@
               }
             ],
             "url": {
-              "raw": "{{baseUrl}}/transactions/deleted",
+              "raw": "{{baseUrl}}/transactions/summary",
               "host": [
                 "{{baseUrl}}"
               ],
               "path": [
                 "transactions",
-                "deleted"
+                "summary"
               ]
             }
           },
@@ -1175,7 +1058,7 @@
               "listen": "test",
               "script": {
                 "exec": [
-                  "pm.test('Listar transações deletadas — status 200', function () {",
+                  "pm.test('Obter resumo mensal de transações — status 200', function () {",
                   "  pm.response.to.have.status(200);",
                   "});"
                 ],
@@ -1185,7 +1068,7 @@
           ]
         },
         {
-          "name": "GET — Listar vencimentos por período",
+          "name": "GET — Obter overview mensal do dashboard",
           "request": {
             "method": "GET",
             "header": [
@@ -1199,13 +1082,13 @@
               }
             ],
             "url": {
-              "raw": "{{baseUrl}}/transactions/due-range",
+              "raw": "{{baseUrl}}/dashboard/overview",
               "host": [
                 "{{baseUrl}}"
               ],
               "path": [
-                "transactions",
-                "due-range"
+                "dashboard",
+                "overview"
               ]
             }
           },
@@ -1214,7 +1097,98 @@
               "listen": "test",
               "script": {
                 "exec": [
-                  "pm.test('Listar vencimentos por período — status 200', function () {",
+                  "pm.test('Obter overview mensal do dashboard — status 200', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "DELETE — Remover transação logicamente",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "X-API-Contract",
+                "value": "v2"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{authToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/transactions/:transaction_id",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "transactions",
+                ":transaction_id"
+              ],
+              "variable": [
+                {
+                  "key": "transaction_id",
+                  "value": "{{transactionId}}"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Remover transação logicamente — status 200', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "DELETE — Remover transação permanentemente",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "X-API-Contract",
+                "value": "v2"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{authToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/transactions/:transaction_id/force",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "transactions",
+                ":transaction_id",
+                "force"
+              ],
+              "variable": [
+                {
+                  "key": "transaction_id",
+                  "value": "{{transactionId}}"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Remover transação permanentemente — status 200', function () {",
                   "  pm.response.to.have.status(200);",
                   "});"
                 ],
@@ -1302,53 +1276,7 @@
           ]
         },
         {
-          "name": "PATCH — Restaurar transação deletada",
-          "request": {
-            "method": "PATCH",
-            "header": [
-              {
-                "key": "X-API-Contract",
-                "value": "v2"
-              },
-              {
-                "key": "Authorization",
-                "value": "Bearer {{authToken}}"
-              }
-            ],
-            "url": {
-              "raw": "{{baseUrl}}/transactions/restore/:transaction_id",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "transactions",
-                "restore",
-                ":transaction_id"
-              ],
-              "variable": [
-                {
-                  "key": "transaction_id",
-                  "value": "{{transactionId}}"
-                }
-              ]
-            }
-          },
-          "event": [
-            {
-              "listen": "test",
-              "script": {
-                "exec": [
-                  "pm.test('Restaurar transação deletada — status 200', function () {",
-                  "  pm.response.to.have.status(200);",
-                  "});"
-                ],
-                "type": "text/javascript"
-              }
-            }
-          ]
-        },
-        {
-          "name": "GET — Obter resumo mensal de transações",
+          "name": "GET — Listar transações deletadas",
           "request": {
             "method": "GET",
             "header": [
@@ -1362,13 +1290,13 @@
               }
             ],
             "url": {
-              "raw": "{{baseUrl}}/transactions/summary",
+              "raw": "{{baseUrl}}/transactions/deleted",
               "host": [
                 "{{baseUrl}}"
               ],
               "path": [
                 "transactions",
-                "summary"
+                "deleted"
               ]
             }
           },
@@ -1377,7 +1305,7 @@
               "listen": "test",
               "script": {
                 "exec": [
-                  "pm.test('Obter resumo mensal de transações — status 200', function () {",
+                  "pm.test('Listar transações deletadas — status 200', function () {",
                   "  pm.response.to.have.status(200);",
                   "});"
                 ],
@@ -1387,9 +1315,9 @@
           ]
         },
         {
-          "name": "DELETE — Remover transação logicamente",
+          "name": "GET — Listar vencimentos por período",
           "request": {
-            "method": "DELETE",
+            "method": "GET",
             "header": [
               {
                 "key": "X-API-Contract",
@@ -1401,19 +1329,13 @@
               }
             ],
             "url": {
-              "raw": "{{baseUrl}}/transactions/:transaction_id",
+              "raw": "{{baseUrl}}/transactions/due-range",
               "host": [
                 "{{baseUrl}}"
               ],
               "path": [
                 "transactions",
-                ":transaction_id"
-              ],
-              "variable": [
-                {
-                  "key": "transaction_id",
-                  "value": "{{transactionId}}"
-                }
+                "due-range"
               ]
             }
           },
@@ -1422,7 +1344,46 @@
               "listen": "test",
               "script": {
                 "exec": [
-                  "pm.test('Remover transação logicamente — status 200', function () {",
+                  "pm.test('Listar vencimentos por período — status 200', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "GET — Obter dashboard mensal legado de transações",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "X-API-Contract",
+                "value": "v2"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{authToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/transactions/dashboard",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "transactions",
+                "dashboard"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Obter dashboard mensal legado de transações — status 200', function () {",
                   "  pm.response.to.have.status(200);",
                   "});"
                 ],
@@ -1468,6 +1429,45 @@
               "script": {
                 "exec": [
                   "pm.test('Obter detalhe de transação — status 200', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "GET — Tendências mensais do dashboard",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "X-API-Contract",
+                "value": "v2"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{authToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/dashboard/trends",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "dashboard",
+                "trends"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Tendências mensais do dashboard — status 200', function () {",
                   "  pm.response.to.have.status(200);",
                   "});"
                 ],
@@ -1530,6 +1530,52 @@
           ]
         },
         {
+          "name": "PATCH — Restaurar transação deletada",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "X-API-Contract",
+                "value": "v2"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{authToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/transactions/restore/:transaction_id",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "transactions",
+                "restore",
+                ":transaction_id"
+              ],
+              "variable": [
+                {
+                  "key": "transaction_id",
+                  "value": "{{transactionId}}"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Restaurar transação deletada — status 200', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
           "name": "PUT — Atualizar transação (compatibilidade PUT)",
           "request": {
             "method": "PUT",
@@ -1581,96 +1627,12 @@
               }
             }
           ]
-        },
-        {
-          "name": "DELETE — Remover transação permanentemente",
-          "request": {
-            "method": "DELETE",
-            "header": [
-              {
-                "key": "X-API-Contract",
-                "value": "v2"
-              },
-              {
-                "key": "Authorization",
-                "value": "Bearer {{authToken}}"
-              }
-            ],
-            "url": {
-              "raw": "{{baseUrl}}/transactions/:transaction_id/force",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "transactions",
-                ":transaction_id",
-                "force"
-              ],
-              "variable": [
-                {
-                  "key": "transaction_id",
-                  "value": "{{transactionId}}"
-                }
-              ]
-            }
-          },
-          "event": [
-            {
-              "listen": "test",
-              "script": {
-                "exec": [
-                  "pm.test('Remover transação permanentemente — status 200', function () {",
-                  "  pm.response.to.have.status(200);",
-                  "});"
-                ],
-                "type": "text/javascript"
-              }
-            }
-          ]
         }
       ]
     },
     {
       "name": "04 - Budgets",
       "item": [
-        {
-          "name": "GET /budgets",
-          "request": {
-            "method": "GET",
-            "header": [
-              {
-                "key": "X-API-Contract",
-                "value": "v2"
-              },
-              {
-                "key": "Authorization",
-                "value": "Bearer {{authToken}}"
-              }
-            ],
-            "url": {
-              "raw": "{{baseUrl}}/budgets",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "budgets"
-              ]
-            }
-          },
-          "event": [
-            {
-              "listen": "test",
-              "script": {
-                "exec": [
-                  "pm.test('GET /budgets — status 200', function () {",
-                  "  pm.response.to.have.status(200);",
-                  "});"
-                ],
-                "type": "text/javascript"
-              }
-            }
-          ]
-        },
         {
           "name": "POST /budgets",
           "request": {
@@ -1722,7 +1684,7 @@
           ]
         },
         {
-          "name": "GET /budgets/summary",
+          "name": "GET /budgets",
           "request": {
             "method": "GET",
             "header": [
@@ -1736,13 +1698,12 @@
               }
             ],
             "url": {
-              "raw": "{{baseUrl}}/budgets/summary",
+              "raw": "{{baseUrl}}/budgets",
               "host": [
                 "{{baseUrl}}"
               ],
               "path": [
-                "budgets",
-                "summary"
+                "budgets"
               ]
             }
           },
@@ -1751,7 +1712,7 @@
               "listen": "test",
               "script": {
                 "exec": [
-                  "pm.test('GET /budgets/summary — status 200', function () {",
+                  "pm.test('GET /budgets — status 200', function () {",
                   "  pm.response.to.have.status(200);",
                   "});"
                 ],
@@ -1797,6 +1758,45 @@
               "script": {
                 "exec": [
                   "pm.test('DELETE /budgets/{budget_id} — status 200', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "GET /budgets/summary",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "X-API-Contract",
+                "value": "v2"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{authToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/budgets/summary",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "budgets",
+                "summary"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('GET /budgets/summary — status 200', function () {",
                   "  pm.response.to.have.status(200);",
                   "});"
                 ],
@@ -1901,44 +1901,6 @@
       "name": "05 - Goals",
       "item": [
         {
-          "name": "GET /goals",
-          "request": {
-            "method": "GET",
-            "header": [
-              {
-                "key": "X-API-Contract",
-                "value": "v2"
-              },
-              {
-                "key": "Authorization",
-                "value": "Bearer {{authToken}}"
-              }
-            ],
-            "url": {
-              "raw": "{{baseUrl}}/goals",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "goals"
-              ]
-            }
-          },
-          "event": [
-            {
-              "listen": "test",
-              "script": {
-                "exec": [
-                  "pm.test('GET /goals — status 200', function () {",
-                  "  pm.response.to.have.status(200);",
-                  "});"
-                ],
-                "type": "text/javascript"
-              }
-            }
-          ]
-        },
-        {
           "name": "POST /goals",
           "request": {
             "method": "POST",
@@ -1989,9 +1951,9 @@
           ]
         },
         {
-          "name": "POST /goals/simulate",
+          "name": "GET /goals",
           "request": {
-            "method": "POST",
+            "method": "GET",
             "header": [
               {
                 "key": "X-API-Contract",
@@ -2003,13 +1965,12 @@
               }
             ],
             "url": {
-              "raw": "{{baseUrl}}/goals/simulate",
+              "raw": "{{baseUrl}}/goals",
               "host": [
                 "{{baseUrl}}"
               ],
               "path": [
-                "goals",
-                "simulate"
+                "goals"
               ]
             }
           },
@@ -2018,7 +1979,7 @@
               "listen": "test",
               "script": {
                 "exec": [
-                  "pm.test('POST /goals/simulate — status 200', function () {",
+                  "pm.test('GET /goals — status 200', function () {",
                   "  pm.response.to.have.status(200);",
                   "});"
                 ],
@@ -2118,96 +2079,6 @@
           ]
         },
         {
-          "name": "PATCH /goals/{goal_id}",
-          "request": {
-            "method": "PATCH",
-            "header": [
-              {
-                "key": "X-API-Contract",
-                "value": "v2"
-              },
-              {
-                "key": "Authorization",
-                "value": "Bearer {{authToken}}"
-              }
-            ],
-            "url": {
-              "raw": "{{baseUrl}}/goals/:goal_id",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "goals",
-                ":goal_id"
-              ],
-              "variable": [
-                {
-                  "key": "goal_id",
-                  "value": "{{goalId}}"
-                }
-              ]
-            }
-          },
-          "event": [
-            {
-              "listen": "test",
-              "script": {
-                "exec": [
-                  "pm.test('PATCH /goals/{goal_id} — status 200', function () {",
-                  "  pm.response.to.have.status(200);",
-                  "});"
-                ],
-                "type": "text/javascript"
-              }
-            }
-          ]
-        },
-        {
-          "name": "PUT /goals/{goal_id}",
-          "request": {
-            "method": "PUT",
-            "header": [
-              {
-                "key": "X-API-Contract",
-                "value": "v2"
-              },
-              {
-                "key": "Authorization",
-                "value": "Bearer {{authToken}}"
-              }
-            ],
-            "url": {
-              "raw": "{{baseUrl}}/goals/:goal_id",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "goals",
-                ":goal_id"
-              ],
-              "variable": [
-                {
-                  "key": "goal_id",
-                  "value": "{{goalId}}"
-                }
-              ]
-            }
-          },
-          "event": [
-            {
-              "listen": "test",
-              "script": {
-                "exec": [
-                  "pm.test('PUT /goals/{goal_id} — status 200', function () {",
-                  "  pm.response.to.have.status(200);",
-                  "});"
-                ],
-                "type": "text/javascript"
-              }
-            }
-          ]
-        },
-        {
           "name": "GET /goals/{goal_id}/plan",
           "request": {
             "method": "GET",
@@ -2298,16 +2169,11 @@
               }
             }
           ]
-        }
-      ]
-    },
-    {
-      "name": "06 - Wallet",
-      "item": [
+        },
         {
-          "name": "GET /wallet",
+          "name": "PATCH /goals/{goal_id}",
           "request": {
-            "method": "GET",
+            "method": "PATCH",
             "header": [
               {
                 "key": "X-API-Contract",
@@ -2319,12 +2185,19 @@
               }
             ],
             "url": {
-              "raw": "{{baseUrl}}/wallet",
+              "raw": "{{baseUrl}}/goals/:goal_id",
               "host": [
                 "{{baseUrl}}"
               ],
               "path": [
-                "wallet"
+                "goals",
+                ":goal_id"
+              ],
+              "variable": [
+                {
+                  "key": "goal_id",
+                  "value": "{{goalId}}"
+                }
               ]
             }
           },
@@ -2333,7 +2206,7 @@
               "listen": "test",
               "script": {
                 "exec": [
-                  "pm.test('GET /wallet — status 200', function () {",
+                  "pm.test('PATCH /goals/{goal_id} — status 200', function () {",
                   "  pm.response.to.have.status(200);",
                   "});"
                 ],
@@ -2342,6 +2215,95 @@
             }
           ]
         },
+        {
+          "name": "POST /goals/simulate",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "X-API-Contract",
+                "value": "v2"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{authToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/goals/simulate",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "goals",
+                "simulate"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('POST /goals/simulate — status 200', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "PUT /goals/{goal_id}",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "X-API-Contract",
+                "value": "v2"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{authToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/goals/:goal_id",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "goals",
+                ":goal_id"
+              ],
+              "variable": [
+                {
+                  "key": "goal_id",
+                  "value": "{{goalId}}"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('PUT /goals/{goal_id} — status 200', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "06 - Wallet",
+      "item": [
         {
           "name": "POST /wallet",
           "request": {
@@ -2393,6 +2355,44 @@
           ]
         },
         {
+          "name": "GET /wallet",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "X-API-Contract",
+                "value": "v2"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{authToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/wallet",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "wallet"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('GET /wallet — status 200', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
           "name": "GET /wallet/valuation",
           "request": {
             "method": "GET",
@@ -2423,46 +2423,6 @@
               "script": {
                 "exec": [
                   "pm.test('GET /wallet/valuation — status 200', function () {",
-                  "  pm.response.to.have.status(200);",
-                  "});"
-                ],
-                "type": "text/javascript"
-              }
-            }
-          ]
-        },
-        {
-          "name": "GET /wallet/valuation/history",
-          "request": {
-            "method": "GET",
-            "header": [
-              {
-                "key": "X-API-Contract",
-                "value": "v2"
-              },
-              {
-                "key": "Authorization",
-                "value": "Bearer {{authToken}}"
-              }
-            ],
-            "url": {
-              "raw": "{{baseUrl}}/wallet/valuation/history",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "wallet",
-                "valuation",
-                "history"
-              ]
-            }
-          },
-          "event": [
-            {
-              "listen": "test",
-              "script": {
-                "exec": [
-                  "pm.test('GET /wallet/valuation/history — status 200', function () {",
                   "  pm.response.to.have.status(200);",
                   "});"
                 ],
@@ -2517,6 +2477,97 @@
           ]
         },
         {
+          "name": "DELETE /wallet/{investment_id}/operations/{operation_id}",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "X-API-Contract",
+                "value": "v2"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{authToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/wallet/:investment_id/operations/:operation_id",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "wallet",
+                ":investment_id",
+                "operations",
+                ":operation_id"
+              ],
+              "variable": [
+                {
+                  "key": "investment_id",
+                  "value": "{{investmentId}}"
+                },
+                {
+                  "key": "operation_id",
+                  "value": "{{operationId}}"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('DELETE /wallet/{investment_id}/operations/{operation_id} — status 200', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "GET /wallet/valuation/history",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "X-API-Contract",
+                "value": "v2"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{authToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/wallet/valuation/history",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "wallet",
+                "valuation",
+                "history"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('GET /wallet/valuation/history — status 200', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
           "name": "GET /wallet/{investment_id}",
           "request": {
             "method": "GET",
@@ -2553,96 +2604,6 @@
               "script": {
                 "exec": [
                   "pm.test('GET /wallet/{investment_id} — status 200', function () {",
-                  "  pm.response.to.have.status(200);",
-                  "});"
-                ],
-                "type": "text/javascript"
-              }
-            }
-          ]
-        },
-        {
-          "name": "PATCH /wallet/{investment_id}",
-          "request": {
-            "method": "PATCH",
-            "header": [
-              {
-                "key": "X-API-Contract",
-                "value": "v2"
-              },
-              {
-                "key": "Authorization",
-                "value": "Bearer {{authToken}}"
-              }
-            ],
-            "url": {
-              "raw": "{{baseUrl}}/wallet/:investment_id",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "wallet",
-                ":investment_id"
-              ],
-              "variable": [
-                {
-                  "key": "investment_id",
-                  "value": "{{investmentId}}"
-                }
-              ]
-            }
-          },
-          "event": [
-            {
-              "listen": "test",
-              "script": {
-                "exec": [
-                  "pm.test('PATCH /wallet/{investment_id} — status 200', function () {",
-                  "  pm.response.to.have.status(200);",
-                  "});"
-                ],
-                "type": "text/javascript"
-              }
-            }
-          ]
-        },
-        {
-          "name": "PUT /wallet/{investment_id}",
-          "request": {
-            "method": "PUT",
-            "header": [
-              {
-                "key": "X-API-Contract",
-                "value": "v2"
-              },
-              {
-                "key": "Authorization",
-                "value": "Bearer {{authToken}}"
-              }
-            ],
-            "url": {
-              "raw": "{{baseUrl}}/wallet/:investment_id",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "wallet",
-                ":investment_id"
-              ],
-              "variable": [
-                {
-                  "key": "investment_id",
-                  "value": "{{investmentId}}"
-                }
-              ]
-            }
-          },
-          "event": [
-            {
-              "listen": "test",
-              "script": {
-                "exec": [
-                  "pm.test('PUT /wallet/{investment_id} — status 200', function () {",
                   "  pm.response.to.have.status(200);",
                   "});"
                 ],
@@ -2736,52 +2697,6 @@
                 "exec": [
                   "pm.test('GET /wallet/{investment_id}/operations — status 200', function () {",
                   "  pm.response.to.have.status(200);",
-                  "});"
-                ],
-                "type": "text/javascript"
-              }
-            }
-          ]
-        },
-        {
-          "name": "POST /wallet/{investment_id}/operations",
-          "request": {
-            "method": "POST",
-            "header": [
-              {
-                "key": "X-API-Contract",
-                "value": "v2"
-              },
-              {
-                "key": "Authorization",
-                "value": "Bearer {{authToken}}"
-              }
-            ],
-            "url": {
-              "raw": "{{baseUrl}}/wallet/:investment_id/operations",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "wallet",
-                ":investment_id",
-                "operations"
-              ],
-              "variable": [
-                {
-                  "key": "investment_id",
-                  "value": "{{investmentId}}"
-                }
-              ]
-            }
-          },
-          "event": [
-            {
-              "listen": "test",
-              "script": {
-                "exec": [
-                  "pm.test('POST /wallet/{investment_id}/operations — status 201', function () {",
-                  "  pm.response.to.have.status(201);",
                   "});"
                 ],
                 "type": "text/javascript"
@@ -2931,9 +2846,9 @@
           ]
         },
         {
-          "name": "DELETE /wallet/{investment_id}/operations/{operation_id}",
+          "name": "GET /wallet/{investment_id}/valuation",
           "request": {
-            "method": "DELETE",
+            "method": "GET",
             "header": [
               {
                 "key": "X-API-Contract",
@@ -2945,24 +2860,19 @@
               }
             ],
             "url": {
-              "raw": "{{baseUrl}}/wallet/:investment_id/operations/:operation_id",
+              "raw": "{{baseUrl}}/wallet/:investment_id/valuation",
               "host": [
                 "{{baseUrl}}"
               ],
               "path": [
                 "wallet",
                 ":investment_id",
-                "operations",
-                ":operation_id"
+                "valuation"
               ],
               "variable": [
                 {
                   "key": "investment_id",
                   "value": "{{investmentId}}"
-                },
-                {
-                  "key": "operation_id",
-                  "value": "{{operationId}}"
                 }
               ]
             }
@@ -2972,7 +2882,143 @@
               "listen": "test",
               "script": {
                 "exec": [
-                  "pm.test('DELETE /wallet/{investment_id}/operations/{operation_id} — status 200', function () {",
+                  "pm.test('GET /wallet/{investment_id}/valuation — status 200', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "PATCH /wallet/{investment_id}",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "X-API-Contract",
+                "value": "v2"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{authToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/wallet/:investment_id",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "wallet",
+                ":investment_id"
+              ],
+              "variable": [
+                {
+                  "key": "investment_id",
+                  "value": "{{investmentId}}"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('PATCH /wallet/{investment_id} — status 200', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "POST /wallet/{investment_id}/operations",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "X-API-Contract",
+                "value": "v2"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{authToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/wallet/:investment_id/operations",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "wallet",
+                ":investment_id",
+                "operations"
+              ],
+              "variable": [
+                {
+                  "key": "investment_id",
+                  "value": "{{investmentId}}"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('POST /wallet/{investment_id}/operations — status 201', function () {",
+                  "  pm.response.to.have.status(201);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "PUT /wallet/{investment_id}",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "X-API-Contract",
+                "value": "v2"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{authToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/wallet/:investment_id",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "wallet",
+                ":investment_id"
+              ],
+              "variable": [
+                {
+                  "key": "investment_id",
+                  "value": "{{investmentId}}"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('PUT /wallet/{investment_id} — status 200', function () {",
                   "  pm.response.to.have.status(200);",
                   "});"
                 ],
@@ -3031,11 +3077,16 @@
               }
             }
           ]
-        },
+        }
+      ]
+    },
+    {
+      "name": "07 - Simulations",
+      "item": [
         {
-          "name": "GET /wallet/{investment_id}/valuation",
+          "name": "DELETE /simulations/{simulation_id}",
           "request": {
-            "method": "GET",
+            "method": "DELETE",
             "header": [
               {
                 "key": "X-API-Contract",
@@ -3047,19 +3098,18 @@
               }
             ],
             "url": {
-              "raw": "{{baseUrl}}/wallet/:investment_id/valuation",
+              "raw": "{{baseUrl}}/simulations/:simulation_id",
               "host": [
                 "{{baseUrl}}"
               ],
               "path": [
-                "wallet",
-                ":investment_id",
-                "valuation"
+                "simulations",
+                ":simulation_id"
               ],
               "variable": [
                 {
-                  "key": "investment_id",
-                  "value": "{{investmentId}}"
+                  "key": "simulation_id",
+                  "value": "{{simulationId}}"
                 }
               ]
             }
@@ -3069,7 +3119,7 @@
               "listen": "test",
               "script": {
                 "exec": [
-                  "pm.test('GET /wallet/{investment_id}/valuation — status 200', function () {",
+                  "pm.test('DELETE /simulations/{simulation_id} — status 200', function () {",
                   "  pm.response.to.have.status(200);",
                   "});"
                 ],
@@ -3077,12 +3127,7 @@
               }
             }
           ]
-        }
-      ]
-    },
-    {
-      "name": "07 - Simulations",
-      "item": [
+        },
         {
           "name": "GET /simulations",
           "request": {
@@ -3113,6 +3158,51 @@
               "script": {
                 "exec": [
                   "pm.test('GET /simulations — status 200', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "GET /simulations/{simulation_id}",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "X-API-Contract",
+                "value": "v2"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{authToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/simulations/:simulation_id",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "simulations",
+                ":simulation_id"
+              ],
+              "variable": [
+                {
+                  "key": "simulation_id",
+                  "value": "{{simulationId}}"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('GET /simulations/{simulation_id} — status 200', function () {",
                   "  pm.response.to.have.status(200);",
                   "});"
                 ],
@@ -3233,7 +3323,7 @@
             },
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"total_value\": 1200,\n  \"installments\": 12,\n  \"annual_rate\": 12.0\n}"
+              "raw": "{\n  \"cash_price\": 1200,\n  \"installment_count\": 12,\n  \"inflation_rate_annual\": 6.5\n}"
             }
           },
           "event": [
@@ -3291,96 +3381,6 @@
                 "exec": [
                   "pm.test('POST /simulations/installment-vs-cash/save — status 201', function () {",
                   "  pm.response.to.have.status(201);",
-                  "});"
-                ],
-                "type": "text/javascript"
-              }
-            }
-          ]
-        },
-        {
-          "name": "DELETE /simulations/{simulation_id}",
-          "request": {
-            "method": "DELETE",
-            "header": [
-              {
-                "key": "X-API-Contract",
-                "value": "v2"
-              },
-              {
-                "key": "Authorization",
-                "value": "Bearer {{authToken}}"
-              }
-            ],
-            "url": {
-              "raw": "{{baseUrl}}/simulations/:simulation_id",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "simulations",
-                ":simulation_id"
-              ],
-              "variable": [
-                {
-                  "key": "simulation_id",
-                  "value": "{{simulationId}}"
-                }
-              ]
-            }
-          },
-          "event": [
-            {
-              "listen": "test",
-              "script": {
-                "exec": [
-                  "pm.test('DELETE /simulations/{simulation_id} — status 200', function () {",
-                  "  pm.response.to.have.status(200);",
-                  "});"
-                ],
-                "type": "text/javascript"
-              }
-            }
-          ]
-        },
-        {
-          "name": "GET /simulations/{simulation_id}",
-          "request": {
-            "method": "GET",
-            "header": [
-              {
-                "key": "X-API-Contract",
-                "value": "v2"
-              },
-              {
-                "key": "Authorization",
-                "value": "Bearer {{authToken}}"
-              }
-            ],
-            "url": {
-              "raw": "{{baseUrl}}/simulations/:simulation_id",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "simulations",
-                ":simulation_id"
-              ],
-              "variable": [
-                {
-                  "key": "simulation_id",
-                  "value": "{{simulationId}}"
-                }
-              ]
-            }
-          },
-          "event": [
-            {
-              "listen": "test",
-              "script": {
-                "exec": [
-                  "pm.test('GET /simulations/{simulation_id} — status 200', function () {",
-                  "  pm.response.to.have.status(200);",
                   "});"
                 ],
                 "type": "text/javascript"
@@ -3502,83 +3502,6 @@
       "name": "08 - Entitlements",
       "item": [
         {
-          "name": "GET /entitlements",
-          "request": {
-            "method": "GET",
-            "header": [
-              {
-                "key": "X-API-Contract",
-                "value": "v2"
-              },
-              {
-                "key": "Authorization",
-                "value": "Bearer {{authToken}}"
-              }
-            ],
-            "url": {
-              "raw": "{{baseUrl}}/entitlements",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "entitlements"
-              ]
-            }
-          },
-          "event": [
-            {
-              "listen": "test",
-              "script": {
-                "exec": [
-                  "pm.test('GET /entitlements — status 200', function () {",
-                  "  pm.response.to.have.status(200);",
-                  "});"
-                ],
-                "type": "text/javascript"
-              }
-            }
-          ]
-        },
-        {
-          "name": "POST /entitlements/admin",
-          "request": {
-            "method": "POST",
-            "header": [
-              {
-                "key": "X-API-Contract",
-                "value": "v2"
-              },
-              {
-                "key": "Authorization",
-                "value": "Bearer {{authToken}}"
-              }
-            ],
-            "url": {
-              "raw": "{{baseUrl}}/entitlements/admin",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "entitlements",
-                "admin"
-              ]
-            }
-          },
-          "event": [
-            {
-              "listen": "test",
-              "script": {
-                "exec": [
-                  "pm.test('POST /entitlements/admin — status 201', function () {",
-                  "  pm.response.to.have.status(201);",
-                  "});"
-                ],
-                "type": "text/javascript"
-              }
-            }
-          ]
-        },
-        {
           "name": "DELETE /entitlements/admin/{entitlement_id}",
           "request": {
             "method": "DELETE",
@@ -3625,6 +3548,44 @@
           ]
         },
         {
+          "name": "GET /entitlements",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "X-API-Contract",
+                "value": "v2"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{authToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/entitlements",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "entitlements"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('GET /entitlements — status 200', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
           "name": "GET /entitlements/check",
           "request": {
             "method": "GET",
@@ -3656,6 +3617,45 @@
                 "exec": [
                   "pm.test('GET /entitlements/check — status 200', function () {",
                   "  pm.response.to.have.status(200);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "POST /entitlements/admin",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "X-API-Contract",
+                "value": "v2"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{authToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/entitlements/admin",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "entitlements",
+                "admin"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('POST /entitlements/admin — status 201', function () {",
+                  "  pm.response.to.have.status(201);",
                   "});"
                 ],
                 "type": "text/javascript"
@@ -3695,8 +3695,8 @@
           "pm.collectionVariables.set('runIn365Days', isoDate(365));",
           "pm.collectionVariables.set('runMonthRef', isoMonth(0));",
           "",
-          "var smokeRequests = [\"GET /healthz\", \"POST \\u2014 Autenticar usu\\u00e1rio\", \"POST \\u2014 Registrar usu\\u00e1rio\", \"GET \\u2014 Obter bootstrap da home do usu\\u00e1rio\", \"GET \\u2014 Obter contexto do usu\\u00e1rio autenticado\", \"GET \\u2014 Obter overview mensal do dashboard\", \"GET \\u2014 Listar transa\\u00e7\\u00f5es\", \"POST \\u2014 Criar transa\\u00e7\\u00e3o\", \"GET \\u2014 Obter resumo mensal de transa\\u00e7\\u00f5es\", \"GET /budgets\", \"POST /budgets\", \"GET /goals\", \"POST /goals\", \"POST /goals/simulate\", \"GET /wallet\", \"POST /wallet\", \"GET /wallet/valuation\", \"POST /simulations/installment-vs-cash/calculate\", \"GET /entitlements\"];",
-          "var privilegedOnlyRequests = [\"POST /entitlements/admin\", \"DELETE /entitlements/admin/{entitlement_id}\"];",
+          "var smokeRequests = [\"GET /healthz\", \"POST \\u2014 Registrar usu\\u00e1rio\", \"POST \\u2014 Autenticar usu\\u00e1rio\", \"GET \\u2014 Obter bootstrap da home do usu\\u00e1rio\", \"GET \\u2014 Obter contexto do usu\\u00e1rio autenticado\", \"POST \\u2014 Criar transa\\u00e7\\u00e3o\", \"GET \\u2014 Listar transa\\u00e7\\u00f5es\", \"GET \\u2014 Obter resumo mensal de transa\\u00e7\\u00f5es\", \"GET \\u2014 Obter overview mensal do dashboard\", \"POST /budgets\", \"GET /budgets\", \"POST /goals\", \"GET /goals\", \"POST /goals/simulate\", \"POST /wallet\", \"GET /wallet\", \"GET /wallet/valuation\", \"POST /simulations/installment-vs-cash/calculate\", \"GET /entitlements\"];",
+          "var privilegedOnlyRequests = [\"DELETE /entitlements/admin/{entitlement_id}\", \"POST /entitlements/admin\"];",
           "var activeProfile = String(pm.environment.get('suiteProfile') || pm.collectionVariables.get('suiteProfile') || 'full').toLowerCase();",
           "if (!['smoke', 'full', 'privileged'].includes(activeProfile)) {",
           "  throw new Error('Unsupported suiteProfile: ' + activeProfile + '. Use smoke, full or privileged.');",
