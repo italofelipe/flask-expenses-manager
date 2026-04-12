@@ -17,6 +17,12 @@ Auraxis API e um backend Flask com suporte a REST e GraphQL, focado em gestao fi
 - Deploy: AWS EC2 com Docker Compose.
 - Reverse proxy/TLS: Nginx + certificados.
 
+## TLS e renovacao de certificados
+- Certificado Let's Encrypt para `api.auraxis.com.br` emitido via Certbot (webroot) dentro do servico `certbot` do `docker-compose.prod.yml`.
+- Renovacao automatica por cron diario as 03:00 UTC no host EC2 (`certbot renew --quiet` + `nginx -s reload`). Referencia: `docs/NGINX_AWS_TLS.md`.
+- Drill mensal `certbot renew --dry-run` documentado em `docs/runbooks/tls-renewal-drill.md` (INF-3 / SEC-hardening), com log de execucao e cadencia antes de cada janela de renovacao real.
+- Sinais independentes de saude: alarme CloudWatch `auraxis.tls.days_to_expiry < 21` (INF-5) e monitor HTTPS UptimeRobot sobre `/healthz`.
+
 ## Qualidade e seguranca
 - Pre-commit: ruff (format + lint + isort), bandit, mypy, gitleaks.
 - CI: suites de testes, gates de seguranca e policy Sonar.

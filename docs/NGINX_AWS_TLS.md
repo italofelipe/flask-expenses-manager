@@ -60,6 +60,13 @@ Use a cron entry on EC2 to renew and reload Nginx:
 0 3 * * * cd /opt/auraxis && docker compose --env-file .env.prod -f docker-compose.prod.yml run --rm certbot renew --quiet && docker compose --env-file .env.prod -f docker-compose.prod.yml exec reverse-proxy nginx -s reload
 ```
 
+### Renewal drill
+Before every real renewal window, run the non-destructive
+`certbot renew --dry-run` drill documented in
+[`runbooks/tls-renewal-drill.md`](./runbooks/tls-renewal-drill.md). The drill
+exercises ACME, webroot and nginx reload without touching the live
+certificate or the Let's Encrypt issuance counter.
+
 ## Rollback
 If TLS config fails:
 ```bash
