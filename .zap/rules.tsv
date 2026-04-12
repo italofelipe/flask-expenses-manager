@@ -1,0 +1,18 @@
+# ZAP Baseline scan rule overrides — SEC-7
+#
+# Format (tab-separated):
+#   <ruleId>	<action>	<url-regex-or-empty>	<comment>
+#
+# Actions:
+#   IGNORE  — mute the rule entirely
+#   WARN    — downgrade to warning (does not fail the build)
+#   FAIL    — upgrade to failure
+#
+# Add entries here to triage noisy false positives. Keep a justification
+# in the comment column so reviewers can audit later.
+#
+# Curated base set — known-noisy rules on API-only surfaces (no HTML):
+10015	IGNORE	(none)	Incomplete or No Cache-control — APIs return JSON, browser caching not applicable
+10027	IGNORE	(none)	Information Disclosure — Suspicious Comments (false positives on minified JSON)
+10096	IGNORE	(none)	Timestamp Disclosure — Unix times are valid payload content, not a leak
+10049	IGNORE	(none)	Storable and Cacheable Content — duplicate of 10015 for our surface
