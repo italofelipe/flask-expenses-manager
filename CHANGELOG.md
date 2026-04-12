@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.24.0](https://github.com/italofelipe/auraxis-api/compare/v1.23.0...v1.24.0) (2026-04-12)
+
+
+### Features
+
+* **auth:** sec-1 close dual-mode refresh_token — cookie-only policy flag + header opt-in ([#984](https://github.com/italofelipe/auraxis-api/issues/984)) ([245eb17](https://github.com/italofelipe/auraxis-api/commit/245eb179a238790ccc66bdcdbf7df381efb3128d))
+
 ## [1.23.0](https://github.com/italofelipe/auraxis-api/compare/v1.22.0...v1.23.0) (2026-04-11)
 
 
