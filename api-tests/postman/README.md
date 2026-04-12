@@ -41,6 +41,16 @@ Os environments devem conter apenas valores seguros para versionamento:
   - `privileged`: roda o subconjunto com bootstrap minimo + fluxos admin/privilegiados;
   - `smoke`: roda o subconjunto canônico mínimo por dominio.
 
+## Fonte de dados
+
+A collection e gerada automaticamente a partir do `openapi.json` (raiz do repo) pelo script `scripts/openapi_to_postman.py`. O OpenAPI e a fonte unica de verdade.
+
+Fluxo de atualizacao:
+1. Altere controllers/schemas no Flask
+2. Regere o spec: `flask openapi-export --output openapi.json`
+3. Regere a collection: `npm run postman:build`
+4. Commite ambos (`openapi.json` + `auraxis.postman_collection.json`)
+
 ## Execucao
 Gerar/regravar a collection oficial:
 ```bash
