@@ -1,0 +1,25 @@
+{
+  "description": "PERF-5 k6 smoke baseline thresholds — established 2026-04-12",
+  "thresholds": {
+    "http_req_duration_p95_ms": 500,
+    "http_req_duration_p99_ms": 1000,
+    "http_req_failed_rate": 0.01
+  },
+  "scenarios": {
+    "smoke-auth": {
+      "script": "smoke-auth.js",
+      "duration": "30s",
+      "vus": 5
+    },
+    "smoke-transactions": {
+      "script": "smoke-transactions.js",
+      "duration": "30s",
+      "vus": 5
+    },
+    "smoke-dashboard": {
+      "script": "smoke-dashboard.js",
+      "duration": "30s",
+      "vus": 5
+    }
+  }
+}
