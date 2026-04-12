@@ -10,10 +10,33 @@ keys, no timestamps, deterministic numeric coercion).
 from __future__ import annotations
 
 import json
+from typing import Any
 
 import click
 from flask import current_app
 from flask.cli import with_appcontext
+
+
+def _stabilize_parameters(spec: dict[str, Any]) -> dict[str, Any]:
+    """Sort parameter arrays inside each path/method for deterministic output.
+
+    OpenAPI parameters are arrays whose order is non-semantic, but
+    non-deterministic ordering causes false drift. Sort by (in, name).
+    """
+    paths = spec.get("paths", {})
+    for _path, methods in paths.items():
+        if not isinstance(methods, dict):
+            continue
+        for _method, operation in methods.items():
+            if not isinstance(operation, dict):
+                continue
+            params = operation.get("parameters")
+            if isinstance(params, list):
+                operation["parameters"] = sorted(
+                    params,
+                    key=lambda p: (p.get("in", ""), p.get("name", "")),
+                )
+    return spec
 
 
 @click.command("openapi-export")
@@ -36,6 +59,8 @@ def openapi_export_command(output: str) -> None:
         spec = response.get_json()
         if not spec:
             raise click.ClickException("Swagger endpoint returned empty payload")
+
+    spec = _stabilize_parameters(spec)
 
     with open(output, "w", encoding="utf-8") as f:
         json.dump(spec, f, ensure_ascii=False, indent=2, sort_keys=True)
