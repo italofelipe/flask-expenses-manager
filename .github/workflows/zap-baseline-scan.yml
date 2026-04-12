@@ -1,0 +1,82 @@
+name: ZAP Baseline Scan
+
+# SEC-7 — OWASP ZAP passive baseline scan against the production API.
+#
+# This is a PASSIVE scan: ZAP spiders discoverable endpoints, inspects
+# response headers, cookies, and content, and flags common misconfigurations
+# (missing CSP, weak headers, insecure cookies, disclosed tech stack, etc.).
+# It does NOT send attack payloads, so it is safe to run against prod.
+#
+# Cadence: weekly (Sunday 10:00 UTC, ~07:00 BRT). Manual runs allowed.
+#
+# The scan targets only the unauthenticated surface (health, docs, login,
+# public endpoints). Authenticated spidering is intentionally out of scope
+# for a baseline scan — use a dedicated full scan for that.
+
+on:
+  schedule:
+    - cron: "0 10 * * 0" # Sunday 10:00 UTC
+  workflow_dispatch:
+    inputs:
+      target_url:
+        description: "Target URL to scan (default: production API)"
+        type: string
+        default: "https://api.auraxis.com.br"
+      fail_on_warnings:
+        description: "Fail the job on Medium+ findings (default: only High)"
+        type: boolean
+        default: false
+
+concurrency:
+  group: zap-baseline-scan
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  issues: write # allow the action to file an issue when findings are found
+
+jobs:
+  baseline:
+    name: ZAP Baseline (Passive)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Resolve target URL
+        id: target
+        env:
+          INPUT_URL: ${{ inputs.target_url }}
+        run: |
+          set -euo pipefail
+          TARGET="${INPUT_URL:-https://api.auraxis.com.br}"
+          echo "url=${TARGET}" >> "$GITHUB_OUTPUT"
+          echo "Scanning target: ${TARGET}"
+
+      - name: Run ZAP Baseline Scan
+        uses: zaproxy/action-baseline@v0.14.0
+        with:
+          target: ${{ steps.target.outputs.url }}
+          rules_file_name: .zap/rules.tsv
+          cmd_options: "-a -j -m 5 -T 10"
+          allow_issue_writing: true
+          fail_action: ${{ inputs.fail_on_warnings || false }}
+          artifact_name: zap-baseline-report
+
+      - name: Summary
+        if: always()
+        env:
+          TARGET: ${{ steps.target.outputs.url }}
+        run: |
+          {
+            echo "## ZAP Baseline Scan"
+            echo ""
+            echo "- **Target:** \`${TARGET}\`"
+            echo "- **Mode:** passive (safe against production)"
+            echo "- **Report:** see \`zap-baseline-report\` artifact on this run"
+            echo ""
+            echo "Findings are also mirrored to a GitHub Issue when present."
+            echo "Tune false positives via \`.zap/rules.tsv\`."
+          } >> "$GITHUB_STEP_SUMMARY"
