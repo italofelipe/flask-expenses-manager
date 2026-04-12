@@ -1,0 +1,135 @@
+name: OpenAPI Diff
+
+on:
+  pull_request:
+    paths:
+      - "openapi.json"
+
+permissions:
+  contents: read
+  pull-requests: write
+
+concurrency:
+  group: openapi-diff-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  diff:
+    name: OpenAPI Diff Report
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout PR head
+        uses: actions/checkout@v4
+        with:
+          path: head
+
+      - name: Checkout base branch
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.base.sha }}
+          path: base
+
+      - name: Install oasdiff
+        run: |
+          curl -fsSL https://github.com/Tufin/oasdiff/releases/latest/download/oasdiff_linux_amd64.tar.gz \
+            | tar xz -C /usr/local/bin oasdiff
+
+      - name: Check for base spec
+        id: base_exists
+        run: |
+          if [ -f base/openapi.json ]; then
+            echo "exists=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "exists=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Generate diff summary
+        if: steps.base_exists.outputs.exists == 'true'
+        id: diff
+        run: |
+          set +e
+
+          # Summary diff (markdown)
+          oasdiff summary base/openapi.json head/openapi.json > /tmp/diff-summary.txt 2>&1
+          SUMMARY_EXIT=$?
+
+          # Breaking changes check
+          oasdiff breaking base/openapi.json head/openapi.json > /tmp/breaking.txt 2>&1
+          BREAKING_EXIT=$?
+
+          # Changelog
+          oasdiff changelog base/openapi.json head/openapi.json > /tmp/changelog.txt 2>&1
+
+          # Count changes
+          ADDED=$(grep -c "endpoint.*added\|new endpoint" /tmp/changelog.txt 2>/dev/null || echo "0")
+          REMOVED=$(grep -c "endpoint.*removed\|removed endpoint" /tmp/changelog.txt 2>/dev/null || echo "0")
+          MODIFIED=$(grep -c "endpoint.*modified\|modified endpoint" /tmp/changelog.txt 2>/dev/null || echo "0")
+
+          HAS_BREAKING="false"
+          if [ "$BREAKING_EXIT" -ne 0 ] && [ -s /tmp/breaking.txt ]; then
+            HAS_BREAKING="true"
+          fi
+
+          echo "has_breaking=$HAS_BREAKING" >> "$GITHUB_OUTPUT"
+          echo "has_changes=true" >> "$GITHUB_OUTPUT"
+
+          # Build comment body
+          {
+            echo "## OpenAPI Diff Report"
+            echo ""
+            if [ "$HAS_BREAKING" = "true" ]; then
+              echo "> **Breaking changes detected.** Review carefully before merging."
+              echo ""
+            fi
+            echo "<details>"
+            echo "<summary>Changelog</summary>"
+            echo ""
+            echo '```'
+            head -100 /tmp/changelog.txt
+            echo '```'
+            echo "</details>"
+            echo ""
+            if [ "$HAS_BREAKING" = "true" ]; then
+              echo "<details>"
+              echo "<summary>Breaking Changes</summary>"
+              echo ""
+              echo '```'
+              cat /tmp/breaking.txt
+              echo '```'
+              echo "</details>"
+            fi
+          } > /tmp/comment-body.txt
+
+      - name: New spec (no base to compare)
+        if: steps.base_exists.outputs.exists != 'true'
+        id: new_spec
+        run: |
+          PATHS=$(python3 -c "import json; print(len(json.load(open('head/openapi.json')).get('paths',{})))")
+          {
+            echo "## OpenAPI Diff Report"
+            echo ""
+            echo "New OpenAPI spec introduced with **${PATHS} paths**. No base spec to compare against."
+          } > /tmp/comment-body.txt
+          echo "has_breaking=false" >> "$GITHUB_OUTPUT"
+          echo "has_changes=true" >> "$GITHUB_OUTPUT"
+
+      - name: Post or update PR comment
+        if: steps.diff.outputs.has_changes == 'true' || steps.new_spec.outputs.has_changes == 'true'
+        uses: marocchino/sticky-pull-request-comment@v2
+        with:
+          header: openapi-diff
+          path: /tmp/comment-body.txt
+
+      - name: Add api-breaking label
+        if: steps.diff.outputs.has_breaking == 'true'
+        uses: actions-ecosystem/action-add-labels@v1
+        with:
+          labels: api-breaking
+
+      - name: Remove api-breaking label (if no longer breaking)
+        if: steps.diff.outputs.has_breaking == 'false' && steps.base_exists.outputs.exists == 'true'
+        uses: actions-ecosystem/action-remove-labels@v1
+        with:
+          labels: api-breaking
+        continue-on-error: true
