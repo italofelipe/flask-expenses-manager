@@ -56,6 +56,7 @@ from app.extensions.error_handlers import register_error_handlers
 from app.extensions.http_observability import register_http_observability
 from app.extensions.integration_metrics_cli import register_integration_metrics_commands
 from app.extensions.prometheus_metrics import register_prometheus_middleware
+from app.extensions.reminders_cli import register_reminders_commands
 from app.extensions.sentry import init_sentry
 from app.extensions.slow_query_log import install_slow_query_log
 from app.extensions.trial_expiry_cli import register_trial_expiry_cli
@@ -266,6 +267,7 @@ def create_app(*, enable_http_runtime: bool = True) -> Flask:
     register_trial_expiry_cli(app)
     register_integration_metrics_commands(app)
     register_billing_webhooks_commands(app)
+    register_reminders_commands(app)
     app.cli.add_command(features_cli_group, "features")
     register_wallet_dependencies(app)
     register_entitlement_dependencies(app)
