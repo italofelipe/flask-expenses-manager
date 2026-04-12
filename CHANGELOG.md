@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.25.1](https://github.com/italofelipe/auraxis-api/compare/v1.25.0...v1.25.1) (2026-04-12)
+
+
+### Performance Improvements
+
+* **indexes:** PERF-1 — add ix_tags_user_id and ix_accounts_user_id migration ([#999](https://github.com/italofelipe/auraxis-api/issues/999)) ([7d7650f](https://github.com/italofelipe/auraxis-api/commit/7d7650f1a40286ee5473989c4bf950c2bbaaca9e))
+
 ## [1.25.0](https://github.com/italofelipe/auraxis-api/compare/v1.24.1...v1.25.0) (2026-04-12)
 
 
