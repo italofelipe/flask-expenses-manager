@@ -13,6 +13,7 @@ from flask_migrate import Migrate
 from sqlalchemy.pool import NullPool
 
 from app.cli.features import features as features_cli_group
+from app.cli.openapi_export import openapi_export_command
 from app.controllers.account import account_bp
 from app.controllers.admin.feature_flags import admin_feature_flags_bp
 from app.controllers.alert_controller import alert_bp, register_alert_dependencies
@@ -269,6 +270,7 @@ def create_app(*, enable_http_runtime: bool = True) -> Flask:
     register_billing_webhooks_commands(app)
     register_reminders_commands(app)
     app.cli.add_command(features_cli_group, "features")
+    app.cli.add_command(openapi_export_command)
     register_wallet_dependencies(app)
     register_entitlement_dependencies(app)
     register_simulation_dependencies(app)

@@ -12,6 +12,12 @@ paths = [
 ]
 
 [[allowlists]]
+description = "OpenAPI spec — example tokens in API documentation are not real secrets"
+paths = [
+  '''openapi\.json''',
+]
+
+[[allowlists]]
 description = "Test fixture values — known mock credential patterns"
 regexTarget = "match"
 regexes = [
