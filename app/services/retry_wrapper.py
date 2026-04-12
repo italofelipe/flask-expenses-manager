@@ -29,7 +29,7 @@ from tenacity import (
     retry,
     retry_if_exception_type,
     stop_after_attempt,
-    wait_exponential,
+    wait_exponential_jitter,
 )
 
 _logger = logging.getLogger("auraxis.retry")
@@ -39,24 +39,29 @@ _RETRYABLE = (HTTPError, Timeout, ConnectionError)
 F = TypeVar("F", bound=Callable[..., Any])
 
 _MAX_ATTEMPTS = 3
-_WAIT_MULTIPLIER = 1
-_WAIT_MIN = 2
+_WAIT_INITIAL = 2
 _WAIT_MAX = 10
+_JITTER_MAX = 1  # up to 1 s random jitter to avoid thundering herd
 
 
 def _make_before_sleep(provider: str) -> Callable[[RetryCallState], None]:
     def _before_sleep(retry_state: RetryCallState) -> None:
         attempt = retry_state.attempt_number
-        exc = retry_state.outcome.exception() if retry_state.outcome else None
+        outcome = retry_state.outcome
+        exc = outcome.exception() if outcome else None
+        elapsed = retry_state.seconds_since_start
         next_wait: float | None
         if retry_state.next_action is not None:
             next_wait = getattr(retry_state.next_action, "sleep", None)
         else:
             next_wait = None
         _logger.warning(
-            "retry provider=%s attempt=%d exception=%r next_wait=%.1fs",
+            "retry provider=%s attempt=%d elapsed=%.2fs outcome=%s "
+            "exception=%r next_wait=%.1fs",
             provider,
             attempt,
+            elapsed,
+            "failure",
             exc,
             next_wait or 0.0,
         )
@@ -67,6 +72,8 @@ def _make_before_sleep(provider: str) -> Callable[[RetryCallState], None]:
             data={
                 "provider": provider,
                 "attempt": attempt,
+                "elapsed": elapsed,
+                "outcome": "failure",
                 "exception": repr(exc),
                 "next_wait": next_wait,
             },
@@ -79,15 +86,16 @@ def with_retry(*, provider: str) -> Callable[[F], F]:
     """Return a tenacity retry decorator configured for the given provider.
 
     Retries up to 3 times on ``HTTPError``, ``Timeout``, or
-    ``ConnectionError`` with exponential backoff (2 s → 4 s → 10 s cap).
+    ``ConnectionError`` with exponential backoff + random jitter
+    (2 s base → 4 s → 10 s cap, ±1 s jitter to avoid thundering herd).
     Each retry emits a structured log line and a Sentry breadcrumb.
     """
     decorator: Callable[[F], F] = retry(
         stop=stop_after_attempt(_MAX_ATTEMPTS),
-        wait=wait_exponential(
-            multiplier=_WAIT_MULTIPLIER,
-            min=_WAIT_MIN,
+        wait=wait_exponential_jitter(
+            initial=_WAIT_INITIAL,
             max=_WAIT_MAX,
+            jitter=_JITTER_MAX,
         ),
         retry=retry_if_exception_type(_RETRYABLE),
         before_sleep=_make_before_sleep(provider),
