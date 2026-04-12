@@ -13,8 +13,15 @@ from unittest.mock import MagicMock, patch
 import pytest
 import requests
 from requests.exceptions import ConnectionError, HTTPError, Timeout
+from tenacity import wait_exponential_jitter
 
-from app.services.retry_wrapper import with_retry
+from app.services.retry_wrapper import (
+    _JITTER_MAX,
+    _WAIT_INITIAL,
+    _WAIT_MAX,
+    _make_before_sleep,
+    with_retry,
+)
 
 # ---------------------------------------------------------------------------
 # retry_wrapper unit tests
@@ -97,6 +104,35 @@ class TestWithRetry:
             _fn()
 
         assert call_count == 1  # no retry for non-transient errors
+
+    def test_jitter_produces_varying_wait_times(self) -> None:
+        """Verify that wait_exponential_jitter produces non-identical waits."""
+        strategy = wait_exponential_jitter(
+            initial=_WAIT_INITIAL, max=_WAIT_MAX, jitter=_JITTER_MAX
+        )
+        mock_state = MagicMock()
+        mock_state.attempt_number = 1
+        # Sample wait times — with jitter they should vary
+        waits = {strategy(retry_state=mock_state) for _ in range(20)}
+        # With jitter > 0, we expect more than 1 distinct wait value
+        assert len(waits) > 1, "Jitter should produce varying wait times"
+
+    def test_before_sleep_logs_elapsed_and_outcome(self) -> None:
+        callback = _make_before_sleep("test-provider")
+        mock_state = MagicMock()
+        mock_state.attempt_number = 2
+        mock_state.seconds_since_start = 3.45
+        mock_state.outcome.exception.return_value = Timeout("transient")
+        mock_state.next_action = MagicMock()
+        mock_state.next_action.sleep = 4.0
+
+        with patch("app.services.retry_wrapper._logger") as mock_logger:
+            callback(mock_state)
+
+        call_args = mock_logger.warning.call_args
+        log_msg = call_args[0][0]
+        assert "elapsed=" in log_msg
+        assert "outcome=" in log_msg
 
 
 # ---------------------------------------------------------------------------
