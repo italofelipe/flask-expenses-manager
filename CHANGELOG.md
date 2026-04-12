@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.24.1](https://github.com/italofelipe/auraxis-api/compare/v1.24.0...v1.24.1) (2026-04-12)
+
+
+### Bug Fixes
+
+* **reminders:** add missing CLI command for dispatch-due-soon ([#989](https://github.com/italofelipe/auraxis-api/issues/989)) ([#992](https://github.com/italofelipe/auraxis-api/issues/992)) ([cfc016c](https://github.com/italofelipe/auraxis-api/commit/cfc016c49040a52341e8f1120644172bc7fbcd6e))
+
 ## [1.24.0](https://github.com/italofelipe/auraxis-api/compare/v1.23.0...v1.24.0) (2026-04-12)
 
 
