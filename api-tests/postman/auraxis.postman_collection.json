@@ -256,6 +256,10 @@
             "method": "POST",
             "header": [
               {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
                 "key": "X-API-Contract",
                 "value": "v2"
               },
@@ -405,6 +409,10 @@
           "request": {
             "method": "POST",
             "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
               {
                 "key": "X-API-Contract",
                 "value": "v2"
@@ -1564,6 +1572,10 @@
           "request": {
             "method": "PATCH",
             "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
               {
                 "key": "X-API-Contract",
                 "value": "v2"
@@ -3762,6 +3774,10 @@
             "method": "POST",
             "header": [
               {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
                 "key": "X-API-Contract",
                 "value": "v2"
               },
@@ -3805,6 +3821,10 @@
           "request": {
             "method": "POST",
             "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
               {
                 "key": "X-API-Contract",
                 "value": "v2"

@@ -54,6 +54,12 @@ repos:
     language: system
     pass_filenames: false
     always_run: true
+  - id: postman-collection-contract
+    name: postman-collection-contract
+    entry: scripts/python_tool.sh pytest tests/test_postman_collection_contract.py -x -q
+    language: system
+    pass_filenames: false
+    files: (openapi\.json|openapi_to_postman\.py|postman_collection\.json|postman_environment\.json)
   - id: security-evidence
     name: security-evidence (OWASP S3)
     entry: bash scripts/security_evidence_check.sh

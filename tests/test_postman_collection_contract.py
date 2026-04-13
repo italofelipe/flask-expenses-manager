@@ -264,3 +264,142 @@ def test_postman_collection_has_auth_headers_for_protected_routes() -> None:
     assert not missing_auth, (
         f"Protected routes missing Authorization header: {missing_auth}"
     )
+
+
+# ---------------------------------------------------------------------------
+# Semantic contract tests — catch runtime failures at build time
+# ---------------------------------------------------------------------------
+
+
+def test_postman_post_put_patch_have_content_type() -> None:
+    """POST/PUT/PATCH must always include Content-Type: application/json.
+
+    Flask returns 415 Unsupported Media Type when Content-Type is missing
+    on endpoints that call request.get_json().
+    """
+    items = _flatten_request_items(_load_postman_items())
+    missing: list[str] = []
+    for item in items:
+        req = item.get("request", {})
+        method = str(req.get("method", "")).upper()
+        if method not in ("POST", "PUT", "PATCH"):
+            continue
+        headers = req.get("header", [])
+        has_ct = any(
+            h.get("key") == "Content-Type" and h.get("value") == "application/json"
+            for h in headers
+        )
+        if not has_ct:
+            missing.append(f"{method} {item.get('name')}")
+    assert not missing, (
+        f"POST/PUT/PATCH requests missing Content-Type header: {missing}"
+    )
+
+
+def test_postman_required_query_params_present() -> None:
+    """Endpoints with required query params in OpenAPI must be present."""
+    openapi_path = Path(__file__).resolve().parents[1] / "openapi.json"
+    spec = json.loads(openapi_path.read_text())
+
+    # Build map: (METHOD, normalized_path) -> [required_param_names]
+    required_params: dict[tuple[str, str], list[str]] = {}
+    for path, methods in spec.get("paths", {}).items():
+        for method, op in methods.items():
+            if not isinstance(op, dict) or method.upper() == "OPTIONS":
+                continue
+            rq = [
+                p["name"]
+                for p in op.get("parameters", [])
+                if p.get("in") == "query" and p.get("required")
+            ]
+            if rq:
+                normalized = re.sub(r"\{[^}]+\}", "{param}", path)
+                required_params[(method.upper(), normalized)] = rq
+
+    items = _flatten_request_items(_load_postman_items())
+    missing: list[str] = []
+    for item in items:
+        req = item.get("request", {})
+        method = str(req.get("method", "")).upper()
+        raw_url = str(req.get("url", {}).get("raw", ""))
+        norm_path = _normalize_path(raw_url)
+        key = (method, norm_path)
+        if key not in required_params:
+            continue
+        query = req.get("url", {}).get("query", [])
+        present_keys = {str(q.get("key", "")) for q in query}
+        for param_name in required_params[key]:
+            if param_name not in present_keys:
+                missing.append(f"{method} {norm_path} missing ?{param_name}")
+    assert not missing, (
+        f"Requests missing required query params from OpenAPI spec: {missing}"
+    )
+
+
+def test_postman_id_capture_for_dependent_operations() -> None:
+    """Create endpoints (POST) that produce IDs used by later requests must
+    capture them in test scripts via pm.collectionVariables.set().
+
+    This catches the common bug where a POST creates a resource but
+    subsequent GET/PATCH/PUT/DELETE fail with 404 because the ID
+    was never captured.
+    """
+    items = _flatten_request_items(_load_postman_items())
+
+    # Build set of collection variables used in path segments
+    path_vars_used: set[str] = set()
+    for item in items:
+        req = item.get("request", {})
+        raw_url = str(req.get("url", {}).get("raw", ""))
+        # Match {{varName}} in path (not query)
+        path_part = raw_url.split("?")[0]
+        for match in re.finditer(r"\{\{(\w+)\}\}", path_part):
+            var = match.group(1)
+            if var != "baseUrl":
+                path_vars_used.add(var)
+
+    # Check that each used variable is set somewhere in test scripts
+    all_test_code = ""
+    for item in items:
+        for event in item.get("event", []):
+            if event.get("listen") == "test":
+                lines = event.get("script", {}).get("exec", [])
+                all_test_code += "\n".join(lines)
+
+    missing: list[str] = []
+    for var in sorted(path_vars_used):
+        # Must appear in a pm.collectionVariables.set('varName', ...) call
+        pattern = f"pm.collectionVariables.set('{var}'"
+        if pattern not in all_test_code:
+            # Also check double-quote variant
+            pattern_dq = f'pm.collectionVariables.set("{var}"'
+            if pattern_dq not in all_test_code:
+                missing.append(var)
+
+    assert not missing, (
+        f"Path variables used in URLs but never captured in test scripts: {missing}. "
+        f"A POST endpoint must set these via pm.collectionVariables.set()."
+    )
+
+
+def test_postman_collection_is_up_to_date() -> None:
+    """The committed collection must match what the generator produces.
+
+    Prevents pushing a hand-edited collection that diverges from the
+    generator, which would cause CI to behave differently than
+    local regeneration.
+    """
+    from scripts.openapi_to_postman import (
+        COLLECTION_PATH,
+        OPENAPI_PATH,
+        build_collection,
+    )
+
+    spec = json.loads(OPENAPI_PATH.read_text())
+    expected = build_collection(spec)
+    actual = json.loads(COLLECTION_PATH.read_text())
+
+    assert actual == expected, (
+        "Postman collection is stale — run 'python3 scripts/openapi_to_postman.py' "
+        "to regenerate. The committed collection must match the generator output."
+    )
