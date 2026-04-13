@@ -221,9 +221,10 @@ ENRICHMENT: dict[str, dict[str, Any]] = {
     "POST /transactions": {
         "body_override": json.dumps(
             {
-                "description": "Postman test txn {{runSeed}}",
-                "value": 42.50,
+                "title": "Conta de luz {{runSeed}}",
+                "amount": "150.50",
                 "type": "expense",
+                "status": "pending",
                 "due_date": "{{runTomorrow}}",
             },
             indent=2,
@@ -238,11 +239,18 @@ ENRICHMENT: dict[str, dict[str, Any]] = {
             "}",
         ],
     },
+    "GET /transactions/summary": {
+        "query_params": [{"key": "month", "value": "{{runMonthRef}}"}],
+    },
+    "GET /dashboard/overview": {
+        "query_params": [{"key": "month", "value": "{{runMonthRef}}"}],
+    },
     "POST /goals": {
         "body_override": json.dumps(
             {
-                "name": "Goal {{runSeed}}",
-                "target_amount": 10000,
+                "title": "Reserva de emergencia {{runSeed}}",
+                "target_amount": "15000.00",
+                "current_amount": "2500.00",
                 "target_date": "{{runIn365Days}}",
             },
             indent=2,
@@ -256,6 +264,19 @@ ENRICHMENT: dict[str, dict[str, Any]] = {
             "  pm.collectionVariables.set('goalId', json.data.id);",
             "}",
         ],
+    },
+    "POST /goals/simulate": {
+        "body_override": json.dumps(
+            {
+                "target_amount": "50000.00",
+                "current_amount": "10000.00",
+                "monthly_income": "12000.00",
+                "monthly_expenses": "7000.00",
+                "monthly_contribution": "2000.00",
+                "target_date": "{{runIn365Days}}",
+            },
+            indent=2,
+        ),
     },
     "POST /wallet": {
         "body_override": json.dumps(
@@ -281,9 +302,9 @@ ENRICHMENT: dict[str, dict[str, Any]] = {
     "POST /budgets": {
         "body_override": json.dumps(
             {
-                "name": "Budget {{runSeed}}",
-                "amount": 500.00,
-                "month": "{{runMonthRef}}",
+                "name": "Alimentação {{runSeed}}",
+                "amount": "500.00",
+                "period": "monthly",
             },
             indent=2,
         ),
@@ -578,10 +599,18 @@ def build_collection(spec: dict[str, Any]) -> dict[str, Any]:
                 headers.insert(0, {"key": "Content-Type", "value": "application/json"})
 
             # --- Request object ---
+            url_obj = _postman_url(path)
+            # Enrichment query params (e.g. ?month={{runMonthRef}})
+            query_params = enrichment.get("query_params")
+            if query_params:
+                url_obj["query"] = query_params
+                qs = "&".join(f"{p['key']}={p['value']}" for p in query_params)
+                url_obj["raw"] += "?" + qs
+
             request: dict[str, Any] = {
                 "method": method.upper(),
                 "header": headers,
-                "url": _postman_url(path),
+                "url": url_obj,
             }
             path_vars = _postman_path_variables(path)
             if path_vars:

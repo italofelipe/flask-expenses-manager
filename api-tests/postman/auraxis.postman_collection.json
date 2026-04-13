@@ -930,7 +930,7 @@
             },
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"description\": \"Postman test txn {{runSeed}}\",\n  \"value\": 42.5,\n  \"type\": \"expense\",\n  \"due_date\": \"{{runTomorrow}}\"\n}"
+              "raw": "{\n  \"title\": \"Conta de luz {{runSeed}}\",\n  \"amount\": \"150.50\",\n  \"type\": \"expense\",\n  \"status\": \"pending\",\n  \"due_date\": \"{{runTomorrow}}\"\n}"
             }
           },
           "event": [
@@ -1004,13 +1004,19 @@
               }
             ],
             "url": {
-              "raw": "{{baseUrl}}/transactions/summary",
+              "raw": "{{baseUrl}}/transactions/summary?month={{runMonthRef}}",
               "host": [
                 "{{baseUrl}}"
               ],
               "path": [
                 "transactions",
                 "summary"
+              ],
+              "query": [
+                {
+                  "key": "month",
+                  "value": "{{runMonthRef}}"
+                }
               ]
             }
           },
@@ -1043,13 +1049,19 @@
               }
             ],
             "url": {
-              "raw": "{{baseUrl}}/dashboard/overview",
+              "raw": "{{baseUrl}}/dashboard/overview?month={{runMonthRef}}",
               "host": [
                 "{{baseUrl}}"
               ],
               "path": [
                 "dashboard",
                 "overview"
+              ],
+              "query": [
+                {
+                  "key": "month",
+                  "value": "{{runMonthRef}}"
+                }
               ]
             }
           },
@@ -1623,7 +1635,7 @@
             },
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"name\": \"Budget {{runSeed}}\",\n  \"amount\": 500.0,\n  \"month\": \"{{runMonthRef}}\"\n}"
+              "raw": "{\n  \"name\": \"Alimenta\\u00e7\\u00e3o {{runSeed}}\",\n  \"amount\": \"500.00\",\n  \"period\": \"monthly\"\n}"
             }
           },
           "event": [
@@ -1890,7 +1902,7 @@
             },
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"name\": \"Goal {{runSeed}}\",\n  \"target_amount\": 10000,\n  \"target_date\": \"{{runIn365Days}}\"\n}"
+              "raw": "{\n  \"title\": \"Reserva de emergencia {{runSeed}}\",\n  \"target_amount\": \"15000.00\",\n  \"current_amount\": \"2500.00\",\n  \"target_date\": \"{{runIn365Days}}\"\n}"
             }
           },
           "event": [
@@ -2182,6 +2194,10 @@
             "method": "POST",
             "header": [
               {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
                 "key": "X-API-Contract",
                 "value": "v2"
               },
@@ -2199,6 +2215,10 @@
                 "goals",
                 "simulate"
               ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"target_amount\": \"50000.00\",\n  \"current_amount\": \"10000.00\",\n  \"monthly_income\": \"12000.00\",\n  \"monthly_expenses\": \"7000.00\",\n  \"monthly_contribution\": \"2000.00\",\n  \"target_date\": \"{{runIn365Days}}\"\n}"
             }
           },
           "event": [
