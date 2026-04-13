@@ -103,8 +103,8 @@ OPERATION_ORDER: dict[str, list[str]] = {
         "GET /transactions/list",
         "DELETE /transactions/{transaction_id}",
         "GET /transactions/deleted",
-        "PATCH /transactions/restore/{transaction_id}",
         "DELETE /transactions/{transaction_id}/force",
+        "PATCH /transactions/restore/{transaction_id}",
     ],
     "04 - Budgets": [
         "POST /budgets",
@@ -328,7 +328,7 @@ ENRICHMENT: dict[str, dict[str, Any]] = {
     },
     "PATCH /user/notification-preferences": {
         "body_override": json.dumps(
-            {"preferences": [{"key": "email_marketing", "enabled": False}]},
+            {"preferences": [{"category": "due_soon", "enabled": False}]},
             indent=2,
         ),
     },
@@ -362,7 +362,10 @@ ENRICHMENT: dict[str, dict[str, Any]] = {
         "query_params": [{"key": "month", "value": "{{runMonthRef}}"}],
     },
     "GET /transactions/expenses": {
-        "query_params": [{"key": "month", "value": "{{runMonthRef}}"}],
+        "query_params": [
+            {"key": "start_date", "value": "{{runToday}}"},
+            {"key": "end_date", "value": "{{runIn30Days}}"},
+        ],
     },
     "GET /transactions/due-range": {
         "query_params": [
@@ -374,6 +377,12 @@ ENRICHMENT: dict[str, dict[str, Any]] = {
         "query_params": [{"key": "month", "value": "{{runMonthRef}}"}],
     },
     # ── Budgets ───────────────────────────────────────────────────────
+    "PATCH /budgets/{budget_id}": {
+        "body_override": json.dumps(
+            {"name": "Alimentação atualizada {{runSeed}}"},
+            indent=2,
+        ),
+    },
     "POST /budgets": {
         "body_override": json.dumps(
             {
@@ -395,6 +404,21 @@ ENRICHMENT: dict[str, dict[str, Any]] = {
         ],
     },
     # ── Goals ─────────────────────────────────────────────────────────
+    "PATCH /goals/{goal_id}": {
+        "body_override": json.dumps(
+            {"title": "Meta atualizada {{runSeed}}"},
+            indent=2,
+        ),
+    },
+    "PUT /goals/{goal_id}": {
+        "body_override": json.dumps(
+            {
+                "title": "Meta substituída {{runSeed}}",
+                "target_amount": "20000.00",
+            },
+            indent=2,
+        ),
+    },
     "POST /goals": {
         "body_override": json.dumps(
             {
@@ -430,6 +454,37 @@ ENRICHMENT: dict[str, dict[str, Any]] = {
         ),
     },
     # ── Wallet ────────────────────────────────────────────────────────
+    "PATCH /wallet/{investment_id}": {
+        "body_override": json.dumps(
+            {"name": "Poupança atualizada {{runSeed}}"},
+            indent=2,
+        ),
+    },
+    "PUT /wallet/{investment_id}": {
+        "body_override": json.dumps(
+            {
+                "name": "Poupança substituída {{runSeed}}",
+                "value": 2000.00,
+                "register_date": "{{runToday}}",
+                "should_be_on_wallet": True,
+            },
+            indent=2,
+        ),
+    },
+    "GET /wallet/{investment_id}/operations/invested-amount": {
+        "query_params": [{"key": "date", "value": "{{runToday}}"}],
+    },
+    "PUT /wallet/{investment_id}/operations/{operation_id}": {
+        "body_override": json.dumps(
+            {
+                "operation_type": "buy",
+                "quantity": "10",
+                "unit_price": "30.00",
+                "fees": "0.00",
+            },
+            indent=2,
+        ),
+    },
     "POST /wallet": {
         "body_override": json.dumps(
             {

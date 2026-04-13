@@ -719,7 +719,7 @@
             },
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"preferences\": [\n    {\n      \"key\": \"email_marketing\",\n      \"enabled\": false\n    }\n  ]\n}"
+              "raw": "{\n  \"preferences\": [\n    {\n      \"category\": \"due_soon\",\n      \"enabled\": false\n    }\n  ]\n}"
             }
           },
           "event": [
@@ -1353,7 +1353,7 @@
               }
             ],
             "url": {
-              "raw": "{{baseUrl}}/transactions/expenses?month={{runMonthRef}}",
+              "raw": "{{baseUrl}}/transactions/expenses?start_date={{runToday}}&end_date={{runIn30Days}}",
               "host": [
                 "{{baseUrl}}"
               ],
@@ -1363,8 +1363,12 @@
               ],
               "query": [
                 {
-                  "key": "month",
-                  "value": "{{runMonthRef}}"
+                  "key": "start_date",
+                  "value": "{{runToday}}"
+                },
+                {
+                  "key": "end_date",
+                  "value": "{{runIn30Days}}"
                 }
               ]
             }
@@ -1556,52 +1560,6 @@
           ]
         },
         {
-          "name": "PATCH — Restaurar transação deletada",
-          "request": {
-            "method": "PATCH",
-            "header": [
-              {
-                "key": "X-API-Contract",
-                "value": "v2"
-              },
-              {
-                "key": "Authorization",
-                "value": "Bearer {{authToken}}"
-              }
-            ],
-            "url": {
-              "raw": "{{baseUrl}}/transactions/restore/:transaction_id",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "transactions",
-                "restore",
-                ":transaction_id"
-              ],
-              "variable": [
-                {
-                  "key": "transaction_id",
-                  "value": "{{transactionId}}"
-                }
-              ]
-            }
-          },
-          "event": [
-            {
-              "listen": "test",
-              "script": {
-                "exec": [
-                  "pm.test('Restaurar transação deletada — status 200', function () {",
-                  "  pm.response.to.have.status(200);",
-                  "});"
-                ],
-                "type": "text/javascript"
-              }
-            }
-          ]
-        },
-        {
           "name": "DELETE — Remover transação permanentemente",
           "request": {
             "method": "DELETE",
@@ -1639,6 +1597,52 @@
               "script": {
                 "exec": [
                   "pm.test('Remover transação permanentemente — status 200', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "PATCH — Restaurar transação deletada",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "X-API-Contract",
+                "value": "v2"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{authToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/transactions/restore/:transaction_id",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "transactions",
+                "restore",
+                ":transaction_id"
+              ],
+              "variable": [
+                {
+                  "key": "transaction_id",
+                  "value": "{{transactionId}}"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Restaurar transação deletada — status 200', function () {",
                   "  pm.response.to.have.status(200);",
                   "});"
                 ],
@@ -1792,6 +1796,10 @@
             "method": "PATCH",
             "header": [
               {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
                 "key": "X-API-Contract",
                 "value": "v2"
               },
@@ -1815,6 +1823,10 @@
                   "value": "{{budgetId}}"
                 }
               ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Alimenta\\u00e7\\u00e3o atualizada {{runSeed}}\"\n}"
             }
           },
           "event": [
@@ -2060,6 +2072,10 @@
             "method": "PATCH",
             "header": [
               {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
                 "key": "X-API-Contract",
                 "value": "v2"
               },
@@ -2083,6 +2099,10 @@
                   "value": "{{goalId}}"
                 }
               ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"Meta atualizada {{runSeed}}\"\n}"
             }
           },
           "event": [
@@ -2105,6 +2125,10 @@
             "method": "PUT",
             "header": [
               {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
                 "key": "X-API-Contract",
                 "value": "v2"
               },
@@ -2128,6 +2152,10 @@
                   "value": "{{goalId}}"
                 }
               ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"Meta substitu\\u00edda {{runSeed}}\",\n  \"target_amount\": \"20000.00\"\n}"
             }
           },
           "event": [
@@ -2473,6 +2501,10 @@
             "method": "PATCH",
             "header": [
               {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
                 "key": "X-API-Contract",
                 "value": "v2"
               },
@@ -2496,6 +2528,10 @@
                   "value": "{{investmentId}}"
                 }
               ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Poupan\\u00e7a atualizada {{runSeed}}\"\n}"
             }
           },
           "event": [
@@ -2518,6 +2554,10 @@
             "method": "PUT",
             "header": [
               {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
                 "key": "X-API-Contract",
                 "value": "v2"
               },
@@ -2541,6 +2581,10 @@
                   "value": "{{investmentId}}"
                 }
               ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Poupan\\u00e7a substitu\\u00edda {{runSeed}}\",\n  \"value\": 2000.0,\n  \"register_date\": \"{{runToday}}\",\n  \"should_be_on_wallet\": true\n}"
             }
           },
           "event": [
@@ -2847,7 +2891,7 @@
               }
             ],
             "url": {
-              "raw": "{{baseUrl}}/wallet/:investment_id/operations/invested-amount",
+              "raw": "{{baseUrl}}/wallet/:investment_id/operations/invested-amount?date={{runToday}}",
               "host": [
                 "{{baseUrl}}"
               ],
@@ -2856,6 +2900,12 @@
                 ":investment_id",
                 "operations",
                 "invested-amount"
+              ],
+              "query": [
+                {
+                  "key": "date",
+                  "value": "{{runToday}}"
+                }
               ],
               "variable": [
                 {
@@ -2979,6 +3029,10 @@
             "method": "PUT",
             "header": [
               {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
                 "key": "X-API-Contract",
                 "value": "v2"
               },
@@ -3008,6 +3062,10 @@
                   "value": "{{operationId}}"
                 }
               ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"operation_type\": \"buy\",\n  \"quantity\": \"10\",\n  \"unit_price\": \"30.00\",\n  \"fees\": \"0.00\"\n}"
             }
           },
           "event": [
