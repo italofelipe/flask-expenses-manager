@@ -56,6 +56,7 @@ jobs:
           FLASK_APP: run.py
           FLASK_ENV: testing
           FLASK_TESTING: "true"
+          PORT: "5000"
           SECURITY_ENFORCE_STRONG_SECRETS: "false"
           DATABASE_URL: "postgresql://test:test@localhost:5432/testdb"
           SECRET_KEY: "k6-smoke-key-with-64-chars-minimum-for-jwt-signing-000000001"
