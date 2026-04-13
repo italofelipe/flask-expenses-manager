@@ -76,24 +76,84 @@ OPERATION_ORDER: dict[str, list[str]] = {
         "POST /auth/refresh",
         "GET /user/me",
     ],
+    "02 - User": [
+        "GET /user/me",
+        "GET /user/bootstrap",
+        "GET /user/profile",
+        "PUT /user/profile",
+        "GET /user/notification-preferences",
+        "PATCH /user/notification-preferences",
+        "GET /user/profile/questionnaire",
+        "POST /user/profile/questionnaire",
+        "POST /user/simulate-salary-increase",
+        "DELETE /user/me",
+    ],
     "03 - Transactions": [
         "POST /transactions",
         "GET /transactions",
+        "GET /transactions/{transaction_id}",
+        "PATCH /transactions/{transaction_id}",
+        "PUT /transactions/{transaction_id}",
         "GET /transactions/summary",
         "GET /dashboard/overview",
-    ],
-    "05 - Goals": [
-        "POST /goals",
-        "GET /goals",
-    ],
-    "06 - Wallet": [
-        "POST /wallet",
-        "GET /wallet",
-        "GET /wallet/valuation",
+        "GET /dashboard/trends",
+        "GET /transactions/dashboard",
+        "GET /transactions/expenses",
+        "GET /transactions/due-range",
+        "GET /transactions/list",
+        "DELETE /transactions/{transaction_id}",
+        "GET /transactions/deleted",
+        "PATCH /transactions/restore/{transaction_id}",
+        "DELETE /transactions/{transaction_id}/force",
     ],
     "04 - Budgets": [
         "POST /budgets",
         "GET /budgets",
+        "GET /budgets/{budget_id}",
+        "PATCH /budgets/{budget_id}",
+        "GET /budgets/summary",
+        "DELETE /budgets/{budget_id}",
+    ],
+    "05 - Goals": [
+        "POST /goals",
+        "GET /goals",
+        "GET /goals/{goal_id}",
+        "PATCH /goals/{goal_id}",
+        "PUT /goals/{goal_id}",
+        "GET /goals/{goal_id}/plan",
+        "GET /goals/{goal_id}/projection",
+        "POST /goals/simulate",
+        "DELETE /goals/{goal_id}",
+    ],
+    "06 - Wallet": [
+        "POST /wallet",
+        "GET /wallet",
+        "GET /wallet/{investment_id}",
+        "PATCH /wallet/{investment_id}",
+        "PUT /wallet/{investment_id}",
+        "GET /wallet/valuation",
+        "GET /wallet/{investment_id}/valuation",
+        "GET /wallet/valuation/history",
+        "GET /wallet/{investment_id}/history",
+        "POST /wallet/{investment_id}/operations",
+        "GET /wallet/{investment_id}/operations",
+        "GET /wallet/{investment_id}/operations/invested-amount",
+        "GET /wallet/{investment_id}/operations/position",
+        "GET /wallet/{investment_id}/operations/summary",
+        "PUT /wallet/{investment_id}/operations/{operation_id}",
+        "DELETE /wallet/{investment_id}/operations/{operation_id}",
+        "DELETE /wallet/{investment_id}",
+    ],
+    "07 - Simulations": [
+        "POST /simulations",
+        "GET /simulations",
+        "GET /simulations/{simulation_id}",
+        "POST /simulations/installment-vs-cash/calculate",
+        "POST /simulations/installment-vs-cash",
+        "POST /simulations/installment-vs-cash/save",
+        "POST /simulations/{simulation_id}/goal",
+        "POST /simulations/{simulation_id}/planned-expense",
+        "DELETE /simulations/{simulation_id}",
     ],
 }
 
@@ -163,6 +223,7 @@ PRIVILEGED_OPERATIONS: set[str] = {
 # Enrichment config — custom bodies, pre-request, test scripts per operation
 # ---------------------------------------------------------------------------
 ENRICHMENT: dict[str, dict[str, Any]] = {
+    # ── Auth ──────────────────────────────────────────────────────────
     "POST /auth/register": {
         "body_override": json.dumps(
             {
@@ -204,10 +265,15 @@ ENRICHMENT: dict[str, dict[str, Any]] = {
         ],
     },
     "POST /auth/refresh": {
-        "body_override": json.dumps(
-            {"refresh_token": "{{refreshToken}}"},
-            indent=2,
-        ),
+        "no_body": True,
+        "prerequest_lines": [
+            "// Refresh endpoint uses @jwt_required(refresh=True) —",
+            "// it needs the refresh token as the Bearer token, not the access token.",
+            "pm.request.headers.upsert({",
+            "  key: 'Authorization',",
+            "  value: 'Bearer ' + pm.collectionVariables.get('refreshToken')",
+            "});",
+        ],
         "test_lines": [
             "pm.test('Refresh returns 200', function () {",
             "  pm.response.to.have.status(200);",
@@ -216,8 +282,57 @@ ENRICHMENT: dict[str, dict[str, Any]] = {
             "if (json.data && json.data.token) {",
             "  pm.collectionVariables.set('authToken', json.data.token);",
             "}",
+            "if (json.data && json.data.refresh_token) {",
+            "  pm.collectionVariables.set('refreshToken', json.data.refresh_token);",
+            "}",
         ],
     },
+    "POST /auth/email/confirm": {
+        "test_lines": [
+            "// Needs a valid confirmation token from email — expect 400 in automated runs",
+            "pm.test('Confirm email — expected 400 without token', function () {",
+            "  pm.expect(pm.response.code).to.be.oneOf([200, 400]);",
+            "});",
+        ],
+    },
+    "POST /auth/password/reset": {
+        "test_lines": [
+            "// Needs a valid reset token — expect 400 in automated runs",
+            "pm.test('Reset password — expected 400 without token', function () {",
+            "  pm.expect(pm.response.code).to.be.oneOf([200, 400]);",
+            "});",
+        ],
+    },
+    "POST /auth/email/resend": {
+        "test_lines": [
+            "// Needs authenticated session — expect 401 when no auth header sent",
+            "pm.test('Resend confirmation — expected 401/200', function () {",
+            "  pm.expect(pm.response.code).to.be.oneOf([200, 401]);",
+            "});",
+        ],
+    },
+    "POST /auth/password/forgot": {
+        "body_override": json.dumps(
+            {"email": "{{runEmail}}"},
+            indent=2,
+        ),
+    },
+    # ── User ──────────────────────────────────────────────────────────
+    "DELETE /user/me": {
+        "test_lines": [
+            "// Returns 403 when email is not confirmed (LGPD protection)",
+            "pm.test('Delete account — expected 403 without email confirmation', function () {",
+            "  pm.expect(pm.response.code).to.be.oneOf([200, 403]);",
+            "});",
+        ],
+    },
+    "PATCH /user/notification-preferences": {
+        "body_override": json.dumps(
+            {"preferences": [{"key": "email_marketing", "enabled": False}]},
+            indent=2,
+        ),
+    },
+    # ── Transactions ──────────────────────────────────────────────────
     "POST /transactions": {
         "body_override": json.dumps(
             {
@@ -234,8 +349,9 @@ ENRICHMENT: dict[str, dict[str, Any]] = {
             "  pm.response.to.have.status(201);",
             "});",
             "var json = pm.response.json();",
-            "if (json.data && json.data.id) {",
-            "  pm.collectionVariables.set('transactionId', json.data.id);",
+            "// Response nests under data.transaction (list) — take first item",
+            "if (json.data && json.data.transaction && json.data.transaction[0]) {",
+            "  pm.collectionVariables.set('transactionId', json.data.transaction[0].id);",
             "}",
         ],
     },
@@ -245,6 +361,40 @@ ENRICHMENT: dict[str, dict[str, Any]] = {
     "GET /dashboard/overview": {
         "query_params": [{"key": "month", "value": "{{runMonthRef}}"}],
     },
+    "GET /transactions/expenses": {
+        "query_params": [{"key": "month", "value": "{{runMonthRef}}"}],
+    },
+    "GET /transactions/due-range": {
+        "query_params": [
+            {"key": "start_date", "value": "{{runToday}}"},
+            {"key": "end_date", "value": "{{runIn30Days}}"},
+        ],
+    },
+    "GET /transactions/dashboard": {
+        "query_params": [{"key": "month", "value": "{{runMonthRef}}"}],
+    },
+    # ── Budgets ───────────────────────────────────────────────────────
+    "POST /budgets": {
+        "body_override": json.dumps(
+            {
+                "name": "Alimentação {{runSeed}}",
+                "amount": "500.00",
+                "period": "monthly",
+            },
+            indent=2,
+        ),
+        "test_lines": [
+            "pm.test('Create budget returns 201', function () {",
+            "  pm.response.to.have.status(201);",
+            "});",
+            "var json = pm.response.json();",
+            "// Response nests under data.budget",
+            "if (json.data && json.data.budget) {",
+            "  pm.collectionVariables.set('budgetId', json.data.budget.id);",
+            "}",
+        ],
+    },
+    # ── Goals ─────────────────────────────────────────────────────────
     "POST /goals": {
         "body_override": json.dumps(
             {
@@ -260,8 +410,9 @@ ENRICHMENT: dict[str, dict[str, Any]] = {
             "  pm.response.to.have.status(201);",
             "});",
             "var json = pm.response.json();",
-            "if (json.data && json.data.id) {",
-            "  pm.collectionVariables.set('goalId', json.data.id);",
+            "// Response nests under data.goal",
+            "if (json.data && json.data.goal) {",
+            "  pm.collectionVariables.set('goalId', json.data.goal.id);",
             "}",
         ],
     },
@@ -278,6 +429,7 @@ ENRICHMENT: dict[str, dict[str, Any]] = {
             indent=2,
         ),
     },
+    # ── Wallet ────────────────────────────────────────────────────────
     "POST /wallet": {
         "body_override": json.dumps(
             {
@@ -294,27 +446,77 @@ ENRICHMENT: dict[str, dict[str, Any]] = {
             "  pm.response.to.have.status(201);",
             "});",
             "var json = pm.response.json();",
-            "if (json.data && json.data.id) {",
-            "  pm.collectionVariables.set('investmentId', json.data.id);",
+            "// Response nests under data.investment",
+            "if (json.data && json.data.investment) {",
+            "  pm.collectionVariables.set('investmentId', json.data.investment.id);",
             "}",
         ],
     },
-    "POST /budgets": {
+    "POST /wallet/{investment_id}/operations": {
         "body_override": json.dumps(
             {
-                "name": "Alimentação {{runSeed}}",
-                "amount": "500.00",
-                "period": "monthly",
+                "operation_type": "buy",
+                "quantity": "5",
+                "unit_price": "28.50",
+                "fees": "0.00",
             },
             indent=2,
         ),
         "test_lines": [
-            "pm.test('Create budget returns 201', function () {",
+            "pm.test('Create wallet operation returns 201', function () {",
             "  pm.response.to.have.status(201);",
             "});",
             "var json = pm.response.json();",
-            "if (json.data && json.data.id) {",
-            "  pm.collectionVariables.set('budgetId', json.data.id);",
+            "if (json.data && json.data.operation) {",
+            "  pm.collectionVariables.set('operationId', json.data.operation.id);",
+            "}",
+        ],
+    },
+    # ── Simulations ───────────────────────────────────────────────────
+    "POST /simulations": {
+        "body_override": json.dumps(
+            {
+                "tool_id": "installment_vs_cash",
+                "rule_version": "1.0",
+                "inputs": {"cash_price": "1000.00"},
+                "result": {"recommendation": "cash"},
+            },
+            indent=2,
+        ),
+        "test_lines": [
+            "pm.test('Save simulation returns 201', function () {",
+            "  pm.response.to.have.status(201);",
+            "});",
+            "var json = pm.response.json();",
+            "// Response nests under data.simulation",
+            "if (json.data && json.data.simulation) {",
+            "  pm.collectionVariables.set('simulationId', json.data.simulation.id);",
+            "}",
+        ],
+    },
+    "POST /simulations/installment-vs-cash": {
+        "body_override": json.dumps(
+            {
+                "cash_price": "900.00",
+                "installment_count": 3,
+                "installment_total": "990.00",
+                "first_payment_delay_days": 30,
+                "opportunity_rate_type": "manual",
+                "opportunity_rate_annual": "12.00",
+                "inflation_rate_annual": "4.50",
+                "fees_enabled": False,
+                "fees_upfront": "0.00",
+            },
+            indent=2,
+        ),
+        "test_lines": [
+            "pm.test('Save installment-vs-cash returns 201', function () {",
+            "  pm.response.to.have.status(201);",
+            "});",
+            "var json = pm.response.json();",
+            "// Capture simulationId for bridge endpoints",
+            "if (json.data && json.data.simulation) {",
+            "  pm.collectionVariables.set('simulationId', json.data.simulation.id);",
             "}",
         ],
     },
@@ -333,6 +535,84 @@ ENRICHMENT: dict[str, dict[str, Any]] = {
             },
             indent=2,
         ),
+    },
+    "POST /simulations/installment-vs-cash/save": {
+        "body_override": json.dumps(
+            {
+                "cash_price": "900.00",
+                "installment_count": 3,
+                "installment_total": "990.00",
+                "first_payment_delay_days": 30,
+                "opportunity_rate_type": "manual",
+                "opportunity_rate_annual": "12.00",
+                "inflation_rate_annual": "4.50",
+                "fees_enabled": False,
+                "fees_upfront": "0.00",
+            },
+            indent=2,
+        ),
+        "test_lines": [
+            "pm.test('Save installment-vs-cash (legacy) returns 201', function () {",
+            "  pm.response.to.have.status(201);",
+            "});",
+            "var json = pm.response.json();",
+            "if (json.data && json.data.simulation) {",
+            "  pm.collectionVariables.set('simulationId', json.data.simulation.id);",
+            "}",
+        ],
+    },
+    "POST /simulations/{simulation_id}/goal": {
+        "body_override": json.dumps(
+            {
+                "title": "Meta da simulação {{runSeed}}",
+                "selected_option": "cash",
+                "target_date": "{{runIn365Days}}",
+            },
+            indent=2,
+        ),
+        "test_lines": [
+            "// Bridge endpoint requires advanced_simulations entitlement — may 403",
+            "pm.test('Goal bridge — expected 201 or 403', function () {",
+            "  pm.expect(pm.response.code).to.be.oneOf([201, 403]);",
+            "});",
+        ],
+    },
+    "POST /simulations/{simulation_id}/planned-expense": {
+        "body_override": json.dumps(
+            {
+                "title": "Despesa da simulação {{runSeed}}",
+                "selected_option": "cash",
+                "due_date": "{{runIn30Days}}",
+            },
+            indent=2,
+        ),
+        "test_lines": [
+            "// Bridge endpoint requires advanced_simulations entitlement — may 403",
+            "pm.test('Planned-expense bridge — expected 201 or 403', function () {",
+            "  pm.expect(pm.response.code).to.be.oneOf([201, 403]);",
+            "});",
+        ],
+    },
+    # ── Entitlements ──────────────────────────────────────────────────
+    "GET /entitlements/check": {
+        "query_params": [{"key": "feature_key", "value": "advanced_simulations"}],
+    },
+    # ── Ops (may not be registered in CI) ─────────────────────────────
+    "GET /ops/metrics": {
+        "test_lines": [
+            "// Ops endpoints may not be registered in all environments",
+            "pm.test('Metrics — expected 200 or 404', function () {",
+            "  pm.expect(pm.response.code).to.be.oneOf([200, 404]);",
+            "});",
+        ],
+    },
+    "GET /ops/observability": {
+        "test_lines": [
+            "// Ops endpoints may not be registered in all environments",
+            "pm.test('Observability — expected 200 or 404', function () {",
+            "  pm.expect(pm.response.code).to.be.oneOf([200, 404]);",
+            "});",
+        ],
     },
 }
 
@@ -594,7 +874,13 @@ def build_collection(spec: dict[str, Any]) -> dict[str, Any]:
 
             # --- Body ---
             enrichment = ENRICHMENT.get(op_key, {})
-            body_str = enrichment.get("body_override") or _extract_body(spec, operation)
+            body_str: str | None = None
+            if enrichment.get("no_body"):
+                body_str = None
+            else:
+                body_str = enrichment.get("body_override") or _extract_body(
+                    spec, operation
+                )
             if body_str:
                 headers.insert(0, {"key": "Content-Type", "value": "application/json"})
 
