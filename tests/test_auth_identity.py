@@ -91,3 +91,77 @@ def test_get_active_auth_context_raises_for_revoked_context(
 
     with pytest.raises(RevokedTokenError):
         get_active_auth_context()
+
+
+def test_is_auth_context_revoked_for_soft_deleted_user(app) -> None:
+    """A soft-deleted user's token must be treated as revoked (LGPD)."""
+    with app.app_context():
+        from app.extensions.database import db
+        from app.utils.datetime_utils import utc_now_naive
+
+        user = User(
+            name="deleted-user",
+            email="deleted-user@email.com",
+            password="hash",
+        )
+        user.current_jti = "valid-jti"
+        user.deleted_at = utc_now_naive()
+        db.session.add(user)
+        db.session.commit()
+
+        context = AuthContext(
+            subject=str(user.id),
+            email=user.email,
+            roles=(),
+            permissions=(),
+            jti="valid-jti",
+            issued_at=None,
+            expires_at=None,
+            raw_claims={"sub": str(user.id), "jti": "valid-jti"},
+        )
+
+        # Even though jti matches, deleted_at must cause revocation.
+        assert is_auth_context_revoked(context) is True
+
+
+def test_jwt_callback_revokes_deleted_user_access_token(app) -> None:
+    """Access-token revocation check must treat soft-deleted users as revoked."""
+    with app.app_context():
+        from app.extensions.database import db
+        from app.extensions.jwt_callbacks import _is_access_token_revoked
+        from app.utils.datetime_utils import utc_now_naive
+
+        user = User(
+            name="deleted-jwt-user",
+            email="deleted-jwt@email.com",
+            password="hash",
+        )
+        user.current_jti = "valid-jti-access"
+        user.deleted_at = utc_now_naive()
+        db.session.add(user)
+        db.session.commit()
+
+        # Token matches current_jti but user is soft-deleted — must be revoked.
+        result = _is_access_token_revoked(str(user.id), "valid-jti-access")
+        assert result is True
+
+
+def test_jwt_callback_revokes_deleted_user_refresh_token(app) -> None:
+    """Refresh-token revocation check must treat soft-deleted users as revoked."""
+    with app.app_context():
+        from app.extensions.database import db
+        from app.extensions.jwt_callbacks import _is_refresh_token_revoked
+        from app.utils.datetime_utils import utc_now_naive
+
+        user = User(
+            name="deleted-refresh-user",
+            email="deleted-refresh@email.com",
+            password="hash",
+        )
+        user.refresh_token_jti = "valid-jti-refresh"
+        user.deleted_at = utc_now_naive()
+        db.session.add(user)
+        db.session.commit()
+
+        result = _is_refresh_token_revoked(str(user.id), "valid-jti-refresh")
+        assert result is True

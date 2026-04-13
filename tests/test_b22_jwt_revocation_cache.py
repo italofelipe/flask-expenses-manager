@@ -235,6 +235,7 @@ class TestCheckIfTokenRevokedWithCache:
 
         mock_user = MagicMock()
         mock_user.current_jti = stored_jti
+        mock_user.deleted_at = None  # active user
 
         jwt_manager, captured = _make_jwt_manager_and_capture()
 
@@ -266,6 +267,7 @@ class TestCheckIfTokenRevokedWithCache:
         noop_cache = _NoOpJwtRevocationCache()
         mock_user = MagicMock()
         mock_user.current_jti = stored_jti
+        mock_user.deleted_at = None  # active user
 
         jwt_manager, captured = _make_jwt_manager_and_capture()
 

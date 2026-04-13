@@ -116,7 +116,8 @@ def main() -> int:
         print("🎉 Todos os testes passaram!")
         print("📚 A documentação Swagger está configurada corretamente.")
         print(
-            "🌐 Acesse: http://localhost:5000/docs/ (quando a aplicação estiver rodando)"
+            "🌐 Acesse: http://localhost:5000/docs/"
+            " (quando a aplicação estiver rodando)"
         )
         return 0
     else:

@@ -32,7 +32,7 @@ def is_token_revoked(jti: str) -> bool:
         if identity is None:
             return True
         user = db.session.get(User, identity)
-        return not user or user.current_jti != jti
+        return not user or user.deleted_at is not None or user.current_jti != jti
     except InvalidAuthContextError:
         return True
 
@@ -44,7 +44,7 @@ def _is_access_token_revoked(user_id: str, jti: str) -> bool:
     if cached_jti is not None:
         return cached_jti != jti
     user = db.session.get(User, UUID(user_id))
-    if not user:
+    if not user or user.deleted_at is not None:  # LGPD: soft-deleted = revoked
         return True
     cache.set_current_jti(user_id, user.current_jti)
     return bool(user.current_jti != jti)
@@ -53,7 +53,7 @@ def _is_access_token_revoked(user_id: str, jti: str) -> bool:
 def _is_refresh_token_revoked(user_id: str, jti: str) -> bool:
     """Check refresh token revocation directly against the DB (not cached)."""
     user = db.session.get(User, UUID(user_id))
-    if not user:
+    if not user or user.deleted_at is not None:  # LGPD: soft-deleted = revoked
         return True
     return bool(user.refresh_token_jti != jti)
 
