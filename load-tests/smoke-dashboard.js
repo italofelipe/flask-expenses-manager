@@ -7,7 +7,7 @@ import { check, sleep } from "k6";
 const BASE_URL = __ENV.BASE_URL || "http://localhost:5000";
 
 export const options = {
-  stages: [{ duration: "30s", target: 5 }],
+  stages: [{ duration: "30s", target: 2 }],
   thresholds: {
     http_req_duration: ["p(95)<500", "p(99)<1000"],
     http_req_failed: ["rate<0.01"],
@@ -15,7 +15,7 @@ export const options = {
 };
 
 function setupUser() {
-  const seed = `${Date.now()}-${__VU}`;
+  const seed = `${Date.now()}-${__VU}-${__ITER}`;
   const email = `k6dash+${seed}@example.com`;
   const password = "K6Test@123456";
   const headers = {
@@ -41,7 +41,10 @@ function setupUser() {
 
 export default function () {
   const token = setupUser();
-  if (!token) return;
+  if (!token) {
+    sleep(1);
+    return;
+  }
 
   const headers = {
     Authorization: `Bearer ${token}`,

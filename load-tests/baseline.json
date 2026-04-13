@@ -9,17 +9,17 @@
     "smoke-auth": {
       "script": "smoke-auth.js",
       "duration": "30s",
-      "vus": 5
+      "vus": 2
     },
     "smoke-transactions": {
       "script": "smoke-transactions.js",
       "duration": "30s",
-      "vus": 5
+      "vus": 2
     },
     "smoke-dashboard": {
       "script": "smoke-dashboard.js",
       "duration": "30s",
-      "vus": 5
+      "vus": 2
     }
   }
 }

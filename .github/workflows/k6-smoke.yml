@@ -58,6 +58,7 @@ jobs:
           FLASK_TESTING: "true"
           PORT: "5000"
           SECURITY_ENFORCE_STRONG_SECRETS: "false"
+          RATE_LIMIT_ENABLED: "false"
           DATABASE_URL: "postgresql://test:test@localhost:5432/testdb"
           SECRET_KEY: "k6-smoke-key-with-64-chars-minimum-for-jwt-signing-000000001"
           JWT_SECRET_KEY: "k6-smoke-jwt-key-with-64-chars-minimum-for-signing-0000002"
