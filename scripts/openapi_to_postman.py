@@ -951,7 +951,9 @@ def build_collection(spec: dict[str, Any]) -> dict[str, Any]:
                 body_str = enrichment.get("body_override") or _extract_body(
                     spec, operation
                 )
-            if body_str:
+            # POST/PUT/PATCH always need Content-Type — Flask returns 415
+            # if missing, even when body is empty (controller calls get_json()).
+            if method.upper() in ("POST", "PUT", "PATCH") or body_str:
                 headers.insert(0, {"key": "Content-Type", "value": "application/json"})
 
             # --- Request object ---
