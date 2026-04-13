@@ -57,5 +57,5 @@ module = [
 disable_error_code = ["untyped-decorator"]
 
 [build-system]
-requires = ["setuptools>=42"]
+requires = ["setuptools>=82.0.1"]
 build-backend = "setuptools.build_meta"
