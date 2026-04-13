@@ -62,6 +62,50 @@ def test_dispatch_due_soon_sends_reminders(app) -> None:
         assert len(outbox) >= 1
 
 
+def test_dispatch_due_soon_email_provider_error_exits_nonzero(app) -> None:
+    """If the email provider raises EmailProviderError the CLI exits 1,
+    logs the error to stderr, and does not abort mid-loop."""
+    import unittest.mock as mock
+
+    from app.services.email_provider import EmailProviderError
+
+    with app.app_context():
+        runner = app.test_cli_runner()
+        with mock.patch(
+            "app.application.services.transaction_reminder_service.get_default_email_provider"
+        ) as mock_provider_factory:
+            mock_provider = mock.MagicMock()
+            mock_provider.send.side_effect = EmailProviderError(
+                "RESEND_API_KEY missing"
+            )
+            mock_provider_factory.return_value = mock_provider
+
+            # Add a transaction so the provider is actually called
+            user = User(
+                id=uuid.uuid4(),
+                name="Error Test User",
+                email="error@email.com",
+                password="hash",
+            )
+            db.session.add(user)
+            db.session.flush()
+            tx = Transaction(
+                user_id=user.id,
+                title="Conta teste",
+                amount=Decimal("50.00"),
+                type=TransactionType.EXPENSE,
+                status=TransactionStatus.PENDING,
+                due_date=date.today() + timedelta(days=7),
+            )
+            db.session.add(tx)
+            db.session.commit()
+
+            result = runner.invoke(args=["reminders", "dispatch-due-soon"])
+
+    assert result.exit_code == 1
+    assert "ERROR" in result.output
+
+
 def test_dispatch_due_soon_dry_run_does_not_send(app) -> None:
     runner = app.test_cli_runner()
     result = runner.invoke(args=["reminders", "dispatch-due-soon", "--dry-run"])
