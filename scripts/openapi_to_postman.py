@@ -49,6 +49,12 @@ TAG_FOLDER_MAP: dict[str, str] = {
 }
 DEFAULT_FOLDER = "99 - Other"
 
+# Per-operation folder override — takes precedence over tag and path-prefix mapping.
+# Use this to relocate specific operations (e.g. logout to the end of the run).
+OPERATION_FOLDER_OVERRIDE: dict[str, str] = {
+    "POST /auth/logout": "99 - Cleanup",
+}
+
 # Path-prefix fallback for untagged endpoints
 PATH_FOLDER_FALLBACK: dict[str, str] = {
     "/goals": "05 - Goals",
@@ -69,7 +75,6 @@ OPERATION_ORDER: dict[str, list[str]] = {
         "POST /auth/login",
         "POST /auth/refresh",
         "GET /user/me",
-        "POST /auth/logout",
     ],
     "03 - Transactions": [
         "POST /transactions",
@@ -103,6 +108,7 @@ FOLDER_ORDER = [
     "06 - Wallet",
     "07 - Simulations",
     "08 - Entitlements",
+    "99 - Cleanup",
     "99 - Other",
 ]
 
@@ -294,9 +300,15 @@ ENRICHMENT: dict[str, dict[str, Any]] = {
     "POST /simulations/installment-vs-cash/calculate": {
         "body_override": json.dumps(
             {
-                "cash_price": 1200,
-                "installment_count": 12,
-                "inflation_rate_annual": 6.5,
+                "cash_price": "900.00",
+                "installment_count": 3,
+                "installment_total": "990.00",
+                "first_payment_delay_days": 30,
+                "opportunity_rate_type": "manual",
+                "opportunity_rate_annual": "12.00",
+                "inflation_rate_annual": "4.50",
+                "fees_enabled": False,
+                "fees_upfront": "0.00",
             },
             indent=2,
         ),
@@ -529,18 +541,22 @@ def build_collection(spec: dict[str, Any]) -> dict[str, Any]:
             if not isinstance(operation, dict):
                 continue
 
-            tags = operation.get("tags", [])
-            tag = tags[0] if tags else "Untagged"
-            folder_name = TAG_FOLDER_MAP.get(tag, "")
-            if not folder_name or tag == "Untagged":
-                # Fallback: match path prefix
-                for prefix, fname in PATH_FOLDER_FALLBACK.items():
-                    if path.startswith(prefix):
-                        folder_name = fname
-                        break
-                else:
-                    folder_name = DEFAULT_FOLDER
             op_key = f"{method.upper()} {path}"
+
+            # Per-operation override takes highest priority
+            folder_name = OPERATION_FOLDER_OVERRIDE.get(op_key, "")
+            if not folder_name:
+                tags = operation.get("tags", [])
+                tag = tags[0] if tags else "Untagged"
+                folder_name = TAG_FOLDER_MAP.get(tag, "")
+                if not folder_name or tag == "Untagged":
+                    # Fallback: match path prefix
+                    for prefix, fname in PATH_FOLDER_FALLBACK.items():
+                        if path.startswith(prefix):
+                            folder_name = fname
+                            break
+                    else:
+                        folder_name = DEFAULT_FOLDER
 
             # --- Headers ---
             headers: list[dict[str, str]] = [

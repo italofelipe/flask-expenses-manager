@@ -300,45 +300,6 @@
           ]
         },
         {
-          "name": "POST — Revogar sessão atual",
-          "request": {
-            "method": "POST",
-            "header": [
-              {
-                "key": "X-API-Contract",
-                "value": "v2"
-              },
-              {
-                "key": "Authorization",
-                "value": "Bearer {{authToken}}"
-              }
-            ],
-            "url": {
-              "raw": "{{baseUrl}}/auth/logout",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "auth",
-                "logout"
-              ]
-            }
-          },
-          "event": [
-            {
-              "listen": "test",
-              "script": {
-                "exec": [
-                  "pm.test('Revogar sessão atual — status 200', function () {",
-                  "  pm.response.to.have.status(200);",
-                  "});"
-                ],
-                "type": "text/javascript"
-              }
-            }
-          ]
-        },
-        {
           "name": "POST — Confirmar conta",
           "request": {
             "method": "POST",
@@ -3323,7 +3284,7 @@
             },
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"cash_price\": 1200,\n  \"installment_count\": 12,\n  \"inflation_rate_annual\": 6.5\n}"
+              "raw": "{\n  \"cash_price\": \"900.00\",\n  \"installment_count\": 3,\n  \"installment_total\": \"990.00\",\n  \"first_payment_delay_days\": 30,\n  \"opportunity_rate_type\": \"manual\",\n  \"opportunity_rate_annual\": \"12.00\",\n  \"inflation_rate_annual\": \"4.50\",\n  \"fees_enabled\": false,\n  \"fees_upfront\": \"0.00\"\n}"
             }
           },
           "event": [
@@ -3656,6 +3617,50 @@
                 "exec": [
                   "pm.test('POST /entitlements/admin — status 201', function () {",
                   "  pm.response.to.have.status(201);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "99 - Cleanup",
+      "item": [
+        {
+          "name": "POST — Revogar sessão atual",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "X-API-Contract",
+                "value": "v2"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{authToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/auth/logout",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "logout"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Revogar sessão atual — status 200', function () {",
+                  "  pm.response.to.have.status(200);",
                   "});"
                 ],
                 "type": "text/javascript"
