@@ -106,6 +106,22 @@ def test_dispatch_due_soon_email_provider_error_exits_nonzero(app) -> None:
     assert "ERROR" in result.output
 
 
+def test_dispatch_due_soon_unexpected_error_exits_nonzero(app) -> None:
+    """If dispatch raises an unexpected exception the CLI exits 1 and logs to stderr."""
+    import unittest.mock as mock
+
+    with app.app_context():
+        runner = app.test_cli_runner()
+        with mock.patch(
+            "app.application.services.transaction_reminder_service.dispatch_due_transaction_reminders",
+            side_effect=RuntimeError("DB connection lost"),
+        ):
+            result = runner.invoke(args=["reminders", "dispatch-due-soon"])
+
+    assert result.exit_code == 1
+    assert "ERROR" in result.output
+
+
 def test_dispatch_due_soon_dry_run_does_not_send(app) -> None:
     runner = app.test_cli_runner()
     result = runner.invoke(args=["reminders", "dispatch-due-soon", "--dry-run"])
