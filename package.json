@@ -4,7 +4,7 @@
   "description": "Canonical Postman/Newman E2E runner for Auraxis API",
   "private": true,
   "scripts": {
-    "postman:build": "python3 scripts/build_postman_collection.py",
+    "postman:build": "python3 scripts/openapi_to_postman.py",
     "postman:local": "bash scripts/run_postman_suite.sh",
     "postman:ci": "bash scripts/run_postman_suite.sh api-tests/postman/environments/local.postman_environment.json",
     "postman:smoke:local": "bash scripts/run_postman_suite.sh --profile smoke",
