@@ -2362,7 +2362,7 @@
             },
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"name\": \"Test Asset {{runSeed}}\",\n  \"ticker\": \"PETR4\",\n  \"quantity\": 10,\n  \"register_date\": \"{{runToday}}\",\n  \"should_be_on_wallet\": true\n}"
+              "raw": "{\n  \"name\": \"Poupan\\u00e7a {{runSeed}}\",\n  \"value\": 1500.0,\n  \"register_date\": \"{{runToday}}\",\n  \"should_be_on_wallet\": true\n}"
             }
           },
           "event": [

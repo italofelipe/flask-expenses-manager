@@ -433,9 +433,8 @@ ENRICHMENT: dict[str, dict[str, Any]] = {
     "POST /wallet": {
         "body_override": json.dumps(
             {
-                "name": "Test Asset {{runSeed}}",
-                "ticker": "PETR4",
-                "quantity": 10,
+                "name": "Poupança {{runSeed}}",
+                "value": 1500.00,
                 "register_date": "{{runToday}}",
                 "should_be_on_wallet": True,
             },
