@@ -7,6 +7,13 @@
       "owner": "platform-security",
       "reviewed_at": "2026-03-27",
       "justification": "No upstream fix is published yet for this advisory, so the exception remains explicit and time-bounded while preserving scanner visibility."
+    },
+    {
+      "id": "GHSA-6w46-j5rx-g56g",
+      "tools": ["pip-audit"],
+      "owner": "platform-security",
+      "reviewed_at": "2026-04-13",
+      "justification": "pytest is a dev-only dependency (not deployed). Upgrade to 9.0.3 requires compatibility validation across test suite."
     }
   ]
 }
