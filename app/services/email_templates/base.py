@@ -364,8 +364,128 @@ def render_account_deletion_email() -> tuple[str, str]:
     return html, text
 
 
+def render_due_soon_email(
+    *,
+    title: str,
+    amount_formatted: str,
+    days_before_due: int,
+) -> tuple[str, str]:
+    """Render the transaction due-soon reminder email (D-7 or D-1).
+
+    Args:
+        title: Transaction title (e.g., "Aluguel").
+        amount_formatted: Pre-formatted amount string (e.g., "1500.00").
+        days_before_due: 7 or 1.
+
+    Returns:
+        (html, text) tuple ready to pass to EmailMessage.
+    """
+    if days_before_due == 1:
+        email_title = "Amanhã vence uma pendência"
+        preview = f"Amanhã vence R$ {amount_formatted} — {title}."
+        heading = "Amanhã vence uma pendência"
+        intro = (
+            f'Sua transação <strong style="color: {_COLOR_TEXT_PRIMARY};">{title}</strong> '
+            f'vence <strong style="color: {_COLOR_BRAND};">amanhã</strong> no valor de '
+            f'<strong style="color: {_COLOR_TEXT_PRIMARY};">R$ {amount_formatted}</strong>.'
+        )
+    else:
+        email_title = "Pendência vencendo em breve"
+        preview = f"Você tem R$ {amount_formatted} vencendo em {days_before_due} dias — {title}."
+        heading = "Pendência vencendo em breve"
+        intro = (
+            f'Sua transação <strong style="color: {_COLOR_TEXT_PRIMARY};">{title}</strong> '
+            f'vence em <strong style="color: {_COLOR_BRAND};">{days_before_due} dias</strong> '
+            f'no valor de <strong style="color: {_COLOR_TEXT_PRIMARY};">R$ {amount_formatted}</strong>.'
+        )
+
+    body_html = f"""
+      <h1 style="font-family: {_FONT_HEADING}; font-size: 26px; font-weight: 700;
+                 color: {_COLOR_TEXT_PRIMARY}; margin: 0 0 8px; line-height: 1.2;">
+        {heading}
+      </h1>
+      <p style="font-family: {_FONT_BODY}; font-size: 13px; font-weight: 600;
+                color: {_COLOR_BRAND}; margin: 0 0 24px; text-transform: uppercase;
+                letter-spacing: 1px;">
+        Auraxis &mdash; Finanças pessoais
+      </p>
+
+      <div style="border-top: 1px solid {_COLOR_BG_ELEVATED}; margin: 0 0 28px;"></div>
+
+      <p style="font-family: {_FONT_BODY}; font-size: 15px; color: {_COLOR_TEXT_SECONDARY};
+                line-height: 1.65; margin: 0 0 24px;">
+        {intro}
+      </p>
+
+      <!-- CTA -->
+      <table role="presentation" cellpadding="0" cellspacing="0" border="0" style="margin: 8px 0 32px;">
+        <tr>
+          <td align="left" style="border-radius: 8px; background-color: {_COLOR_BRAND};">
+            <!--[if mso]>
+            <v:roundrect xmlns:v="urn:schemas-microsoft-com:vml" xmlns:w="urn:schemas-microsoft-com:office:word"
+              href="{_APP_URL}" style="height:48px;v-text-anchor:middle;width:200px;" arcsize="17%"
+              strokecolor="{_COLOR_BRAND_DARK}" fillcolor="{_COLOR_BRAND}">
+              <w:anchorlock/>
+              <center style="color:{_COLOR_BG_BASE};font-family:{_FONT_BODY};font-size:15px;font-weight:600;">
+                Ver no Auraxis
+              </center>
+            </v:roundrect>
+            <![endif]-->
+            <!--[if !mso]><!-->
+            <a href="{_APP_URL}"
+               style="background-color: {_COLOR_BRAND}; color: {_COLOR_BG_BASE};
+                      font-family: {_FONT_BODY}; font-size: 15px; font-weight: 600;
+                      text-decoration: none; display: inline-block;
+                      padding: 14px 32px; border-radius: 8px;">
+              Ver no Auraxis
+            </a>
+            <!--<![endif]-->
+          </td>
+        </tr>
+      </table>
+
+      <div style="border-top: 1px solid {_COLOR_BG_ELEVATED}; margin: 0 0 20px;"></div>
+
+      <p style="font-family: {_FONT_BODY}; font-size: 12px; color: {_COLOR_TEXT_MUTED};
+                line-height: 1.6; margin: 0;">
+        Para gerenciar suas preferências de notificação, acesse as configurações no aplicativo.
+      </p>
+    """
+
+    html = _base_layout(
+        title=email_title,
+        preview_text=preview,
+        body_html=body_html,
+    )
+
+    if days_before_due == 1:
+        text = (
+            f"Amanhã vence uma pendência — Auraxis\n"
+            f"=====================================\n\n"
+            f"Sua transação '{title}' vence amanhã no valor de R$ {amount_formatted}.\n\n"
+            f"Acesse o Auraxis para gerenciar suas finanças:\n"
+            f"{_APP_URL}\n\n"
+            f"Para gerenciar preferências de notificação, acesse as configurações no app.\n\n"
+            f"— Equipe Auraxis\n"
+        )
+    else:
+        text = (
+            f"Pendência vencendo em breve — Auraxis\n"
+            f"======================================\n\n"
+            f"Sua transação '{title}' vence em {days_before_due} dias "
+            f"no valor de R$ {amount_formatted}.\n\n"
+            f"Acesse o Auraxis para gerenciar suas finanças:\n"
+            f"{_APP_URL}\n\n"
+            f"Para gerenciar preferências de notificação, acesse as configurações no app.\n\n"
+            f"— Equipe Auraxis\n"
+        )
+
+    return html, text
+
+
 __all__ = [
     "render_account_deletion_email",
     "render_confirmation_email",
+    "render_due_soon_email",
     "render_password_reset_email",
 ]

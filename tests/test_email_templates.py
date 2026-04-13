@@ -11,6 +11,7 @@ from __future__ import annotations
 
 from app.services.email_templates import (
     render_confirmation_email,
+    render_due_soon_email,
     render_password_reset_email,
 )
 
@@ -99,3 +100,82 @@ class TestRenderPasswordResetEmail:
     def test_html_contains_brand_colour(self) -> None:
         html, _ = render_password_reset_email(reset_url=RESET_URL)
         assert "#ffab1a" in html
+
+
+class TestRenderDueSoonEmail:
+    def test_returns_html_and_text_tuple(self) -> None:
+        result = render_due_soon_email(
+            title="Aluguel", amount_formatted="1500.00", days_before_due=7
+        )
+        assert isinstance(result, tuple)
+        assert len(result) == 2
+
+    def test_html_is_valid_doctype(self) -> None:
+        html, _ = render_due_soon_email(
+            title="Aluguel", amount_formatted="1500.00", days_before_due=7
+        )
+        assert html.strip().startswith("<!DOCTYPE html>")
+
+    def test_html_contains_brand_colour(self) -> None:
+        html, _ = render_due_soon_email(
+            title="Aluguel", amount_formatted="1500.00", days_before_due=7
+        )
+        assert "#ffab1a" in html
+
+    def test_html_contains_brand_name(self) -> None:
+        html, _ = render_due_soon_email(
+            title="Aluguel", amount_formatted="1500.00", days_before_due=7
+        )
+        assert "Auraxis" in html
+
+    def test_html_contains_cta_button(self) -> None:
+        html, _ = render_due_soon_email(
+            title="Aluguel", amount_formatted="1500.00", days_before_due=7
+        )
+        assert "Ver no Auraxis" in html
+
+    def test_d7_html_contains_title_and_amount(self) -> None:
+        html, _ = render_due_soon_email(
+            title="Aluguel", amount_formatted="1500.00", days_before_due=7
+        )
+        assert "Aluguel" in html
+        assert "1500.00" in html
+        assert "Pendência vencendo em breve" in html
+
+    def test_d1_html_heading_is_tomorrow(self) -> None:
+        html, _ = render_due_soon_email(
+            title="Aluguel", amount_formatted="750.00", days_before_due=1
+        )
+        assert "Amanhã vence uma pendência" in html
+        assert "amanhã" in html
+
+    def test_d1_html_contains_title_and_amount(self) -> None:
+        html, _ = render_due_soon_email(
+            title="Cartão Nubank", amount_formatted="320.50", days_before_due=1
+        )
+        assert "Cartão Nubank" in html
+        assert "320.50" in html
+
+    def test_text_is_plain_string(self) -> None:
+        _, text = render_due_soon_email(
+            title="Aluguel", amount_formatted="1500.00", days_before_due=7
+        )
+        assert "<" not in text
+
+    def test_text_contains_app_url(self) -> None:
+        _, text = render_due_soon_email(
+            title="Aluguel", amount_formatted="1500.00", days_before_due=7
+        )
+        assert "app.auraxis.com.br" in text
+
+    def test_d7_text_mentions_days(self) -> None:
+        _, text = render_due_soon_email(
+            title="Aluguel", amount_formatted="1500.00", days_before_due=7
+        )
+        assert "7 dias" in text
+
+    def test_d1_text_mentions_amanha(self) -> None:
+        _, text = render_due_soon_email(
+            title="Aluguel", amount_formatted="1500.00", days_before_due=1
+        )
+        assert "amanhã" in text
