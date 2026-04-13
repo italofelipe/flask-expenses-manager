@@ -1,5 +1,25 @@
 # Changelog
 
+## [1.26.0](https://github.com/italofelipe/auraxis-api/compare/v1.25.1...v1.26.0) (2026-04-13)
+
+
+### Features
+
+* **h-p3.3:** branded email templates for D-7 and D-1 transaction reminders ([#1017](https://github.com/italofelipe/auraxis-api/issues/1017)) ([9595bb3](https://github.com/italofelipe/auraxis-api/commit/9595bb34c1a3a7d9a1856ee51d71ca81daa07f93))
+* **postman:** POSTMAN-02 — generate collection from openapi.json ([#1002](https://github.com/italofelipe/auraxis-api/issues/1002)) ([c7989d6](https://github.com/italofelipe/auraxis-api/commit/c7989d687947e50fdcf6785c0daf1f494c820284))
+* **postman:** POSTMAN-04 — push collection to Postman Cloud via API ([#1006](https://github.com/italofelipe/auraxis-api/issues/1006)) ([736c90c](https://github.com/italofelipe/auraxis-api/commit/736c90c723551e42d1d5e187f3359e4b963900d7)), closes [#966](https://github.com/italofelipe/auraxis-api/issues/966)
+* **postman:** semantic contract tests + pre-commit gate ([#1014](https://github.com/italofelipe/auraxis-api/issues/1014)) ([35116fb](https://github.com/italofelipe/auraxis-api/commit/35116fb0b7354c77dc48ef0828befdf3ed335e12))
+
+
+### Bug Fixes
+
+* **reminders:** handle EmailProviderError + expose SSM output ([#989](https://github.com/italofelipe/auraxis-api/issues/989)) ([#1015](https://github.com/italofelipe/auraxis-api/issues/1015)) ([7e50eed](https://github.com/italofelipe/auraxis-api/commit/7e50eede09be3e30a6f642cd3401f3aa89229b0f))
+
+
+### Performance Improvements
+
+* **k6:** PERF-5 — k6 smoke baseline scripts and CI workflow ([#1005](https://github.com/italofelipe/auraxis-api/issues/1005)) ([2deef21](https://github.com/italofelipe/auraxis-api/commit/2deef21451b520fd643e2e46eb3ca170bf03bf65))
+
 ## [1.25.1](https://github.com/italofelipe/auraxis-api/compare/v1.25.0...v1.25.1) (2026-04-12)
 
 
