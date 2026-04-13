@@ -155,6 +155,7 @@ def is_auth_context_revoked(context: AuthContext) -> bool:
     user = _user_from_auth_context(context)
     return (
         user is None
+        or user.deleted_at is not None  # LGPD: soft-deleted accounts are always revoked
         or context.jti is None
         or not hasattr(user, "current_jti")
         or user.current_jti != context.jti
