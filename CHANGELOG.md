@@ -1,5 +1,24 @@
 # Changelog
 
+## [1.25.1](https://github.com/italofelipe/auraxis-api/compare/v1.25.0...v1.25.1) (2026-04-12)
+
+
+### Performance Improvements
+
+* **indexes:** PERF-1 — add ix_tags_user_id and ix_accounts_user_id migration ([#999](https://github.com/italofelipe/auraxis-api/issues/999)) ([7d7650f](https://github.com/italofelipe/auraxis-api/commit/7d7650f1a40286ee5473989c4bf950c2bbaaca9e))
+
+## [1.25.0](https://github.com/italofelipe/auraxis-api/compare/v1.24.1...v1.25.0) (2026-04-12)
+
+
+### Features
+
+* **openapi:** POSTMAN-01 + POSTMAN-06 — CLI export + drift check ([#963](https://github.com/italofelipe/auraxis-api/issues/963), [#968](https://github.com/italofelipe/auraxis-api/issues/968)) ([#997](https://github.com/italofelipe/auraxis-api/issues/997)) ([753ba1d](https://github.com/italofelipe/auraxis-api/commit/753ba1d2785bf76809bed61a47c47e419bb6ee94))
+
+
+### Performance Improvements
+
+* **retry:** PERF-4 — add jitter + structured logging to retry wrapper ([#994](https://github.com/italofelipe/auraxis-api/issues/994)) ([210e085](https://github.com/italofelipe/auraxis-api/commit/210e085cbaed71e8a2dc7ca3d8916d17301f837f))
+
 ## [1.24.1](https://github.com/italofelipe/auraxis-api/compare/v1.24.0...v1.24.1) (2026-04-12)
 
 
