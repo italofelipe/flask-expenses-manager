@@ -103,8 +103,8 @@ OPERATION_ORDER: dict[str, list[str]] = {
         "GET /transactions/list",
         "DELETE /transactions/{transaction_id}",
         "GET /transactions/deleted",
-        "DELETE /transactions/{transaction_id}/force",
         "PATCH /transactions/restore/{transaction_id}",
+        "DELETE /transactions/{transaction_id}/force",
     ],
     "04 - Budgets": [
         "POST /budgets",
@@ -375,6 +375,36 @@ ENRICHMENT: dict[str, dict[str, Any]] = {
     },
     "GET /transactions/dashboard": {
         "query_params": [{"key": "month", "value": "{{runMonthRef}}"}],
+    },
+    "PATCH /transactions/restore/{transaction_id}": {
+        "test_lines": [
+            "pm.test('Restaurar transação deletada — status 200', function () {",
+            "  pm.response.to.have.status(200);",
+            "});",
+        ],
+    },
+    "DELETE /transactions/{transaction_id}/force": {
+        "prerequest_lines": [
+            "// Force-delete requires deleted=True. After restore the transaction is active,",
+            "// so we soft-delete it again before the permanent delete.",
+            "var baseUrl = pm.collectionVariables.get('baseUrl') || pm.environment.get('baseUrl');",
+            "var txId = pm.collectionVariables.get('transactionId');",
+            "var token = pm.collectionVariables.get('authToken');",
+            "if (txId) {",
+            "  pm.sendRequest({",
+            "    url: baseUrl + '/transactions/' + txId,",
+            "    method: 'DELETE',",
+            "    header: { 'Authorization': 'Bearer ' + token }",
+            "  }, function (err, res) {",
+            "    // Ignore result — transaction may already be soft-deleted",
+            "  });",
+            "}",
+        ],
+        "test_lines": [
+            "pm.test('Force-delete transaction — status 200', function () {",
+            "  pm.response.to.have.status(200);",
+            "});",
+        ],
     },
     # ── Budgets ───────────────────────────────────────────────────────
     "PATCH /budgets/{budget_id}": {

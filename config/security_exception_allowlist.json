@@ -10,7 +10,7 @@
     },
     {
       "id": "GHSA-6w46-j5rx-g56g",
-      "tools": ["pip-audit"],
+      "tools": ["pip-audit", "osv-scanner"],
       "owner": "platform-security",
       "reviewed_at": "2026-04-13",
       "justification": "pytest is a dev-only dependency (not deployed). Upgrade to 9.0.3 requires compatibility validation across test suite."
