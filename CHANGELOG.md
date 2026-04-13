@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.26.1](https://github.com/italofelipe/auraxis-api/compare/v1.26.0...v1.26.1) (2026-04-13)
+
+
+### Bug Fixes
+
+* **auth:** revoke JWT tokens for soft-deleted users + billing canonical wiki ([#1030](https://github.com/italofelipe/auraxis-api/issues/1030)) ([4ca1aaf](https://github.com/italofelipe/auraxis-api/commit/4ca1aaf2fbe7df5032c2f14b96d1d3f3d044284a))
+
 ## [1.26.0](https://github.com/italofelipe/auraxis-api/compare/v1.25.1...v1.26.0) (2026-04-13)
 
 
