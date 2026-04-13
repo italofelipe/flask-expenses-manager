@@ -56,7 +56,7 @@ jobs:
           echo "Scanning target: ${TARGET}"
 
       - name: Run ZAP Baseline Scan
-        uses: zaproxy/action-baseline@v0.14.0
+        uses: zaproxy/action-baseline@v0.15.0
         with:
           target: ${{ steps.target.outputs.url }}
           rules_file_name: .zap/rules.tsv

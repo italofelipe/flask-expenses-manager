@@ -1,0 +1,91 @@
+name: k6 Smoke
+
+on:
+  pull_request:
+    paths:
+      - "app/**"
+      - "load-tests/**"
+      - "requirements.txt"
+  workflow_dispatch:
+
+concurrency:
+  group: k6-smoke-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  k6-smoke:
+    name: k6 Smoke Tests
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: test
+          POSTGRES_PASSWORD: test
+          POSTGRES_DB: testdb
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+          cache: pip
+          cache-dependency-path: requirements.txt
+
+      - name: Install Python dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -r requirements.txt
+
+      - name: Install k6
+        uses: grafana/setup-k6-action@v1
+
+      - name: Start Flask app
+        env:
+          FLASK_APP: run.py
+          FLASK_ENV: testing
+          FLASK_TESTING: "true"
+          PORT: "5000"
+          SECURITY_ENFORCE_STRONG_SECRETS: "false"
+          RATE_LIMIT_ENABLED: "false"
+          DATABASE_URL: "postgresql://test:test@localhost:5432/testdb"
+          SECRET_KEY: "k6-smoke-key-with-64-chars-minimum-for-jwt-signing-000000001"
+          JWT_SECRET_KEY: "k6-smoke-jwt-key-with-64-chars-minimum-for-signing-0000002"
+          DOCS_EXPOSURE_POLICY: public
+        run: |
+          python -c "
+          from app import create_app
+          from app.extensions.database import db
+          app = create_app()
+          with app.app_context():
+              db.create_all()
+          "
+          python run.py &
+          # Wait for app to be ready
+          for i in $(seq 1 30); do
+            if curl -s http://localhost:5000/healthz > /dev/null 2>&1; then
+              echo "App ready after ${i}s"
+              break
+            fi
+            sleep 1
+          done
+
+      - name: Run k6 smoke-auth
+        run: k6 run --env BASE_URL=http://localhost:5000 load-tests/smoke-auth.js
+
+      - name: Run k6 smoke-transactions
+        run: k6 run --env BASE_URL=http://localhost:5000 load-tests/smoke-transactions.js
+
+      - name: Run k6 smoke-dashboard
+        run: k6 run --env BASE_URL=http://localhost:5000 load-tests/smoke-dashboard.js
