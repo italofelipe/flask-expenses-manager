@@ -349,4 +349,4 @@ if __name__ == "__main__":
         raise SystemExit(main())
     except RulesetError as exc:
         print(exc, file=sys.stderr)
-        raise SystemExit(2)
+        raise SystemExit(2) from None
