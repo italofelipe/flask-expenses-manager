@@ -12,6 +12,7 @@ from app.models.transaction import Transaction, TransactionStatus
 from app.models.user import User
 from app.services.alert_service import _is_dispatch_allowed
 from app.services.email_provider import EmailMessage, get_default_email_provider
+from app.services.email_templates.base import render_due_soon_email
 from app.utils.datetime_utils import utc_now_naive
 
 _REMINDER_WINDOWS = {
@@ -108,21 +109,25 @@ def dispatch_due_transaction_reminders(
             skipped += 1
             continue
 
+        amount_str = _serialize_amount(transaction.amount)
+        email_html, email_text = render_due_soon_email(
+            title=transaction.title,
+            amount_formatted=amount_str,
+            days_before_due=days_before_due,
+        )
+        if days_before_due == 1:
+            subject = f"Amanhã vence: {transaction.title} (R$ {amount_str})"
+        else:
+            subject = (
+                f"Vence em {days_before_due} dias: {transaction.title} "
+                f"(R$ {amount_str})"
+            )
         provider.send(
             EmailMessage(
                 to_email=str(user.email),
-                subject="Lembrete de pendência na Auraxis",
-                html=(
-                    "<p>Você possui uma pendência se aproximando.</p>"
-                    f"<p><strong>{transaction.title}</strong> vence em "
-                    f"{days_before_due} dia(s), no valor de R$ "
-                    f"{_serialize_amount(transaction.amount)}.</p>"
-                ),
-                text=(
-                    f"Você possui uma pendência se aproximando. {transaction.title} "
-                    f"vence em {days_before_due} dia(s), no valor de R$ "
-                    f"{_serialize_amount(transaction.amount)}."
-                ),
+                subject=subject,
+                html=email_html,
+                text=email_text,
                 tag=category,
             )
         )
