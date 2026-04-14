@@ -68,17 +68,37 @@ If multi-device is ever adopted, the migration path is:
 
 ### Decision: consolidate REST surface, add sunset headers
 
-See the dedicated section in `docs/wiki/MVP-1-Transacoes-Tecnico.md` and issue #840
-for the full breakdown. Summary of decisions:
+**Status: IMPLEMENTED.** All endpoint normalization is in place.
 
-- `GET /transactions` is the canonical collection endpoint (with query param filters)
-- `GET /transactions/list` is deprecated with `Sunset` + `Deprecation` headers
-- `GET /transactions/expenses` is deprecated; use `GET /transactions?type=expense`
-- `PATCH /transactions/{id}` is the canonical partial-update method
-- `PUT /transactions/{id}` is deprecated with sunset header
-- Query params are normalized: `start_date` / `end_date` everywhere
+Summary of the canonical API surface:
 
-**Status:** Pending implementation.
+| Method | Path | Status |
+|--------|------|--------|
+| `GET` | `/transactions` | Canonical — all filters via query params |
+| `GET` | `/transactions/list` | Deprecated — `Deprecation: true`, `Sunset: 2026-06-30`, successor `/transactions` |
+| `GET` | `/transactions/expenses` | Deprecated — successor `/transactions?type=expense` |
+| `GET` | `/transactions/dashboard` | Deprecated — successor `/dashboard/overview` |
+| `PATCH` | `/transactions/{id}` | Canonical partial update |
+| `PUT` | `/transactions/{id}` | Deprecated — successor `PATCH /transactions/{id}` |
+| `GET` | `/dashboard/overview` | Canonical dashboard |
+
+Canonical query params for `GET /transactions`:
+- `start_date` / `end_date` (YYYY-MM-DD)
+- `type` (income|expense)
+- `status` (paid|pending|cancelled|postponed|overdue)
+- `tag_id`, `account_id`, `credit_card_id`
+- `page`, `per_page`
+
+Implementation files:
+- `app/controllers/transaction/list_resources.py` — canonical + legacy collection
+- `app/controllers/transaction/analytics_resources.py` — deprecated analytics endpoints
+- `app/controllers/transaction/update_resource.py` — PATCH canonical, PUT deprecated
+- `app/controllers/transaction/utils.py` — `_apply_deprecation_headers()` helper
+- `app/controllers/dashboard/resources.py` — canonical `/dashboard/overview`
+
+Legacy camelCase param aliases (`startDate`, `finalDate`, `initialDate`) remain
+accepted only on deprecated endpoints until sunset (2026-06-30). Canonical
+`GET /transactions` uses `start_date`/`end_date` exclusively.
 
 ---
 
