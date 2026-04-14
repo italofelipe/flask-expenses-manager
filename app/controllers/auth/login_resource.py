@@ -64,6 +64,11 @@ def _persist_session(
     refresh_jti: str,
     pending_new_hash: str | None,
 ) -> None:
+    # H-P5.3 — single-session policy (intentional product decision):
+    # Overwriting current_jti immediately invalidates any previously issued
+    # access + refresh pair. If the previous session was from another device,
+    # that device's next authenticated request will receive SESSION_DISPLACED (401).
+    # See docs/wiki/MVP-1-Hardening-Strategy.md § H-P5.3 for rationale.
     needs_commit = (
         user.current_jti != jti
         or user.refresh_token_jti != refresh_jti

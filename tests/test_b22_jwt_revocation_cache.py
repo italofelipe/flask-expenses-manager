@@ -291,6 +291,135 @@ class TestCheckIfTokenRevokedWithCache:
 
 
 # ---------------------------------------------------------------------------
+# Unit tests — SESSION_DISPLACED flag (H-P5.3 single-session policy)
+# ---------------------------------------------------------------------------
+
+
+class TestSessionDisplacedFlag:
+    """Verify that g.session_displaced is set when a session is replaced."""
+
+    def _run_check(
+        self, *, app: Any, cache: Any, user_id: str, jti: str, mock_user: Any = None
+    ) -> bool:
+        """Run _is_access_token_revoked inside an app context and return the result."""
+        import app.extensions.jwt_callbacks as _m
+
+        with app.app_context():
+            with patch.object(_m, "get_jwt_revocation_cache", return_value=cache):
+                if mock_user is not None:
+                    with (
+                        patch.object(_m, "db") as mock_db,
+                        patch.object(_m, "UUID", side_effect=uuid.UUID),
+                    ):
+                        mock_db.session.get.return_value = mock_user
+                        return _m._is_access_token_revoked(user_id, jti)
+                else:
+                    return _m._is_access_token_revoked(user_id, jti)
+
+    def test_session_displaced_set_on_cache_hit_with_different_jti(
+        self, app: Any
+    ) -> None:
+        """Cache hit with a different (newer) JTI → session was displaced."""
+        user_id = str(uuid.uuid4())
+        new_jti = "new-device-jti"
+        old_jti = "old-device-jti"
+
+        redis_client = MagicMock()
+        redis_client.get.return_value = new_jti.encode()  # current JTI is new
+        cache = RedisJwtRevocationCache(redis_client)
+
+        import app.extensions.jwt_callbacks as _m
+
+        with app.app_context():
+            with patch.object(_m, "get_jwt_revocation_cache", return_value=cache):
+                # old_jti is being validated — it's not the current one
+                result = _m._is_access_token_revoked(user_id, old_jti)
+                from flask import g as flask_g
+
+                displaced = getattr(flask_g, "session_displaced", False)
+
+        assert result is True
+        assert displaced is True
+
+    def test_session_displaced_not_set_when_jti_matches(self, app: Any) -> None:
+        """Cache hit with the same JTI → valid token, no displacement."""
+        user_id = str(uuid.uuid4())
+        current_jti = "same-jti"
+
+        redis_client = MagicMock()
+        redis_client.get.return_value = current_jti.encode()
+        cache = RedisJwtRevocationCache(redis_client)
+
+        import app.extensions.jwt_callbacks as _m
+
+        with app.app_context():
+            with patch.object(_m, "get_jwt_revocation_cache", return_value=cache):
+                result = _m._is_access_token_revoked(user_id, current_jti)
+                from flask import g as flask_g
+
+                displaced = getattr(flask_g, "session_displaced", False)
+
+        assert result is False
+        assert displaced is False
+
+    def test_session_displaced_set_on_db_fallback_with_nonnull_current_jti(
+        self, app: Any
+    ) -> None:
+        """Cache miss + DB shows non-null current_jti ≠ incoming → SESSION_DISPLACED."""
+        user_id = str(uuid.uuid4())
+        incoming_jti = "old-jti"
+
+        noop_cache = _NoOpJwtRevocationCache()
+        mock_user = MagicMock()
+        mock_user.current_jti = "new-session-jti"  # a different session is active
+        mock_user.deleted_at = None
+
+        import app.extensions.jwt_callbacks as _m
+
+        with app.app_context():
+            with (
+                patch.object(_m, "get_jwt_revocation_cache", return_value=noop_cache),
+                patch.object(_m, "db") as mock_db,
+                patch.object(_m, "UUID", side_effect=uuid.UUID),
+            ):
+                mock_db.session.get.return_value = mock_user
+                result = _m._is_access_token_revoked(user_id, incoming_jti)
+                from flask import g as flask_g
+
+                displaced = getattr(flask_g, "session_displaced", False)
+
+        assert result is True
+        assert displaced is True
+
+    def test_session_not_displaced_when_current_jti_is_null(self, app: Any) -> None:
+        """Cache miss + DB shows null current_jti → explicit logout, not displaced."""
+        user_id = str(uuid.uuid4())
+        incoming_jti = "some-jti"
+
+        noop_cache = _NoOpJwtRevocationCache()
+        mock_user = MagicMock()
+        mock_user.current_jti = None  # explicit logout cleared it
+        mock_user.deleted_at = None
+
+        import app.extensions.jwt_callbacks as _m
+
+        with app.app_context():
+            with (
+                patch.object(_m, "get_jwt_revocation_cache", return_value=noop_cache),
+                patch.object(_m, "db") as mock_db,
+                patch.object(_m, "UUID", side_effect=uuid.UUID),
+            ):
+                mock_db.session.get.return_value = mock_user
+                result = _m._is_access_token_revoked(user_id, incoming_jti)
+                from flask import g as flask_g
+
+                displaced = getattr(flask_g, "session_displaced", False)
+
+        assert result is True
+        assert displaced is False
+
+
+# ---------------------------------------------------------------------------
 # Integration tests — logout invalidates cache (via HTTP)
 # ---------------------------------------------------------------------------
 

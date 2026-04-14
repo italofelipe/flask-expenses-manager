@@ -1,7 +1,7 @@
 from typing import Any, Dict
 from uuid import UUID
 
-from flask import jsonify
+from flask import g, jsonify
 from flask.typing import ResponseReturnValue
 from flask_jwt_extended import JWTManager
 
@@ -38,16 +38,31 @@ def is_token_revoked(jti: str) -> bool:
 
 
 def _is_access_token_revoked(user_id: str, jti: str) -> bool:
-    """Check access token revocation using Redis cache (DB fallback on miss)."""
+    """Check access token revocation using Redis cache (DB fallback on miss).
+
+    Side-effect: sets ``g.session_displaced = True`` when the token is revoked
+    because a new session replaced it (single-session policy, H-P5.3). This flag
+    is read by ``revoked_token_callback`` to return the ``SESSION_DISPLACED``
+    error code so clients can show a targeted "logged in on another device" message.
+    """
     cache = get_jwt_revocation_cache()
     cached_jti = cache.get_current_jti(user_id)
     if cached_jti is not None:
-        return cached_jti != jti
+        displaced = cached_jti != jti
+        if displaced:
+            # cached_jti is non-empty → another session is active → displaced
+            g.session_displaced = True
+        return displaced
     user = db.session.get(User, UUID(user_id))
     if not user or user.deleted_at is not None:  # LGPD: soft-deleted = revoked
         return True
     cache.set_current_jti(user_id, user.current_jti)
-    return bool(user.current_jti != jti)
+    if user.current_jti != jti:
+        # current_jti is non-null → another session replaced this one
+        if user.current_jti is not None:
+            g.session_displaced = True
+        return True
+    return False
 
 
 def _is_refresh_token_revoked(user_id: str, jti: str) -> bool:
@@ -78,9 +93,18 @@ def register_jwt_callbacks(jwt: JWTManager) -> None:
     def revoked_token_callback(
         jwt_header: Dict[str, Any], jwt_payload: Dict[str, Any]
     ) -> Any:
+        # H-P5.3 — single-session policy feedback:
+        # SESSION_DISPLACED → another device logged in (current_jti replaced).
+        # SESSION_REVOKED   → explicit logout or account erasure.
+        if getattr(g, "session_displaced", False):
+            return _jwt_error_response(
+                "Sua sessão foi encerrada porque você entrou em outro dispositivo.",
+                code="SESSION_DISPLACED",
+                status_code=401,
+            )
         return _jwt_error_response(
-            "Token revogado",
-            code="UNAUTHORIZED",
+            "Sessão encerrada. Faça login novamente.",
+            code="SESSION_REVOKED",
             status_code=401,
         )
 
