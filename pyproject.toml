@@ -36,26 +36,6 @@ strict = true
 plugins = []
 disallow_subclassing_any = false
 
-# ARC-10 mypy strict migration — override list.
-# Fase 1+2 (13 modules) migrated to per-decorator # type: ignore[misc].
-# Remaining: schemas wildcard + 7 controller/auth modules (Fase 3).
-[[tool.mypy.overrides]]
-module = [
-    # Marshmallow schemas — @pre_load/@post_load/@validates decorators.
-    # Deferred to Fase 3 (schema type-safety refactor).
-    "app.schemas.*",
-    # Controllers with mixed typed_jwt_required + route decorators.
-    # Deferred to Fase 3 (after typed_decorators.py stubs are added).
-    "app.controllers.subscription_controller",
-    "app.controllers.shared_entries.resources",
-    "app.controllers.fiscal.resources",
-    "app.controllers.wallet.valuation_resources",
-    "app.controllers.wallet.operation_resources",
-    "app.controllers.wallet.entry_resources",
-    "app.controllers.auth.error_handlers",
-]
-disable_error_code = ["untyped-decorator"]
-
 [build-system]
 requires = ["setuptools>=82.0.1"]
 build-backend = "setuptools.build_meta"
