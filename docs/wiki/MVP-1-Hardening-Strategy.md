@@ -68,34 +68,75 @@ If multi-device is ever adopted, the migration path is:
 
 ### Decision: consolidate REST surface, add sunset headers
 
-See the dedicated section in `docs/wiki/MVP-1-Transacoes-Tecnico.md` and issue #840
-for the full breakdown. Summary of decisions:
+**Status: IMPLEMENTED.** All endpoint normalization is in place.
 
-- `GET /transactions` is the canonical collection endpoint (with query param filters)
-- `GET /transactions/list` is deprecated with `Sunset` + `Deprecation` headers
-- `GET /transactions/expenses` is deprecated; use `GET /transactions?type=expense`
-- `PATCH /transactions/{id}` is the canonical partial-update method
-- `PUT /transactions/{id}` is deprecated with sunset header
-- Query params are normalized: `start_date` / `end_date` everywhere
+Summary of the canonical API surface:
 
-**Status:** Pending implementation.
+| Method | Path | Status |
+|--------|------|--------|
+| `GET` | `/transactions` | Canonical — all filters via query params |
+| `GET` | `/transactions/list` | Deprecated — `Deprecation: true`, `Sunset: 2026-06-30`, successor `/transactions` |
+| `GET` | `/transactions/expenses` | Deprecated — successor `/transactions?type=expense` |
+| `GET` | `/transactions/dashboard` | Deprecated — successor `/dashboard/overview` |
+| `PATCH` | `/transactions/{id}` | Canonical partial update |
+| `PUT` | `/transactions/{id}` | Deprecated — successor `PATCH /transactions/{id}` |
+| `GET` | `/dashboard/overview` | Canonical dashboard |
+
+Canonical query params for `GET /transactions`:
+- `start_date` / `end_date` (YYYY-MM-DD)
+- `type` (income|expense)
+- `status` (paid|pending|cancelled|postponed|overdue)
+- `tag_id`, `account_id`, `credit_card_id`
+- `page`, `per_page`
+
+Implementation files:
+- `app/controllers/transaction/list_resources.py` — canonical + legacy collection
+- `app/controllers/transaction/analytics_resources.py` — deprecated analytics endpoints
+- `app/controllers/transaction/update_resource.py` — PATCH canonical, PUT deprecated
+- `app/controllers/transaction/utils.py` — `_apply_deprecation_headers()` helper
+- `app/controllers/dashboard/resources.py` — canonical `/dashboard/overview`
+
+Legacy camelCase param aliases (`startDate`, `finalDate`, `initialDate`) remain
+accepted only on deprecated endpoints until sunset (2026-06-30). Canonical
+`GET /transactions` uses `start_date`/`end_date` exclusively.
 
 ---
 
 ## H-P5.1 — Resolver dualidade REST + GraphQL (issue #839)
 
-### Decision: REST canonical, GraphQL read-only per domain
+### Decision: REST canonical, GraphQL mutations deprecated per domain
 
-| Domain | Owner | GraphQL role |
-|--------|-------|--------------|
-| Auth | REST-only | Mutations deprecated (compat only) |
-| Transactions | REST canonical | Read queries only |
-| Goals | REST canonical | Read queries only |
-| Wallet | REST canonical | Read queries only |
-| Dashboard | REST-only | Not exposed |
-| User profile | REST canonical | Read queries only |
+**Status: IMPLEMENTED.** `deprecation_reason` added to all mutations that duplicate
+REST canonical endpoints. See `app/graphql/mutations/__init__.py`.
 
-**Status:** Pending implementation.
+#### Ownership table
+
+| Domain | REST role | GraphQL mutations |
+|--------|-----------|-------------------|
+| Auth | REST-only | All deprecated (sunset 2026-12-31) |
+| Transactions | REST canonical | CRUD mutations deprecated |
+| Goals | REST canonical | CRUD mutations deprecated |
+| Wallet | REST canonical | CRUD mutations deprecated |
+| Dashboard | REST-only | Not exposed in GraphQL |
+| User profile | REST canonical | `update_user_profile` deprecated |
+| Budget | REST canonical | Mutations kept (compat window) |
+| Subscriptions | REST canonical | Mutations kept (compat window) |
+| Tickers | GraphQL-only | No deprecation |
+| Investment ops | GraphQL-only | No deprecation |
+| Notification prefs | GraphQL-only | No deprecation |
+| Simulations | REST+GraphQL parity | No deprecation |
+
+#### GraphQL read queries
+
+**All read queries remain active.** The ownership decision affects write mutations only.
+GraphQL is the preferred interface for complex, nested reads (dashboard aggregations,
+goal projections, investment portfolio views).
+
+#### Sunset timeline
+
+- **2026-12-31**: Deprecated mutations removed from schema.
+- Introspection already reflects `isDeprecated: true` for all deprecated mutations.
+- Clients should migrate to REST equivalents before sunset.
 
 ---
 
