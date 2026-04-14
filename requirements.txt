@@ -41,3 +41,4 @@ webargs==8.7.1
 Werkzeug==3.1.8
 types-python-dateutil==2.9.0.20260408
 types-requests==2.33.0.20260402
+reportlab==4.4.0
