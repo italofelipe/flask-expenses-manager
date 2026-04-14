@@ -104,18 +104,39 @@ accepted only on deprecated endpoints until sunset (2026-06-30). Canonical
 
 ## H-P5.1 — Resolver dualidade REST + GraphQL (issue #839)
 
-### Decision: REST canonical, GraphQL read-only per domain
+### Decision: REST canonical, GraphQL mutations deprecated per domain
 
-| Domain | Owner | GraphQL role |
-|--------|-------|--------------|
-| Auth | REST-only | Mutations deprecated (compat only) |
-| Transactions | REST canonical | Read queries only |
-| Goals | REST canonical | Read queries only |
-| Wallet | REST canonical | Read queries only |
-| Dashboard | REST-only | Not exposed |
-| User profile | REST canonical | Read queries only |
+**Status: IMPLEMENTED.** `deprecation_reason` added to all mutations that duplicate
+REST canonical endpoints. See `app/graphql/mutations/__init__.py`.
 
-**Status:** Pending implementation.
+#### Ownership table
+
+| Domain | REST role | GraphQL mutations |
+|--------|-----------|-------------------|
+| Auth | REST-only | All deprecated (sunset 2026-12-31) |
+| Transactions | REST canonical | CRUD mutations deprecated |
+| Goals | REST canonical | CRUD mutations deprecated |
+| Wallet | REST canonical | CRUD mutations deprecated |
+| Dashboard | REST-only | Not exposed in GraphQL |
+| User profile | REST canonical | `update_user_profile` deprecated |
+| Budget | REST canonical | Mutations kept (compat window) |
+| Subscriptions | REST canonical | Mutations kept (compat window) |
+| Tickers | GraphQL-only | No deprecation |
+| Investment ops | GraphQL-only | No deprecation |
+| Notification prefs | GraphQL-only | No deprecation |
+| Simulations | REST+GraphQL parity | No deprecation |
+
+#### GraphQL read queries
+
+**All read queries remain active.** The ownership decision affects write mutations only.
+GraphQL is the preferred interface for complex, nested reads (dashboard aggregations,
+goal projections, investment portfolio views).
+
+#### Sunset timeline
+
+- **2026-12-31**: Deprecated mutations removed from schema.
+- Introspection already reflects `isDeprecated: true` for all deprecated mutations.
+- Clients should migrate to REST equivalents before sunset.
 
 ---
 
