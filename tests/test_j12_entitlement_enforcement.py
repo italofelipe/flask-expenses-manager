@@ -287,10 +287,21 @@ def test_sync_grants_trial_features_for_trialing_sub(app) -> None:
 # ---------------------------------------------------------------------------
 
 
-def test_require_entitlement_returns_false_for_missing_feature(client) -> None:
+def test_require_entitlement_returns_false_for_missing_feature(app, client) -> None:
     """Check endpoint reports no access when user lacks the feature."""
+    from app.services.entitlement_service import revoke_entitlement
+
     token = _register_and_login(client)
-    # The user has no entitlements — check endpoint should show no access
+    # Fetch user_id from profile before entering app context
+    profile_resp = client.get("/user/profile", headers=_auth(token))
+    profile_body = profile_resp.get_json()
+    user_id = uuid.UUID(
+        profile_body.get("data", {}).get("id") or profile_body.get("user", {}).get("id")
+    )
+    # Revoke the trial entitlement to simulate a free/downgraded user
+    with app.app_context():
+        revoke_entitlement(user_id, "export_pdf")
+        db.session.commit()
     response = client.get(
         "/entitlements/check?feature_key=export_pdf",
         headers=_auth(token),
@@ -326,6 +337,17 @@ def test_require_entitlement_decorator_returns_403_when_missing(app, client) -> 
 
     # Use a real registered user so auth guard allows the request
     token = _register_and_login(client)
+    # Fetch user_id from profile, then revoke trial entitlement to simulate free-tier
+    from app.services.entitlement_service import revoke_entitlement
+
+    profile_resp = client.get("/user/profile", headers=_auth(token))
+    profile_body = profile_resp.get_json()
+    user_id = uuid.UUID(
+        profile_body.get("data", {}).get("id") or profile_body.get("user", {}).get("id")
+    )
+    with app.app_context():
+        revoke_entitlement(user_id, "export_pdf")
+        db.session.commit()
 
     resp = client.get(
         "/test-j12-entitlement-required",

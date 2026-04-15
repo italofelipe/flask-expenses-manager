@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from .blueprint import transaction_bp
+from .export_resource import TransactionExportResource
 from .report_resources import (
     TransactionCollectionResource,
     TransactionDeletedResource,
@@ -98,6 +99,11 @@ def register_transaction_routes() -> None:
     transaction_bp.add_url_rule(
         "/due-range",
         view_func=TransactionDuePeriodResource.as_view("transaction_due_period"),
+        methods=["GET"],
+    )
+    transaction_bp.add_url_rule(
+        "/export",
+        view_func=TransactionExportResource.as_view("transaction_export"),
         methods=["GET"],
     )
 

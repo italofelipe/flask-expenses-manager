@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import datetime
 from decimal import ROUND_DOWN, Decimal
 from typing import Callable, cast
 from uuid import UUID
@@ -58,7 +59,7 @@ class InstallmentVsCashBridgeService:
                     "current_amount": _money_str(
                         Decimal(str(payload.get("current_amount", "0.00")))
                     ),
-                    "target_date": payload.get("target_date"),
+                    "target_date": _date_to_iso(payload.get("target_date")),
                     "priority": payload.get("priority", 3),
                     "status": "active",
                 }
@@ -193,3 +194,10 @@ def _compact_optional_fields(
     payload: dict[str, object | None],
 ) -> dict[str, object]:
     return {key: value for key, value in payload.items() if value is not None}
+
+
+def _date_to_iso(value: object) -> str | None:
+    """Convert a datetime.date to ISO string; downstream schemas expect strings."""
+    if isinstance(value, datetime.date):
+        return value.isoformat()
+    return None

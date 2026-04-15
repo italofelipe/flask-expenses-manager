@@ -143,6 +143,19 @@ class RegisterResource(MethodResource):
 
             db.session.commit()
 
+            # Sync trial entitlements (export_pdf, advanced_simulations, etc.)
+            from app.services.entitlement_service import (
+                sync_entitlements_from_subscription,
+            )
+
+            try:
+                sync_entitlements_from_subscription(trial_subscription)
+                db.session.commit()
+            except Exception:
+                current_app.logger.warning(
+                    "Failed to sync trial entitlements for user %s", user.id
+                )
+
             try:
                 dependencies.issue_email_confirmation(user)
             except Exception:

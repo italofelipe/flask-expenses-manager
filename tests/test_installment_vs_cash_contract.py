@@ -126,7 +126,16 @@ def test_installment_vs_cash_save_alias_emits_deprecation_headers(client) -> Non
 
 
 def test_installment_vs_cash_goal_bridge_requires_entitlement(client) -> None:
-    token, _email = _register_and_login(client, prefix="installment-goal-noent")
+    token, email = _register_and_login(client, prefix="installment-goal-noent")
+    # Simulate a downgraded/free user by revoking the trial entitlement
+    with client.application.app_context():
+        from app.extensions.database import db
+        from app.services.entitlement_service import revoke_entitlement
+
+        user = User.query.filter_by(email=email).first()
+        assert user is not None
+        revoke_entitlement(user.id, "advanced_simulations")
+        db.session.commit()
     save_response = client.post(
         "/simulations/installment-vs-cash",
         json=_payload(),

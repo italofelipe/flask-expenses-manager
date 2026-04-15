@@ -31,9 +31,12 @@ jobs:
           path: base
 
       - name: Install oasdiff
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
-          curl -fsSL https://github.com/Tufin/oasdiff/releases/latest/download/oasdiff_linux_amd64.tar.gz \
-            | tar xz -C /usr/local/bin oasdiff
+          gh release download --repo Tufin/oasdiff --pattern '*linux_amd64.tar.gz' -D /tmp/oasdiff-dl
+          tar xz -C /usr/local/bin oasdiff -f /tmp/oasdiff-dl/*.tar.gz
+          echo "Installed $(oasdiff --version)"
 
       - name: Check for base spec
         id: base_exists
