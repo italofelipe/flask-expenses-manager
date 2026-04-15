@@ -1,5 +1,21 @@
 # Changelog
 
+## [1.27.0](https://github.com/italofelipe/auraxis-api/compare/v1.26.1...v1.27.0) (2026-04-15)
+
+
+### Features
+
+* **advisory:** AI advisory engine — GET /advisory/insights ([#1026](https://github.com/italofelipe/auraxis-api/issues/1026)) ([#1044](https://github.com/italofelipe/auraxis-api/issues/1044)) ([ffbec15](https://github.com/italofelipe/auraxis-api/commit/ffbec15ba06a723708110412e924d3c149781a72))
+* **auth:** multi-device sessions with refresh token rotation ([#1028](https://github.com/italofelipe/auraxis-api/issues/1028)) ([#1045](https://github.com/italofelipe/auraxis-api/issues/1045)) ([8d1c092](https://github.com/italofelipe/auraxis-api/commit/8d1c092499648b03f0159cf6e3a1897a2ad2b10e))
+* **dashboard:** survival index endpoint — GET /dashboard/survival-index ([#1024](https://github.com/italofelipe/auraxis-api/issues/1024)) ([#1041](https://github.com/italofelipe/auraxis-api/issues/1041)) ([ceceb3b](https://github.com/italofelipe/auraxis-api/commit/ceceb3b4220743b3b23069b98cde4008ee5562b8))
+* **graphql:** deprecate REST-canonical mutations per H-P5.1 ownership decision [[#839](https://github.com/italofelipe/auraxis-api/issues/839)] ([#1036](https://github.com/italofelipe/auraxis-api/issues/1036)) ([72eb744](https://github.com/italofelipe/auraxis-api/commit/72eb7447cbaa79150dc79ecf270cf1af4a04bc3d))
+* **transactions:** export endpoint CSV/PDF com entitlement export_pdf ([#1022](https://github.com/italofelipe/auraxis-api/issues/1022)) ([#1040](https://github.com/italofelipe/auraxis-api/issues/1040)) ([d19c214](https://github.com/italofelipe/auraxis-api/commit/d19c214cf025e128cfdec507da9d04ae0ccc80b3))
+
+
+### Bug Fixes
+
+* **graphql:** revert mutation deprecation — REST e GraphQL mantêm paridade total de CRUD [[#839](https://github.com/italofelipe/auraxis-api/issues/839)] ([#1038](https://github.com/italofelipe/auraxis-api/issues/1038)) ([39871a1](https://github.com/italofelipe/auraxis-api/commit/39871a1a2a50aacaf601e8b530f17f76d349572c))
+
 ## [1.26.1](https://github.com/italofelipe/auraxis-api/compare/v1.26.0...v1.26.1) (2026-04-13)
 
 
