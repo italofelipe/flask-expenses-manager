@@ -41,13 +41,18 @@ def search_audit_events_by_request_id(
 
 
 def purge_expired_audit_events(*, retention_days: int) -> int:
+    from app.extensions.prometheus_metrics import record_audit_purge
+
     safe_retention_days = max(int(retention_days), 1)
     cutoff = datetime.now(UTC) - timedelta(days=safe_retention_days)
     deleted = AuditEvent.query.filter(AuditEvent.created_at < cutoff).delete(
         synchronize_session=False
     )
     db.session.commit()
-    return int(deleted)
+    count = int(deleted)
+    if count > 0:
+        record_audit_purge(count)
+    return count
 
 
 def serialize_audit_event(event: AuditEvent) -> dict[str, Any]:

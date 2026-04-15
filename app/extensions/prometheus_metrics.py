@@ -40,13 +40,18 @@ except ImportError:  # pragma: no cover
 _HTTP_REQUESTS_TOTAL: Any = None
 _HTTP_REQUEST_DURATION: Any = None
 _AUTH_LOGINS_TOTAL: Any = None
+_AUDIT_EVENTS_PURGED_TOTAL: Any = None
 
 _DURATION_BUCKETS = (0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1.0, 2.5)
 
 
 def _ensure_metrics_initialized() -> None:
     """Lazily initialise Prometheus metric objects (idempotent)."""
-    global _HTTP_REQUESTS_TOTAL, _HTTP_REQUEST_DURATION, _AUTH_LOGINS_TOTAL
+    global \
+        _HTTP_REQUESTS_TOTAL, \
+        _HTTP_REQUEST_DURATION, \
+        _AUTH_LOGINS_TOTAL, \
+        _AUDIT_EVENTS_PURGED_TOTAL
 
     if not _PROMETHEUS_AVAILABLE:
         return
@@ -73,6 +78,12 @@ def _ensure_metrics_initialized() -> None:
             ["status"],
         )
 
+    if _AUDIT_EVENTS_PURGED_TOTAL is None:
+        _AUDIT_EVENTS_PURGED_TOTAL = Counter(
+            "auraxis_audit_events_purged_total",
+            "Total audit_events rows deleted by the retention job",
+        )
+
 
 def record_http_request(
     *,
@@ -94,6 +105,13 @@ def record_http_request(
             method=method,
             endpoint=endpoint,
         ).observe(duration_seconds)
+
+
+def record_audit_purge(count: int) -> None:
+    """Increment ``auraxis_audit_events_purged_total`` by *count* rows deleted."""
+    _ensure_metrics_initialized()
+    if _AUDIT_EVENTS_PURGED_TOTAL is not None:
+        _AUDIT_EVENTS_PURGED_TOTAL.inc(count)
 
 
 def record_auth_login(*, status: str) -> None:
@@ -155,6 +173,7 @@ def register_prometheus_middleware(app: "Flask") -> None:
 
 __all__ = [
     "generate_latest_metrics",
+    "record_audit_purge",
     "record_auth_login",
     "record_http_request",
     "register_prometheus_middleware",
