@@ -149,6 +149,10 @@ OPENAPI_GAPS: set[tuple[str, str]] = {
     # Bank statements
     ("POST", "/bank-statements/preview"),
     ("POST", "/bank-statements/confirm"),
+    # Advisory (not yet in apispec-documented blueprints)
+    ("GET", "/advisory/insights"),
+    # Dashboard survival index (not yet in apispec-documented blueprints)
+    ("GET", "/dashboard/survival-index"),
 }
 
 
