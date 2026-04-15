@@ -6980,9 +6980,9 @@
                   }
                 }
               ],
-              "deprecationReason": "Use REST POST /auth/register. Deprecated (H-P5.1): use REST instead. Sunset: 2026-12-31.",
+              "deprecationReason": null,
               "description": null,
-              "isDeprecated": true,
+              "isDeprecated": false,
               "name": "registerUser",
               "type": {
                 "kind": "OBJECT",
@@ -7025,9 +7025,9 @@
                   }
                 }
               ],
-              "deprecationReason": "Use REST POST /auth/login. Deprecated (H-P5.1): use REST instead. Sunset: 2026-12-31.",
+              "deprecationReason": null,
               "description": null,
-              "isDeprecated": true,
+              "isDeprecated": false,
               "name": "login",
               "type": {
                 "kind": "OBJECT",
@@ -7037,9 +7037,9 @@
             },
             {
               "args": [],
-              "deprecationReason": "Use REST POST /auth/logout. Deprecated (H-P5.1): use REST instead. Sunset: 2026-12-31.",
+              "deprecationReason": null,
               "description": null,
-              "isDeprecated": true,
+              "isDeprecated": false,
               "name": "logout",
               "type": {
                 "kind": "OBJECT",
@@ -7066,9 +7066,9 @@
                   }
                 }
               ],
-              "deprecationReason": "Use REST POST /auth/forgot-password. Deprecated (H-P5.1): use REST instead. Sunset: 2026-12-31.",
+              "deprecationReason": null,
               "description": null,
-              "isDeprecated": true,
+              "isDeprecated": false,
               "name": "forgotPassword",
               "type": {
                 "kind": "OBJECT",
@@ -7095,9 +7095,9 @@
                   }
                 }
               ],
-              "deprecationReason": "Use REST POST /auth/resend-confirmation. Deprecated (H-P5.1): use REST instead. Sunset: 2026-12-31.",
+              "deprecationReason": null,
               "description": null,
-              "isDeprecated": true,
+              "isDeprecated": false,
               "name": "resendConfirmationEmail",
               "type": {
                 "kind": "OBJECT",
@@ -7140,9 +7140,9 @@
                   }
                 }
               ],
-              "deprecationReason": "Use REST POST /auth/reset-password. Deprecated (H-P5.1): use REST instead. Sunset: 2026-12-31.",
+              "deprecationReason": null,
               "description": null,
-              "isDeprecated": true,
+              "isDeprecated": false,
               "name": "resetPassword",
               "type": {
                 "kind": "OBJECT",
@@ -7169,9 +7169,9 @@
                   }
                 }
               ],
-              "deprecationReason": "Use REST POST /auth/confirm-email. Deprecated (H-P5.1): use REST instead. Sunset: 2026-12-31.",
+              "deprecationReason": null,
               "description": null,
-              "isDeprecated": true,
+              "isDeprecated": false,
               "name": "confirmEmail",
               "type": {
                 "kind": "OBJECT",
@@ -7374,9 +7374,9 @@
                   }
                 }
               ],
-              "deprecationReason": "Use REST PATCH /user/profile. Deprecated (H-P5.1): use REST instead. Sunset: 2026-12-31.",
+              "deprecationReason": null,
               "description": null,
-              "isDeprecated": true,
+              "isDeprecated": false,
               "name": "updateUserProfile",
               "type": {
                 "kind": "OBJECT",
@@ -7595,9 +7595,9 @@
                   }
                 }
               ],
-              "deprecationReason": "Use REST POST /transactions. Deprecated (H-P5.1): use REST /transactions. Sunset: 2026-12-31.",
+              "deprecationReason": null,
               "description": null,
-              "isDeprecated": true,
+              "isDeprecated": false,
               "name": "createTransaction",
               "type": {
                 "kind": "OBJECT",
@@ -7828,9 +7828,9 @@
                   }
                 }
               ],
-              "deprecationReason": "Use REST PATCH /transactions/{id}. Deprecated (H-P5.1): use REST /transactions. Sunset: 2026-12-31.",
+              "deprecationReason": null,
               "description": null,
-              "isDeprecated": true,
+              "isDeprecated": false,
               "name": "updateTransaction",
               "type": {
                 "kind": "OBJECT",
@@ -7857,9 +7857,9 @@
                   }
                 }
               ],
-              "deprecationReason": "Use REST DELETE /transactions/{id}. Deprecated (H-P5.1): use REST /transactions. Sunset: 2026-12-31.",
+              "deprecationReason": null,
               "description": null,
-              "isDeprecated": true,
+              "isDeprecated": false,
               "name": "deleteTransaction",
               "type": {
                 "kind": "OBJECT",
@@ -7974,9 +7974,9 @@
                   }
                 }
               ],
-              "deprecationReason": "Use REST POST /goals. Deprecated (H-P5.1): use REST /goals. Sunset: 2026-12-31.",
+              "deprecationReason": null,
               "description": null,
-              "isDeprecated": true,
+              "isDeprecated": false,
               "name": "createGoal",
               "type": {
                 "kind": "OBJECT",
@@ -8099,9 +8099,9 @@
                   }
                 }
               ],
-              "deprecationReason": "Use REST PATCH /goals/{id}. Deprecated (H-P5.1): use REST /goals. Sunset: 2026-12-31.",
+              "deprecationReason": null,
               "description": null,
-              "isDeprecated": true,
+              "isDeprecated": false,
               "name": "updateGoal",
               "type": {
                 "kind": "OBJECT",
@@ -8128,9 +8128,9 @@
                   }
                 }
               ],
-              "deprecationReason": "Use REST DELETE /goals/{id}. Deprecated (H-P5.1): use REST /goals. Sunset: 2026-12-31.",
+              "deprecationReason": null,
               "description": null,
-              "isDeprecated": true,
+              "isDeprecated": false,
               "name": "deleteGoal",
               "type": {
                 "kind": "OBJECT",
@@ -8805,9 +8805,9 @@
                   }
                 }
               ],
-              "deprecationReason": "Use REST POST /wallet/entries. Deprecated (H-P5.1): use REST /wallet/entries. Sunset: 2026-12-31.",
+              "deprecationReason": null,
               "description": null,
-              "isDeprecated": true,
+              "isDeprecated": false,
               "name": "addWalletEntry",
               "type": {
                 "kind": "OBJECT",
@@ -8942,9 +8942,9 @@
                   }
                 }
               ],
-              "deprecationReason": "Use REST PATCH /wallet/entries/{id}. Deprecated (H-P5.1): use REST /wallet/entries. Sunset: 2026-12-31.",
+              "deprecationReason": null,
               "description": null,
-              "isDeprecated": true,
+              "isDeprecated": false,
               "name": "updateWalletEntry",
               "type": {
                 "kind": "OBJECT",
@@ -8971,9 +8971,9 @@
                   }
                 }
               ],
-              "deprecationReason": "Use REST DELETE /wallet/entries/{id}. Deprecated (H-P5.1): use REST /wallet/entries. Sunset: 2026-12-31.",
+              "deprecationReason": null,
               "description": null,
-              "isDeprecated": true,
+              "isDeprecated": false,
               "name": "deleteWalletEntry",
               "type": {
                 "kind": "OBJECT",

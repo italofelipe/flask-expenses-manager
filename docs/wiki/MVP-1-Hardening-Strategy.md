@@ -104,39 +104,30 @@ accepted only on deprecated endpoints until sunset (2026-06-30). Canonical
 
 ## H-P5.1 — Resolver dualidade REST + GraphQL (issue #839)
 
-### Decision: REST canonical, GraphQL mutations deprecated per domain
+### Decision: REST e GraphQL com paridade total de CRUD
 
-**Status: IMPLEMENTED.** `deprecation_reason` added to all mutations that duplicate
-REST canonical endpoints. See `app/graphql/mutations/__init__.py`.
+REST e GraphQL são interfaces equivalentes e igualmente suportadas para todas as
+operações de criação, leitura, edição e exclusão. Ambas devem funcionar corretamente
+e permanecer em sincronia — não há interface "canônica" em detrimento da outra.
 
-#### Ownership table
+**Nenhuma mutation GraphQL é depreciada por existir um endpoint REST equivalente.**
 
-| Domain | REST role | GraphQL mutations |
-|--------|-----------|-------------------|
-| Auth | REST-only | All deprecated (sunset 2026-12-31) |
-| Transactions | REST canonical | CRUD mutations deprecated |
-| Goals | REST canonical | CRUD mutations deprecated |
-| Wallet | REST canonical | CRUD mutations deprecated |
-| Dashboard | REST-only | Not exposed in GraphQL |
-| User profile | REST canonical | `update_user_profile` deprecated |
-| Budget | REST canonical | Mutations kept (compat window) |
-| Subscriptions | REST canonical | Mutations kept (compat window) |
-| Tickers | GraphQL-only | No deprecation |
-| Investment ops | GraphQL-only | No deprecation |
-| Notification prefs | GraphQL-only | No deprecation |
-| Simulations | REST+GraphQL parity | No deprecation |
+#### Princípio de paridade
 
-#### GraphQL read queries
+- Qualquer operação disponível via REST **deve** ter um equivalente GraphQL funcional.
+- Qualquer operação disponível via GraphQL **deve** ter um equivalente REST funcional.
+- As duas interfaces compartilham a mesma camada de serviço — não há lógica duplicada,
+  apenas adaptadores distintos.
 
-**All read queries remain active.** The ownership decision affects write mutations only.
-GraphQL is the preferred interface for complex, nested reads (dashboard aggregations,
-goal projections, investment portfolio views).
+#### O que é exclusivo de cada interface
 
-#### Sunset timeline
+| Interface | Casos de uso exclusivos |
+|-----------|------------------------|
+| GraphQL | Queries aninhadas complexas (portfolio + metas + dashboard em um request) |
+| REST | Webhooks, integração com ferramentas externas, export endpoints |
 
-- **2026-12-31**: Deprecated mutations removed from schema.
-- Introspection already reflects `isDeprecated: true` for all deprecated mutations.
-- Clients should migrate to REST equivalents before sunset.
+**Status: REVISADO.** A decisão anterior de deprecar mutations foi revertida.
+REST e GraphQL são e continuarão sendo interfaces de paridade total de CRUD.
 
 ---
 
