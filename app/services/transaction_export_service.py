@@ -1,14 +1,17 @@
-"""Transaction export service — issue #1022.
+"""Transaction export service — issue #1022, streaming refactor #1055.
 
 Generates CSV and PDF exports for a user's transactions.
 Both formats respect the same filters (date range, type, status).
 Export is gated behind the ``export_pdf`` entitlement (Premium plan).
 
-Limits
-------
-- Maximum 10 000 transactions per export to avoid memory / timeout issues.
-- Callers receive a structured ``ExportResult`` so the controller can set
-  appropriate headers without coupling to the generation logic.
+CSV export is streamed via ``generate_csv_stream()`` — a generator that
+yields one line at a time so the response body is flushed incrementally.
+This removes the previous 10 000-row hard limit and reduces peak memory
+usage from O(N) to O(batch_size).
+
+PDF export loads rows in batches but must materialise the full document
+before returning (ReportLab's SimpleDocTemplate is not incrementally
+writable without the low-level canvas API).
 """
 
 from __future__ import annotations
@@ -18,14 +21,14 @@ import io
 from dataclasses import dataclass
 from datetime import date
 from decimal import Decimal
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Generator, Iterator
 
 from app.models.transaction import Transaction, TransactionStatus, TransactionType
 
 if TYPE_CHECKING:
     from uuid import UUID
 
-EXPORT_LIMIT = 10_000
+_EXPORT_BATCH_SIZE = 500
 _DATE_FMT = "%d/%m/%Y"
 _CSV_COLUMNS = ["data", "tipo", "titulo", "valor", "status", "descricao"]
 
@@ -38,46 +41,123 @@ class ExportResult:
 
 
 # ---------------------------------------------------------------------------
-# Query
+# Batched query (no hard limit)
 # ---------------------------------------------------------------------------
 
 
-def _build_export_query(
+def _iter_transactions_batched(
     *,
     user_id: "UUID",
     start_date: date | None,
     end_date: date | None,
     tx_type: TransactionType | None,
     status: TransactionStatus | None,
-) -> list[Transaction]:
-    query = Transaction.query.filter_by(user_id=user_id, deleted=False)
+    batch_size: int = _EXPORT_BATCH_SIZE,
+) -> Iterator[Transaction]:
+    """Yield every matching transaction using cursor-based pagination.
 
-    if start_date is not None:
-        query = query.filter(Transaction.due_date >= start_date)
-    if end_date is not None:
-        query = query.filter(Transaction.due_date <= end_date)
-    if tx_type is not None:
-        query = query.filter(Transaction.type == tx_type)
-    if status is not None:
-        query = query.filter(Transaction.status == status)
+    Queries ``batch_size`` rows at a time ordered by ``(due_date, id)``
+    so pagination is deterministic and restart-safe.  There is no upper
+    bound on the total number of rows yielded.
+    """
+    from uuid import UUID as _UUID
 
-    results: list[Transaction] = (
-        query.order_by(Transaction.due_date.asc(), Transaction.created_at.asc())
-        .limit(EXPORT_LIMIT)
-        .all()
-    )
-    return results
+    last_due: date | None = None
+    last_id: _UUID | None = None
+
+    while True:
+        query = Transaction.query.filter_by(user_id=user_id, deleted=False)
+
+        if start_date is not None:
+            query = query.filter(Transaction.due_date >= start_date)
+        if end_date is not None:
+            query = query.filter(Transaction.due_date <= end_date)
+        if tx_type is not None:
+            query = query.filter(Transaction.type == tx_type)
+        if status is not None:
+            query = query.filter(Transaction.status == status)
+
+        if last_due is not None and last_id is not None:
+            # Keyset pagination: skip rows we already yielded.
+            # Rows are ordered by (due_date ASC, id ASC) so this condition
+            # correctly advances the cursor without duplicates or gaps.
+            from sqlalchemy import and_, or_
+
+            query = query.filter(
+                or_(
+                    Transaction.due_date > last_due,
+                    and_(
+                        Transaction.due_date == last_due,
+                        Transaction.id > last_id,
+                    ),
+                )
+            )
+
+        batch: list[Transaction] = (
+            query.order_by(Transaction.due_date.asc(), Transaction.id.asc())
+            .limit(batch_size)
+            .all()
+        )
+        if not batch:
+            break
+
+        for row in batch:
+            yield row
+
+        last_row = batch[-1]
+        last_due = last_row.due_date
+        last_id = last_row.id
+
+        if len(batch) < batch_size:
+            # Last partial batch — no more rows
+            break
 
 
 # ---------------------------------------------------------------------------
-# CSV
+# CSV streaming generator
 # ---------------------------------------------------------------------------
 
 
-def _build_csv_rows(transactions: list[Transaction]) -> list[list[str]]:
-    rows: list[list[str]] = []
-    for tx in transactions:
-        rows.append(
+def generate_csv_stream(
+    *,
+    user_id: "UUID",
+    start_date: date | None = None,
+    end_date: date | None = None,
+    tx_type: TransactionType | None = None,
+    status: TransactionStatus | None = None,
+) -> Generator[str, None, None]:
+    """Yield one CSV line at a time (header + data rows).
+
+    Each yielded string ends with CRLF (standard CSV line ending).
+    The first yielded string is the UTF-8 BOM + header row so the
+    output is Excel-compatible when concatenated.
+
+    Usage with Flask::
+
+        from flask import Response, stream_with_context
+
+        return Response(
+            stream_with_context(generate_csv_stream(user_id=user_id, ...)),
+            mimetype="text/csv; charset=utf-8",
+            headers={"Content-Disposition": 'attachment; filename="export.csv"'},
+        )
+    """
+    # BOM + header
+    buf = io.StringIO()
+    writer = csv.writer(buf, lineterminator="\r\n")
+    writer.writerow(_CSV_COLUMNS)
+    yield "\ufeff" + buf.getvalue()  # UTF-8 BOM for Excel compat
+
+    for tx in _iter_transactions_batched(
+        user_id=user_id,
+        start_date=start_date,
+        end_date=end_date,
+        tx_type=tx_type,
+        status=status,
+    ):
+        row_buf = io.StringIO()
+        row_writer = csv.writer(row_buf, lineterminator="\r\n")
+        row_writer.writerow(
             [
                 tx.due_date.strftime(_DATE_FMT) if tx.due_date else "",
                 tx.type.value if tx.type else "",
@@ -87,7 +167,12 @@ def _build_csv_rows(transactions: list[Transaction]) -> list[list[str]]:
                 tx.description or "",
             ]
         )
-    return rows
+        yield row_buf.getvalue()
+
+
+# ---------------------------------------------------------------------------
+# CSV (materialised, for backward compat and service-layer unit tests)
+# ---------------------------------------------------------------------------
 
 
 def generate_csv_export(
@@ -99,22 +184,24 @@ def generate_csv_export(
     status: TransactionStatus | None = None,
     month_label: str = "",
 ) -> ExportResult:
-    transactions = _build_export_query(
-        user_id=user_id,
-        start_date=start_date,
-        end_date=end_date,
-        tx_type=tx_type,
-        status=status,
-    )
+    """Return a fully-materialised ExportResult (backward-compatible API).
 
-    buf = io.StringIO()
-    writer = csv.writer(buf)
-    writer.writerow(_CSV_COLUMNS)
-    writer.writerows(_build_csv_rows(transactions))
+    Internally consumes ``generate_csv_stream()`` so the same batching
+    and unlimited-row semantics apply.
+    """
+    content = "".join(
+        generate_csv_stream(
+            user_id=user_id,
+            start_date=start_date,
+            end_date=end_date,
+            tx_type=tx_type,
+            status=status,
+        )
+    ).encode("utf-8")
 
     filename = f"auraxis_transactions_{month_label or 'export'}.csv"
     return ExportResult(
-        content=buf.getvalue().encode("utf-8-sig"),  # BOM for Excel compat
+        content=content,
         content_type="text/csv; charset=utf-8",
         filename=filename,
     )
@@ -156,12 +243,15 @@ def generate_pdf_export(
         TableStyle,
     )
 
-    transactions = _build_export_query(
-        user_id=user_id,
-        start_date=start_date,
-        end_date=end_date,
-        tx_type=tx_type,
-        status=status,
+    # Materialise rows in batches — no 10K hard limit
+    transactions = list(
+        _iter_transactions_batched(
+            user_id=user_id,
+            start_date=start_date,
+            end_date=end_date,
+            tx_type=tx_type,
+            status=status,
+        )
     )
 
     buf = io.BytesIO()
