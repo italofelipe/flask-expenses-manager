@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.30.0](https://github.com/italofelipe/auraxis-api/compare/v1.29.0...v1.30.0) (2026-04-15)
+
+
+### Features
+
+* **governance:** entitlement matrix documentation + CI enforcement ([#1057](https://github.com/italofelipe/auraxis-api/issues/1057)) ([#1079](https://github.com/italofelipe/auraxis-api/issues/1079)) ([b5f14f9](https://github.com/italofelipe/auraxis-api/commit/b5f14f965816dfea459c4a6948fbf9ad7c689b1b))
+* **observability:** cache hit/miss/invalidation Prometheus metrics ([#1056](https://github.com/italofelipe/auraxis-api/issues/1056)) ([#1078](https://github.com/italofelipe/auraxis-api/issues/1078)) ([a17b821](https://github.com/italofelipe/auraxis-api/commit/a17b821b54a27f164c01b82095566f9bac2c8a63))
+
 ## [1.29.0](https://github.com/italofelipe/auraxis-api/compare/v1.28.0...v1.29.0) (2026-04-15)
 
 
