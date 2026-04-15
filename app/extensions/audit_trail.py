@@ -99,6 +99,54 @@ def _log_retention_strategy(
     )
 
 
+def record_entity_delete(
+    *,
+    entity_type: str,
+    entity_id: str,
+    actor_id: str | None,
+    extra: str | None = None,
+) -> None:
+    """Persist a soft-delete audit event for a domain entity.
+
+    This is separate from the HTTP-level audit hook — it is called directly
+    from service/controller code when a soft-delete operation occurs.
+
+    Parameters
+    ----------
+    entity_type:
+        Domain label for the deleted entity, e.g. ``"transaction"`` or ``"user"``.
+    entity_id:
+        String representation of the entity's primary key (UUID).
+    actor_id:
+        The authenticated user who performed the delete, or ``None`` for
+        system-initiated deletes.
+    extra:
+        Optional JSON-serializable string with additional metadata
+        (e.g. reason, deleted_at).
+    """
+    if not _is_audit_persistence_enabled():
+        return
+    try:
+        event = AuditEvent(
+            method="SYSTEM",
+            path="",
+            status=0,
+            entity_type=entity_type,
+            entity_id=entity_id,
+            action="soft_delete",
+            actor_id=actor_id,
+            extra=extra,
+        )
+        db.session.add(event)
+        db.session.flush()
+    except Exception:
+        current_app.logger.exception(
+            "audit_entity_delete_failed entity_type=%s entity_id=%s",
+            entity_type,
+            entity_id,
+        )
+
+
 def register_audit_trail(app: Flask) -> None:
     if not _is_audit_trail_enabled():
         return

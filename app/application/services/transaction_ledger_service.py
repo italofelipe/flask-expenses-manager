@@ -346,6 +346,13 @@ class TransactionLedgerService:
 
         try:
             transaction.deleted = True
+            from app.extensions.audit_trail import record_entity_delete
+
+            record_entity_delete(
+                entity_type="transaction",
+                entity_id=str(transaction_id),
+                actor_id=str(self._user_id),
+            )
             db.session.commit()
             self._invalidate_dashboard_cache()
         except Exception:

@@ -146,6 +146,22 @@ class DeleteMeResource(MethodResource):
         _anonymise_user(user)
         db.session.commit()
 
+        # Record soft-delete audit trail — best-effort; never block the response.
+        try:
+            from app.extensions.audit_trail import record_entity_delete
+
+            record_entity_delete(
+                entity_type="user",
+                entity_id=str(user.id),
+                actor_id=str(user.id),
+            )
+            db.session.commit()
+        except Exception:
+            current_app.logger.exception(
+                "account_deletion: failed to record audit trail for user %s",
+                user.id,
+            )
+
         # Send deletion confirmation — best-effort; never block the response.
         try:
             html, text = render_account_deletion_email()

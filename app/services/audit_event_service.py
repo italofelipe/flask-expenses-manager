@@ -50,8 +50,24 @@ def purge_expired_audit_events(*, retention_days: int) -> int:
     return int(deleted)
 
 
+def list_entity_audit_events(
+    entity_type: str,
+    entity_id: str,
+    *,
+    limit: int = 100,
+) -> list[AuditEvent]:
+    """Return audit events for a specific entity, newest first."""
+    safe_limit = min(max(int(limit), 1), 500)
+    return list(
+        AuditEvent.query.filter_by(entity_type=entity_type, entity_id=entity_id)
+        .order_by(AuditEvent.created_at.desc())
+        .limit(safe_limit)
+        .all()
+    )
+
+
 def serialize_audit_event(event: AuditEvent) -> dict[str, Any]:
-    return {
+    result: dict[str, Any] = {
         "id": str(event.id),
         "request_id": event.request_id,
         "method": event.method,
@@ -62,3 +78,10 @@ def serialize_audit_event(event: AuditEvent) -> dict[str, Any]:
         "user_agent": event.user_agent,
         "created_at": event.created_at.isoformat(),
     }
+    if event.entity_type is not None:
+        result["entity_type"] = event.entity_type
+        result["entity_id"] = event.entity_id
+        result["action"] = event.action
+        result["actor_id"] = event.actor_id
+        result["extra"] = event.extra
+    return result
