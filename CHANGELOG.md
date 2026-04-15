@@ -1,5 +1,14 @@
 # Changelog
 
+## [1.28.0](https://github.com/italofelipe/auraxis-api/compare/v1.27.1...v1.28.0) (2026-04-15)
+
+
+### Features
+
+* **resilience:** email DLQ — zero-loss retry for notifications ([#1049](https://github.com/italofelipe/auraxis-api/issues/1049)) ([#1069](https://github.com/italofelipe/auraxis-api/issues/1069)) ([c6c7b0b](https://github.com/italofelipe/auraxis-api/commit/c6c7b0b0589b432f84d38a6e913212e3a0c452b6))
+* **resilience:** login guard — in-memory failover when Redis down at runtime ([#1050](https://github.com/italofelipe/auraxis-api/issues/1050)) ([#1071](https://github.com/italofelipe/auraxis-api/issues/1071)) ([6239568](https://github.com/italofelipe/auraxis-api/commit/6239568450d23766d2e83c2c978b02aca11ced64))
+* **retention:** audit event auto-retention — scheduled job, BRIN index, Prometheus counter ([#1051](https://github.com/italofelipe/auraxis-api/issues/1051)) ([#1072](https://github.com/italofelipe/auraxis-api/issues/1072)) ([73b53a9](https://github.com/italofelipe/auraxis-api/commit/73b53a94f3d970a036fd89064c64764cf83bea8d))
+
 ## [1.27.1](https://github.com/italofelipe/auraxis-api/compare/v1.27.0...v1.27.1) (2026-04-15)
 
 
