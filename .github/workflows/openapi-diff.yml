@@ -34,18 +34,9 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          # Resolve latest tag via gh CLI (avoids GitHub API rate-limit on anonymous curl)
-          VERSION=$(gh release view --repo Tufin/oasdiff --json tagName -q '.tagName')
-          # Try goreleaser naming (Linux_x86_64), fall back to legacy (linux_amd64)
-          URL_NEW="https://github.com/Tufin/oasdiff/releases/download/${VERSION}/oasdiff_Linux_x86_64.tar.gz"
-          URL_OLD="https://github.com/Tufin/oasdiff/releases/download/${VERSION}/oasdiff_linux_amd64.tar.gz"
-          if curl -fsSL "$URL_NEW" | tar xz -C /usr/local/bin oasdiff 2>/dev/null; then
-            echo "Installed oasdiff ${VERSION} (new naming)"
-          elif curl -fsSL "$URL_OLD" | tar xz -C /usr/local/bin oasdiff 2>/dev/null; then
-            echo "Installed oasdiff ${VERSION} (legacy naming)"
-          else
-            echo "::error::Failed to download oasdiff ${VERSION}" && exit 1
-          fi
+          gh release download --repo Tufin/oasdiff --pattern '*linux_amd64.tar.gz' -D /tmp/oasdiff-dl
+          tar xz -C /usr/local/bin oasdiff -f /tmp/oasdiff-dl/*.tar.gz
+          echo "Installed $(oasdiff --version)"
 
       - name: Check for base spec
         id: base_exists
