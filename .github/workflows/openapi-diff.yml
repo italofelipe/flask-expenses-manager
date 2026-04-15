@@ -32,8 +32,18 @@ jobs:
 
       - name: Install oasdiff
         run: |
-          curl -fsSL https://github.com/Tufin/oasdiff/releases/latest/download/oasdiff_linux_amd64.tar.gz \
-            | tar xz -C /usr/local/bin oasdiff
+          VERSION=$(curl -sf https://api.github.com/repos/Tufin/oasdiff/releases/latest \
+            | python3 -c "import json,sys; print(json.load(sys.stdin)['tag_name'])")
+          # Try new goreleaser naming first (Linux_x86_64), fall back to old (linux_amd64)
+          URL_NEW="https://github.com/Tufin/oasdiff/releases/download/${VERSION}/oasdiff_Linux_x86_64.tar.gz"
+          URL_OLD="https://github.com/Tufin/oasdiff/releases/download/${VERSION}/oasdiff_linux_amd64.tar.gz"
+          if curl -fsSL "$URL_NEW" | tar xz -C /usr/local/bin oasdiff 2>/dev/null; then
+            echo "Installed oasdiff ${VERSION} (new naming)"
+          elif curl -fsSL "$URL_OLD" | tar xz -C /usr/local/bin oasdiff 2>/dev/null; then
+            echo "Installed oasdiff ${VERSION} (legacy naming)"
+          else
+            echo "::error::Failed to download oasdiff ${VERSION}" && exit 1
+          fi
 
       - name: Check for base spec
         id: base_exists
