@@ -1,5 +1,17 @@
 # Changelog
 
+## [1.29.0](https://github.com/italofelipe/auraxis-api/compare/v1.28.0...v1.29.0) (2026-04-15)
+
+
+### Features
+
+* **shared-entries:** optimistic locking via version column ([#1053](https://github.com/italofelipe/auraxis-api/issues/1053)) ([#1074](https://github.com/italofelipe/auraxis-api/issues/1074)) ([76a5a74](https://github.com/italofelipe/auraxis-api/commit/76a5a74405716d660500284a4e0fa170475b9084))
+
+
+### Performance Improvements
+
+* **queries:** query-count regression gate — CI enforcement for N+1 prevention ([#1054](https://github.com/italofelipe/auraxis-api/issues/1054)) ([#1075](https://github.com/italofelipe/auraxis-api/issues/1075)) ([384249c](https://github.com/italofelipe/auraxis-api/commit/384249caf46b8c93d6db0710b2b8f04e65b7aa1d))
+
 ## [1.28.0](https://github.com/italofelipe/auraxis-api/compare/v1.27.1...v1.28.0) (2026-04-15)
 
 
