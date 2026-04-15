@@ -8,7 +8,7 @@ Clients must include the current ``version`` value in mutation requests
 (CONFLICT_CONCURRENT_EDIT) if the version doesn't match the DB value.
 
 Revision ID: hd1053_shared_entries_version
-Revises: h1028_refresh_tokens
+Revises: hd1051_audit_retention_index
 Create Date: 2026-04-15 00:00:00.000000
 
 """
@@ -19,7 +19,7 @@ import sqlalchemy as sa
 from alembic import op
 
 revision = "hd1053_shared_entries_version"
-down_revision = "h1028_refresh_tokens"
+down_revision = "hd1051_audit_retention_index"
 branch_labels = None
 depends_on = None
 
