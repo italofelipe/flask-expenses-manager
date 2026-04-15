@@ -527,27 +527,27 @@ type Mutation {
   resetPassword(newPassword: String!, token: String!): AuthPayloadType
   confirmEmail(token: String!): AuthPayloadType
   updateUserProfile(birthDate: String, financialObjectives: String, gender: String, initialInvestment: Float, investmentGoalDate: String, investorProfile: String, investorProfileSuggested: String, monthlyExpenses: Float, monthlyIncome: Float, monthlyIncomeNet: Float, monthlyInvestment: Float, netWorth: Float, occupation: String, profileQuizScore: Int, stateUf: String, taxonomyVersion: String): UpdateUserProfileMutation
-  createTransaction(accountId: UUID, amount: String!, creditCardId: UUID, currency: String = "BRL", description: String, dueDate: String!, endDate: String, installmentCount: Int, isInstallment: Boolean = false, isRecurring: Boolean = false, observation: String, startDate: String, status: String = "pending", tagId: UUID, title: String!, type: String!): CreateTransactionMutation
-  updateTransaction(accountId: UUID, amount: String, creditCardId: UUID, currency: String, description: String, dueDate: String, endDate: String, installmentCount: Int, isInstallment: Boolean, isRecurring: Boolean, observation: String, paidAt: String, startDate: String, status: String, tagId: UUID, title: String, transactionId: UUID!, type: String): UpdateTransactionMutation
-  deleteTransaction(transactionId: UUID!): DeleteTransactionMutation
-  createGoal(category: String, currentAmount: String, description: String, priority: Int, status: String, targetAmount: String!, targetDate: String, title: String!): CreateGoalMutation
-  updateGoal(category: String, currentAmount: String, description: String, goalId: UUID!, priority: Int, status: String, targetAmount: String, targetDate: String, title: String): UpdateGoalMutation
-  deleteGoal(goalId: UUID!): DeleteGoalMutation
+  createTransaction(accountId: UUID, amount: String!, creditCardId: UUID, currency: String = "BRL", description: String, dueDate: String!, endDate: String, installmentCount: Int, isInstallment: Boolean = false, isRecurring: Boolean = false, observation: String, startDate: String, status: String = "pending", tagId: UUID, title: String!, type: String!): CreateTransactionMutation @deprecated(reason: "ADR-0002: use POST /transactions")
+  updateTransaction(accountId: UUID, amount: String, creditCardId: UUID, currency: String, description: String, dueDate: String, endDate: String, installmentCount: Int, isInstallment: Boolean, isRecurring: Boolean, observation: String, paidAt: String, startDate: String, status: String, tagId: UUID, title: String, transactionId: UUID!, type: String): UpdateTransactionMutation @deprecated(reason: "ADR-0002: use PATCH /transactions/{id}")
+  deleteTransaction(transactionId: UUID!): DeleteTransactionMutation @deprecated(reason: "ADR-0002: use DELETE /transactions/{id}")
+  createGoal(category: String, currentAmount: String, description: String, priority: Int, status: String, targetAmount: String!, targetDate: String, title: String!): CreateGoalMutation @deprecated(reason: "ADR-0002: use POST /goals")
+  updateGoal(category: String, currentAmount: String, description: String, goalId: UUID!, priority: Int, status: String, targetAmount: String, targetDate: String, title: String): UpdateGoalMutation @deprecated(reason: "ADR-0002: use PATCH /goals/{id}")
+  deleteGoal(goalId: UUID!): DeleteGoalMutation @deprecated(reason: "ADR-0002: use DELETE /goals/{id}")
   simulateGoalPlan(currentAmount: String, monthlyContribution: String, monthlyExpenses: String, monthlyIncome: String, targetAmount: String!, targetDate: String): SimulateGoalPlanMutation
   saveInstallmentVsCashSimulation(cashPrice: String!, feesEnabled: Boolean = false, feesUpfront: String = "0.00", firstPaymentDelayDays: Int = 30, inflationRateAnnual: String!, installmentAmount: String, installmentCount: Int!, installmentTotal: String, opportunityRateAnnual: String, opportunityRateType: String = "manual", scenarioLabel: String): SaveInstallmentVsCashSimulationMutation
   createGoalFromInstallmentVsCashSimulation(category: String = "planned_purchase", currentAmount: String = "0.00", description: String, priority: Int = 3, selectedOption: String!, simulationId: UUID!, targetDate: String, title: String!): CreateGoalFromInstallmentVsCashSimulationMutation
   createPlannedExpenseFromInstallmentVsCashSimulation(accountId: UUID, creditCardId: UUID, currency: String = "BRL", description: String, dueDate: String, firstDueDate: String, observation: String, selectedOption: String!, simulationId: UUID!, status: String = "pending", tagId: UUID, title: String!, upfrontDueDate: String): CreatePlannedExpenseFromInstallmentVsCashSimulationMutation
-  addWalletEntry(annualRate: Float, assetClass: String, name: String!, quantity: Int, registerDate: String, shouldBeOnWallet: Boolean!, targetWithdrawDate: String, ticker: String, value: Float): AddWalletEntryMutation
-  updateWalletEntry(annualRate: Float, assetClass: String, investmentId: UUID!, name: String, quantity: Int, registerDate: String, shouldBeOnWallet: Boolean, targetWithdrawDate: String, ticker: String, value: Float): UpdateWalletEntryMutation
-  deleteWalletEntry(investmentId: UUID!): DeleteWalletEntryMutation
-  addInvestmentOperation(executedAt: String, fees: String, investmentId: UUID!, notes: String, operationType: String!, quantity: String!, unitPrice: String!): AddInvestmentOperationMutation
-  updateInvestmentOperation(executedAt: String, fees: String, investmentId: UUID!, notes: String, operationId: UUID!, operationType: String, quantity: String, unitPrice: String): UpdateInvestmentOperationMutation
-  deleteInvestmentOperation(investmentId: UUID!, operationId: UUID!): DeleteInvestmentOperationMutation
+  addWalletEntry(annualRate: Float, assetClass: String, name: String!, quantity: Int, registerDate: String, shouldBeOnWallet: Boolean!, targetWithdrawDate: String, ticker: String, value: Float): AddWalletEntryMutation @deprecated(reason: "ADR-0002: use POST /wallet")
+  updateWalletEntry(annualRate: Float, assetClass: String, investmentId: UUID!, name: String, quantity: Int, registerDate: String, shouldBeOnWallet: Boolean, targetWithdrawDate: String, ticker: String, value: Float): UpdateWalletEntryMutation @deprecated(reason: "ADR-0002: use PATCH /wallet/{id}")
+  deleteWalletEntry(investmentId: UUID!): DeleteWalletEntryMutation @deprecated(reason: "ADR-0002: use DELETE /wallet/{id}")
+  addInvestmentOperation(executedAt: String, fees: String, investmentId: UUID!, notes: String, operationType: String!, quantity: String!, unitPrice: String!): AddInvestmentOperationMutation @deprecated(reason: "ADR-0002: use POST /wallet/{id}/operations")
+  updateInvestmentOperation(executedAt: String, fees: String, investmentId: UUID!, notes: String, operationId: UUID!, operationType: String, quantity: String, unitPrice: String): UpdateInvestmentOperationMutation @deprecated(reason: "ADR-0002: use PATCH /wallet/{id}/operations/{op_id}")
+  deleteInvestmentOperation(investmentId: UUID!, operationId: UUID!): DeleteInvestmentOperationMutation @deprecated(reason: "ADR-0002: use DELETE /wallet/{id}/operations/{op_id}")
   addTicker(quantity: Float!, symbol: String!, type: String): AddTickerMutation
   deleteTicker(symbol: String!): DeleteTickerMutation
-  createBudget(amount: String!, endDate: String, isActive: Boolean, name: String!, period: String!, startDate: String, tagId: String): CreateBudgetMutation
-  updateBudget(amount: String, budgetId: UUID!, endDate: String, isActive: Boolean, name: String, period: String, startDate: String, tagId: String): UpdateBudgetMutation
-  deleteBudget(budgetId: UUID!): DeleteBudgetMutation
+  createBudget(amount: String!, endDate: String, isActive: Boolean, name: String!, period: String!, startDate: String, tagId: String): CreateBudgetMutation @deprecated(reason: "ADR-0002: use POST /budgets")
+  updateBudget(amount: String, budgetId: UUID!, endDate: String, isActive: Boolean, name: String, period: String, startDate: String, tagId: String): UpdateBudgetMutation @deprecated(reason: "ADR-0002: use PATCH /budgets/{id}")
+  deleteBudget(budgetId: UUID!): DeleteBudgetMutation @deprecated(reason: "ADR-0002: use DELETE /budgets/{id}")
   createCheckoutSession(billingCycle: String, planSlug: String!): CreateCheckoutSessionMutation
   cancelSubscription: CancelSubscriptionMutation
   updateNotificationPreferences(preferences: [PreferenceInput!]!): UpdateNotificationPreferencesMutation
