@@ -84,17 +84,27 @@ class RedisCacheService:
         self._client = client
 
     def get(self, key: str) -> Any | None:
+        from app.extensions.prometheus_metrics import (
+            record_cache_hit,
+            record_cache_miss,
+        )
+
+        ns = key.split(":")[0]
         try:
             raw = self._client.get(key)
             if raw is None:
+                record_cache_miss(ns)
                 return None
             decoded = (
                 raw.decode("utf-8") if isinstance(raw, (bytes, bytearray)) else raw
             )
-            return json.loads(decoded)
+            result = json.loads(decoded)
+            record_cache_hit(ns)
+            return result
         except Exception:
             # key is user-controlled — do not include in log output (S5145).
             logger.warning("cache_service: GET failed — cache miss", exc_info=True)
+            record_cache_miss(ns)
             return None
 
     def set(self, key: str, value: Any, *, ttl: int) -> None:
@@ -105,20 +115,29 @@ class RedisCacheService:
             logger.warning("cache_service: SET failed", exc_info=True)
 
     def invalidate(self, key: str) -> None:
+        from app.extensions.prometheus_metrics import record_cache_invalidation
+
+        ns = key.split(":")[0]
         try:
             self._client.delete(key)
+            record_cache_invalidation(ns)
         except Exception:
             # key is user-controlled — do not include in log output (S5145).
             logger.warning("cache_service: DELETE failed", exc_info=True)
 
     def invalidate_pattern(self, pattern: str) -> None:
         """Delete all keys matching a glob pattern (uses SCAN to avoid blocking)."""
+        from app.extensions.prometheus_metrics import record_cache_invalidation
+
+        ns = pattern.split(":")[0]
         try:
             cursor = 0
             while True:
                 cursor, keys = self._client.scan(cursor, match=pattern, count=100)
                 if keys:
                     self._client.delete(*keys)
+                    for _ in keys:
+                        record_cache_invalidation(ns)
                 if cursor == 0:
                     break
         except Exception:

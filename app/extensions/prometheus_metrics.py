@@ -41,6 +41,9 @@ _HTTP_REQUESTS_TOTAL: Any = None
 _HTTP_REQUEST_DURATION: Any = None
 _AUTH_LOGINS_TOTAL: Any = None
 _AUDIT_EVENTS_PURGED_TOTAL: Any = None
+_CACHE_HITS_TOTAL: Any = None
+_CACHE_MISSES_TOTAL: Any = None
+_CACHE_INVALIDATIONS_TOTAL: Any = None
 
 _DURATION_BUCKETS = (0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1.0, 2.5)
 
@@ -51,7 +54,10 @@ def _ensure_metrics_initialized() -> None:
         _HTTP_REQUESTS_TOTAL, \
         _HTTP_REQUEST_DURATION, \
         _AUTH_LOGINS_TOTAL, \
-        _AUDIT_EVENTS_PURGED_TOTAL
+        _AUDIT_EVENTS_PURGED_TOTAL, \
+        _CACHE_HITS_TOTAL, \
+        _CACHE_MISSES_TOTAL, \
+        _CACHE_INVALIDATIONS_TOTAL
 
     if not _PROMETHEUS_AVAILABLE:
         return
@@ -84,6 +90,27 @@ def _ensure_metrics_initialized() -> None:
             "Total audit_events rows deleted by the retention job",
         )
 
+    if _CACHE_HITS_TOTAL is None:
+        _CACHE_HITS_TOTAL = Counter(
+            "auraxis_cache_hits_total",
+            "Cache hits by key namespace",
+            ["namespace"],
+        )
+
+    if _CACHE_MISSES_TOTAL is None:
+        _CACHE_MISSES_TOTAL = Counter(
+            "auraxis_cache_misses_total",
+            "Cache misses by key namespace",
+            ["namespace"],
+        )
+
+    if _CACHE_INVALIDATIONS_TOTAL is None:
+        _CACHE_INVALIDATIONS_TOTAL = Counter(
+            "auraxis_cache_invalidations_total",
+            "Cache key invalidations by namespace",
+            ["namespace"],
+        )
+
 
 def record_http_request(
     *,
@@ -112,6 +139,27 @@ def record_audit_purge(count: int) -> None:
     _ensure_metrics_initialized()
     if _AUDIT_EVENTS_PURGED_TOTAL is not None:
         _AUDIT_EVENTS_PURGED_TOTAL.inc(count)
+
+
+def record_cache_hit(namespace: str) -> None:
+    """Increment ``auraxis_cache_hits_total`` for the given namespace."""
+    _ensure_metrics_initialized()
+    if _CACHE_HITS_TOTAL is not None:
+        _CACHE_HITS_TOTAL.labels(namespace=namespace).inc()
+
+
+def record_cache_miss(namespace: str) -> None:
+    """Increment ``auraxis_cache_misses_total`` for the given namespace."""
+    _ensure_metrics_initialized()
+    if _CACHE_MISSES_TOTAL is not None:
+        _CACHE_MISSES_TOTAL.labels(namespace=namespace).inc()
+
+
+def record_cache_invalidation(namespace: str) -> None:
+    """Increment ``auraxis_cache_invalidations_total`` for the given namespace."""
+    _ensure_metrics_initialized()
+    if _CACHE_INVALIDATIONS_TOTAL is not None:
+        _CACHE_INVALIDATIONS_TOTAL.labels(namespace=namespace).inc()
 
 
 def record_auth_login(*, status: str) -> None:
@@ -175,6 +223,9 @@ __all__ = [
     "generate_latest_metrics",
     "record_audit_purge",
     "record_auth_login",
+    "record_cache_hit",
+    "record_cache_invalidation",
+    "record_cache_miss",
     "record_http_request",
     "register_prometheus_middleware",
 ]
