@@ -7,6 +7,11 @@ from flask import Response, current_app, request
 from flask_apispec.views import MethodResource
 from flask_jwt_extended import get_jwt, get_jwt_identity, set_refresh_cookies
 
+from app.application.services.session_service import (
+    SessionNotFoundError,
+    TokenReuseError,
+    rotate_session_by_jti,
+)
 from app.docs.openapi_helpers import (
     contract_header_param,
     json_error_response,
@@ -14,6 +19,7 @@ from app.docs.openapi_helpers import (
 )
 from app.extensions.database import db
 from app.extensions.jwt_revocation_cache import get_jwt_revocation_cache
+from app.http.request_context import get_request_context
 from app.models.user import User
 from app.utils.typed_decorators import typed_doc as doc
 from app.utils.typed_decorators import typed_jwt_required as jwt_required
@@ -94,6 +100,27 @@ class RefreshTokenResource(MethodResource):
             new_access_jti = dependencies.get_token_jti(new_access_token)
             new_refresh_jti = dependencies.get_token_jti(new_refresh_token)
 
+            request_context = get_request_context()
+            try:
+                rotate_session_by_jti(
+                    old_jti=incoming_jti,
+                    new_raw_refresh_token=new_refresh_token,
+                    new_refresh_jti=new_refresh_jti,
+                    new_access_jti=new_access_jti,
+                    user_agent=request_context.user_agent,
+                    remote_addr=request_context.client_ip,
+                )
+            except TokenReuseError:
+                return compat_error(
+                    legacy_payload={"message": "Token invalid or already used"},
+                    status_code=401,
+                    message="Token invalid or already used",
+                    error_code="TOKEN_REUSED",
+                )
+            except SessionNotFoundError:
+                pass  # No RefreshToken row → legacy path, continue.
+
+            # Keep user fields in sync for backward-compat (Redis cache + old clients).
             user.current_jti = new_access_jti
             user.refresh_token_jti = new_refresh_jti
             db.session.commit()

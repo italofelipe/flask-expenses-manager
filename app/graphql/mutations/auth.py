@@ -422,3 +422,47 @@ class UpdateUserProfileMutation(graphene.Mutation):
         return UpdateUserProfileMutation(
             user=UserType(**_user_to_graphql_payload(user))
         )
+
+
+class RevokeSessionMutation(graphene.Mutation):
+    """Revoke a specific session by ID (multi-device, #1028)."""
+
+    class Arguments:
+        session_id = graphene.String(required=True)
+
+    ok = graphene.Boolean(required=True)
+    message = graphene.String(required=True)
+
+    def mutate(
+        self, info: graphene.ResolveInfo, session_id: str
+    ) -> "RevokeSessionMutation":
+        from uuid import UUID
+
+        from app.application.services.session_service import (
+            SessionNotFoundError,
+            revoke_session,
+        )
+
+        user = get_current_user_required()
+        try:
+            revoke_session(session_id=UUID(session_id), user_id=user.id)
+        except (ValueError, SessionNotFoundError) as exc:
+            raise _public_graphql_error(
+                "Session not found.",
+                code=GRAPHQL_ERROR_CODE_UNAUTHORIZED,
+            ) from exc
+        return RevokeSessionMutation(ok=True, message="Session revoked")
+
+
+class RevokeAllSessionsMutation(graphene.Mutation):
+    """Revoke all active sessions — global logout (#1028)."""
+
+    ok = graphene.Boolean(required=True)
+    revoked = graphene.Int(required=True)
+
+    def mutate(self, info: graphene.ResolveInfo) -> "RevokeAllSessionsMutation":
+        from app.application.services.session_service import revoke_all_sessions
+
+        user = get_current_user_required()
+        count = revoke_all_sessions(user_id=user.id)
+        return RevokeAllSessionsMutation(ok=True, revoked=count)

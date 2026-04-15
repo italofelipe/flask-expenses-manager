@@ -79,6 +79,7 @@ from app.models.fiscal import (  # noqa: F401
 )
 from app.models.goal import Goal  # noqa: F401
 from app.models.investment_operation import InvestmentOperation  # noqa: F401
+from app.models.refresh_token import RefreshToken  # noqa: F401
 from app.models.shared_entry import Invitation, SharedEntry  # noqa: F401
 from app.models.sharing_audit import SharingAuditEvent  # noqa: F401
 from app.models.simulation import Simulation  # noqa: F401

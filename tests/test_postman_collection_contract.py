@@ -153,6 +153,10 @@ OPENAPI_GAPS: set[tuple[str, str]] = {
     ("GET", "/advisory/insights"),
     # Dashboard survival index (not yet in apispec-documented blueprints)
     ("GET", "/dashboard/survival-index"),
+    # Multi-device session management (#1028)
+    ("GET", "/auth/sessions"),
+    ("DELETE", "/auth/sessions"),
+    ("DELETE", "/auth/sessions/{param}"),
 }
 
 
