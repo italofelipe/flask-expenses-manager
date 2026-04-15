@@ -40,6 +40,78 @@ jobs:
           role-to-assume: ${{ vars.AWS_ROLE_ARN_PROD }}
           aws-region: ${{ vars.AWS_REGION }}
 
+      - name: Ensure web container is running
+        env:
+          AWS_REGION: ${{ vars.AWS_REGION }}
+          PROD_INSTANCE_ID: ${{ vars.AURAXIS_PROD_INSTANCE_ID }}
+        run: |
+          # Script stored as heredoc — avoids JSON-escaping nightmares inline.
+          # SSM receives the script as an array of individual commands.
+          COMMANDS='["cd /opt/auraxis",
+            "if docker compose exec -T web true 2>/dev/null; then echo web-container-ok; exit 0; fi",
+            "echo web-container-not-running -- attempting restart",
+            "docker compose up -d web",
+            "sleep 20",
+            "if docker compose exec -T web true 2>/dev/null; then echo web-container-recovered; exit 0; fi",
+            "echo FATAL: web container failed to start after restart attempt",
+            "docker compose logs --tail=50 web",
+            "exit 1"
+          ]'
+
+          COMMAND_ID=$(aws ssm send-command \
+            --region "${AWS_REGION}" \
+            --instance-ids "${PROD_INSTANCE_ID}" \
+            --document-name "AWS-RunShellScript" \
+            --parameters "commands=${COMMANDS}" \
+            --query "Command.CommandId" \
+            --output text)
+
+          echo "SSM Command ID: ${COMMAND_ID}"
+
+          for i in $(seq 1 36); do
+            STATUS=$(aws ssm get-command-invocation \
+              --region "${AWS_REGION}" \
+              --command-id "${COMMAND_ID}" \
+              --instance-id "${PROD_INSTANCE_ID}" \
+              --query "StatusDetails" \
+              --output text 2>/dev/null || echo "Pending")
+
+            echo "Attempt ${i}: ${STATUS}"
+
+            if [ "${STATUS}" = "Success" ]; then
+              echo "Container health check passed."
+              aws ssm get-command-invocation \
+                --region "${AWS_REGION}" \
+                --command-id "${COMMAND_ID}" \
+                --instance-id "${PROD_INSTANCE_ID}" \
+                --query "StandardOutputContent" \
+                --output text 2>/dev/null || true
+              exit 0
+            elif [ "${STATUS}" = "Failed" ] || [ "${STATUS}" = "Cancelled" ] || [ "${STATUS}" = "TimedOut" ]; then
+              echo "Container health check/recovery failed with status: ${STATUS}"
+              echo "--- stdout ---"
+              aws ssm get-command-invocation \
+                --region "${AWS_REGION}" \
+                --command-id "${COMMAND_ID}" \
+                --instance-id "${PROD_INSTANCE_ID}" \
+                --query "StandardOutputContent" \
+                --output text 2>/dev/null || true
+              echo "--- stderr ---"
+              aws ssm get-command-invocation \
+                --region "${AWS_REGION}" \
+                --command-id "${COMMAND_ID}" \
+                --instance-id "${PROD_INSTANCE_ID}" \
+                --query "StandardErrorContent" \
+                --output text 2>/dev/null || true
+              exit 1
+            fi
+
+            sleep 10
+          done
+
+          echo "Timed out waiting for container health check."
+          exit 1
+
       - name: Dispatch reminders via SSM
         env:
           AWS_REGION: ${{ vars.AWS_REGION }}
@@ -99,6 +171,41 @@ jobs:
           echo "Timed out waiting for SSM command to complete."
           exit 1
 
+      - name: Collect diagnostics on failure
+        if: failure()
+        id: diagnostics
+        env:
+          AWS_REGION: ${{ vars.AWS_REGION }}
+          PROD_INSTANCE_ID: ${{ vars.AURAXIS_PROD_INSTANCE_ID }}
+        run: |
+          COMMAND_ID=$(aws ssm send-command \
+            --region "${AWS_REGION}" \
+            --instance-ids "${PROD_INSTANCE_ID}" \
+            --document-name "AWS-RunShellScript" \
+            --parameters 'commands=["cd /opt/auraxis && echo === docker compose ps === && docker compose ps && echo && echo === web logs last 30 lines === && docker compose logs --tail=30 web 2>&1 || echo no logs available"]' \
+            --query "Command.CommandId" \
+            --output text 2>/dev/null || echo "UNAVAILABLE")
+
+          if [ "${COMMAND_ID}" = "UNAVAILABLE" ]; then
+            echo "diagnostics_output=SSM unavailable — cannot collect diagnostics." >> "${GITHUB_OUTPUT}"
+            exit 0
+          fi
+
+          sleep 20
+
+          DIAG=$(aws ssm get-command-invocation \
+            --region "${AWS_REGION}" \
+            --command-id "${COMMAND_ID}" \
+            --instance-id "${PROD_INSTANCE_ID}" \
+            --query "StandardOutputContent" \
+            --output text 2>/dev/null || echo "(diagnostics collection failed)")
+
+          {
+            echo "diagnostics_output<<DIAG_EOF"
+            echo "${DIAG}" | head -c 3000
+            echo "DIAG_EOF"
+          } >> "${GITHUB_OUTPUT}"
+
       - name: Notify failure via GitHub Issue
         if: failure()
         uses: actions/github-script@v7
@@ -108,6 +215,7 @@ jobs:
             const runUrl = `https://github.com/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`;
             const now = new Date().toISOString();
             const title = '🚨 [reminder-job] Falha no envio de lembretes de vencimento';
+            const diagnostics = `${{ steps.diagnostics.outputs.diagnostics_output }}` || '(diagnostics unavailable)';
             const issueBody = [
               '## Reminder Job falhou',
               '',
@@ -129,6 +237,11 @@ jobs:
               '',
               `- Data: ${now}`,
               `- Run: ${runUrl}`,
+              '',
+              '### Diagnóstico automático',
+              '```',
+              diagnostics,
+              '```',
             ].join('\n');
             const query = [
               `repo:${context.repo.owner}/${context.repo.repo}`,
