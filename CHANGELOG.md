@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.27.1](https://github.com/italofelipe/auraxis-api/compare/v1.27.0...v1.27.1) (2026-04-15)
+
+
+### Bug Fixes
+
+* **ops:** reminder-job — container health check + auto-recovery before dispatch ([#1066](https://github.com/italofelipe/auraxis-api/issues/1066)) ([c7b6974](https://github.com/italofelipe/auraxis-api/commit/c7b6974f4c9f3c134c81b45a00b357b7a0d9e2d0))
+
 ## [1.27.0](https://github.com/italofelipe/auraxis-api/compare/v1.26.1...v1.27.0) (2026-04-15)
 
 
