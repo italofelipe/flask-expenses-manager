@@ -1,7 +1,7 @@
 {
   "info": {
     "name": "Auraxis API",
-    "description": "Auto-generated from openapi.json (61 paths). Do not edit manually — regenerate with: npm run postman:build",
+    "description": "Auto-generated from openapi.json (62 paths). Do not edit manually — regenerate with: npm run postman:build",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "item": [
@@ -1696,6 +1696,45 @@
               "script": {
                 "exec": [
                   "pm.test('Exportar transações (CSV ou PDF) — status 200', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "GET — Índice de sobrevivência financeira (burn rate)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "X-API-Contract",
+                "value": "v2"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{authToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/dashboard/survival-index",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "dashboard",
+                "survival-index"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Índice de sobrevivência financeira (burn rate) — status 200', function () {",
                   "  pm.response.to.have.status(200);",
                   "});"
                 ],

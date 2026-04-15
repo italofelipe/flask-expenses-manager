@@ -2761,6 +2761,160 @@
         ]
       }
     },
+    "/dashboard/survival-index": {
+      "get": {
+        "description": "Calcula quantos meses o patrimônio atual sustenta o custo de vida médio. Patrimônio = soma das entradas de carteira (should_be_on_wallet=True). Custo médio = média de despesas pagas nos últimos 3 meses completos.",
+        "parameters": [
+          {
+            "description": "Opcional. Envie `v2` para o envelope padronizado.",
+            "example": "v2",
+            "in": "header",
+            "name": "X-API-Contract",
+            "required": false,
+            "type": "string"
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "example": {
+                  "data": {
+                    "avg_monthly_expense": 5000.0,
+                    "classification": "comfortable",
+                    "period_analyzed_months": 3,
+                    "survival_months": 8.5,
+                    "total_assets": 42500.0
+                  },
+                  "message": "Índice de sobrevivência calculado com sucesso"
+                },
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "object"
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "meta": {
+                      "type": "object"
+                    }
+                  },
+                  "required": [
+                    "message",
+                    "data"
+                  ]
+                }
+              }
+            },
+            "description": "Índice de sobrevivência calculado",
+            "headers": {
+              "X-Request-ID": {
+                "description": "Identificador único da requisição gerado pela API.",
+                "example": "9fcd2e4f4d8747b4a7d8a2b1b930f52a",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "example": {
+                  "code": "UNAUTHORIZED",
+                  "message": "Token revogado",
+                  "status_code": 401
+                },
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string"
+                    },
+                    "details": {
+                      "type": "object"
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "status_code": {
+                      "type": "integer"
+                    }
+                  },
+                  "required": [
+                    "message",
+                    "code"
+                  ]
+                }
+              }
+            },
+            "description": "Token inválido",
+            "headers": {
+              "X-Request-ID": {
+                "description": "Identificador único da requisição gerado pela API.",
+                "example": "9fcd2e4f4d8747b4a7d8a2b1b930f52a",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "example": {
+                  "code": "INTERNAL_ERROR",
+                  "message": "Erro ao calcular índice de sobrevivência",
+                  "status_code": 500
+                },
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string"
+                    },
+                    "details": {
+                      "type": "object"
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "status_code": {
+                      "type": "integer"
+                    }
+                  },
+                  "required": [
+                    "message",
+                    "code"
+                  ]
+                }
+              }
+            },
+            "description": "Erro interno",
+            "headers": {
+              "X-Request-ID": {
+                "description": "Identificador único da requisição gerado pela API.",
+                "example": "9fcd2e4f4d8747b4a7d8a2b1b930f52a",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "summary": "Índice de sobrevivência financeira (burn rate)",
+        "tags": [
+          "Dashboard"
+        ]
+      }
+    },
     "/dashboard/trends": {
       "get": {
         "description": "Retorna a série histórica de receitas, despesas e saldo para os últimos N meses (apenas transações pagas).",
