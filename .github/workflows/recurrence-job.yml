@@ -1,8 +1,8 @@
 name: Recurrence Job
 
 on:
-  schedule:
-    - cron: "0 3 * * *"
+  # Schedule disabled: superseded by the Flask-command-based recurrence implementation.
+  # Kept as workflow_dispatch for emergency manual runs only.
   workflow_dispatch:
 
 concurrency:
