@@ -13,6 +13,7 @@ class SharedEntryPayload(TypedDict):
     transaction_id: str
     status: str
     split_type: str
+    version: int
     transaction_title: str | None
     transaction_amount: float | None
     my_share: float | None
@@ -116,6 +117,7 @@ def serialize_shared_entry(
         "transaction_id": str(entry.transaction_id),
         "status": entry.status.value,
         "split_type": entry.split_type.value,
+        "version": entry.version,
         "transaction_title": transaction_title,
         "transaction_amount": transaction_amount,
         "my_share": my_share,

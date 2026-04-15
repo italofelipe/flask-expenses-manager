@@ -64,6 +64,13 @@ class SharedEntry(db.Model):
     split_type = db.Column(
         db.Enum(SplitType, values_callable=_enum_values), nullable=False
     )
+    # Optimistic locking — incremented on every write; clients must echo it back
+    version = db.Column(
+        db.Integer,
+        nullable=False,
+        default=0,
+        server_default=db.text("0"),
+    )
     created_at = db.Column(db.DateTime, nullable=False, default=utc_now_naive)
     updated_at = db.Column(
         db.DateTime, nullable=False, default=utc_now_naive, onupdate=utc_now_naive

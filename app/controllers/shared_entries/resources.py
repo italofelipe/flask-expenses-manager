@@ -237,6 +237,85 @@ def list_shared_with_me() -> tuple[dict[str, Any], int]:
     )
 
 
+@shared_entries_bp.route("/<uuid:shared_entry_id>", methods=["PATCH"])
+@jwt_required()
+def update_shared_entry_route(shared_entry_id: UUID) -> tuple[dict[str, Any], int]:
+    """Update a shared entry with optimistic locking.
+
+    Request body must include ``version`` (current known version) to guard
+    against concurrent modifications.  Returns HTTP 409 if the version does
+    not match the DB state.
+    """
+    from app.services.shared_entry_service import (
+        SharedEntryConcurrentEditError,
+        SharedEntryForbiddenError,
+        SharedEntryNotFoundError,
+    )
+
+    user_id: UUID = current_user_id()
+    payload = request.get_json(silent=True) or {}
+
+    if "version" not in payload:
+        raise ResponseContractError(
+            "Campo 'version' é obrigatório para atualização.",
+            code="VALIDATION_ERROR",
+            status_code=400,
+            details={"version": ["required"]},
+            legacy_payload={"error": "Campo 'version' é obrigatório para atualização."},
+        )
+    try:
+        expected_version = int(payload["version"])
+    except (TypeError, ValueError) as exc:
+        raise ResponseContractError(
+            "Campo 'version' deve ser um inteiro.",
+            code="VALIDATION_ERROR",
+            status_code=400,
+            details={"version": ["must_be_integer"]},
+            legacy_payload={"error": "Campo 'version' deve ser um inteiro."},
+        ) from exc
+
+    split_type: str | None = payload.get("split_type")
+    if split_type is not None:
+        valid_split_types = {
+            item.value
+            for item in __import__(
+                "app.models.shared_entry", fromlist=["SplitType"]
+            ).SplitType
+        }
+        if split_type not in valid_split_types:
+            raise ResponseContractError(
+                "Campo 'split_type' inválido.",
+                code="VALIDATION_ERROR",
+                status_code=400,
+                details={"split_type": ["must_be_one_of: equal, percentage, custom"]},
+                legacy_payload={"error": "Campo 'split_type' inválido."},
+            )
+
+    try:
+        entry = get_shared_entries_dependencies().update_shared_entry(
+            shared_entry_id,
+            user_id,
+            expected_version=expected_version,
+            split_type=split_type,
+        )
+    except ResponseContractError as exc:
+        return contract_error_tuple(exc)
+    except SharedEntryNotFoundError as exc:
+        return api_error_tuple(exc)
+    except SharedEntryForbiddenError as exc:
+        return api_error_tuple(exc)
+    except SharedEntryConcurrentEditError as exc:
+        return api_error_tuple(exc)
+
+    serialized = serialize_shared_entry(entry)
+    return compat_success(
+        legacy_payload={"shared_entry": serialized},
+        status_code=200,
+        message="Compartilhamento atualizado com sucesso",
+        data={"shared_entry": serialized},
+    )
+
+
 @shared_entries_bp.route("/<uuid:shared_entry_id>", methods=["DELETE"])
 @jwt_required()
 def revoke_shared_entry(shared_entry_id: UUID) -> tuple[dict[str, Any], int]:
