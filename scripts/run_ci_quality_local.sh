@@ -27,6 +27,7 @@ if [[ "$MODE" == "docker" ]]; then
       python3 scripts/repo_hygiene_check.py && \
       python3 scripts/graphql_auth_config_check.py && \
       python3 scripts/alembic_single_head_check.py && \
+      python3 scripts/entitlement_coverage_check.py && \
       python -m pip install --upgrade pip && \
       python -m pip install -r requirements.txt -r requirements-dev.txt && \
       python3 scripts/security_exception_governance.py check && \
@@ -47,6 +48,7 @@ python3 scripts/check_feature_flags.py
 python3 scripts/repo_hygiene_check.py
 python3 scripts/graphql_auth_config_check.py
 python3 scripts/alembic_single_head_check.py
+python3 scripts/entitlement_coverage_check.py
 python3 scripts/security_exception_governance.py check
 "${PYTHON_BIN}" -m pip_audit -r requirements.txt $(python3 scripts/security_exception_governance.py pip-audit-args)
 "${PYTHON_BIN}" -m ruff format --check .

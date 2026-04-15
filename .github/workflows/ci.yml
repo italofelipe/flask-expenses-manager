@@ -36,6 +36,9 @@ jobs:
       - name: Repo Hygiene
         run: python scripts/repo_hygiene_check.py
 
+      - name: Entitlement coverage check (issue #1057)
+        run: python scripts/entitlement_coverage_check.py
+
       - name: GraphQL mutation ownership audit (ADR-0002)
         run: python scripts/graphql_mutation_audit.py
 
