@@ -1,4 +1,4 @@
-"""Tests for GET /transactions/export (issue #1022).
+"""Tests for GET /transactions/export (issue #1022, streaming refactor #1055).
 
 Covers:
 - CSV export returns valid CSV with correct columns
@@ -8,7 +8,7 @@ Covers:
 - Filters (type, status, date range) narrow results correctly
 - Invalid format parameter returns 400
 - Export with zero transactions returns empty CSV (headers only)
-- Export limit is respected (mocked)
+- Streaming generator yields header then data rows without hard limit
 """
 
 from __future__ import annotations
@@ -22,7 +22,10 @@ from decimal import Decimal
 from app.extensions.database import db
 from app.models.entitlement import Entitlement, EntitlementSource
 from app.models.transaction import Transaction, TransactionStatus, TransactionType
-from app.services.transaction_export_service import EXPORT_LIMIT, generate_csv_export
+from app.services.transaction_export_service import (
+    generate_csv_export,
+    generate_csv_stream,
+)
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -309,5 +312,80 @@ class TestExportServiceUnit:
             assert "2026-01" in result.filename
             assert result.filename.endswith(".csv")
 
-    def test_export_limit_constant(self) -> None:
-        assert EXPORT_LIMIT == 10_000
+    def test_generate_csv_stream_yields_header_then_rows(self, app) -> None:
+        """generate_csv_stream() yields BOM+header first, then one line per row."""
+        with app.app_context():
+            user_id = uuid.uuid4()
+            for i in range(3):
+                db.session.add(
+                    Transaction(
+                        user_id=user_id,
+                        title=f"Streaming tx {i}",
+                        amount=Decimal("50.00"),
+                        type=TransactionType.EXPENSE,
+                        status=TransactionStatus.PENDING,
+                        due_date=date(2026, 1, i + 1),
+                    )
+                )
+            db.session.commit()
+
+            lines = list(generate_csv_stream(user_id=user_id))
+
+        # First line: BOM + header
+        header_line = lines[0]
+        assert header_line.startswith("\ufeff")
+        reader = csv.reader(io.StringIO(header_line.lstrip("\ufeff")))
+        assert next(reader) == [
+            "data",
+            "tipo",
+            "titulo",
+            "valor",
+            "status",
+            "descricao",
+        ]
+        # Subsequent lines: one per transaction
+        assert len(lines) == 4  # 1 header + 3 data
+
+    def test_generate_csv_stream_empty_yields_header_only(self, app) -> None:
+        """Stream for a user with no transactions yields only the header line."""
+        with app.app_context():
+            user_id = uuid.uuid4()
+            lines = list(generate_csv_stream(user_id=user_id))
+
+        assert len(lines) == 1
+        assert lines[0].startswith("\ufeff")
+
+    def test_generate_csv_stream_spans_multiple_batches(self, app) -> None:
+        """Batched query correctly chains pages — all rows are yielded."""
+        from app.services.transaction_export_service import _iter_transactions_batched
+
+        with app.app_context():
+            user_id = uuid.uuid4()
+            for i in range(5):
+                db.session.add(
+                    Transaction(
+                        user_id=user_id,
+                        title=f"Batch tx {i}",
+                        amount=Decimal("10.00"),
+                        type=TransactionType.EXPENSE,
+                        status=TransactionStatus.PENDING,
+                        due_date=date(2026, 1, i + 1),
+                    )
+                )
+            db.session.commit()
+
+            # Use batch_size=2 to force multiple pages
+            rows = list(
+                _iter_transactions_batched(
+                    user_id=user_id,
+                    start_date=None,
+                    end_date=None,
+                    tx_type=None,
+                    status=None,
+                    batch_size=2,
+                )
+            )
+
+        assert len(rows) == 5
+        titles = [r.title for r in rows]
+        assert sorted(titles) == [f"Batch tx {i}" for i in range(5)]

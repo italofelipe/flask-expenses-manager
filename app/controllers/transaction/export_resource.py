@@ -13,15 +13,18 @@ Entitlement
 Requires the ``export_pdf`` feature (Premium / Trial plan).
 Free users receive 403 ENTITLEMENT_REQUIRED.
 
-Limit
------
-Maximum 10 000 transactions per export.  If the date range covers more rows
-than the limit the response contains the first 10 000 ordered by due_date asc.
+Streaming (CSV)
+---------------
+CSV exports are streamed via Flask ``stream_with_context`` — rows are flushed
+to the client as they are generated so peak memory usage stays constant
+regardless of dataset size.  There is no row-count limit.
+
+PDF exports are still materialised in memory (ReportLab requirement).
 """
 
 from __future__ import annotations
 
-from flask import Response, make_response, request
+from flask import Response, make_response, request, stream_with_context
 from flask_apispec.views import MethodResource
 
 from app.application.errors import PublicValidationError
@@ -29,7 +32,7 @@ from app.auth import current_user_id
 from app.docs.openapi_helpers import json_error_response
 from app.models.transaction import TransactionStatus, TransactionType
 from app.services.transaction_export_service import (
-    generate_csv_export,
+    generate_csv_stream,
     generate_pdf_export,
 )
 from app.utils.typed_decorators import (
@@ -113,7 +116,8 @@ class TransactionExportResource(MethodResource):
             "- `start_date` / `end_date`: intervalo de `due_date` (YYYY-MM-DD)\n"
             "- `type`: `income` | `expense`\n"
             "- `status`: `paid` | `pending` | `cancelled` | `postponed` | `overdue`\n\n"
-            "Limite: máximo de 10 000 transações por export."
+            "CSV: streamed via chunked transfer — sem limite de linhas.\n"
+            "PDF: materializado em memória (limitado pela RAM do servidor)."
         ),
         tags=["Transações"],
         responses={
@@ -159,34 +163,42 @@ class TransactionExportResource(MethodResource):
 
         user_id = current_user_id()
         fmt = str(params["format"])
-        try:
-            if fmt == "pdf":
+        month_label = str(params["month_label"])
+
+        if fmt == "pdf":
+            try:
                 result = generate_pdf_export(
                     user_id=user_id,
                     start_date=params["start_date"],  # type: ignore[arg-type]
                     end_date=params["end_date"],  # type: ignore[arg-type]
                     tx_type=params["tx_type"],  # type: ignore[arg-type]
                     status=params["tx_status"],  # type: ignore[arg-type]
-                    month_label=str(params["month_label"]),
+                    month_label=month_label,
                 )
-            else:
-                result = generate_csv_export(
+            except Exception:
+                return _internal_error_response(
+                    message="Erro ao gerar o arquivo de exportação.",
+                    log_context="transaction PDF export generation failed",
+                )
+            response = make_response(result.content)
+            response.headers["Content-Type"] = result.content_type
+            response.headers["Content-Disposition"] = (
+                f'attachment; filename="{result.filename}"'
+            )
+            return response
+
+        # CSV — stream row by row; no hard row-count limit
+        filename = f"auraxis_transactions_{month_label or 'export'}.csv"
+        return Response(
+            stream_with_context(
+                generate_csv_stream(
                     user_id=user_id,
                     start_date=params["start_date"],  # type: ignore[arg-type]
                     end_date=params["end_date"],  # type: ignore[arg-type]
                     tx_type=params["tx_type"],  # type: ignore[arg-type]
                     status=params["tx_status"],  # type: ignore[arg-type]
-                    month_label=str(params["month_label"]),
                 )
-        except Exception:
-            return _internal_error_response(
-                message="Erro ao gerar o arquivo de exportação.",
-                log_context="transaction export generation failed",
-            )
-
-        response = make_response(result.content)
-        response.headers["Content-Type"] = result.content_type
-        response.headers["Content-Disposition"] = (
-            f'attachment; filename="{result.filename}"'
+            ),
+            mimetype="text/csv; charset=utf-8",
+            headers={"Content-Disposition": f'attachment; filename="{filename}"'},
         )
-        return response

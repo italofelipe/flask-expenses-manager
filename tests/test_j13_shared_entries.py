@@ -699,3 +699,274 @@ def test_enum_values_aligned_with_frontend(app) -> None:
             "declined",
         }
         assert {s.value for s in SplitType} == {"equal", "percentage", "custom"}
+
+
+# ---------------------------------------------------------------------------
+# Optimistic locking — service unit tests (#1053)
+# ---------------------------------------------------------------------------
+
+
+def test_update_shared_entry_increments_version(app) -> None:
+    """update_shared_entry increments version and applies split_type change."""
+    from app.extensions.database import db
+    from app.models.shared_entry import SplitType
+    from app.services.shared_entry_service import share_entry, update_shared_entry
+
+    with app.app_context():
+        owner = _make_user("upd-ok")
+        db.session.add(owner)
+        db.session.flush()
+        txn = _make_transaction(owner.id)
+        db.session.add(txn)
+        db.session.commit()
+
+        entry = share_entry(
+            owner_id=owner.id, transaction_id=txn.id, split_type="equal"
+        )
+        assert entry.version == 0
+
+        updated = update_shared_entry(
+            entry.id,
+            owner.id,
+            expected_version=0,
+            split_type="percentage",
+        )
+        assert updated.version == 1
+        assert updated.split_type == SplitType.PERCENTAGE
+
+
+def test_update_shared_entry_concurrent_edit_raises_conflict(app) -> None:
+    """update_shared_entry raises SharedEntryConcurrentEditError on version mismatch."""
+    from app.extensions.database import db
+    from app.services.shared_entry_service import (
+        SharedEntryConcurrentEditError,
+        share_entry,
+        update_shared_entry,
+    )
+
+    with app.app_context():
+        owner = _make_user("upd-conflict")
+        db.session.add(owner)
+        db.session.flush()
+        txn = _make_transaction(owner.id)
+        db.session.add(txn)
+        db.session.commit()
+
+        entry = share_entry(
+            owner_id=owner.id, transaction_id=txn.id, split_type="equal"
+        )
+        # Advance version once legitimately
+        update_shared_entry(entry.id, owner.id, expected_version=0)
+
+        # Now try to update with the stale version (0 instead of 1)
+        with pytest.raises(SharedEntryConcurrentEditError):
+            update_shared_entry(entry.id, owner.id, expected_version=0)
+
+
+def test_update_shared_entry_not_found_raises(app) -> None:
+    """update_shared_entry raises SharedEntryNotFoundError for unknown id."""
+    import uuid
+
+    from app.services.shared_entry_service import (
+        SharedEntryNotFoundError,
+        update_shared_entry,
+    )
+
+    with app.app_context():
+        with pytest.raises(SharedEntryNotFoundError):
+            update_shared_entry(uuid.uuid4(), uuid.uuid4(), expected_version=0)
+
+
+def test_update_shared_entry_forbidden_raises(app) -> None:
+    """update_shared_entry raises SharedEntryForbiddenError for non-owner."""
+    from app.extensions.database import db
+    from app.services.shared_entry_service import (
+        SharedEntryForbiddenError,
+        share_entry,
+        update_shared_entry,
+    )
+
+    with app.app_context():
+        owner = _make_user("upd-owner")
+        attacker = _make_user("upd-atk")
+        db.session.add_all([owner, attacker])
+        db.session.flush()
+        txn = _make_transaction(owner.id)
+        db.session.add(txn)
+        db.session.commit()
+
+        entry = share_entry(
+            owner_id=owner.id, transaction_id=txn.id, split_type="equal"
+        )
+
+        with pytest.raises(SharedEntryForbiddenError):
+            update_shared_entry(entry.id, attacker.id, expected_version=0)
+
+
+# ---------------------------------------------------------------------------
+# Optimistic locking — serializer unit test (#1053)
+# ---------------------------------------------------------------------------
+
+
+def test_serialize_shared_entry_includes_version(app) -> None:
+    """serialize_shared_entry exposes the version field."""
+    from app.controllers.shared_entries.serializers import serialize_shared_entry
+
+    with app.app_context():
+        owner = _make_user("ser-ver")
+        txn = _make_transaction(owner.id)
+
+        entry = _make_shared_entry(owner, txn, split_type="equal")
+        entry.version = 3  # type: ignore[assignment]
+
+        payload = serialize_shared_entry(entry)
+        assert payload["version"] == 3
+
+
+# ---------------------------------------------------------------------------
+# Optimistic locking — HTTP endpoint tests (#1053)
+# ---------------------------------------------------------------------------
+
+
+def test_patch_shared_entry_success(client) -> None:
+    """PATCH /shared-entries/<id> with correct version updates the entry."""
+    owner_id, owner_token = _register_and_login(client, "patch-ok")
+    txn_id = _create_transaction_via_api(client, owner_token)
+
+    create_resp = client.post(
+        "/shared-entries",
+        json={"transaction_id": txn_id, "split_type": "equal"},
+        headers=_auth(owner_token),
+    )
+    assert create_resp.status_code == 201, create_resp.get_json()
+    body = create_resp.get_json()
+    se = body.get("shared_entry") or body.get("data", {}).get("shared_entry", {})
+    se_id = se["id"]
+    assert se["version"] == 0
+
+    patch_resp = client.patch(
+        f"/shared-entries/{se_id}",
+        json={"version": 0, "split_type": "percentage"},
+        headers=_auth(owner_token),
+    )
+    assert patch_resp.status_code == 200, patch_resp.get_json()
+    updated = patch_resp.get_json()
+    updated_se = updated.get("shared_entry") or updated.get("data", {}).get(
+        "shared_entry", {}
+    )
+    assert updated_se["version"] == 1
+    assert updated_se["split_type"] == "percentage"
+
+
+def test_patch_shared_entry_missing_version_returns_400(client) -> None:
+    """PATCH without 'version' returns 400."""
+    owner_id, owner_token = _register_and_login(client, "patch-no-ver")
+    txn_id = _create_transaction_via_api(client, owner_token)
+
+    create_resp = client.post(
+        "/shared-entries",
+        json={"transaction_id": txn_id, "split_type": "equal"},
+        headers=_auth(owner_token),
+    )
+    assert create_resp.status_code == 201
+    body = create_resp.get_json()
+    se = body.get("shared_entry") or body.get("data", {}).get("shared_entry", {})
+    se_id = se["id"]
+
+    resp = client.patch(
+        f"/shared-entries/{se_id}",
+        json={"split_type": "custom"},
+        headers=_auth(owner_token),
+    )
+    assert resp.status_code == 400
+
+
+def test_patch_shared_entry_invalid_version_returns_400(client) -> None:
+    """PATCH with non-integer 'version' returns 400."""
+    owner_id, owner_token = _register_and_login(client, "patch-bad-ver")
+    txn_id = _create_transaction_via_api(client, owner_token)
+
+    create_resp = client.post(
+        "/shared-entries",
+        json={"transaction_id": txn_id, "split_type": "equal"},
+        headers=_auth(owner_token),
+    )
+    assert create_resp.status_code == 201
+    body = create_resp.get_json()
+    se = body.get("shared_entry") or body.get("data", {}).get("shared_entry", {})
+    se_id = se["id"]
+
+    resp = client.patch(
+        f"/shared-entries/{se_id}",
+        json={"version": "not-a-number"},
+        headers=_auth(owner_token),
+    )
+    assert resp.status_code == 400
+
+
+def test_patch_shared_entry_invalid_split_type_returns_400(client) -> None:
+    """PATCH with invalid split_type returns 400."""
+    owner_id, owner_token = _register_and_login(client, "patch-bad-st")
+    txn_id = _create_transaction_via_api(client, owner_token)
+
+    create_resp = client.post(
+        "/shared-entries",
+        json={"transaction_id": txn_id, "split_type": "equal"},
+        headers=_auth(owner_token),
+    )
+    assert create_resp.status_code == 201
+    body = create_resp.get_json()
+    se = body.get("shared_entry") or body.get("data", {}).get("shared_entry", {})
+    se_id = se["id"]
+
+    resp = client.patch(
+        f"/shared-entries/{se_id}",
+        json={"version": 0, "split_type": "invalid_type"},
+        headers=_auth(owner_token),
+    )
+    assert resp.status_code == 400
+
+
+def test_patch_shared_entry_not_found_returns_404(client) -> None:
+    """PATCH /shared-entries/<unknown-uuid> returns 404."""
+    _uid, token = _register_and_login(client, "patch-404")
+    fake_id = str(uuid.uuid4())
+
+    resp = client.patch(
+        f"/shared-entries/{fake_id}",
+        json={"version": 0},
+        headers=_auth(token),
+    )
+    assert resp.status_code == 404
+
+
+def test_patch_shared_entry_concurrent_edit_returns_409(client) -> None:
+    """PATCH with stale version returns 409 CONFLICT_CONCURRENT_EDIT."""
+    owner_id, owner_token = _register_and_login(client, "patch-409")
+    txn_id = _create_transaction_via_api(client, owner_token)
+
+    create_resp = client.post(
+        "/shared-entries",
+        json={"transaction_id": txn_id, "split_type": "equal"},
+        headers=_auth(owner_token),
+    )
+    assert create_resp.status_code == 201
+    body = create_resp.get_json()
+    se = body.get("shared_entry") or body.get("data", {}).get("shared_entry", {})
+    se_id = se["id"]
+
+    # First update succeeds (version 0 → 1)
+    first = client.patch(
+        f"/shared-entries/{se_id}",
+        json={"version": 0, "split_type": "percentage"},
+        headers=_auth(owner_token),
+    )
+    assert first.status_code == 200
+
+    # Second update with stale version 0 must conflict
+    second = client.patch(
+        f"/shared-entries/{se_id}",
+        json={"version": 0, "split_type": "custom"},
+        headers=_auth(owner_token),
+    )
+    assert second.status_code == 409
