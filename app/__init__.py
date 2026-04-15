@@ -54,6 +54,7 @@ from app.extensions.audit_retention_cli import register_audit_retention_commands
 from app.extensions.audit_trail import register_audit_trail
 from app.extensions.billing_webhooks_cli import register_billing_webhooks_commands
 from app.extensions.database import db
+from app.extensions.email_dlq_cli import register_email_dlq_commands
 from app.extensions.error_handlers import register_error_handlers
 from app.extensions.http_observability import register_http_observability
 from app.extensions.integration_metrics_cli import register_integration_metrics_commands
@@ -271,6 +272,7 @@ def create_app(*, enable_http_runtime: bool = True) -> Flask:
     register_integration_metrics_commands(app)
     register_billing_webhooks_commands(app)
     register_reminders_commands(app)
+    register_email_dlq_commands(app)
     app.cli.add_command(features_cli_group, "features")
     app.cli.add_command(openapi_export_command)
     register_wallet_dependencies(app)
