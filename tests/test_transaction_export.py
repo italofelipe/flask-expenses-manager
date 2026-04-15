@@ -92,8 +92,16 @@ def _create_transaction(
 
 
 class TestExportEntitlementGate:
-    def test_free_user_gets_403(self, client) -> None:
-        token, _ = _register_and_login(client, prefix="export-free")
+    def test_free_user_gets_403(self, app, client) -> None:
+        from app.services.entitlement_service import revoke_entitlement
+
+        token, user_id = _register_and_login(client, prefix="export-free")
+        # Revoke the trial entitlement to simulate a free/downgraded user
+        with app.app_context():
+            revoke_entitlement(uuid.UUID(user_id), "export_pdf")
+            from app.extensions.database import db as _db
+
+            _db.session.commit()
         resp = client.get("/transactions/export", headers=_auth(token))
         assert resp.status_code == 403
         body = resp.get_json()
