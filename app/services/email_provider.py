@@ -154,6 +154,16 @@ class ResendEmailProvider:
         except RequestException as exc:
             raise EmailProviderError("Resend request failed") from exc
 
+    def send_with_dlq_fallback(self, message: EmailMessage) -> EmailDeliveryResult:
+        """Send email; push to DLQ if all retries are exhausted."""
+        from app.services.email_dlq import get_email_dlq
+
+        try:
+            return self.send(message)
+        except EmailProviderError as exc:
+            get_email_dlq().push(message, reason=str(exc))
+            raise
+
 
 def get_default_email_provider() -> EmailProvider:
     provider_name = _env("EMAIL_PROVIDER").lower()
