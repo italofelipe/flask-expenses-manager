@@ -1,7 +1,11 @@
 from __future__ import annotations
 
 from .blueprint import dashboard_bp
-from .resources import DashboardOverviewResource, DashboardTrendsResource
+from .resources import (
+    DashboardOverviewResource,
+    DashboardSurvivalIndexResource,
+    DashboardTrendsResource,
+)
 
 _ROUTES_REGISTERED = False
 
@@ -19,6 +23,11 @@ def register_dashboard_routes() -> None:
     dashboard_bp.add_url_rule(
         "/trends",
         view_func=DashboardTrendsResource.as_view("trends"),
+        methods=["GET"],
+    )
+    dashboard_bp.add_url_rule(
+        "/survival-index",
+        view_func=DashboardSurvivalIndexResource.as_view("survival_index"),
         methods=["GET"],
     )
     _ROUTES_REGISTERED = True

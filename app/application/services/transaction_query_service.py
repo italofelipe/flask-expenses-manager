@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import date, timedelta
-from typing import Any, Callable, TypedDict, cast
+from typing import Any, Callable, Literal, TypedDict, cast
 from uuid import UUID
 
 from sqlalchemy import case, func
@@ -12,6 +12,7 @@ from app.application.services.transaction_application_service import (
 )
 from app.extensions.database import db
 from app.models.transaction import Transaction, TransactionStatus, TransactionType
+from app.models.wallet import Wallet
 from app.services.transaction_analytics_service import TransactionAnalyticsService
 from app.services.transaction_serialization import (
     TransactionPayload,
@@ -86,6 +87,17 @@ class TransactionTrendsMonthEntry(TypedDict):
 class TransactionTrendsResult(TypedDict):
     months: int
     series: list[TransactionTrendsMonthEntry]
+
+
+SurvivalClassification = Literal["critical", "attention", "comfortable", "secure"]
+
+
+class SurvivalIndexResult(TypedDict):
+    survival_months: float | None
+    total_assets: float
+    avg_monthly_expense: float
+    classification: SurvivalClassification | None
+    period_analyzed_months: int
 
 
 class TransactionDueRangeResult(TypedDict):
@@ -382,11 +394,96 @@ class TransactionQueryService:
             int(row.expense_transactions or 0),
         )
 
+    def get_survival_index(self, *, period_months: int = 3) -> SurvivalIndexResult:
+        """Compute burn-rate survival index.
+
+        total_assets / avg_monthly_expense = months of runway.
+        avg_monthly_expense is the mean of PAID expenses across the last
+        *period_months* calendar months.
+        """
+        today = date.today()
+
+        # --- Total assets: wallet entries marked as on-wallet, with a value ---
+        assets_row = (
+            db.session.query(func.coalesce(func.sum(Wallet.value), 0).label("total"))
+            .filter(
+                Wallet.user_id == self._user_id,
+                Wallet.should_be_on_wallet.is_(True),
+                Wallet.value.isnot(None),
+            )
+            .one()
+        )
+        total_assets = float(assets_row.total or 0)
+
+        # --- Build period: 3 complete calendar months before current month ---
+        # e.g. today=April → period Jan 1 – March 31
+        year = today.year
+        anchor_month = today.month - period_months
+        while anchor_month <= 0:
+            anchor_month += 12
+            year -= 1
+        period_start = date(year, anchor_month, 1)
+
+        # Last day of previous complete month (avoid partial current month)
+        first_of_current = today.replace(day=1)
+        period_end = first_of_current - timedelta(days=1)
+
+        # Total expenses in period (PAID, non-deleted)
+        expense_row = (
+            db.session.query(
+                func.coalesce(func.sum(Transaction.amount), 0).label("total")
+            )
+            .filter(
+                Transaction.user_id == self._user_id,
+                Transaction.deleted.is_(False),
+                Transaction.type == TransactionType.EXPENSE,
+                Transaction.status == TransactionStatus.PAID,
+                Transaction.due_date >= period_start,
+                Transaction.due_date <= period_end,
+            )
+            .one()
+        )
+        total_expense = float(expense_row.total or 0)
+        avg_monthly_expense = round(total_expense / period_months, 2)
+
+        # --- Edge cases ---
+        if avg_monthly_expense == 0:
+            return {
+                "survival_months": None,
+                "total_assets": round(total_assets, 2),
+                "avg_monthly_expense": 0.0,
+                "classification": None,
+                "period_analyzed_months": period_months,
+            }
+
+        survival_months = round(total_assets / avg_monthly_expense, 2)
+        classification = _classify_survival(survival_months)
+
+        return {
+            "survival_months": survival_months,
+            "total_assets": round(total_assets, 2),
+            "avg_monthly_expense": avg_monthly_expense,
+            "classification": classification,
+            "period_analyzed_months": period_months,
+        }
+
     def _application_service(self) -> TransactionApplicationService:
         return self._dependencies.transaction_application_service_factory(self._user_id)
 
 
+def _classify_survival(months: float) -> SurvivalClassification:
+    if months < 3:
+        return "critical"
+    if months < 6:
+        return "attention"
+    if months <= 12:
+        return "comfortable"
+    return "secure"
+
+
 __all__ = [
+    "SurvivalClassification",
+    "SurvivalIndexResult",
     "TransactionCountsPayload",
     "TransactionDashboardResult",
     "TransactionDueRangeResult",

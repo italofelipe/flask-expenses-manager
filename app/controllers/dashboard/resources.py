@@ -311,4 +311,93 @@ class DashboardTrendsResource(MethodResource):
         return resp
 
 
-__all__ = ["DashboardOverviewResource", "DashboardTrendsResource"]
+class DashboardSurvivalIndexResource(MethodResource):
+    @doc(
+        summary="Índice de sobrevivência financeira (burn rate)",
+        description=(
+            "Calcula quantos meses o patrimônio atual sustenta o custo de vida médio. "
+            "Patrimônio = soma das entradas de carteira (should_be_on_wallet=True). "
+            "Custo médio = média de despesas pagas nos últimos 3 meses completos."
+        ),
+        tags=["Dashboard"],
+        security=[{"BearerAuth": []}],
+        params={
+            **contract_header_param(supported_version="v2"),
+        },
+        responses={
+            200: json_success_response(
+                description="Índice de sobrevivência calculado",
+                message="Índice de sobrevivência calculado com sucesso",
+                data_example={
+                    "survival_months": 8.5,
+                    "total_assets": 42500.00,
+                    "avg_monthly_expense": 5000.00,
+                    "classification": "comfortable",
+                    "period_analyzed_months": 3,
+                },
+            ),
+            401: json_error_response(
+                description="Token inválido",
+                message="Token revogado",
+                error_code="UNAUTHORIZED",
+                status_code=401,
+            ),
+            500: json_error_response(
+                description="Erro interno",
+                message="Erro ao calcular índice de sobrevivência",
+                error_code="INTERNAL_ERROR",
+                status_code=500,
+            ),
+        },
+    )
+    @jwt_required()
+    def get(self) -> Response:
+        token_error = _guard_revoked_token()
+        if token_error is not None:
+            return token_error
+
+        user_uuid = current_user_id()
+        cache = get_cache_service()
+        cache_key = f"dashboard:survival-index:{user_uuid}"
+
+        cached = cache.get(cache_key)
+        if cached is not None:
+            resp = compat_success_response(
+                legacy_payload=cached,
+                status_code=200,
+                message="Índice de sobrevivência calculado com sucesso",
+                data=cached,
+            )
+            resp.headers["X-Cache"] = "HIT"
+            return resp
+
+        dependencies = get_transaction_dependencies()
+        query_service = dependencies.transaction_query_service_factory(user_uuid)
+
+        try:
+            result = query_service.get_survival_index()
+        except Exception:
+            return compat_error_response(
+                legacy_payload={"error": "Erro ao calcular índice de sobrevivência"},
+                status_code=500,
+                message="Erro ao calcular índice de sobrevivência",
+                error_code="INTERNAL_ERROR",
+            )
+
+        payload: dict[str, Any] = dict(result)
+        cache.set(cache_key, payload, ttl=DASHBOARD_CACHE_TTL)
+        resp = compat_success_response(
+            legacy_payload=payload,
+            status_code=200,
+            message="Índice de sobrevivência calculado com sucesso",
+            data=payload,
+        )
+        resp.headers["X-Cache"] = "MISS"
+        return resp
+
+
+__all__ = [
+    "DashboardOverviewResource",
+    "DashboardSurvivalIndexResource",
+    "DashboardTrendsResource",
+]
