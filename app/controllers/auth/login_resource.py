@@ -8,6 +8,7 @@ from flask_jwt_extended import set_refresh_cookies
 
 from app.application.services.login_identity_service import resolve_login_identity
 from app.application.services.password_verification_service import needs_rehash
+from app.application.services.session_service import create_session
 from app.docs.openapi_helpers import (
     contract_header_param,
     json_error_response,
@@ -62,13 +63,15 @@ def _persist_session(
     user: Any,
     jti: str,
     refresh_jti: str,
+    raw_refresh_token: str,
     pending_new_hash: str | None,
+    user_agent: str | None = None,
+    remote_addr: str | None = None,
 ) -> None:
-    # H-P5.3 — single-session policy (intentional product decision):
-    # Overwriting current_jti immediately invalidates any previously issued
-    # access + refresh pair. If the previous session was from another device,
-    # that device's next authenticated request will receive SESSION_DISPLACED (401).
-    # See docs/wiki/MVP-1-Hardening-Strategy.md § H-P5.3 for rationale.
+    # H-1028 — multi-device session tracking via RefreshToken table.
+    # We still update user.current_jti / user.refresh_token_jti for backward
+    # compatibility with the Redis revocation cache (single-session fast path).
+    # The RefreshToken row is the authoritative record for per-session tracking.
     needs_commit = (
         user.current_jti != jti
         or user.refresh_token_jti != refresh_jti
@@ -80,6 +83,14 @@ def _persist_session(
     user.refresh_token_jti = refresh_jti
     if pending_new_hash is not None:
         user.password = pending_new_hash
+    create_session(
+        user_id=user.id,
+        raw_refresh_token=raw_refresh_token,
+        refresh_jti=refresh_jti,
+        access_jti=jti,
+        user_agent=user_agent,
+        remote_addr=remote_addr,
+    )
     db.session.commit()
 
 
@@ -256,7 +267,10 @@ class AuthResource(MethodResource):
                 user=identity.user,
                 jti=jti,
                 refresh_jti=refresh_jti,
+                raw_refresh_token=refresh_token,
                 pending_new_hash=_pending_new_hash,
+                user_agent=request_context.user_agent,
+                remote_addr=request_context.client_ip,
             )
             user_data = {
                 "id": str(identity.user.id),

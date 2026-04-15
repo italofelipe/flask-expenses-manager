@@ -551,6 +551,12 @@ type Mutation {
   createCheckoutSession(billingCycle: String, planSlug: String!): CreateCheckoutSessionMutation
   cancelSubscription: CancelSubscriptionMutation
   updateNotificationPreferences(preferences: [PreferenceInput!]!): UpdateNotificationPreferencesMutation
+
+  """Revoke a specific session by ID (multi-device, #1028)."""
+  revokeSession(sessionId: String!): RevokeSessionMutation
+
+  """Revoke all active sessions — global logout (#1028)."""
+  revokeAllSessions: RevokeAllSessionsMutation
 }
 
 type AuthPayloadType {
@@ -712,4 +718,16 @@ input PreferenceInput {
   category: String!
   enabled: Boolean!
   globalOptOut: Boolean
+}
+
+"""Revoke a specific session by ID (multi-device, #1028)."""
+type RevokeSessionMutation {
+  ok: Boolean!
+  message: String!
+}
+
+"""Revoke all active sessions — global logout (#1028)."""
+type RevokeAllSessionsMutation {
+  ok: Boolean!
+  revoked: Int!
 }

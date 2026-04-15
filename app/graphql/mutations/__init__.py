@@ -10,6 +10,8 @@ from app.graphql.mutations.auth import (
     RegisterUserMutation,
     ResendConfirmationEmailMutation,
     ResetPasswordMutation,
+    RevokeAllSessionsMutation,
+    RevokeSessionMutation,
     UpdateUserProfileMutation,
 )
 from app.graphql.mutations.budget import (
@@ -90,6 +92,8 @@ class Mutation(graphene.ObjectType):
     create_checkout_session = CreateCheckoutSessionMutation.Field()
     cancel_subscription = CancelSubscriptionMutation.Field()
     update_notification_preferences = UpdateNotificationPreferencesMutation.Field()
+    revoke_session = RevokeSessionMutation.Field()
+    revoke_all_sessions = RevokeAllSessionsMutation.Field()
 
 
 __all__ = ["Mutation"]

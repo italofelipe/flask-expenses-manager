@@ -9,6 +9,11 @@ from .refresh_token_resource import RefreshTokenResource
 from .register_resource import RegisterResource
 from .resend_confirmation_resource import ResendConfirmationResource
 from .reset_password_resource import ResetPasswordResource
+from .sessions_resource import (
+    SessionListResource,
+    SessionRevokeAllResource,
+    SessionRevokeResource,
+)
 
 _ROUTES_REGISTERED = False
 
@@ -41,6 +46,21 @@ def register_auth_routes() -> None:
     auth_bp.add_url_rule(
         "/email/resend",
         view_func=ResendConfirmationResource.as_view("resendconfirmationresource"),
+    )
+    auth_bp.add_url_rule(
+        "/sessions",
+        view_func=SessionListResource.as_view("sessionlistresource"),
+        methods=["GET"],
+    )
+    auth_bp.add_url_rule(
+        "/sessions",
+        view_func=SessionRevokeAllResource.as_view("sessionrevokeallresource"),
+        methods=["DELETE"],
+    )
+    auth_bp.add_url_rule(
+        "/sessions/<session_id>",
+        view_func=SessionRevokeResource.as_view("sessionrevokeresource"),
+        methods=["DELETE"],
     )
     _ROUTES_REGISTERED = True
 

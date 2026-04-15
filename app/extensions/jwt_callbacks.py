@@ -37,14 +37,44 @@ def is_token_revoked(jti: str) -> bool:
         return True
 
 
+def _is_access_token_revoked_multi_session(user_id: str, jti: str) -> bool | None:
+    """Check multi-device access-token revocation via the RefreshToken table.
+
+    Returns None if the session predates the RefreshToken table (no row found),
+    signalling to the caller to fall back to the user.current_jti path.
+    """
+    from app.application.services.session_service import (
+        has_any_session,
+        is_access_jti_active,
+    )
+
+    try:
+        uid = UUID(user_id)
+        active = is_access_jti_active(user_id=uid, jti=jti)
+        if active:
+            return False  # Definitely active → not revoked.
+        if has_any_session(user_id=uid):
+            return True  # Rows exist but this JTI is not among them → revoked.
+        return None  # No rows — fall back to user.current_jti.
+    except Exception:
+        return None  # Defensive: fall back on any error.
+
+
 def _is_access_token_revoked(user_id: str, jti: str) -> bool:
     """Check access token revocation using Redis cache (DB fallback on miss).
 
-    Side-effect: sets ``g.session_displaced = True`` when the token is revoked
-    because a new session replaced it (single-session policy, H-P5.3). This flag
-    is read by ``revoked_token_callback`` to return the ``SESSION_DISPLACED``
-    error code so clients can show a targeted "logged in on another device" message.
+    H-1028: Multi-device sessions.  When the user has RefreshToken rows,
+    revocation is checked per-session (current_access_jti).  Falls back to
+    the legacy single-session user.current_jti path for old sessions.
+
+    Side-effect: sets ``g.session_displaced = True`` for the legacy path.
     """
+    # Multi-device fast path — try RefreshToken table first.
+    multi = _is_access_token_revoked_multi_session(user_id, jti)
+    if multi is not None:
+        return multi
+
+    # Legacy single-session path (no RefreshToken rows for this user).
     cache = get_jwt_revocation_cache()
     cached_jti = cache.get_current_jti(user_id)
     if cached_jti is not None:
@@ -66,10 +96,22 @@ def _is_access_token_revoked(user_id: str, jti: str) -> bool:
 
 
 def _is_refresh_token_revoked(user_id: str, jti: str) -> bool:
-    """Check refresh token revocation directly against the DB (not cached)."""
+    """Check refresh token revocation against the DB.
+
+    H-1028: checks the RefreshToken table first (with family revocation on
+    reuse); falls back to user.refresh_token_jti for sessions without rows.
+    """
     user = db.session.get(User, UUID(user_id))
     if not user or user.deleted_at is not None:  # LGPD: soft-deleted = revoked
         return True
+
+    from app.application.services.session_service import check_refresh_jti_revoked
+
+    result = check_refresh_jti_revoked(user_id=UUID(user_id), jti=jti)
+    if result is not None:
+        return result
+
+    # Fallback: legacy user.refresh_token_jti field.
     return bool(user.refresh_token_jti != jti)
 
 

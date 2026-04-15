@@ -549,6 +549,23 @@ GRAPHQL_OPERATION_CATALOG: tuple[GraphQLOperationDoc, ...] = (
         summary="Atualiza as preferências de notificação do usuário autenticado.",
         source_module=MUTATION_NOTIFICATION_MODULE,
     ),
+    # Multi-device sessions (#1028)
+    GraphQLOperationDoc(
+        name="revokeSession",
+        operation_type="mutation",
+        domain="auth",
+        access="auth_required",
+        summary="Revoga uma sessão específica pelo ID (multi-device).",
+        source_module=MUTATION_AUTH_MODULE,
+    ),
+    GraphQLOperationDoc(
+        name="revokeAllSessions",
+        operation_type="mutation",
+        domain="auth",
+        access="auth_required",
+        summary="Revoga todas as sessões ativas — logout global.",
+        source_module=MUTATION_AUTH_MODULE,
+    ),
 )
 
 

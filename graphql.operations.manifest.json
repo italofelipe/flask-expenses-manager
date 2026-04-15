@@ -477,5 +477,21 @@
     "operation_type": "mutation",
     "source_module": "app.graphql.mutations.notification",
     "summary": "Atualiza as preferências de notificação do usuário autenticado."
+  },
+  {
+    "access": "auth_required",
+    "domain": "auth",
+    "name": "revokeSession",
+    "operation_type": "mutation",
+    "source_module": "app.graphql.mutations.auth",
+    "summary": "Revoga uma sessão específica pelo ID (multi-device)."
+  },
+  {
+    "access": "auth_required",
+    "domain": "auth",
+    "name": "revokeAllSessions",
+    "operation_type": "mutation",
+    "source_module": "app.graphql.mutations.auth",
+    "summary": "Revoga todas as sessões ativas — logout global."
   }
 ]
