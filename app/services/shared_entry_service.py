@@ -36,6 +36,20 @@ class SharedEntryAlreadyDeclinedError(APIError):
         )
 
 
+class SharedEntryConcurrentEditError(APIError):
+    """Raised when an update is rejected due to a version mismatch (lost update)."""
+
+    def __init__(self) -> None:
+        super().__init__(
+            message=(
+                "O compartilhamento foi modificado por outro usuário. "
+                "Recarregue e tente novamente."
+            ),
+            code="CONFLICT_CONCURRENT_EDIT",
+            status_code=409,
+        )
+
+
 # Backward-compat alias so existing call-sites don't break during migration
 SharedEntryAlreadyRevokedError = SharedEntryAlreadyDeclinedError
 
@@ -113,6 +127,45 @@ def list_shared_with_me(user_id: UUID) -> list[SharedEntry]:
         .order_by(SharedEntry.created_at.desc())
         .all()
     )
+
+
+def update_shared_entry(
+    shared_entry_id: UUID,
+    owner_id: UUID,
+    *,
+    expected_version: int,
+    split_type: str | None = None,
+) -> SharedEntry:
+    """Update a shared entry using optimistic locking.
+
+    The ``expected_version`` must match the current DB value.  If it does not
+    (i.e., another writer modified the row in between), the function raises
+    ``SharedEntryConcurrentEditError`` (HTTP 409) rather than silently
+    overwriting the competing change.
+
+    On success, ``version`` is incremented by 1 before committing.
+    """
+    entry: SharedEntry | None = db.session.get(SharedEntry, shared_entry_id)
+    if entry is None:
+        raise SharedEntryNotFoundError()
+    if entry.owner_id != owner_id:
+        raise SharedEntryForbiddenError()
+
+    updates: dict[str, object] = {"version": expected_version + 1}
+    if split_type is not None:
+        updates["split_type"] = SplitType(split_type)
+
+    rows_updated = SharedEntry.query.filter_by(
+        id=shared_entry_id, version=expected_version
+    ).update(updates, synchronize_session=False)
+    if rows_updated == 0:
+        db.session.rollback()
+        raise SharedEntryConcurrentEditError()
+
+    db.session.commit()
+    # Reload fresh state after the out-of-band update
+    db.session.refresh(entry)
+    return entry
 
 
 def get_shared_entry(shared_entry_id: UUID, requesting_user_id: UUID) -> SharedEntry:

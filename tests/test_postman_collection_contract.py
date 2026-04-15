@@ -82,6 +82,7 @@ OPENAPI_GAPS: set[tuple[str, str]] = {
     ("GET", "/shared-entries/by-me"),
     ("GET", "/shared-entries/with-me"),
     ("DELETE", "/shared-entries/{param}"),
+    ("PATCH", "/shared-entries/{param}"),
     ("GET", "/shared-entries/invitations"),
     ("POST", "/shared-entries/invitations"),
     ("POST", "/shared-entries/invitations/{param}/accept"),

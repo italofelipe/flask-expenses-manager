@@ -18,6 +18,7 @@ from app.services.shared_entry_service import (
     list_shared_with_me,
     revoke_share,
     share_entry,
+    update_shared_entry,
 )
 
 SHARED_ENTRIES_DEPENDENCIES_EXTENSION_KEY = "shared_entries_dependencies"
@@ -29,6 +30,7 @@ class SharedEntriesDependencies:
     list_shared_by_me: Callable[[UUID], list[SharedEntry]]
     list_shared_with_me: Callable[[UUID], list[SharedEntry]]
     revoke_share: Callable[[UUID, UUID], SharedEntry]
+    update_shared_entry: Callable[..., SharedEntry]
     list_invitations: Callable[[UUID], list[Invitation]]
     create_invitation: Callable[
         [UUID, UUID, str, float | None, float | None, str | None, int],
@@ -44,6 +46,7 @@ def _default_dependencies() -> SharedEntriesDependencies:
         list_shared_by_me=list_shared_by_me,
         list_shared_with_me=list_shared_with_me,
         revoke_share=revoke_share,
+        update_shared_entry=update_shared_entry,
         list_invitations=list_invitations,
         create_invitation=create_invitation,
         accept_invitation=accept_invitation,
