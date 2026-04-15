@@ -28,6 +28,11 @@ repos:
 
 - repo: local
   hooks:
+  - id: no-duplicate-files
+    name: no-duplicate-files (macOS AI agent artifacts)
+    entry: python3 scripts/no_duplicate_files_check.py
+    language: system
+    types: [file]
   - id: repo-hygiene-check
     name: repo-hygiene-check
     entry: python3 scripts/repo_hygiene_check.py

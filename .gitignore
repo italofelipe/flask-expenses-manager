@@ -74,3 +74,27 @@ docs/PROJECT_PANORAMA_REPORT_*.md
 docs/SECURITY_REASSESSMENT_*.md
 docs/CI_CD 2.md
 docs/CI_CD 3.md
+
+# ── Artefatos duplicados macOS (criados por agentes de IA em worktrees) ──────
+# Padrão: "foo 2.py", "foo 3.md", etc. — cópias macOS quando o destino já existe.
+# O Claude Code hook (pre-tool-use.py) também bloqueia a escrita desses arquivos.
+*[_ ]2.py
+*[_ ]3.py
+*[_ ]2.yml
+*[_ ]3.yml
+*[_ ]2.yaml
+*[_ ]3.yaml
+*[_ ]2.md
+*[_ ]3.md
+*[_ ]2.ts
+*[_ ]3.ts
+*[_ ]2.tsx
+*[_ ]3.tsx
+*[_ ]2.js
+*[_ ]3.js
+*[_ ]2.json
+*[_ ]3.json
+*[_ ]2.tf
+*[_ ]3.tf
+*[_ ]2.hcl
+*[_ ]3.hcl
