@@ -14,7 +14,7 @@ import logging
 from typing import Any
 from uuid import UUID
 
-from flask import Blueprint, current_app, jsonify, request
+from flask import Blueprint, current_app, request
 from flask.typing import ResponseReturnValue
 
 from app.application.services.billing_email_service import dispatch_billing_email
@@ -58,6 +58,7 @@ from app.services.subscription_service import (
     sync_subscription_from_provider,
 )
 from app.utils.datetime_utils import utc_now_naive
+from app.utils.response_builder import json_response
 
 logger = logging.getLogger(__name__)
 
@@ -96,7 +97,7 @@ def _serialize_subscription(sub: Subscription) -> dict[str, Any]:
 
 
 def _ok(data: dict[str, Any], status: int = 200) -> ResponseReturnValue:
-    return jsonify({"success": True, "data": data}), status
+    return json_response({"success": True, "data": data}, status_code=status)
 
 
 def _err(

@@ -39,6 +39,9 @@ jobs:
       - name: GraphQL mutation ownership audit (ADR-0002)
         run: python scripts/graphql_mutation_audit.py
 
+      - name: Controller response contract check (arch/#1047)
+        run: python scripts/controller_response_contract_check.py
+
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip

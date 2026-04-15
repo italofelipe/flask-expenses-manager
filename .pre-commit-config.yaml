@@ -49,6 +49,12 @@ repos:
     language: system
     pass_filenames: false
     files: app/graphql/mutations/
+  - id: controller-response-contract-check
+    name: controller-response-contract-check (arch/#1047)
+    entry: python3 scripts/controller_response_contract_check.py
+    language: system
+    pass_filenames: false
+    files: app/controllers/
   - id: alembic-single-head-check
     name: alembic-single-head-check
     entry: python3 scripts/alembic_single_head_check.py
