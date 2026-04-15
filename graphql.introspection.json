@@ -7595,9 +7595,9 @@
                   }
                 }
               ],
-              "deprecationReason": null,
+              "deprecationReason": "ADR-0002: use POST /transactions",
               "description": null,
-              "isDeprecated": false,
+              "isDeprecated": true,
               "name": "createTransaction",
               "type": {
                 "kind": "OBJECT",
@@ -7828,9 +7828,9 @@
                   }
                 }
               ],
-              "deprecationReason": null,
+              "deprecationReason": "ADR-0002: use PATCH /transactions/{id}",
               "description": null,
-              "isDeprecated": false,
+              "isDeprecated": true,
               "name": "updateTransaction",
               "type": {
                 "kind": "OBJECT",
@@ -7857,9 +7857,9 @@
                   }
                 }
               ],
-              "deprecationReason": null,
+              "deprecationReason": "ADR-0002: use DELETE /transactions/{id}",
               "description": null,
-              "isDeprecated": false,
+              "isDeprecated": true,
               "name": "deleteTransaction",
               "type": {
                 "kind": "OBJECT",
@@ -7974,9 +7974,9 @@
                   }
                 }
               ],
-              "deprecationReason": null,
+              "deprecationReason": "ADR-0002: use POST /goals",
               "description": null,
-              "isDeprecated": false,
+              "isDeprecated": true,
               "name": "createGoal",
               "type": {
                 "kind": "OBJECT",
@@ -8099,9 +8099,9 @@
                   }
                 }
               ],
-              "deprecationReason": null,
+              "deprecationReason": "ADR-0002: use PATCH /goals/{id}",
               "description": null,
-              "isDeprecated": false,
+              "isDeprecated": true,
               "name": "updateGoal",
               "type": {
                 "kind": "OBJECT",
@@ -8128,9 +8128,9 @@
                   }
                 }
               ],
-              "deprecationReason": null,
+              "deprecationReason": "ADR-0002: use DELETE /goals/{id}",
               "description": null,
-              "isDeprecated": false,
+              "isDeprecated": true,
               "name": "deleteGoal",
               "type": {
                 "kind": "OBJECT",
@@ -8805,9 +8805,9 @@
                   }
                 }
               ],
-              "deprecationReason": null,
+              "deprecationReason": "ADR-0002: use POST /wallet",
               "description": null,
-              "isDeprecated": false,
+              "isDeprecated": true,
               "name": "addWalletEntry",
               "type": {
                 "kind": "OBJECT",
@@ -8942,9 +8942,9 @@
                   }
                 }
               ],
-              "deprecationReason": null,
+              "deprecationReason": "ADR-0002: use PATCH /wallet/{id}",
               "description": null,
-              "isDeprecated": false,
+              "isDeprecated": true,
               "name": "updateWalletEntry",
               "type": {
                 "kind": "OBJECT",
@@ -8971,9 +8971,9 @@
                   }
                 }
               ],
-              "deprecationReason": null,
+              "deprecationReason": "ADR-0002: use DELETE /wallet/{id}",
               "description": null,
-              "isDeprecated": false,
+              "isDeprecated": true,
               "name": "deleteWalletEntry",
               "type": {
                 "kind": "OBJECT",
@@ -9084,9 +9084,9 @@
                   }
                 }
               ],
-              "deprecationReason": null,
+              "deprecationReason": "ADR-0002: use POST /wallet/{id}/operations",
               "description": null,
-              "isDeprecated": false,
+              "isDeprecated": true,
               "name": "addInvestmentOperation",
               "type": {
                 "kind": "OBJECT",
@@ -9201,9 +9201,9 @@
                   }
                 }
               ],
-              "deprecationReason": null,
+              "deprecationReason": "ADR-0002: use PATCH /wallet/{id}/operations/{op_id}",
               "description": null,
-              "isDeprecated": false,
+              "isDeprecated": true,
               "name": "updateInvestmentOperation",
               "type": {
                 "kind": "OBJECT",
@@ -9246,9 +9246,9 @@
                   }
                 }
               ],
-              "deprecationReason": null,
+              "deprecationReason": "ADR-0002: use DELETE /wallet/{id}/operations/{op_id}",
               "description": null,
-              "isDeprecated": false,
+              "isDeprecated": true,
               "name": "deleteInvestmentOperation",
               "type": {
                 "kind": "OBJECT",
@@ -9441,9 +9441,9 @@
                   }
                 }
               ],
-              "deprecationReason": null,
+              "deprecationReason": "ADR-0002: use POST /budgets",
               "description": null,
-              "isDeprecated": false,
+              "isDeprecated": true,
               "name": "createBudget",
               "type": {
                 "kind": "OBJECT",
@@ -9554,9 +9554,9 @@
                   }
                 }
               ],
-              "deprecationReason": null,
+              "deprecationReason": "ADR-0002: use PATCH /budgets/{id}",
               "description": null,
-              "isDeprecated": false,
+              "isDeprecated": true,
               "name": "updateBudget",
               "type": {
                 "kind": "OBJECT",
@@ -9583,9 +9583,9 @@
                   }
                 }
               ],
-              "deprecationReason": null,
+              "deprecationReason": "ADR-0002: use DELETE /budgets/{id}",
               "description": null,
-              "isDeprecated": false,
+              "isDeprecated": true,
               "name": "deleteBudget",
               "type": {
                 "kind": "OBJECT",

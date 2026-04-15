@@ -38,6 +38,12 @@ repos:
     entry: python3 scripts/graphql_auth_config_check.py
     language: system
     pass_filenames: false
+  - id: graphql-mutation-audit
+    name: graphql-mutation-audit (ADR-0002)
+    entry: python3 scripts/graphql_mutation_audit.py
+    language: system
+    pass_filenames: false
+    files: app/graphql/mutations/
   - id: alembic-single-head-check
     name: alembic-single-head-check
     entry: python3 scripts/alembic_single_head_check.py
