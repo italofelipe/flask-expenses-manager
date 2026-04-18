@@ -8,7 +8,18 @@ from marshmallow import fields
 
 from app.application.services.wallet_application_service import WalletApplicationError
 from app.auth import current_user_id
-from app.docs.openapi_helpers import deprecated_headers_doc
+from app.schemas.openapi.wallet.docs import (
+    WALLET_ADD_DOC,
+    WALLET_DELETE_DOC,
+    WALLET_GET_DOC,
+    WALLET_HISTORY_DOC,
+    WALLET_LIST_DOC,
+    WALLET_PATCH_DOC,
+    WALLET_PUT_DOC,
+    WALLET_UPDATE_SUCCESS_MESSAGE,
+    WALLET_UPDATE_SUCCESSOR_ENDPOINT,
+    WALLET_UPDATE_SUCCESSOR_METHOD,
+)
 from app.utils.typed_decorators import typed_doc as doc
 from app.utils.typed_decorators import typed_jwt_required as jwt_required
 from app.utils.typed_decorators import typed_use_kwargs as use_kwargs
@@ -21,39 +32,9 @@ from .contracts import (
 )
 from .dependencies import get_wallet_dependencies
 
-WALLET_UPDATE_SUCCESSOR_ENDPOINT = "/wallet/{investment_id}"
-WALLET_UPDATE_SUCCESSOR_METHOD = "PATCH"
-WALLET_UPDATE_SUCCESS_MESSAGE = "Investimento atualizado com sucesso"
-
 
 @wallet_bp.route("", methods=["POST"])
-@doc(
-    description=(
-        "Adiciona um novo item à carteira do usuário.\n\n"
-        "Você pode informar um valor fixo (como R$1000,00 em poupança) "
-        "ou um ativo com ticker.\n\n"
-        "Regras:\n"
-        "- Se informar o campo 'ticker', o campo 'value' será ignorado.\n"
-        "- Se não informar 'ticker', é obrigatório informar 'value'.\n"
-        "- Se informar 'ticker', também é obrigatório informar 'quantity'.\n\n"
-        "Exemplo com valor fixo:\n"
-        "{'name': 'Poupança', 'value': 1500.00, 'register_date': "
-        "'2024-07-01', 'should_be_on_wallet': true}\n\n"
-        "Exemplo com ticker:\n"
-        "{'name': 'Investimento PETR4', 'ticker': 'petr4', 'quantity': 10, "
-        "'register_date': '2024-07-01', 'should_be_on_wallet': true}\n\n"
-        "Resposta esperada:\n"
-        "{'message': 'Ativo cadastrado com sucesso'}"
-    ),
-    tags=["Wallet"],
-    security=[{"BearerAuth": []}],
-    responses={
-        201: {"description": "Ativo cadastrado com sucesso"},
-        400: {"description": "Erro de validação ou ticker inválido"},
-        401: {"description": "Token inválido"},
-        500: {"description": "Erro interno"},
-    },
-)
+@doc(**WALLET_ADD_DOC)
 @jwt_required()
 def add_wallet_entry() -> tuple[dict[str, Any], int]:
     user_id = current_user_id()
@@ -79,23 +60,7 @@ def add_wallet_entry() -> tuple[dict[str, Any], int]:
 
 
 @wallet_bp.route("", methods=["GET"])
-@doc(
-    description="Lista os investimentos cadastrados na carteira com paginação.",
-    tags=["Wallet"],
-    security=[{"BearerAuth": []}],
-    params={
-        "X-API-Contract": {
-            "in": "header",
-            "description": "Opcional. Envie 'v2' para o contrato padronizado.",
-            "type": "string",
-            "required": False,
-        }
-    },
-    responses={
-        200: {"description": "Lista paginada de investimentos"},
-        401: {"description": "Token inválido"},
-    },
-)
+@doc(**WALLET_LIST_DOC)
 @use_kwargs(
     {
         "page": fields.Int(load_default=1, validate=lambda x: x > 0),
@@ -136,29 +101,7 @@ def list_wallet_entries(page: int, per_page: int) -> tuple[dict[str, Any], int]:
 
 
 @wallet_bp.route("/<uuid:investment_id>", methods=["GET"])
-@doc(
-    description=(
-        "Retorna o detalhe canônico de um investimento específico da carteira "
-        "do usuário autenticado."
-    ),
-    tags=["Wallet"],
-    security=[{"BearerAuth": []}],
-    params={
-        "investment_id": {"description": "ID do investimento"},
-        "X-API-Contract": {
-            "in": "header",
-            "description": "Opcional. Envie 'v2' para o contrato padronizado.",
-            "type": "string",
-            "required": False,
-        },
-    },
-    responses={
-        200: {"description": "Investimento retornado com sucesso"},
-        401: {"description": "Token inválido"},
-        403: {"description": "Sem permissão"},
-        404: {"description": "Investimento não encontrado"},
-    },
-)
+@doc(**WALLET_GET_DOC)
 @jwt_required()
 def get_wallet_entry(investment_id: UUID) -> tuple[dict[str, Any], int]:
     user_id = current_user_id()
@@ -179,33 +122,7 @@ def get_wallet_entry(investment_id: UUID) -> tuple[dict[str, Any], int]:
 
 
 @wallet_bp.route("/<uuid:investment_id>/history", methods=["GET"])
-@doc(
-    description=(
-        "Retorna o histórico de alterações de um investimento, "
-        + "paginado e ordenado."
-    ),
-    tags=["Wallet"],
-    security=[{"BearerAuth": []}],
-    params={
-        "investment_id": {"description": "ID do investimento"},
-        "page": {"description": "Página desejada (default: 1)"},
-        "per_page": {
-            "description": "Itens por página (default: 5, mínimo 1, máximo 100)"
-        },
-        "X-API-Contract": {
-            "in": "header",
-            "description": "Opcional. Envie 'v2' para o contrato padronizado.",
-            "type": "string",
-            "required": False,
-        },
-    },
-    responses={
-        200: {"description": "Histórico paginado"},
-        401: {"description": "Token inválido"},
-        403: {"description": "Sem permissão"},
-        404: {"description": "Investimento não encontrado"},
-    },
-)
+@doc(**WALLET_HISTORY_DOC)
 @jwt_required()
 def get_wallet_history(investment_id: UUID) -> tuple[dict[str, Any], int]:
     user_id = current_user_id()
@@ -259,29 +176,7 @@ def _update_wallet_entry_data(
 
 
 @wallet_bp.route("/<uuid:investment_id>", methods=["PATCH"])
-@doc(
-    description=(
-        "Atualiza parcialmente um investimento existente da carteira do usuário. "
-        "Este é o método canônico para alterações parciais."
-    ),
-    tags=["Wallet"],
-    security=[{"BearerAuth": []}],
-    params={
-        "investment_id": {"description": "ID do investimento"},
-        "X-API-Contract": {
-            "in": "header",
-            "description": "Opcional. Envie 'v2' para o contrato padronizado.",
-            "type": "string",
-            "required": False,
-        },
-    },
-    responses={
-        200: {"description": "Investimento atualizado com sucesso"},
-        400: {"description": "Dados inválidos"},
-        401: {"description": "Token inválido"},
-        404: {"description": "Investimento não encontrado"},
-    },
-)
+@doc(**WALLET_PATCH_DOC)
 @jwt_required()
 def patch_wallet_entry(investment_id: UUID) -> tuple[dict[str, Any], int]:
     try:
@@ -304,35 +199,7 @@ def patch_wallet_entry(investment_id: UUID) -> tuple[dict[str, Any], int]:
 
 
 @wallet_bp.route("/<uuid:investment_id>", methods=["PUT"])
-@doc(
-    description=(
-        "Compatibilidade transitória para atualização parcial de investimento. "
-        "Use `PATCH /wallet/{investment_id}` como método canônico."
-    ),
-    tags=["Wallet"],
-    security=[{"BearerAuth": []}],
-    params={
-        "investment_id": {"description": "ID do investimento"},
-        "X-API-Contract": {
-            "in": "header",
-            "description": "Opcional. Envie 'v2' para o contrato padronizado.",
-            "type": "string",
-            "required": False,
-        },
-    },
-    responses={
-        200: {
-            "description": WALLET_UPDATE_SUCCESS_MESSAGE,
-            "headers": deprecated_headers_doc(
-                successor_endpoint=WALLET_UPDATE_SUCCESSOR_ENDPOINT,
-                successor_method=WALLET_UPDATE_SUCCESSOR_METHOD,
-            ),
-        },
-        400: {"description": "Dados inválidos"},
-        401: {"description": "Token inválido"},
-        404: {"description": "Investimento não encontrado"},
-    },
-)
+@doc(**WALLET_PUT_DOC)
 @jwt_required()
 def update_wallet_entry(investment_id: UUID) -> Response | tuple[dict[str, Any], int]:
     try:
@@ -357,26 +224,7 @@ def update_wallet_entry(investment_id: UUID) -> Response | tuple[dict[str, Any],
 
 
 @wallet_bp.route("/<uuid:investment_id>", methods=["DELETE"])
-@doc(
-    description="Deleta um investimento da carteira do usuário autenticado.",
-    tags=["Wallet"],
-    security=[{"BearerAuth": []}],
-    params={
-        "investment_id": {"description": "ID do investimento"},
-        "X-API-Contract": {
-            "in": "header",
-            "description": "Opcional. Envie 'v2' para o contrato padronizado.",
-            "type": "string",
-            "required": False,
-        },
-    },
-    responses={
-        200: {"description": "Investimento deletado com sucesso"},
-        401: {"description": "Token inválido"},
-        403: {"description": "Sem permissão para deletar"},
-        404: {"description": "Investimento não encontrado"},
-    },
-)
+@doc(**WALLET_DELETE_DOC)
 @jwt_required()
 def delete_wallet_entry(investment_id: UUID) -> tuple[dict[str, Any], int]:
     user_id = current_user_id()

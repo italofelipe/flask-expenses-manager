@@ -10,8 +10,16 @@ from flask import request
 
 from app.auth import current_user_id
 from app.controllers.response_contract import compat_error_tuple, compat_success_tuple
+from app.schemas.openapi.fiscal.response import (
+    serialize_document as _serialise_document,
+)
+from app.schemas.openapi.fiscal.response import (
+    serialize_entry as _serialise_entry,
+)
+from app.schemas.openapi.fiscal.response import (
+    serialize_row as _serialise_row,
+)
 from app.services.csv_ingestion_service import (
-    ParsedRow,
     ParseResult,
     create_import_batch,
     finalize_import_batch,
@@ -35,10 +43,6 @@ from app.utils.typed_decorators import typed_jwt_required as jwt_required
 
 from .blueprint import fiscal_bp
 
-# ---------------------------------------------------------------------------
-# Helpers
-# ---------------------------------------------------------------------------
-
 
 def _parse_date_param(value: str) -> date:
     for fmt in ("%Y-%m-%d", "%d/%m/%Y"):
@@ -47,58 +51,6 @@ def _parse_date_param(value: str) -> date:
         except ValueError:
             continue
     raise ValueError(f"Invalid date format: {value!r}. Use YYYY-MM-DD.")
-
-
-def _serialise_row(row: ParsedRow) -> dict[str, Any]:
-    return {
-        "description": row.description,
-        "amount": str(row.amount),
-        "date": row.date.isoformat(),
-        "category": row.category,
-        "external_id": row.external_id,
-    }
-
-
-def _serialise_entry(entry: Any) -> dict[str, Any]:
-    return {
-        "id": str(entry.id),
-        "fiscal_document_id": str(entry.fiscal_document_id),
-        "expected_net_amount": (
-            str(entry.expected_net_amount)
-            if entry.expected_net_amount is not None
-            else None
-        ),
-        "received_amount": (
-            str(entry.received_amount) if entry.received_amount is not None else None
-        ),
-        "outstanding_amount": (
-            str(entry.outstanding_amount)
-            if entry.outstanding_amount is not None
-            else None
-        ),
-        "reconciliation_status": entry.reconciliation_status.value,
-        "received_at": entry.received_at.isoformat() if entry.received_at else None,
-        "created_at": entry.created_at.isoformat() if entry.created_at else None,
-        "disclaimer": (
-            "Este valor é estimativo e não substitui cálculo fiscal "
-            "por profissional habilitado"
-        ),
-    }
-
-
-def _serialise_document(doc: Any) -> dict[str, Any]:
-    return {
-        "id": str(doc.id),
-        "external_id": doc.external_id,
-        "type": doc.type.value,
-        "status": doc.status.value,
-        "issued_at": doc.issued_at.isoformat() if doc.issued_at else None,
-        "counterparty": doc.counterparty,
-        "gross_amount": str(doc.gross_amount),
-        "currency": doc.currency,
-        "description": doc.description,
-        "created_at": doc.created_at.isoformat() if doc.created_at else None,
-    }
 
 
 # ---------------------------------------------------------------------------
