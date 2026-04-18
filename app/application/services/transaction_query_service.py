@@ -1,123 +1,51 @@
+"""Transaction Query Service — read-side facade.
+
+Composes the transaction application service (CRUD + month aggregates) and
+the analytics service (multi-month trends / runway) behind a single
+query-oriented API used by REST + GraphQL resolvers.
+
+Type payloads live in ``app.application.services.transaction.query_types``;
+multi-month / survival aggregation logic lives on
+``TransactionAnalyticsService``.
+"""
+
 from __future__ import annotations
 
-from dataclasses import dataclass
-from datetime import date, timedelta
-from typing import Any, Callable, Literal, TypedDict, cast
+from datetime import date
+from typing import Any, cast
 from uuid import UUID
 
 from sqlalchemy import case, func
 
+from app.application.services.transaction.query_types import (
+    SurvivalClassification,
+    SurvivalIndexResult,
+    TransactionCountsPayload,
+    TransactionDashboardResult,
+    TransactionDueRangeResult,
+    TransactionExpensePeriodResult,
+    TransactionListResult,
+    TransactionPaginationPayload,
+    TransactionQueryDependencies,
+    TransactionSummaryResult,
+    TransactionTrendsMonthEntry,
+    TransactionTrendsResult,
+)
 from app.application.services.transaction_application_service import (
     TransactionApplicationService,
 )
 from app.extensions.database import db
-from app.models.transaction import Transaction, TransactionStatus, TransactionType
-from app.models.wallet import Wallet
-from app.services.transaction_analytics_service import TransactionAnalyticsService
+from app.models.transaction import Transaction, TransactionType
+from app.services.transaction_analytics_service import (
+    TransactionAnalyticsService,
+)
+from app.services.transaction_analytics_service import (
+    classify_survival as _classify_survival,  # re-exported for back-compat
+)
 from app.services.transaction_serialization import (
     TransactionPayload,
     serialize_transaction_payload,
 )
-
-
-class TransactionPaginationPayload(TypedDict):
-    total: int
-    page: int
-    per_page: int
-    pages: int
-
-
-class TransactionCountsPayload(TypedDict):
-    total_transactions: int
-    income_transactions: int
-    expense_transactions: int
-
-
-class TransactionListResult(TypedDict):
-    items: list[TransactionPayload]
-    pagination: TransactionPaginationPayload
-
-
-class TransactionSummaryPaginationPayload(TypedDict):
-    total: int
-    page: int
-    page_size: int
-    has_next_page: bool
-    data: list[TransactionPayload]
-
-
-class TransactionSummaryResult(TypedDict):
-    month: str
-    income_total: float
-    expense_total: float
-    paginated: TransactionSummaryPaginationPayload
-
-
-class TransactionDashboardCountsPayload(TypedDict):
-    total_transactions: int
-    income_transactions: int
-    expense_transactions: int
-    status: dict[str, int]
-
-
-class TransactionDashboardCategoryPayload(TypedDict):
-    tag_id: str | None
-    category_name: str
-    total_amount: float
-    transactions_count: int
-
-
-class TransactionDashboardResult(TypedDict):
-    month: str
-    income_total: float
-    expense_total: float
-    balance: float
-    counts: TransactionDashboardCountsPayload
-    top_expense_categories: list[TransactionDashboardCategoryPayload]
-    top_income_categories: list[TransactionDashboardCategoryPayload]
-
-
-class TransactionTrendsMonthEntry(TypedDict):
-    month: str
-    income: float
-    expenses: float
-    balance: float
-
-
-class TransactionTrendsResult(TypedDict):
-    months: int
-    series: list[TransactionTrendsMonthEntry]
-
-
-SurvivalClassification = Literal["critical", "attention", "comfortable", "secure"]
-
-
-class SurvivalIndexResult(TypedDict):
-    survival_months: float | None
-    total_assets: float
-    avg_monthly_expense: float
-    classification: SurvivalClassification | None
-    period_analyzed_months: int
-
-
-class TransactionDueRangeResult(TypedDict):
-    items: list[TransactionPayload]
-    counts: TransactionCountsPayload
-    pagination: TransactionPaginationPayload
-
-
-class TransactionExpensePeriodResult(TypedDict):
-    expenses: list[TransactionPayload]
-    counts: TransactionCountsPayload
-    pagination: TransactionPaginationPayload
-
-
-@dataclass(frozen=True)
-class TransactionQueryDependencies:
-    transaction_application_service_factory: Callable[
-        [UUID], TransactionApplicationService
-    ]
-    analytics_service_factory: Callable[[UUID], TransactionAnalyticsService]
 
 
 class TransactionQueryService:
@@ -196,86 +124,7 @@ class TransactionQueryService:
         )
 
     def get_dashboard_trends(self, *, months: int) -> TransactionTrendsResult:
-        """Compute monthly income/expense/balance for the last N months.
-
-        Only months that have at least one paid transaction are included.
-        Results are ordered most-recent first.
-        """
-        today = date.today()
-        # Build the first day of each of the last `months` calendar months.
-        month_starts: list[date] = []
-        for i in range(months):
-            # Walk back month by month from current month
-            year = today.year
-            month = today.month - i
-            while month <= 0:
-                month += 12
-                year -= 1
-            month_starts.append(date(year, month, 1))
-
-        # Compute last-day of month helper
-        def _last_day(d: date) -> date:
-            next_month = d.replace(day=28) + timedelta(days=4)
-            return next_month.replace(day=1) - timedelta(days=1)
-
-        series: list[TransactionTrendsMonthEntry] = []
-        for ms in month_starts:
-            me = _last_day(ms)
-            month_label = ms.strftime("%Y-%m")
-
-            row = (
-                db.session.query(
-                    func.coalesce(
-                        func.sum(
-                            case(
-                                (
-                                    Transaction.type == TransactionType.INCOME,
-                                    Transaction.amount,
-                                ),
-                                else_=0,
-                            )
-                        ),
-                        0,
-                    ).label("income"),
-                    func.coalesce(
-                        func.sum(
-                            case(
-                                (
-                                    Transaction.type == TransactionType.EXPENSE,
-                                    Transaction.amount,
-                                ),
-                                else_=0,
-                            )
-                        ),
-                        0,
-                    ).label("expenses"),
-                    func.count(Transaction.id).label("tx_count"),
-                )
-                .filter(
-                    Transaction.user_id == self._user_id,
-                    Transaction.deleted.is_(False),
-                    Transaction.status == TransactionStatus.PAID,
-                    Transaction.due_date >= ms,
-                    Transaction.due_date <= me,
-                )
-                .one()
-            )
-
-            if int(row.tx_count or 0) == 0:
-                continue
-
-            income = float(row.income or 0)
-            expenses = float(row.expenses or 0)
-            series.append(
-                {
-                    "month": month_label,
-                    "income": income,
-                    "expenses": expenses,
-                    "balance": round(income - expenses, 2),
-                }
-            )
-
-        return {"months": months, "series": series}
+        return self._analytics_service().get_dashboard_trends(months=months)
 
     def get_due_transactions(
         self,
@@ -349,6 +198,9 @@ class TransactionQueryService:
         ).all()
         return [serialize_transaction_payload(item) for item in deleted_transactions]
 
+    def get_survival_index(self, *, period_months: int = 3) -> SurvivalIndexResult:
+        return self._analytics_service().get_survival_index(period_months=period_months)
+
     def _build_period_query(
         self,
         *,
@@ -394,91 +246,11 @@ class TransactionQueryService:
             int(row.expense_transactions or 0),
         )
 
-    def get_survival_index(self, *, period_months: int = 3) -> SurvivalIndexResult:
-        """Compute burn-rate survival index.
-
-        total_assets / avg_monthly_expense = months of runway.
-        avg_monthly_expense is the mean of PAID expenses across the last
-        *period_months* calendar months.
-        """
-        today = date.today()
-
-        # --- Total assets: wallet entries marked as on-wallet, with a value ---
-        assets_row = (
-            db.session.query(func.coalesce(func.sum(Wallet.value), 0).label("total"))
-            .filter(
-                Wallet.user_id == self._user_id,
-                Wallet.should_be_on_wallet.is_(True),
-                Wallet.value.isnot(None),
-            )
-            .one()
-        )
-        total_assets = float(assets_row.total or 0)
-
-        # --- Build period: 3 complete calendar months before current month ---
-        # e.g. today=April → period Jan 1 – March 31
-        year = today.year
-        anchor_month = today.month - period_months
-        while anchor_month <= 0:
-            anchor_month += 12
-            year -= 1
-        period_start = date(year, anchor_month, 1)
-
-        # Last day of previous complete month (avoid partial current month)
-        first_of_current = today.replace(day=1)
-        period_end = first_of_current - timedelta(days=1)
-
-        # Total expenses in period (PAID, non-deleted)
-        expense_row = (
-            db.session.query(
-                func.coalesce(func.sum(Transaction.amount), 0).label("total")
-            )
-            .filter(
-                Transaction.user_id == self._user_id,
-                Transaction.deleted.is_(False),
-                Transaction.type == TransactionType.EXPENSE,
-                Transaction.status == TransactionStatus.PAID,
-                Transaction.due_date >= period_start,
-                Transaction.due_date <= period_end,
-            )
-            .one()
-        )
-        total_expense = float(expense_row.total or 0)
-        avg_monthly_expense = round(total_expense / period_months, 2)
-
-        # --- Edge cases ---
-        if avg_monthly_expense == 0:
-            return {
-                "survival_months": None,
-                "total_assets": round(total_assets, 2),
-                "avg_monthly_expense": 0.0,
-                "classification": None,
-                "period_analyzed_months": period_months,
-            }
-
-        survival_months = round(total_assets / avg_monthly_expense, 2)
-        classification = _classify_survival(survival_months)
-
-        return {
-            "survival_months": survival_months,
-            "total_assets": round(total_assets, 2),
-            "avg_monthly_expense": avg_monthly_expense,
-            "classification": classification,
-            "period_analyzed_months": period_months,
-        }
-
     def _application_service(self) -> TransactionApplicationService:
         return self._dependencies.transaction_application_service_factory(self._user_id)
 
-
-def _classify_survival(months: float) -> SurvivalClassification:
-    if months < 3:
-        return "critical"
-    if months < 6:
-        return "attention"
-    if months <= 12:
-        return "comfortable"
-    return "secure"
+    def _analytics_service(self) -> TransactionAnalyticsService:
+        return self._dependencies.analytics_service_factory(self._user_id)
 
 
 __all__ = [
@@ -495,4 +267,5 @@ __all__ = [
     "TransactionSummaryResult",
     "TransactionTrendsMonthEntry",
     "TransactionTrendsResult",
+    "_classify_survival",
 ]
