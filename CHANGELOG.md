@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.31.0](https://github.com/italofelipe/auraxis-api/compare/v1.30.0...v1.31.0) (2026-04-18)
+
+
+### Features
+
+* **arc-api-01-02:** MarketDataProvider port + async outbound queue (RQ/Redis) ([#1093](https://github.com/italofelipe/auraxis-api/issues/1093)) ([4d95f99](https://github.com/italofelipe/auraxis-api/commit/4d95f99dd9b83b871a5d946931a135d7c73c640a))
+* **arc-api-03:** correlation-ID middleware end-to-end (X-Request-ID) ([#1089](https://github.com/italofelipe/auraxis-api/issues/1089)) ([f7d32f5](https://github.com/italofelipe/auraxis-api/commit/f7d32f54c85c4b426801a753075bd9584011df9d))
+
 ## [1.30.0](https://github.com/italofelipe/auraxis-api/compare/v1.29.0...v1.30.0) (2026-04-15)
 
 
