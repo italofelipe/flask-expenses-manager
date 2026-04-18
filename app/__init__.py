@@ -65,6 +65,7 @@ from app.extensions.sentry import init_sentry
 from app.extensions.slow_query_log import install_slow_query_log
 from app.extensions.trial_expiry_cli import register_trial_expiry_cli
 from app.http.request_context import register_request_context_adapter
+from app.middleware.correlation_id import register_correlation_id
 from app.middleware.cors import register_cors
 from app.middleware.docs_access import register_docs_access_guard
 from app.middleware.security_headers import register_security_headers
@@ -99,6 +100,7 @@ DOCS_CLASS_REGISTRATION_FALLBACK_ENDPOINTS = {
 
 def _register_http_runtime(app: Flask) -> None:
     register_request_context_adapter(app)
+    register_correlation_id(app)
     register_http_observability(app)
     register_prometheus_middleware(app)
     register_cors(app)
