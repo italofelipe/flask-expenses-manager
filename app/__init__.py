@@ -14,6 +14,7 @@ from sqlalchemy.pool import NullPool
 
 from app.cli.features import features as features_cli_group
 from app.cli.openapi_export import openapi_export_command
+from app.cli.worker_cli import worker_cli_group
 from app.controllers.account import account_bp
 from app.controllers.admin.audit_trail import admin_audit_trail_bp
 from app.controllers.admin.feature_flags import admin_feature_flags_bp
@@ -278,6 +279,7 @@ def create_app(*, enable_http_runtime: bool = True) -> Flask:
     register_email_dlq_commands(app)
     app.cli.add_command(features_cli_group, "features")
     app.cli.add_command(openapi_export_command)
+    app.cli.add_command(worker_cli_group, "worker")
     register_wallet_dependencies(app)
     register_entitlement_dependencies(app)
     register_simulation_dependencies(app)
