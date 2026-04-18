@@ -1,4 +1,6 @@
-from typing import Any, cast
+from __future__ import annotations
+
+from typing import TYPE_CHECKING, Any, cast
 from uuid import UUID
 
 from sqlalchemy import case, func
@@ -6,6 +8,19 @@ from sqlalchemy import case, func
 from app.extensions.database import db
 from app.models.tag import Tag
 from app.models.transaction import Transaction, TransactionType
+from app.services.transaction_trends import (
+    classify_survival as classify_survival,  # re-export
+)
+from app.services.transaction_trends import (
+    compute_dashboard_trends,
+    compute_survival_index,
+)
+
+if TYPE_CHECKING:
+    from app.application.services.transaction.query_types import (
+        SurvivalIndexResult,
+        TransactionTrendsResult,
+    )
 
 
 class TransactionAnalyticsService:
@@ -161,3 +176,15 @@ class TransactionAnalyticsService:
             }
             for tag_id, tag_name, total_amount, transactions_count in rows
         ]
+
+    def get_dashboard_trends(self, *, months: int) -> TransactionTrendsResult:
+        return compute_dashboard_trends(user_id=self.user_id, months=months)
+
+    def get_survival_index(self, *, period_months: int = 3) -> SurvivalIndexResult:
+        return compute_survival_index(user_id=self.user_id, period_months=period_months)
+
+
+__all__ = [
+    "TransactionAnalyticsService",
+    "classify_survival",
+]
