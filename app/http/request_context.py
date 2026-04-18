@@ -7,12 +7,16 @@ entrypoint for request metadata consumed outside HTTP adapters.
 from __future__ import annotations
 
 import os
+import re
 from collections.abc import Mapping
 from dataclasses import dataclass
 from typing import Literal, overload
 from uuid import uuid4
 
 from flask import Flask, Response, g, has_request_context, request
+
+# Allow only safe characters in inbound X-Request-ID to prevent log injection.
+_REQUEST_ID_SAFE_RE = re.compile(r"^[a-zA-Z0-9\-_.]{1,128}$")
 
 
 @dataclass(frozen=True)
@@ -83,8 +87,17 @@ def _build_request_context() -> RequestContext:
     )
 
 
+def _sanitize_inbound_request_id(value: str) -> str:
+    """Return value if it is safe to use as a request_id, else empty string."""
+    value = value.strip()
+    return value if _REQUEST_ID_SAFE_RE.match(value) else ""
+
+
 def bind_request_context() -> None:
-    g.request_id = uuid4().hex
+    # Honor an X-Request-ID forwarded by nginx ($request_id) or a frontend
+    # client so the same ID is traceable end-to-end.  Sanitise before storing.
+    incoming = _sanitize_inbound_request_id(request.headers.get("X-Request-ID", ""))
+    g.request_id = incoming or uuid4().hex
     g.request_context = _build_request_context()
 
 
