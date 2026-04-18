@@ -16,7 +16,6 @@ from app.http.runtime import (
     set_runtime_extension,
 )
 from app.models.user import User
-from app.services.email_provider import EmailMessage, get_default_email_provider
 from app.services.email_templates import render_confirmation_email
 
 EMAIL_CONFIRMATION_NEUTRAL_MESSAGE = (
@@ -98,14 +97,15 @@ def _dispatch_confirmation_email(*, email: str, token: str) -> None:
             }
         )
     html, text = render_confirmation_email(confirmation_url=confirmation_url)
-    get_default_email_provider().send(
-        EmailMessage(
-            to_email=email,
-            subject="Confirme sua conta Auraxis",
-            html=html,
-            text=text,
-            tag="account_confirmation",
-        )
+
+    from app.services.outbound_queue import get_default_outbound_queue
+
+    get_default_outbound_queue().enqueue_send_email(
+        to_email=email,
+        subject="Confirme sua conta Auraxis",
+        html=html,
+        text=text,
+        tag="account_confirmation",
     )
     runtime_logger().info(
         "event=auth.email_confirmation_instructions_dispatched email=%s url_present=%s",
