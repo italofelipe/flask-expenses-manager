@@ -2,13 +2,13 @@ from __future__ import annotations
 
 import os
 import re
-import time
 from datetime import UTC, datetime
 from typing import Any, Dict, Optional
 
 import requests
 from requests.exceptions import RequestException
 
+from app.extensions.brapi_cache import get_brapi_cache
 from app.extensions.integration_metrics import increment_metric
 from app.http.runtime import runtime_logger
 from app.services.circuit_breaker import CircuitBreaker
@@ -17,7 +17,6 @@ from config import Config
 
 
 class InvestmentService:
-    _cache: dict[str, tuple[float, Any]] = {}
     _circuit_breaker: CircuitBreaker = CircuitBreaker(
         failure_threshold=3,
         recovery_timeout=30.0,
@@ -32,29 +31,15 @@ class InvestmentService:
         cache_ttl_seconds = int(os.getenv("BRAPI_CACHE_TTL_SECONDS", "60"))
         return timeout_seconds, max_retries, cache_ttl_seconds
 
-    @classmethod
-    def _cache_get(cls, cache_key: str, ttl_seconds: int) -> Any | None:
+    @staticmethod
+    def _cache_get(cache_key: str, ttl_seconds: int) -> Any | None:
         if ttl_seconds <= 0:
             return None
-        cache_entry = cls._cache.get(cache_key)
-        if not cache_entry:
-            return None
-        cached_at, payload = cache_entry
-        if (time.monotonic() - cached_at) > ttl_seconds:
-            cls._cache.pop(cache_key, None)
-            return None
-        return payload
+        return get_brapi_cache().get(cache_key)
 
-    @classmethod
-    def _cache_set(cls, cache_key: str, payload: Any, ttl_seconds: int) -> None:
-        if ttl_seconds <= 0:
-            return
-        cls._cache[cache_key] = (time.monotonic(), payload)
-
-    @classmethod
-    def _clear_cache_for_tests(cls) -> None:
-        cls._cache.clear()
-        cls._circuit_breaker.reset()
+    @staticmethod
+    def _cache_set(cache_key: str, payload: Any, ttl_seconds: int) -> None:
+        get_brapi_cache().set(cache_key, payload, ttl_seconds)
 
     @staticmethod
     def _record_brapi_event(event: str, *, detail: str | None = None) -> None:

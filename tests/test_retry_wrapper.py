@@ -276,9 +276,10 @@ class TestBrapiRetryIntegration:
     def test_request_json_retries_on_http_error_then_succeeds(
         self, monkeypatch: pytest.MonkeyPatch
     ) -> None:
+        from app.extensions.brapi_cache import reset_brapi_cache_for_tests
         from app.services.investment_service import InvestmentService
 
-        InvestmentService._clear_cache_for_tests()
+        reset_brapi_cache_for_tests()
         call_count = 0
 
         ok_response = MagicMock()
@@ -304,9 +305,10 @@ class TestBrapiRetryIntegration:
     def test_request_json_returns_none_after_all_retries_exhausted(
         self, monkeypatch: pytest.MonkeyPatch
     ) -> None:
+        from app.extensions.brapi_cache import reset_brapi_cache_for_tests
         from app.services.investment_service import InvestmentService
 
-        InvestmentService._clear_cache_for_tests()
+        reset_brapi_cache_for_tests()
         call_count = 0
 
         def _always_timeout(*args, **kwargs):  # type: ignore[no-untyped-def]

@@ -148,7 +148,13 @@ class RateLimiterService:
             # Provider callback — no JWT. Capped at 60/min per IP to absorb
             # legitimate retry bursts while blocking automated abuse.
             ("/subscriptions/webhook", "webhook"),
-            # ── GraphQL (user/IP-keyed) ──────────────────────────────────
+            # ── GraphQL mutations — stricter limit than queries ───────────
+            # Mutations are write operations; a lower ceiling prevents abuse
+            # of create_* endpoints (goals, transactions, budgets, etc.).
+            # The synthetic path "/graphql/mutation" is resolved by detecting
+            # the "mutation" keyword in the request body before calling consume().
+            ("/graphql/mutation", "graphql_mutation"),
+            # ── GraphQL queries (user/IP-keyed) ──────────────────────────
             ("/graphql", "graphql"),
             # ── high-volume CRUD tiers (user/IP-keyed) ───────────────────
             ("/transactions", "transactions"),
@@ -203,6 +209,14 @@ class RateLimiterService:
                     "RATE_LIMIT_WEBHOOK_WINDOW_SECONDS", default_window
                 ),
                 key_scope=KEY_SCOPE_IP,
+            ),
+            "graphql_mutation": RateLimitRule(
+                name="graphql_mutation",
+                limit=_read_int_env("RATE_LIMIT_GRAPHQL_MUTATION_LIMIT", 30),
+                window_seconds=_read_int_env(
+                    "RATE_LIMIT_GRAPHQL_MUTATION_WINDOW_SECONDS", default_window
+                ),
+                key_scope=KEY_SCOPE_USER_OR_IP,
             ),
             "graphql": RateLimitRule(
                 name="graphql",
@@ -407,6 +421,17 @@ def _build_backend_unavailable_response(reason: str | None = None) -> Response:
     return response
 
 
+def _is_graphql_mutation_request() -> bool:
+    """True when the current POST to /graphql is a write mutation operation."""
+    if request.path != "/graphql" or request.method != "POST":
+        return False
+    payload = request.get_json(silent=True, force=True)
+    if not isinstance(payload, dict):
+        return False
+    query = str(payload.get("query", "")).lstrip()
+    return query.lower().startswith("mutation")
+
+
 def _should_skip_rate_limit() -> bool:
     if request.method == "OPTIONS":
         return True
@@ -427,6 +452,8 @@ def _is_fail_closed_active(limiter: RateLimiterService) -> bool:
 
 def _consume_with_backend_guard(
     limiter: RateLimiterService,
+    *,
+    effective_path: str | None = None,
 ) -> RateLimitDecision | Response | None:
     if _is_fail_closed_active(limiter):
         if current_app:
@@ -437,9 +464,10 @@ def _consume_with_backend_guard(
             )
         return _build_backend_unavailable_response(limiter.backend_failure_reason)
 
+    path = effective_path if effective_path is not None else request.path
     try:
         return limiter.consume(
-            path=request.path,
+            path=path,
             user_subject=_extract_subject_from_bearer_token(),
             client_ip=_get_client_ip(),
         )
@@ -449,7 +477,7 @@ def _consume_with_backend_guard(
             current_app.logger.exception(
                 "rate_limit_backend_error configured_backend=%s path=%s",
                 limiter.configured_backend,
-                request.path,
+                path,
             )
         if limiter.fail_closed and limiter.configured_backend == "redis":
             return _build_backend_unavailable_response("rate limit backend error")
@@ -496,7 +524,10 @@ def register_rate_limit_guard(app: Flask) -> None:
         if _should_skip_rate_limit():
             return None
 
-        outcome = _consume_with_backend_guard(limiter)
+        effective_path = (
+            "/graphql/mutation" if _is_graphql_mutation_request() else request.path
+        )
+        outcome = _consume_with_backend_guard(limiter, effective_path=effective_path)
         if isinstance(outcome, Response):
             return outcome
         if outcome is None:

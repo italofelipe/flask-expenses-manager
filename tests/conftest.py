@@ -76,17 +76,17 @@ def client(app) -> Generator:
 
 @pytest.fixture(autouse=True)
 def clear_investment_service_cache() -> Generator[None, None, None]:
+    from app.extensions.brapi_cache import reset_brapi_cache_for_tests
     from app.extensions.integration_metrics import reset_metrics_for_tests
-    from app.services.investment_service import InvestmentService
     from app.services.login_attempt_guard_service import (
         reset_login_attempt_guard_for_tests,
     )
 
-    InvestmentService._clear_cache_for_tests()
+    reset_brapi_cache_for_tests()
     reset_metrics_for_tests()
     reset_login_attempt_guard_for_tests()
     yield
-    InvestmentService._clear_cache_for_tests()
+    reset_brapi_cache_for_tests()
     reset_metrics_for_tests()
     reset_login_attempt_guard_for_tests()
 

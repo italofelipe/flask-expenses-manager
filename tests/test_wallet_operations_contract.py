@@ -3,6 +3,7 @@ from datetime import date, timedelta
 from decimal import Decimal
 from typing import Any, Dict
 
+from app.extensions.brapi_cache import reset_brapi_cache_for_tests
 from app.services.investment_service import InvestmentService
 
 
@@ -263,7 +264,7 @@ def test_wallet_operation_invested_amount_by_date_v2(client) -> None:
 
 def test_wallet_portfolio_and_investment_valuation_v2(client, monkeypatch) -> None:
     token = _register_and_login(client, "owner-op5")
-    InvestmentService._clear_cache_for_tests()
+    reset_brapi_cache_for_tests()
     monkeypatch.setattr(InvestmentService, "get_market_price", lambda _ticker: 25.0)
 
     ticker_wallet_response = client.post(
