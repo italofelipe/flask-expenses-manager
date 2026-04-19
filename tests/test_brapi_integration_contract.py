@@ -6,8 +6,8 @@ from typing import Any
 
 import requests
 
+from app.extensions.brapi_cache import reset_brapi_cache_for_tests
 from app.extensions.integration_metrics import build_brapi_metrics_payload
-from app.services.investment_service import InvestmentService
 
 
 def _auth_headers(token: str, contract: str = "v2") -> dict[str, str]:
@@ -88,7 +88,7 @@ def _register_and_login_graphql(client: Any, prefix: str) -> str:
 
 def _force_brapi_timeout(monkeypatch: Any) -> None:
     monkeypatch.setenv("BRAPI_MAX_RETRIES", "0")
-    InvestmentService._clear_cache_for_tests()
+    reset_brapi_cache_for_tests()
 
     def _raise_timeout(*_args: Any, **_kwargs: Any) -> Any:
         raise requests.exceptions.Timeout("provider timeout")

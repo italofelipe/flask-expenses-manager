@@ -8,6 +8,7 @@ import pytest
 
 from app.services.outbound_queue import (
     OutboundQueue,
+    RQOutboundQueue,
     SyncOutboundQueue,
     get_default_outbound_queue,
     reset_outbound_queue_for_tests,
@@ -92,3 +93,50 @@ class TestSyncOutboundQueue:
         mock_dlq.push.assert_called_once()
         _, kwargs = mock_dlq.push.call_args
         assert "reason" in kwargs
+
+
+class TestRQOutboundQueue:
+    _EMAIL_KWARGS = dict(
+        to_email="rq@example.com",
+        subject="RQ Test",
+        html="<p>RQ</p>",
+        text="RQ",
+        tag="rq_tag",
+    )
+
+    def _make_rq_queue(self) -> tuple[RQOutboundQueue, MagicMock]:
+        mock_redis_lib = MagicMock()
+        mock_rq = MagicMock()
+        mock_conn = MagicMock()
+        mock_rq_queue = MagicMock()
+        mock_redis_lib.Redis.from_url.return_value = mock_conn
+        mock_rq.Queue.return_value = mock_rq_queue
+        with (
+            patch.dict("sys.modules", {"redis": mock_redis_lib, "rq": mock_rq}),
+        ):
+            queue = RQOutboundQueue("redis://localhost:6379")
+        queue._queue = mock_rq_queue
+        return queue, mock_rq_queue
+
+    def test_enqueue_returns_job_id_on_success(self):
+        queue, mock_rq_queue = self._make_rq_queue()
+        mock_job = MagicMock()
+        mock_job.id = "job-abc-123"
+        mock_rq_queue.enqueue.return_value = mock_job
+        result = queue.enqueue_send_email(**self._EMAIL_KWARGS)
+        assert result == "job-abc-123"
+
+    def test_enqueue_falls_back_to_sync_on_exception(self, app):
+        queue, mock_rq_queue = self._make_rq_queue()
+        mock_rq_queue.enqueue.side_effect = Exception("Redis enqueue failed")
+
+        mock_provider = MagicMock()
+        with app.app_context():
+            with patch(
+                "app.services.email_provider.get_default_email_provider",
+                return_value=mock_provider,
+            ):
+                result = queue.enqueue_send_email(**self._EMAIL_KWARGS)
+
+        assert result is None
+        mock_provider.send.assert_called_once()

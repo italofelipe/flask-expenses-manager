@@ -3,6 +3,7 @@ from typing import Any
 import pytest
 import requests
 
+from app.extensions.brapi_cache import inject_memory_cache_for_tests
 from app.services.investment_service import InvestmentService
 
 
@@ -20,8 +21,6 @@ class _FakeResponse:
 
 
 def test_get_market_price_success(monkeypatch: pytest.MonkeyPatch) -> None:
-    InvestmentService._clear_cache_for_tests()
-
     def _fake_get(*args: Any, **kwargs: Any) -> _FakeResponse:
         return _FakeResponse({"results": [{"regularMarketPrice": 42.5}]})
 
@@ -31,8 +30,6 @@ def test_get_market_price_success(monkeypatch: pytest.MonkeyPatch) -> None:
 
 
 def test_get_market_price_no_results(monkeypatch: pytest.MonkeyPatch) -> None:
-    InvestmentService._clear_cache_for_tests()
-
     def _fake_get(*args: Any, **kwargs: Any) -> _FakeResponse:
         return _FakeResponse({"results": []})
 
@@ -42,8 +39,6 @@ def test_get_market_price_no_results(monkeypatch: pytest.MonkeyPatch) -> None:
 
 
 def test_get_market_price_request_exception(monkeypatch: pytest.MonkeyPatch) -> None:
-    InvestmentService._clear_cache_for_tests()
-
     def _fake_get(*args: Any, **kwargs: Any) -> _FakeResponse:
         raise requests.exceptions.RequestException("network error")
 
@@ -55,8 +50,6 @@ def test_get_market_price_request_exception(monkeypatch: pytest.MonkeyPatch) -> 
 def test_get_market_price_rejects_invalid_ticker_format(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    InvestmentService._clear_cache_for_tests()
-
     called = {"value": False}
 
     def _fake_get(*args: Any, **kwargs: Any) -> _FakeResponse:
@@ -72,8 +65,6 @@ def test_get_market_price_rejects_invalid_ticker_format(
 def test_get_market_price_rejects_invalid_provider_payload(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    InvestmentService._clear_cache_for_tests()
-
     def _fake_get(*args: Any, **kwargs: Any) -> _FakeResponse:
         return _FakeResponse({"results": [{"regularMarketPrice": "invalid"}]})
 
@@ -85,8 +76,6 @@ def test_get_market_price_rejects_invalid_provider_payload(
 def test_get_market_price_retries_transient_error(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    InvestmentService._clear_cache_for_tests()
-    monkeypatch.setenv("BRAPI_MAX_RETRIES", "2")
     monkeypatch.setenv("BRAPI_CACHE_TTL_SECONDS", "0")
 
     calls = {"count": 0}
@@ -98,7 +87,10 @@ def test_get_market_price_retries_transient_error(
         return _FakeResponse({"results": [{"regularMarketPrice": 30.0}]})
 
     monkeypatch.setattr(requests, "get", _fake_get)
-    monkeypatch.setattr("app.services.investment_service.time.sleep", lambda _: None)
+    # Patch tenacity's sleep so retries are instant in tests.
+    import tenacity.nap
+
+    monkeypatch.setattr(tenacity.nap, "sleep", lambda _: None)
 
     assert InvestmentService.get_market_price("vale3") == 30.0
     assert calls["count"] == 2
@@ -107,7 +99,6 @@ def test_get_market_price_retries_transient_error(
 def test_get_market_price_uses_configured_timeout(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    InvestmentService._clear_cache_for_tests()
     monkeypatch.setenv("BRAPI_TIMEOUT_SECONDS", "4")
     monkeypatch.setenv("BRAPI_CACHE_TTL_SECONDS", "0")
 
@@ -124,8 +115,8 @@ def test_get_market_price_uses_configured_timeout(
 
 
 def test_get_market_price_uses_cache(monkeypatch: pytest.MonkeyPatch) -> None:
-    InvestmentService._clear_cache_for_tests()
     monkeypatch.setenv("BRAPI_CACHE_TTL_SECONDS", "60")
+    mem = inject_memory_cache_for_tests()
 
     calls = {"count": 0}
 
@@ -138,13 +129,15 @@ def test_get_market_price_uses_cache(monkeypatch: pytest.MonkeyPatch) -> None:
     assert InvestmentService.get_market_price("bbas3") == 18.0
     assert InvestmentService.get_market_price("bbas3") == 18.0
     assert calls["count"] == 1
+    # Entry stored in memory cache.
+    assert mem.get("BBAS3") == 18.0
 
 
 def test_get_historical_prices_success_and_cache(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    InvestmentService._clear_cache_for_tests()
     monkeypatch.setenv("BRAPI_CACHE_TTL_SECONDS", "60")
+    mem = inject_memory_cache_for_tests()
 
     calls = {"count": 0}
 
@@ -170,19 +163,19 @@ def test_get_historical_prices_success_and_cache(
     )
     assert prices["2025-02-09"] == 21.5
     assert prices["2025-02-10"] == 22.0
-    # Segunda chamada deve vir do cache.
+    # Second call must come from cache (no extra API call).
     prices_cached = InvestmentService.get_historical_prices(
         "petr4", start_date="2025-02-09", end_date="2025-02-10"
     )
     assert prices_cached == prices
     assert calls["count"] == 1
+    # Verify the key was stored in memory cache.
+    assert mem.get("HIST:PETR4:2025-02-09:2025-02-10") is not None
 
 
 def test_get_historical_prices_request_exception(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    InvestmentService._clear_cache_for_tests()
-
     def _fake_get(*args: Any, **kwargs: Any) -> _FakeResponse:
         raise requests.exceptions.RequestException("network error")
 
@@ -221,24 +214,29 @@ def test_internal_helpers_handle_defensive_paths(
     assert InvestmentService._request_json("https://example.com") is None
 
 
-def test_cache_get_expires_entry() -> None:
-    InvestmentService._clear_cache_for_tests()
-    InvestmentService._cache["CACHE:KEY"] = (0.0, {"value": 1})
+def test_cache_respects_ttl_zero(monkeypatch: pytest.MonkeyPatch) -> None:
+    """When BRAPI_CACHE_TTL_SECONDS=0 the cache is bypassed."""
+    monkeypatch.setenv("BRAPI_CACHE_TTL_SECONDS", "0")
+    mem = inject_memory_cache_for_tests()
 
-    # Simula tempo atual além do TTL para forçar expiração e remoção da chave.
-    with pytest.MonkeyPatch.context() as monkeypatch:
-        monkeypatch.setattr(
-            "app.services.investment_service.time.monotonic", lambda: 10.0
-        )
-        assert InvestmentService._cache_get("CACHE:KEY", ttl_seconds=1) is None
+    calls = {"count": 0}
 
-    assert "CACHE:KEY" not in InvestmentService._cache
+    def _fake_get(*args: Any, **kwargs: Any) -> _FakeResponse:
+        calls["count"] += 1
+        return _FakeResponse({"results": [{"regularMarketPrice": 9.0}]})
+
+    monkeypatch.setattr(requests, "get", _fake_get)
+
+    assert InvestmentService.get_market_price("abcd3") == 9.0
+    assert InvestmentService.get_market_price("abcd3") == 9.0
+    # TTL=0 means nothing is stored and every call goes to the provider.
+    assert calls["count"] == 2
+    assert mem.get("ABCD3") is None
 
 
 def test_get_historical_prices_skips_invalid_rows(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    InvestmentService._clear_cache_for_tests()
     monkeypatch.setenv("BRAPI_CACHE_TTL_SECONDS", "0")
 
     def _fake_get(*args: Any, **kwargs: Any) -> _FakeResponse:
@@ -268,8 +266,6 @@ def test_get_historical_prices_skips_invalid_rows(
 def test_get_historical_prices_requires_results_as_dict_item(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    InvestmentService._clear_cache_for_tests()
-
     def _fake_get(*args: Any, **kwargs: Any) -> _FakeResponse:
         return _FakeResponse({"results": ["invalid"]})
 
