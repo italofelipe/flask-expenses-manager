@@ -113,3 +113,33 @@ def test_rate_limit_blocks_graphql_transport_after_threshold(client: Any) -> Non
     assert blocked_body["error"] == "RATE_LIMIT_EXCEEDED"
     assert blocked_body["details"]["rule"] == "graphql"
     assert blocked.headers["X-RateLimit-Rule"] == "graphql"
+
+
+def test_graphql_mutation_uses_stricter_rule(client: Any) -> None:
+    limiter = _rate_limiter(client)
+    limiter.set_rule("graphql_mutation", limit=1, window_seconds=60)
+    limiter.set_rule("graphql", limit=100, window_seconds=60)
+
+    mutation_payload = {
+        "query": 'mutation { login(email: "a@b.com", password: "x") { token } }'
+    }
+    first = client.post("/graphql", json=mutation_payload)
+    blocked = client.post("/graphql", json=mutation_payload)
+
+    assert first.status_code == 200
+    assert blocked.status_code == 429
+    blocked_body = blocked.get_json()
+    assert blocked_body["details"]["rule"] == "graphql_mutation"
+    assert blocked.headers["X-RateLimit-Rule"] == "graphql_mutation"
+
+
+def test_graphql_query_does_not_use_mutation_rule(client: Any) -> None:
+    limiter = _rate_limiter(client)
+    limiter.set_rule("graphql_mutation", limit=1, window_seconds=60)
+    limiter.set_rule("graphql", limit=100, window_seconds=60)
+
+    query_payload = {"query": "query { __typename }"}
+    for _ in range(3):
+        resp = client.post("/graphql", json=query_payload)
+        assert resp.status_code == 200
+        assert resp.headers.get("X-RateLimit-Rule") == "graphql"
