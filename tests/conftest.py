@@ -1,7 +1,7 @@
 import os
 import sys
 from pathlib import Path
-from typing import Generator
+from typing import Any, Generator
 
 import pytest
 from sqlalchemy.orm import close_all_sessions
@@ -95,3 +95,44 @@ def clear_investment_service_cache() -> Generator[None, None, None]:
 def cleanup_sqlalchemy_sessions() -> Generator[None, None, None]:
     yield
     close_all_sessions()
+
+
+@pytest.fixture
+def query_counter(app: Any) -> Generator[dict[str, int], None, None]:
+    """SQLAlchemy query counter fixture.
+
+    Attaches an event listener to the engine that increments a counter for
+    every SQL statement executed.  Yields a dict with key ``"n"`` so tests
+    can assert ``counts["n"] <= threshold``.
+
+    Usage::
+
+        def test_foo(app, query_counter):
+            with app.app_context():
+                query_counter["n"] = 0  # reset if needed
+                do_something()
+                assert query_counter["n"] <= 5
+    """
+    from sqlalchemy import event
+
+    from app.extensions.database import db
+
+    counts: dict[str, int] = {"n": 0}
+
+    def _before_cursor_execute(
+        conn: Any,
+        cursor: Any,
+        statement: Any,
+        parameters: Any,
+        context: Any,
+        executemany: Any,
+    ) -> None:
+        counts["n"] += 1
+
+    with app.app_context():
+        event.listen(db.engine, "before_cursor_execute", _before_cursor_execute)
+
+    yield counts
+
+    with app.app_context():
+        event.remove(db.engine, "before_cursor_execute", _before_cursor_execute)
