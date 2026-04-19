@@ -11,7 +11,12 @@ from app.models.alert import Alert, AlertStatus
 from app.models.transaction import Transaction, TransactionStatus
 from app.models.user import User
 from app.services.alert_service import _is_dispatch_allowed
-from app.services.email_provider import EmailMessage, get_default_email_provider
+from app.services.email_dlq import get_email_dlq
+from app.services.email_provider import (
+    EmailMessage,
+    EmailProviderError,
+    get_default_email_provider,
+)
 from app.services.email_templates.base import render_due_soon_email
 from app.utils.datetime_utils import utc_now_naive
 
@@ -64,6 +69,16 @@ def _serialize_amount(value: Decimal | float | int | object) -> str:
         return str(value)
 
 
+def _send_or_queue(message: EmailMessage) -> AlertStatus:
+    """Send email; push to DLQ on failure. Returns the resulting alert status."""
+    try:
+        get_default_email_provider().send(message)
+        return AlertStatus.SENT
+    except EmailProviderError as exc:
+        get_email_dlq().push(message, reason=str(exc))
+        return AlertStatus.PENDING
+
+
 def _eligible_transactions(*, target_date: date) -> Sequence[Transaction]:
     return cast(
         Sequence[Transaction],
@@ -90,7 +105,6 @@ def dispatch_due_transaction_reminders(
     sent = 0
     skipped = 0
     queued = 0
-    provider = get_default_email_provider()
 
     for transaction in _eligible_transactions(target_date=target_date):
         scanned += 1
@@ -124,25 +138,18 @@ def dispatch_due_transaction_reminders(
                 f"Vence em {days_before_due} dias: {transaction.title} "
                 f"(R$ {amount_str})"
             )
-        message = EmailMessage(
-            to_email=str(user.email),
-            subject=subject,
-            html=email_html,
-            text=email_text,
-            tag=category,
+        alert_status = _send_or_queue(
+            EmailMessage(
+                to_email=str(user.email),
+                subject=subject,
+                html=email_html,
+                text=email_text,
+                tag=category,
+            )
         )
-        from app.services.email_dlq import get_email_dlq
-        from app.services.email_provider import EmailProviderError
-
-        try:
-            provider.send(message)
-            alert_status = AlertStatus.SENT
+        if alert_status == AlertStatus.SENT:
             sent += 1
-        except EmailProviderError as exc:
-            # Push to DLQ so the message is not lost; do not propagate so the
-            # job continues processing remaining transactions and exits 0.
-            get_email_dlq().push(message, reason=str(exc))
-            alert_status = AlertStatus.PENDING
+        else:
             queued += 1
 
         db.session.add(

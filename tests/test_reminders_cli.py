@@ -77,7 +77,9 @@ def test_dispatch_due_soon_email_provider_error_queues_to_dlq_and_exits_zero(
             mock.patch(
                 "app.application.services.transaction_reminder_service.get_default_email_provider"
             ) as mock_provider_factory,
-            mock.patch("app.services.email_dlq.get_email_dlq") as mock_dlq_factory,
+            mock.patch(
+                "app.application.services.transaction_reminder_service.get_email_dlq"
+            ) as mock_dlq_factory,
         ):
             mock_provider = mock.MagicMock()
             mock_provider.send.side_effect = EmailProviderError(
