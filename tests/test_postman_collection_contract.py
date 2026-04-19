@@ -154,8 +154,9 @@ OPENAPI_GAPS: set[tuple[str, str]] = {
     ("POST", "/bank-statements/confirm"),
     # Advisory (not yet in apispec-documented blueprints)
     ("GET", "/advisory/insights"),
-    # Dashboard survival index (not yet in apispec-documented blueprints)
+    # Dashboard routes not yet in apispec-documented blueprints
     ("GET", "/dashboard/survival-index"),
+    ("GET", "/dashboard/weekly-summary"),
     # Multi-device session management (#1028)
     ("GET", "/auth/sessions"),
     ("DELETE", "/auth/sessions"),

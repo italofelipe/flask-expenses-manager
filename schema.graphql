@@ -25,6 +25,7 @@ type Query {
   transactionDueRange(startDate: String, endDate: String, initialDate: String @deprecated(reason: "Use startDate."), finalDate: String @deprecated(reason: "Use endDate."), page: Int = 1, perPage: Int = 10, orderBy: String = "overdue_first"): TransactionDueRangePayloadType
   transaction(transactionId: UUID!): TransactionTypeObject
   dashboardOverview(month: String!): TransactionDashboardPayloadType
+  weeklySummary(period: String, startDate: String, endDate: String): WeeklySummaryPayloadType
   me: UserType
 }
 
@@ -494,6 +495,41 @@ type TransactionDueCountsType {
   totalTransactions: Int!
   incomeTransactions: Int!
   expenseTransactions: Int!
+}
+
+type WeeklySummaryPayloadType {
+  currentWeek: WeeklyPeriodTotalsType!
+  previousWeek: WeeklyPeriodTotalsType!
+  comparison: WeeklyComparisonType!
+  series: [WeeklySummarySeriesEntryType]!
+  period: String!
+  seriesStart: String!
+  seriesEnd: String!
+}
+
+type WeeklyPeriodTotalsType {
+  start: String!
+  end: String!
+  income: Float!
+  expense: Float!
+  balance: Float!
+  transactionCount: Int!
+}
+
+type WeeklyComparisonType {
+  incomeDelta: Float!
+  incomeDeltaPercent: Float
+  expenseDelta: Float!
+  expenseDeltaPercent: Float
+  balanceDelta: Float!
+  balanceDeltaPercent: Float
+}
+
+type WeeklySummarySeriesEntryType {
+  date: String!
+  income: Float!
+  expense: Float!
+  balance: Float!
 }
 
 type UserType {

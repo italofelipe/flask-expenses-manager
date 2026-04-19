@@ -143,6 +143,105 @@ DASHBOARD_TRENDS_DOC: dict[str, Any] = {
     },
 }
 
+DASHBOARD_WEEKLY_SUMMARY_DOC: dict[str, Any] = {
+    "summary": "Resumo semanal com comparativo (semana atual vs anterior)",
+    "description": (
+        "Retorna os totais da semana atual e da semana anterior (receita, despesa, "
+        "saldo, contagem de transações pagas), o comparativo com deltas absolutos e "
+        "percentuais, e uma série temporal para alimentar gráficos. "
+        "Granularidade: diária quando period ≤ 31 dias, semanal caso contrário."
+    ),
+    "tags": ["Dashboard"],
+    "security": [{"BearerAuth": []}],
+    "params": {
+        "period": {
+            "description": "Preset de período da série: 1m (padrão), 3m, 6m",
+            "in": "query",
+            "type": "string",
+            "required": False,
+            "example": "1m",
+        },
+        "start_date": {
+            "description": "Data inicial para período customizado (YYYY-MM-DD)",
+            "in": "query",
+            "type": "string",
+            "required": False,
+            "example": "2026-03-01",
+        },
+        "end_date": {
+            "description": "Data final para período customizado (YYYY-MM-DD)",
+            "in": "query",
+            "type": "string",
+            "required": False,
+            "example": "2026-04-19",
+        },
+        **contract_header_param(supported_version="v2"),
+    },
+    "responses": {
+        200: json_success_response(
+            description="Resumo semanal calculado com sucesso",
+            message="Resumo semanal calculado com sucesso",
+            data_example={
+                "current_week": {
+                    "start": "2026-04-14",
+                    "end": "2026-04-20",
+                    "income": 2500.0,
+                    "expense": 1800.0,
+                    "balance": 700.0,
+                    "transaction_count": 8,
+                },
+                "previous_week": {
+                    "start": "2026-04-07",
+                    "end": "2026-04-13",
+                    "income": 0.0,
+                    "expense": 2100.0,
+                    "balance": -2100.0,
+                    "transaction_count": 5,
+                },
+                "comparison": {
+                    "income_delta": 2500.0,
+                    "income_delta_percent": None,
+                    "expense_delta": -300.0,
+                    "expense_delta_percent": -14.29,
+                    "balance_delta": 2800.0,
+                    "balance_delta_percent": None,
+                },
+                "series": [
+                    {
+                        "date": "2026-03-20",
+                        "income": 0.0,
+                        "expense": 200.0,
+                        "balance": -200.0,
+                    }
+                ],
+                "period": "1m",
+                "series_start": "2026-03-20",
+                "series_end": "2026-04-19",
+            },
+        ),
+        401: json_error_response(
+            description="Token inválido",
+            message="Token revogado",
+            error_code="UNAUTHORIZED",
+            status_code=401,
+        ),
+        422: json_error_response(
+            description="Parâmetro inválido",
+            message=(
+                "Período inválido. Use 1m, 3m, 6m ou forneça start_date e end_date."
+            ),
+            error_code="VALIDATION_ERROR",
+            status_code=422,
+        ),
+        500: json_error_response(
+            description="Erro interno",
+            message="Erro ao calcular resumo semanal",
+            error_code="INTERNAL_ERROR",
+            status_code=500,
+        ),
+    },
+}
+
 DASHBOARD_SURVIVAL_DOC: dict[str, Any] = {
     "summary": "Índice de sobrevivência financeira (burn rate)",
     "description": (
