@@ -36,7 +36,6 @@ def dispatch_due_soon(ctx: click.Context, dry_run: bool) -> None:
     from app.application.services.transaction_reminder_service import (
         dispatch_due_transaction_reminders,
     )
-    from app.services.email_provider import EmailProviderError
 
     exit_code = 0
     for window in (7, 1):
@@ -44,14 +43,9 @@ def dispatch_due_soon(ctx: click.Context, dry_run: bool) -> None:
             result = dispatch_due_transaction_reminders(days_before_due=window)
             click.echo(
                 f"{window}-day reminders: "
-                f"scanned={result.scanned} sent={result.sent} skipped={result.skipped}"
+                f"scanned={result.scanned} sent={result.sent} "
+                f"skipped={result.skipped} queued={result.queued}"
             )
-        except EmailProviderError as exc:
-            click.echo(
-                f"ERROR {window}-day reminders: email provider failed — {exc}",
-                err=True,
-            )
-            exit_code = 1
         except Exception as exc:  # noqa: BLE001
             click.echo(
                 f"ERROR {window}-day reminders: unexpected failure — {exc}",

@@ -26,6 +26,7 @@ class ReminderDispatchResult:
     scanned: int
     sent: int
     skipped: int
+    queued: int = 0
 
 
 def _start_of_day(day: date) -> datetime:
@@ -88,6 +89,7 @@ def dispatch_due_transaction_reminders(
     scanned = 0
     sent = 0
     skipped = 0
+    queued = 0
     provider = get_default_email_provider()
 
     for transaction in _eligible_transactions(target_date=target_date):
@@ -122,30 +124,43 @@ def dispatch_due_transaction_reminders(
                 f"Vence em {days_before_due} dias: {transaction.title} "
                 f"(R$ {amount_str})"
             )
-        provider.send(
-            EmailMessage(
-                to_email=str(user.email),
-                subject=subject,
-                html=email_html,
-                text=email_text,
-                tag=category,
-            )
+        message = EmailMessage(
+            to_email=str(user.email),
+            subject=subject,
+            html=email_html,
+            text=email_text,
+            tag=category,
         )
+        from app.services.email_dlq import get_email_dlq
+        from app.services.email_provider import EmailProviderError
+
+        try:
+            provider.send(message)
+            alert_status = AlertStatus.SENT
+            sent += 1
+        except EmailProviderError as exc:
+            # Push to DLQ so the message is not lost; do not propagate so the
+            # job continues processing remaining transactions and exits 0.
+            get_email_dlq().push(message, reason=str(exc))
+            alert_status = AlertStatus.PENDING
+            queued += 1
+
         db.session.add(
             Alert(
                 user_id=transaction.user_id,
                 category=category,
-                status=AlertStatus.SENT,
+                status=alert_status,
                 entity_type="transaction",
                 entity_id=transaction.id,
                 # Anchor triggered_at to reference_day so idempotency checks that
                 # filter by _start_of_day(day)//_end_of_day(day) always match,
                 # even when the caller passes a synthetic `today` (e.g. in tests).
                 triggered_at=_start_of_day(reference_day),
-                sent_at=utc_now_naive(),
+                sent_at=utc_now_naive() if alert_status == AlertStatus.SENT else None,
             )
         )
-        sent += 1
 
     db.session.commit()
-    return ReminderDispatchResult(scanned=scanned, sent=sent, skipped=skipped)
+    return ReminderDispatchResult(
+        scanned=scanned, sent=sent, skipped=skipped, queued=queued
+    )
