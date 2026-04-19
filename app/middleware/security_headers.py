@@ -25,9 +25,6 @@ class SecurityHeadersPolicy:
 
 
 def _build_security_headers_policy() -> SecurityHeadersPolicy:
-    is_debug = _read_bool_env("FLASK_DEBUG", False)
-    is_testing = _read_bool_env("FLASK_TESTING", False)
-    is_production = not (is_debug or is_testing)
     return SecurityHeadersPolicy(
         frame_options=os.getenv("SECURITY_X_FRAME_OPTIONS", "SAMEORIGIN").strip(),
         content_type_options=os.getenv(
@@ -44,9 +41,14 @@ def _build_security_headers_policy() -> SecurityHeadersPolicy:
         ).strip(),
         hsts_value=os.getenv(
             "SECURITY_HSTS_VALUE",
-            "max-age=31536000; includeSubDomains",
+            "max-age=63072000; includeSubDomains; preload",
         ).strip(),
-        hsts_enabled=_read_bool_env("SECURITY_HSTS_ENABLED", is_production),
+        # Default False in production: the nginx reverse-proxy (or ALB) is the
+        # canonical HSTS source. Setting it to True here would produce a duplicate
+        # Strict-Transport-Security header (ZAP [10035]). Explicitly set
+        # SECURITY_HSTS_ENABLED=true only when the app terminates TLS directly
+        # (i.e. no nginx/ALB in front).
+        hsts_enabled=_read_bool_env("SECURITY_HSTS_ENABLED", False),
         # API only serves JSON — no scripts, styles, or frames needed.
         csp_value=os.getenv(
             "SECURITY_CSP",
