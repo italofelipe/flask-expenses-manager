@@ -62,25 +62,32 @@ def test_dispatch_due_soon_sends_reminders(app) -> None:
         assert len(outbox) >= 1
 
 
-def test_dispatch_due_soon_email_provider_error_exits_nonzero(app) -> None:
-    """If the email provider raises EmailProviderError the CLI exits 1,
-    logs the error to stderr, and does not abort mid-loop."""
+def test_dispatch_due_soon_email_provider_error_queues_to_dlq_and_exits_zero(
+    app,
+) -> None:
+    """EmailProviderError is caught by the service, pushed to DLQ, and the CLI
+    exits 0 with queued=N in output — the job is not considered failed."""
     import unittest.mock as mock
 
     from app.services.email_provider import EmailProviderError
 
     with app.app_context():
         runner = app.test_cli_runner()
-        with mock.patch(
-            "app.application.services.transaction_reminder_service.get_default_email_provider"
-        ) as mock_provider_factory:
+        with (
+            mock.patch(
+                "app.application.services.transaction_reminder_service.get_default_email_provider"
+            ) as mock_provider_factory,
+            mock.patch("app.services.email_dlq.get_email_dlq") as mock_dlq_factory,
+        ):
             mock_provider = mock.MagicMock()
             mock_provider.send.side_effect = EmailProviderError(
                 "RESEND_API_KEY missing"
             )
             mock_provider_factory.return_value = mock_provider
 
-            # Add a transaction so the provider is actually called
+            mock_dlq = mock.MagicMock()
+            mock_dlq_factory.return_value = mock_dlq
+
             user = User(
                 id=uuid.uuid4(),
                 name="Error Test User",
@@ -102,8 +109,9 @@ def test_dispatch_due_soon_email_provider_error_exits_nonzero(app) -> None:
 
             result = runner.invoke(args=["reminders", "dispatch-due-soon"])
 
-    assert result.exit_code == 1
-    assert "ERROR" in result.output
+    assert result.exit_code == 0
+    assert "queued=1" in result.output
+    mock_dlq.push.assert_called_once()
 
 
 def test_dispatch_due_soon_unexpected_error_exits_nonzero(app) -> None:
