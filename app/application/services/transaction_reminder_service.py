@@ -11,7 +11,12 @@ from app.models.alert import Alert, AlertStatus
 from app.models.transaction import Transaction, TransactionStatus
 from app.models.user import User
 from app.services.alert_service import _is_dispatch_allowed
-from app.services.email_provider import EmailMessage, get_default_email_provider
+from app.services.email_dlq import get_email_dlq
+from app.services.email_provider import (
+    EmailMessage,
+    EmailProviderError,
+    get_default_email_provider,
+)
 from app.services.email_templates.base import render_due_soon_email
 from app.utils.datetime_utils import utc_now_naive
 
@@ -26,6 +31,7 @@ class ReminderDispatchResult:
     scanned: int
     sent: int
     skipped: int
+    queued: int = 0
 
 
 def _start_of_day(day: date) -> datetime:
@@ -63,6 +69,22 @@ def _serialize_amount(value: Decimal | float | int | object) -> str:
         return str(value)
 
 
+def _build_subject(*, days_before_due: int, title: str, amount_str: str) -> str:
+    if days_before_due == 1:
+        return f"Amanhã vence: {title} (R$ {amount_str})"
+    return f"Vence em {days_before_due} dias: {title} (R$ {amount_str})"
+
+
+def _send_or_queue(message: EmailMessage) -> AlertStatus:
+    """Send email; push to DLQ on failure. Returns the resulting alert status."""
+    try:
+        get_default_email_provider().send(message)
+        return AlertStatus.SENT
+    except EmailProviderError as exc:
+        get_email_dlq().push(message, reason=str(exc))
+        return AlertStatus.PENDING
+
+
 def _eligible_transactions(*, target_date: date) -> Sequence[Transaction]:
     return cast(
         Sequence[Transaction],
@@ -88,7 +110,7 @@ def dispatch_due_transaction_reminders(
     scanned = 0
     sent = 0
     skipped = 0
-    provider = get_default_email_provider()
+    queued = 0
 
     for transaction in _eligible_transactions(target_date=target_date):
         scanned += 1
@@ -115,14 +137,12 @@ def dispatch_due_transaction_reminders(
             amount_formatted=amount_str,
             days_before_due=days_before_due,
         )
-        if days_before_due == 1:
-            subject = f"Amanhã vence: {transaction.title} (R$ {amount_str})"
-        else:
-            subject = (
-                f"Vence em {days_before_due} dias: {transaction.title} "
-                f"(R$ {amount_str})"
-            )
-        provider.send(
+        subject = _build_subject(
+            days_before_due=days_before_due,
+            title=transaction.title,
+            amount_str=amount_str,
+        )
+        alert_status = _send_or_queue(
             EmailMessage(
                 to_email=str(user.email),
                 subject=subject,
@@ -131,21 +151,29 @@ def dispatch_due_transaction_reminders(
                 tag=category,
             )
         )
+        if alert_status == AlertStatus.SENT:
+            sent += 1
+            sent_at = utc_now_naive()
+        else:
+            queued += 1
+            sent_at = None
+
         db.session.add(
             Alert(
                 user_id=transaction.user_id,
                 category=category,
-                status=AlertStatus.SENT,
+                status=alert_status,
                 entity_type="transaction",
                 entity_id=transaction.id,
                 # Anchor triggered_at to reference_day so idempotency checks that
                 # filter by _start_of_day(day)//_end_of_day(day) always match,
                 # even when the caller passes a synthetic `today` (e.g. in tests).
                 triggered_at=_start_of_day(reference_day),
-                sent_at=utc_now_naive(),
+                sent_at=sent_at,
             )
         )
-        sent += 1
 
     db.session.commit()
-    return ReminderDispatchResult(scanned=scanned, sent=sent, skipped=skipped)
+    return ReminderDispatchResult(
+        scanned=scanned, sent=sent, skipped=skipped, queued=queued
+    )
