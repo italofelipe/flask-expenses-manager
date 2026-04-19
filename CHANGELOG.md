@@ -1,5 +1,17 @@
 # Changelog
 
+## [1.32.0](https://github.com/italofelipe/auraxis-api/compare/v1.31.0...v1.32.0) (2026-04-19)
+
+
+### Features
+
+* **quality:** n+1 gate, hypothesis property tests, REST contract doc ([#1027](https://github.com/italofelipe/auraxis-api/issues/1027) [#1054](https://github.com/italofelipe/auraxis-api/issues/1054) [#1087](https://github.com/italofelipe/auraxis-api/issues/1087)) ([#1096](https://github.com/italofelipe/auraxis-api/issues/1096)) ([a7d5d14](https://github.com/italofelipe/auraxis-api/commit/a7d5d14447d076f84b20cb7899c2b0f686337ddb))
+
+
+### Bug Fixes
+
+* **jobs:** audit-retention SSM cd bug + reminder DLQ fallback ([#989](https://github.com/italofelipe/auraxis-api/issues/989) [#1081](https://github.com/italofelipe/auraxis-api/issues/1081)) ([#1094](https://github.com/italofelipe/auraxis-api/issues/1094)) ([ab7dd14](https://github.com/italofelipe/auraxis-api/commit/ab7dd14b6053600601fe5105e5f9d99fcc6cf717))
+
 ## [1.31.0](https://github.com/italofelipe/auraxis-api/compare/v1.30.0...v1.31.0) (2026-04-18)
 
 
