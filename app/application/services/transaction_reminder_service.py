@@ -69,6 +69,12 @@ def _serialize_amount(value: Decimal | float | int | object) -> str:
         return str(value)
 
 
+def _build_subject(*, days_before_due: int, title: str, amount_str: str) -> str:
+    if days_before_due == 1:
+        return f"Amanhã vence: {title} (R$ {amount_str})"
+    return f"Vence em {days_before_due} dias: {title} (R$ {amount_str})"
+
+
 def _send_or_queue(message: EmailMessage) -> AlertStatus:
     """Send email; push to DLQ on failure. Returns the resulting alert status."""
     try:
@@ -131,13 +137,11 @@ def dispatch_due_transaction_reminders(
             amount_formatted=amount_str,
             days_before_due=days_before_due,
         )
-        if days_before_due == 1:
-            subject = f"Amanhã vence: {transaction.title} (R$ {amount_str})"
-        else:
-            subject = (
-                f"Vence em {days_before_due} dias: {transaction.title} "
-                f"(R$ {amount_str})"
-            )
+        subject = _build_subject(
+            days_before_due=days_before_due,
+            title=transaction.title,
+            amount_str=amount_str,
+        )
         alert_status = _send_or_queue(
             EmailMessage(
                 to_email=str(user.email),
@@ -149,8 +153,10 @@ def dispatch_due_transaction_reminders(
         )
         if alert_status == AlertStatus.SENT:
             sent += 1
+            sent_at = utc_now_naive()
         else:
             queued += 1
+            sent_at = None
 
         db.session.add(
             Alert(
@@ -163,7 +169,7 @@ def dispatch_due_transaction_reminders(
                 # filter by _start_of_day(day)//_end_of_day(day) always match,
                 # even when the caller passes a synthetic `today` (e.g. in tests).
                 triggered_at=_start_of_day(reference_day),
-                sent_at=utc_now_naive() if alert_status == AlertStatus.SENT else None,
+                sent_at=sent_at,
             )
         )
 
