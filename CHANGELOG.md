@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.33.0](https://github.com/italofelipe/auraxis-api/compare/v1.32.0...v1.33.0) (2026-04-20)
+
+
+### Features
+
+* **dashboard:** B13 — contrato de resumo semanal com comparativo e série temporal ([#1104](https://github.com/italofelipe/auraxis-api/issues/1104)) ([7ea7a49](https://github.com/italofelipe/auraxis-api/commit/7ea7a492297a6424b349f6741b7ae6514182be99))
+
 ## [1.32.0](https://github.com/italofelipe/auraxis-api/compare/v1.31.0...v1.32.0) (2026-04-19)
 
 
