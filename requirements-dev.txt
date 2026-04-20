@@ -6,6 +6,6 @@ cosmic-ray==8.4.6
 pip-audit==2.9.0
 pydantic>=2.0
 schemathesis==3.39.16
-types-requests==2.33.0.20260402
+types-requests==2.33.0.20260408
 types-python-dateutil==2.9.0.20260408
 hypothesis==6.131.15
