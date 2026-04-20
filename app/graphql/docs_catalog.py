@@ -86,6 +86,17 @@ GRAPHQL_OPERATION_CATALOG: tuple[GraphQLOperationDoc, ...] = (
         source_module=QUERY_DASHBOARD_MODULE,
     ),
     GraphQLOperationDoc(
+        name="weeklySummary",
+        operation_type="query",
+        domain="dashboard",
+        access="auth_required",
+        summary=(
+            "Resumo semanal: comparativo semana atual vs anterior + "
+            "série temporal para gráfico (B13)."
+        ),
+        source_module=QUERY_DASHBOARD_MODULE,
+    ),
+    GraphQLOperationDoc(
         name="transactions",
         operation_type="query",
         domain="transactions",

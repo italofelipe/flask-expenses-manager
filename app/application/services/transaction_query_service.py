@@ -30,6 +30,7 @@ from app.application.services.transaction.query_types import (
     TransactionSummaryResult,
     TransactionTrendsMonthEntry,
     TransactionTrendsResult,
+    WeeklySummaryResult,
 )
 from app.application.services.transaction_application_service import (
     TransactionApplicationService,
@@ -200,6 +201,22 @@ class TransactionQueryService:
 
     def get_survival_index(self, *, period_months: int = 3) -> SurvivalIndexResult:
         return self._analytics_service().get_survival_index(period_months=period_months)
+
+    def get_weekly_summary(
+        self,
+        *,
+        period: str = "1m",
+        start_date: date | None = None,
+        end_date: date | None = None,
+    ) -> WeeklySummaryResult:
+        from app.services.weekly_summary import compute_weekly_summary
+
+        return compute_weekly_summary(
+            user_id=self._user_id,
+            period=period,
+            start_date=start_date,
+            end_date=end_date,
+        )
 
     def _build_period_query(
         self,

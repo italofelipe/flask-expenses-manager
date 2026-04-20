@@ -112,6 +112,41 @@ class TransactionExpensePeriodResult(TypedDict):
     pagination: TransactionPaginationPayload
 
 
+class WeeklyPeriodTotals(TypedDict):
+    start: str
+    end: str
+    income: float
+    expense: float
+    balance: float
+    transaction_count: int
+
+
+class WeeklyComparison(TypedDict):
+    income_delta: float
+    income_delta_percent: float | None
+    expense_delta: float
+    expense_delta_percent: float | None
+    balance_delta: float
+    balance_delta_percent: float | None
+
+
+class WeeklySummarySeriesEntry(TypedDict):
+    date: str
+    income: float
+    expense: float
+    balance: float
+
+
+class WeeklySummaryResult(TypedDict):
+    current_week: WeeklyPeriodTotals
+    previous_week: WeeklyPeriodTotals
+    comparison: WeeklyComparison
+    series: list[WeeklySummarySeriesEntry]
+    period: str
+    series_start: str
+    series_end: str
+
+
 @dataclass(frozen=True)
 class TransactionQueryDependencies:
     transaction_application_service_factory: Callable[
@@ -136,4 +171,8 @@ __all__ = [
     "TransactionSummaryResult",
     "TransactionTrendsMonthEntry",
     "TransactionTrendsResult",
+    "WeeklyComparison",
+    "WeeklyPeriodTotals",
+    "WeeklySummaryResult",
+    "WeeklySummarySeriesEntry",
 ]

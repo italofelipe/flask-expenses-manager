@@ -17,6 +17,14 @@
   },
   {
     "access": "auth_required",
+    "domain": "dashboard",
+    "name": "weeklySummary",
+    "operation_type": "query",
+    "source_module": "app.graphql.queries.dashboard",
+    "summary": "Resumo semanal: comparativo semana atual vs anterior + série temporal para gráfico (B13)."
+  },
+  {
+    "access": "auth_required",
     "domain": "transactions",
     "name": "transactions",
     "operation_type": "query",

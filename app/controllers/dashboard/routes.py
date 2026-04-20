@@ -5,6 +5,7 @@ from .resources import (
     DashboardOverviewResource,
     DashboardSurvivalIndexResource,
     DashboardTrendsResource,
+    DashboardWeeklySummaryResource,
 )
 
 _ROUTES_REGISTERED = False
@@ -28,6 +29,11 @@ def register_dashboard_routes() -> None:
     dashboard_bp.add_url_rule(
         "/survival-index",
         view_func=DashboardSurvivalIndexResource.as_view("survival_index"),
+        methods=["GET"],
+    )
+    dashboard_bp.add_url_rule(
+        "/weekly-summary",
+        view_func=DashboardWeeklySummaryResource.as_view("weekly_summary"),
         methods=["GET"],
     )
     _ROUTES_REGISTERED = True

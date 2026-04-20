@@ -560,3 +560,43 @@ class AlertPreferenceType(graphene.ObjectType):
 
 class NotificationPreferencesType(graphene.ObjectType):
     preferences = graphene.List(AlertPreferenceType, required=True)
+
+
+# ---------------------------------------------------------------------------
+# Weekly summary types (B13 — MVP1 Dashboard)
+# ---------------------------------------------------------------------------
+
+
+class WeeklyPeriodTotalsType(graphene.ObjectType):
+    start = graphene.String(required=True)
+    end = graphene.String(required=True)
+    income = graphene.Float(required=True)
+    expense = graphene.Float(required=True)
+    balance = graphene.Float(required=True)
+    transaction_count = graphene.Int(required=True)
+
+
+class WeeklyComparisonType(graphene.ObjectType):
+    income_delta = graphene.Float(required=True)
+    income_delta_percent = graphene.Float()
+    expense_delta = graphene.Float(required=True)
+    expense_delta_percent = graphene.Float()
+    balance_delta = graphene.Float(required=True)
+    balance_delta_percent = graphene.Float()
+
+
+class WeeklySummarySeriesEntryType(graphene.ObjectType):
+    date = graphene.String(required=True)
+    income = graphene.Float(required=True)
+    expense = graphene.Float(required=True)
+    balance = graphene.Float(required=True)
+
+
+class WeeklySummaryPayloadType(graphene.ObjectType):
+    current_week = graphene.Field(WeeklyPeriodTotalsType, required=True)
+    previous_week = graphene.Field(WeeklyPeriodTotalsType, required=True)
+    comparison = graphene.Field(WeeklyComparisonType, required=True)
+    series = graphene.List(WeeklySummarySeriesEntryType, required=True)
+    period = graphene.String(required=True)
+    series_start = graphene.String(required=True)
+    series_end = graphene.String(required=True)
