@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import os
+import re
 from typing import Any
 
 from flask import Flask, Response, current_app
@@ -17,6 +18,19 @@ DEFAULT_AUDIT_PATH_PREFIXES = (
     "/wallet",
     "/graphql",
 )
+
+
+# Allow-list for log-safe entity IDs (S5145 / CWE-117).
+# Only UUID-format strings pass through; anything else is redacted so
+# user-controlled data never reaches the logger verbatim.
+_SAFE_ID_RE = re.compile(
+    r"^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+    re.IGNORECASE,
+)
+
+
+def _safe_log_id(value: str) -> str:
+    return value if _SAFE_ID_RE.match(value) else "[redacted]"
 
 
 def _is_audit_trail_enabled() -> bool:
@@ -143,7 +157,7 @@ def record_entity_delete(
         current_app.logger.exception(
             "audit_entity_delete_failed entity_type=%s entity_id=%s",
             entity_type,
-            entity_id,
+            _safe_log_id(entity_id),
         )
 
 
