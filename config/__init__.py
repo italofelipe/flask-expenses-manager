@@ -85,9 +85,18 @@ class Config:
         and not _read_bool_env("FLASK_TESTING", False),
     )
     JWT_COOKIE_SAMESITE = os.getenv("JWT_COOKIE_SAMESITE", "Lax")
-    # CSRF protection for cookie-based JWTs is deferred to a follow-up issue
-    # (double-submit token + per-request header). Keep disabled for now.
-    JWT_COOKIE_CSRF_PROTECT = False
+    # SEC-AUD-03 — Double-submit CSRF token for the refresh cookie.
+    # Gated behind AURAXIS_CSRF_ENFORCE so web/app clients can migrate first:
+    # while OFF, the CSRF cookie is NOT set and refresh works without the header
+    # (backward-compatible). Once all clients read the CSRF cookie and forward
+    # it as X-CSRF-TOKEN on /auth/refresh, flip the flag in prod to enforce.
+    JWT_COOKIE_CSRF_PROTECT = _read_bool_env("AURAXIS_CSRF_ENFORCE", False)
+    JWT_CSRF_CHECK_FORM = False
+    JWT_ACCESS_CSRF_HEADER_NAME = "X-CSRF-TOKEN"
+    JWT_REFRESH_CSRF_HEADER_NAME = "X-CSRF-TOKEN"
+    JWT_ACCESS_CSRF_COOKIE_NAME = "auraxis_csrf_access"
+    JWT_REFRESH_CSRF_COOKIE_NAME = "auraxis_csrf_refresh"
+    JWT_CSRF_IN_COOKIES = True
     # SEC-1 — close dual-mode: when True, login/refresh responses stop echoing
     # refresh_token in the JSON body; clients must rely on the httpOnly cookie.
     # Keep False until legacy clients have migrated. Header X-Refresh-Cookie-Only
