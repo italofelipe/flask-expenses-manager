@@ -90,6 +90,27 @@ jobs:
         with:
           args: detect --source . --verbose --redact --config .gitleaks.toml
 
+  # SEC-AUD-12 — TruffleHog complements Gitleaks by validating that
+  # detected secrets are *active* against each provider's API. Parity
+  # with auraxis-web and auraxis-app, which already run both scanners.
+  secret-scan-trufflehog:
+    name: Secret Scan (TruffleHog)
+    runs-on: ubuntu-latest
+    needs: quality
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Run TruffleHog
+        uses: trufflesecurity/trufflehog@main
+        with:
+          path: ./
+          base: ${{ github.event.repository.default_branch }}
+          head: HEAD
+          extra_args: --only-verified
+
   dependency-review:
     name: Dependency Review (PR gate)
     if: ${{ github.event_name == 'pull_request' }}
