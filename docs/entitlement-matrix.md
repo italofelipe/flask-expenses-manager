@@ -30,6 +30,7 @@ matching entry here.
 | `export_pdf` | Premium, Trial | Downgrade to Free / cancellation |
 | `advanced_simulations` | Premium, Trial | Downgrade to Free / cancellation |
 | `shared_entries` | Premium, Trial | Downgrade to Free / cancellation |
+| `focus_mode` | Premium, Trial | Downgrade to Free / cancellation |
 | `basic_simulations` | Free, Premium, Trial | Never |
 | `wallet_read` | Free, Premium, Trial | Never |
 
