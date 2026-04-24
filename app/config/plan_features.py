@@ -13,6 +13,7 @@ PLAN_FEATURES: dict[str, list[str]] = {
         "advanced_simulations",
         "export_pdf",
         "shared_entries",
+        "focus_mode",
     ],
     "trial": [
         "basic_simulations",
@@ -20,6 +21,7 @@ PLAN_FEATURES: dict[str, list[str]] = {
         "advanced_simulations",
         "export_pdf",
         "shared_entries",
+        "focus_mode",
     ],
 }
 
