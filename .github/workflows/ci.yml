@@ -602,7 +602,7 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Trivy FS scan (repo)
-        uses: aquasecurity/trivy-action@0.35.0
+        uses: aquasecurity/trivy-action@v0.36.0
         with:
           scan-type: fs
           scan-ref: .
@@ -629,7 +629,7 @@ jobs:
         run: bash scripts/ci_image_artifact.sh load reports/ci-images/runtime-prod.tar.gz
 
       - name: Trivy image scan
-        uses: aquasecurity/trivy-action@0.35.0
+        uses: aquasecurity/trivy-action@v0.36.0
         with:
           image-ref: auraxis-ci-prod:${{ github.sha }}
           format: table
