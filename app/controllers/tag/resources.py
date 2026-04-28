@@ -22,7 +22,8 @@ MISSING_NAME_MESSAGE = "Field 'name' is required"
 NAME_TOO_LONG_MESSAGE = "Field 'name' must be at most 50 characters"
 TAG_NOT_FOUND_MESSAGE = "Tag not found"
 INVALID_COLOR_MESSAGE = "Field 'color' must be a valid hex color code (e.g. #FF6B6B)"
-_HEX_COLOR_RE = re.compile(r"^#[0-9A-Fa-f]{6}$")
+# Accept #RRGGBB and #RRGGBBAA; alpha is stripped before persisting.
+_HEX_COLOR_RE = re.compile(r"^#[0-9A-Fa-f]{6}([0-9A-Fa-f]{2})?$")
 
 
 def _serialize_tag(t: Tag) -> dict[str, Any]:
@@ -38,6 +39,14 @@ def _validate_color(color: str | None) -> bool:
     if color is None:
         return True
     return bool(_HEX_COLOR_RE.match(color))
+
+
+def _normalize_color(color: str | None) -> str | None:
+    if color is None:
+        return None
+    if _HEX_COLOR_RE.match(color):
+        return color[:7]
+    return color
 
 
 @tag_bp.route("", methods=["GET"])
@@ -89,6 +98,7 @@ def create_tag() -> tuple[dict[str, Any], int]:
             message=INVALID_COLOR_MESSAGE,
             error_code="INVALID_COLOR",
         )
+    color = _normalize_color(color)
     icon = payload.get("icon") or None
 
     tag = Tag(user_id=user_id, name=name, color=color, icon=icon)
@@ -146,7 +156,7 @@ def update_tag(tag_id: UUID) -> tuple[dict[str, Any], int]:
 
     tag.name = name
     if "color" in payload:
-        tag.color = color
+        tag.color = _normalize_color(color)
     if "icon" in payload:
         tag.icon = payload.get("icon") or None
     db.session.commit()
