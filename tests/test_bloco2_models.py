@@ -249,6 +249,39 @@ def test_create_tag_invalid_color_returns_400(client) -> None:
     assert resp.status_code == 400
 
 
+def test_create_tag_accepts_hex_with_alpha_and_normalizes(client) -> None:
+    token, _ = _register_and_login(client, "tag-color-alpha")
+
+    resp = client.post(
+        "/tags",
+        headers=_auth(token),
+        json={"name": "Gastos fixos", "color": "#C21717FF", "icon": None},
+    )
+    assert resp.status_code == 201, resp.get_json()
+    tag = resp.get_json()["data"]["tag"]
+    assert tag["color"] == "#C21717"
+    assert tag["icon"] is None
+
+
+def test_update_tag_normalizes_alpha_hex(client) -> None:
+    token, _ = _register_and_login(client, "tag-update-alpha")
+
+    create = client.post(
+        "/tags",
+        headers=_auth(token),
+        json={"name": "Lazer", "color": "#FFEAA7"},
+    )
+    tag_id = create.get_json()["data"]["tag"]["id"]
+
+    resp = client.put(
+        f"/tags/{tag_id}",
+        headers=_auth(token),
+        json={"name": "Lazer", "color": "#9B59B6CC"},
+    )
+    assert resp.status_code == 200, resp.get_json()
+    assert resp.get_json()["data"]["tag"]["color"] == "#9B59B6"
+
+
 def test_list_tags_returns_color_and_icon(client) -> None:
     token, _ = _register_and_login(client, "tag-list-color")
 

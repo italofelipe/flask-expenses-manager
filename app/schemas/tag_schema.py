@@ -2,12 +2,21 @@ import re
 
 from marshmallow import Schema, ValidationError, fields, validate
 
-_HEX_COLOR_RE = re.compile(r"^#[0-9A-Fa-f]{6}$")
+_HEX_COLOR_RE = re.compile(r"^#[0-9A-Fa-f]{6}([0-9A-Fa-f]{2})?$")
 
 
 def _validate_hex_color(value: str) -> None:
     if value is not None and not _HEX_COLOR_RE.match(value):
         raise ValidationError("Color must be a valid hex color code (e.g. #FF6B6B)")
+
+
+def normalize_hex_color(value: str | None) -> str | None:
+    """Drop alpha channel: normalize #RRGGBBAA to canonical #RRGGBB."""
+    if value is None:
+        return None
+    if _HEX_COLOR_RE.match(value):
+        return value[:7]
+    return value
 
 
 class TagSchema(Schema):
