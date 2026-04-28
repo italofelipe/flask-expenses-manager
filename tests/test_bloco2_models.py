@@ -282,6 +282,29 @@ def test_update_tag_normalizes_alpha_hex(client) -> None:
     assert resp.get_json()["data"]["tag"]["color"] == "#9B59B6"
 
 
+def test_tag_schema_accepts_six_and_eight_digit_hex() -> None:
+    from marshmallow import ValidationError
+
+    from app.schemas.tag_schema import TagSchema
+
+    schema = TagSchema()
+
+    # 6-digit canonical
+    schema.load({"name": "ok-6", "color": "#FF6B6B"})
+    # 8-digit with alpha
+    schema.load({"name": "ok-8", "color": "#C21717FF"})
+    # null color allowed
+    schema.load({"name": "ok-null", "color": None})
+
+    # Invalid forms still rejected
+    for bad in ("red", "#XYZ", "#12345", "#1234567"):
+        try:
+            schema.load({"name": "bad", "color": bad})
+        except ValidationError:
+            continue
+        raise AssertionError(f"expected ValidationError for color={bad!r}")
+
+
 def test_list_tags_returns_color_and_icon(client) -> None:
     token, _ = _register_and_login(client, "tag-list-color")
 

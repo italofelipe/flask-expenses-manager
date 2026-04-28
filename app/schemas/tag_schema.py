@@ -10,15 +10,6 @@ def _validate_hex_color(value: str) -> None:
         raise ValidationError("Color must be a valid hex color code (e.g. #FF6B6B)")
 
 
-def normalize_hex_color(value: str | None) -> str | None:
-    """Drop alpha channel: normalize #RRGGBBAA to canonical #RRGGBB."""
-    if value is None:
-        return None
-    if _HEX_COLOR_RE.match(value):
-        return value[:7]
-    return value
-
-
 class TagSchema(Schema):
     """Schema para criação e atualização de tags"""
 
