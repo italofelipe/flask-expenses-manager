@@ -170,6 +170,25 @@ GRAPHQL_OPERATION_CATALOG: tuple[GraphQLOperationDoc, ...] = (
         source_module=QUERY_SIMULATION_MODULE,
     ),
     GraphQLOperationDoc(
+        name="simulations",
+        operation_type="query",
+        domain="simulations",
+        access="auth_required",
+        summary=(
+            "Lista as simulações persistidas do usuário autenticado, "
+            "com paginação e filtro opcional por toolId."
+        ),
+        source_module=QUERY_SIMULATION_MODULE,
+    ),
+    GraphQLOperationDoc(
+        name="simulation",
+        operation_type="query",
+        domain="simulations",
+        access="auth_required",
+        summary="Retorna o detalhe de uma simulação persistida do usuário.",
+        source_module=QUERY_SIMULATION_MODULE,
+    ),
+    GraphQLOperationDoc(
         name="walletEntries",
         operation_type="query",
         domain="wallet",

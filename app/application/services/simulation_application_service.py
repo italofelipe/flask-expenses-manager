@@ -55,11 +55,13 @@ class SimulationApplicationService:
         *,
         page: int,
         per_page: int,
+        tool_id: str | None = None,
     ) -> dict[str, Any]:
         try:
             sims, pagination = self._service.list_simulations(
                 page=page,
                 per_page=per_page,
+                tool_id=tool_id,
             )
         except SimulationServiceError as exc:
             raise _to_application_error(exc) from exc

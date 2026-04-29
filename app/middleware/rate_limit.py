@@ -148,6 +148,13 @@ class RateLimiterService:
             # Provider callback — no JWT. Capped at 60/min per IP to absorb
             # legitimate retry bursts while blocking automated abuse.
             ("/subscriptions/webhook", "webhook"),
+            # ── simulations save (user-keyed) ────────────────────────────
+            # POST /simulations is the canonical generic save endpoint
+            # (DEC-196 / #1128). Capped at 60 saves/min/user to block
+            # scripted abuse while leaving room for legitimate batch UX.
+            # Resolved by detecting POST on /simulations in
+            # _resolve_effective_path before calling consume().
+            ("/simulations/save", "simulations_save"),
             # ── GraphQL mutations — stricter limit than queries ───────────
             # Mutations are write operations; a lower ceiling prevents abuse
             # of create_* endpoints (goals, transactions, budgets, etc.).
@@ -259,6 +266,17 @@ class RateLimiterService:
                 limit=_read_int_env("RATE_LIMIT_SETTINGS_LIMIT", 60),
                 window_seconds=_read_int_env(
                     "RATE_LIMIT_SETTINGS_WINDOW_SECONDS", default_window
+                ),
+                key_scope=KEY_SCOPE_USER_OR_IP,
+            ),
+            # POST /simulations canonical save (DEC-196 / #1128).
+            # 60 saves/min/user — capacity for legitimate batch UX,
+            # ceiling for scripted abuse.
+            "simulations_save": RateLimitRule(
+                name="simulations_save",
+                limit=_read_int_env("RATE_LIMIT_SIMULATIONS_SAVE_LIMIT", 60),
+                window_seconds=_read_int_env(
+                    "RATE_LIMIT_SIMULATIONS_SAVE_WINDOW_SECONDS", default_window
                 ),
                 key_scope=KEY_SCOPE_USER_OR_IP,
             ),
@@ -432,6 +450,30 @@ def _is_graphql_mutation_request() -> bool:
     return query.lower().startswith("mutation")
 
 
+def _is_simulations_save_request() -> bool:
+    """True when the current request is the canonical POST /simulations save.
+
+    Other simulation endpoints (the legacy installment-vs-cash routes and the
+    detail/delete routes under /simulations/<id>) keep their default rule.
+    """
+    return request.path == "/simulations" and request.method == "POST"
+
+
+def _resolve_effective_path() -> str:
+    """Map the current request path to a synthetic path used by rate-limit rules.
+
+    Returns ``request.path`` for routes that already match a rule prefix; for
+    request shapes that need bespoke routing (GraphQL mutations, the canonical
+    simulations save) we return a synthetic path that the rule order resolves
+    to a stricter rule.
+    """
+    if _is_graphql_mutation_request():
+        return "/graphql/mutation"
+    if _is_simulations_save_request():
+        return "/simulations/save"
+    return request.path
+
+
 def _should_skip_rate_limit() -> bool:
     if request.method == "OPTIONS":
         return True
@@ -524,10 +566,9 @@ def register_rate_limit_guard(app: Flask) -> None:
         if _should_skip_rate_limit():
             return None
 
-        effective_path = (
-            "/graphql/mutation" if _is_graphql_mutation_request() else request.path
+        outcome = _consume_with_backend_guard(
+            limiter, effective_path=_resolve_effective_path()
         )
-        outcome = _consume_with_backend_guard(limiter, effective_path=effective_path)
         if isinstance(outcome, Response):
             return outcome
         if outcome is None:
