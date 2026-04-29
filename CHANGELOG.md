@@ -1,5 +1,18 @@
 # Changelog
 
+## [1.34.0](https://github.com/italofelipe/auraxis-api/compare/v1.33.0...v1.34.0) (2026-04-29)
+
+
+### Features
+
+* **entitlements:** add focus_mode to premium plan ([#1117](https://github.com/italofelipe/auraxis-api/issues/1117)) ([893820f](https://github.com/italofelipe/auraxis-api/commit/893820fa0a6a44b5fc7fb22098bc24fff71d6e78))
+* **simulations:** canonical generic /simulations endpoint ([#1128](https://github.com/italofelipe/auraxis-api/issues/1128)) ([#1130](https://github.com/italofelipe/auraxis-api/issues/1130)) ([2124a9e](https://github.com/italofelipe/auraxis-api/commit/2124a9e270561be906e1a78b07e2c93c59df541e))
+
+
+### Bug Fixes
+
+* **tags:** accept hex with alpha channel and normalize ([#1125](https://github.com/italofelipe/auraxis-api/issues/1125)) ([347450d](https://github.com/italofelipe/auraxis-api/commit/347450dd08db94595e192dfb90a0e194ab9fa890))
+
 ## [1.33.0](https://github.com/italofelipe/auraxis-api/compare/v1.32.0...v1.33.0) (2026-04-20)
 
 
