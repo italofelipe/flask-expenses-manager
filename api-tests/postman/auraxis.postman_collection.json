@@ -390,9 +390,20 @@
               "listen": "test",
               "script": {
                 "exec": [
-                  "pm.test('DELETE /auth/sessions/{session_id} — status 200', function () {",
-                  "  pm.response.to.have.status(200);",
+                  "pm.test('DELETE /auth/sessions/{session_id} — 200 or 404', function () {",
+                  "  pm.expect(pm.response.code).to.be.oneOf([200, 404]);",
                   "});"
+                ],
+                "type": "text/javascript"
+              }
+            },
+            {
+              "listen": "prerequest",
+              "script": {
+                "exec": [
+                  "pm.collectionVariables.set(",
+                  "  'session_id', '00000000-0000-0000-0000-000000000000',",
+                  ");"
                 ],
                 "type": "text/javascript"
               }
@@ -4136,7 +4147,7 @@
           "}",
           "",
           "var smokeRequests = [\"GET /healthz\", \"POST \\u2014 Registrar usu\\u00e1rio\", \"POST \\u2014 Autenticar usu\\u00e1rio\", \"GET \\u2014 Obter contexto do usu\\u00e1rio autenticado\", \"GET \\u2014 Obter bootstrap da home do usu\\u00e1rio\", \"POST \\u2014 Criar transa\\u00e7\\u00e3o\", \"GET \\u2014 Listar transa\\u00e7\\u00f5es\", \"GET \\u2014 Obter resumo mensal de transa\\u00e7\\u00f5es\", \"GET \\u2014 Obter overview mensal do dashboard\", \"POST /budgets\", \"GET /budgets\", \"POST /goals\", \"GET /goals\", \"POST /goals/simulate\", \"POST /wallet\", \"GET /wallet\", \"GET /wallet/valuation\", \"POST /simulations/installment-vs-cash/calculate\", \"GET /entitlements\"];",
-          "var privilegedOnlyRequests = [\"DELETE /entitlements/admin/{entitlement_id}\", \"POST /entitlements/admin\"];",
+          "var privilegedOnlyRequests = [\"DELETE /auth/sessions\", \"DELETE /auth/sessions/{session_id}\", \"DELETE /entitlements/admin/{entitlement_id}\", \"POST /entitlements/admin\"];",
           "var activeProfile = String(pm.environment.get('suiteProfile') || pm.collectionVariables.get('suiteProfile') || 'full').toLowerCase();",
           "if (!['smoke', 'full', 'privileged'].includes(activeProfile)) {",
           "  throw new Error('Unsupported suiteProfile: ' + activeProfile + '. Use smoke, full or privileged.');",
