@@ -217,6 +217,11 @@ SMOKE_OPERATIONS: set[str] = {
 PRIVILEGED_OPERATIONS: set[str] = {
     "POST /entitlements/admin",
     "DELETE /entitlements/admin/{entitlement_id}",
+    # The session-revocation endpoints invalidate the bearer token mid-run
+    # (which breaks every subsequent assertion in the suite). Keep them in
+    # the privileged profile so the full smoke run leaves them out.
+    "DELETE /auth/sessions",
+    "DELETE /auth/sessions/{session_id}",
 }
 
 # ---------------------------------------------------------------------------
@@ -292,6 +297,38 @@ ENRICHMENT: dict[str, dict[str, Any]] = {
             "// Needs a valid confirmation token from email — expect 400 in automated runs",
             "pm.test('Confirm email — expected 400 without token', function () {",
             "  pm.expect(pm.response.code).to.be.oneOf([200, 400]);",
+            "});",
+        ],
+    },
+    "GET /auth/sessions": {
+        "test_lines": [
+            "pm.test('GET /auth/sessions — status 200', function () {",
+            "  pm.response.to.have.status(200);",
+            "});",
+        ],
+    },
+    "DELETE /auth/sessions/{session_id}": {
+        # Cleanup — the smoke suite stays inside a single session for the
+        # whole run, so we have no specific id to revoke. We feed a fake
+        # UUID into the path variable and accept the 404 the API returns
+        # for an unknown session — that is the contract being smoked.
+        "prerequest_lines": [
+            "pm.collectionVariables.set(",
+            "  'session_id', '00000000-0000-0000-0000-000000000000',",
+            ");",
+        ],
+        "test_lines": [
+            "pm.test('DELETE /auth/sessions/{session_id} — 200 or 404', function () {",
+            "  pm.expect(pm.response.code).to.be.oneOf([200, 404]);",
+            "});",
+        ],
+    },
+    "DELETE /auth/sessions": {
+        # Cleanup — explicitly revokes every active session for the user,
+        # which is exactly what the suite wants at the end of a run.
+        "test_lines": [
+            "pm.test('DELETE /auth/sessions — status 200', function () {",
+            "  pm.response.to.have.status(200);",
             "});",
         ],
     },

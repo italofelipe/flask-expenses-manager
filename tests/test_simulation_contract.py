@@ -34,9 +34,10 @@ def _auth(token: str, v2: bool = False) -> Dict[str, str]:
 
 
 def _sim_payload(**overrides: Any) -> Dict[str, Any]:
+    """Canonical payload using a tool_id present in TOOLS_REGISTRY."""
     payload: Dict[str, Any] = {
-        "tool_id": "salary_net",
-        "rule_version": "2025.1",
+        "tool_id": "salary-net-clt",
+        "rule_version": "2026.04",
         "inputs": {"gross": 5000},
         "result": {"net": 4100},
     }
@@ -55,7 +56,7 @@ def test_simulation_save_returns_201(client) -> None:
     assert resp.status_code == 201
     body = resp.get_json()
     assert "simulation" in body
-    assert body["simulation"]["tool_id"] == "salary_net"
+    assert body["simulation"]["tool_id"] == "salary-net-clt"
     assert body["simulation"]["saved"] is True
 
 
@@ -99,7 +100,7 @@ def test_simulation_list_after_save(client) -> None:
     assert resp.status_code == 200
     body = resp.get_json()
     assert len(body["items"]) == 1
-    assert body["items"][0]["tool_id"] == "salary_net"
+    assert body["items"][0]["tool_id"] == "salary-net-clt"
 
 
 # ---------------------------------------------------------------------------

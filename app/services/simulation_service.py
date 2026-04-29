@@ -51,11 +51,13 @@ class SimulationService:
         *,
         page: int,
         per_page: int,
+        tool_id: str | None = None,
     ) -> tuple[list[Simulation], dict[str, int]]:
-        paginated = (
-            Simulation.query.filter_by(user_id=self.user_id, saved=True)
-            .order_by(Simulation.created_at.desc())
-            .paginate(page=page, per_page=per_page, error_out=False)
+        query = Simulation.query.filter_by(user_id=self.user_id, saved=True)
+        if tool_id:
+            query = query.filter_by(tool_id=tool_id)
+        paginated = query.order_by(Simulation.created_at.desc()).paginate(
+            page=page, per_page=per_page, error_out=False
         )
         pagination = {
             "page": paginated.page,

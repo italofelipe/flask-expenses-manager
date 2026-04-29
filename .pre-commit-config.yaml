@@ -60,6 +60,12 @@ repos:
     entry: python3 scripts/alembic_single_head_check.py
     language: system
     pass_filenames: false
+  - id: tools-registry-parity
+    name: tools-registry-parity (DEC-196)
+    entry: python3 scripts/check_tools_registry_parity.py
+    language: system
+    pass_filenames: false
+    files: (app/simulations/tools_registry\.py|tools-catalog\.ts)
   - id: mypy
     name: mypy
     entry: scripts/python_tool.sh mypy --no-incremental app

@@ -27,6 +27,8 @@ class Simulation(db.Model):
     rule_version = db.Column(db.String(20), nullable=False)
     inputs = db.Column(db.JSON, nullable=False)
     result = db.Column(db.JSON, nullable=False)
+    # Optional user-supplied label/notes (e.g., "Cenário conservador").
+    extra_metadata = db.Column("metadata", db.JSON, nullable=True)
     saved = db.Column(db.Boolean, nullable=False, default=False)
     goal_id = db.Column(UUID(as_uuid=True), db.ForeignKey("goals.id"), nullable=True)
     created_at = db.Column(db.DateTime, nullable=False, default=utc_now_naive)
@@ -34,6 +36,12 @@ class Simulation(db.Model):
     __table_args__ = (
         db.Index("ix_simulations_user_created", "user_id", "created_at"),
         db.Index("ix_simulations_user_saved", "user_id", "saved"),
+        db.Index(
+            "ix_simulations_user_tool_created",
+            "user_id",
+            "tool_id",
+            "created_at",
+        ),
     )
 
     def __repr__(self) -> str:

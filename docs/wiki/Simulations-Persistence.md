@@ -1,7 +1,8 @@
 # Simulations Persistence — Backend Implementation Guide
 
-> Status: Planned · Decision: ADR `simulations_canonical_persistence.md` (platform) /
-> DEC-196 · Date: 2026-04-29
+> Status: **Implemented** (PR feat/simulations-canonical-endpoint, #1128) ·
+> Decision: ADR `simulations_canonical_persistence.md` (platform) / DEC-196 ·
+> Date: 2026-04-29
 
 ## Scope
 
