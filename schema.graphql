@@ -16,6 +16,8 @@ type Query {
   walletHistory(investmentId: UUID!, page: Int = 1, perPage: Int = 5): WalletHistoryPayloadType
   tickers: [TickerType]
   installmentVsCashCalculate(cashPrice: String!, installmentCount: Int!, installmentAmount: String, installmentTotal: String, firstPaymentDelayDays: Int = 30, opportunityRateType: String = "manual", opportunityRateAnnual: String, inflationRateAnnual: String!, feesEnabled: Boolean = false, feesUpfront: String = "0.00", scenarioLabel: String): InstallmentVsCashCalculationPayloadType
+  simulations(page: Int = 1, perPage: Int = 20, toolId: String): SimulationListPayloadType!
+  simulation(id: UUID!): SimulationType
   goals(page: Int = 1, perPage: Int = 10, status: String): GoalListPayloadType
   goal(goalId: UUID!): GoalTypeObject
   goalPlan(goalId: UUID!): GoalPlanType
@@ -364,6 +366,42 @@ type InstallmentVsCashScheduleItemType {
   cumulativeRealValueToday: String!
   cashCumulative: String!
 }
+
+type SimulationListPayloadType {
+  items: [SimulationType]!
+  page: Int!
+  perPage: Int!
+  total: Int!
+  pages: Int!
+}
+
+"""Generic persisted simulation envelope (DEC-196 / #1128)."""
+type SimulationType {
+  id: UUID!
+  userId: UUID!
+  toolId: String!
+  ruleVersion: String!
+  inputs: JSONString!
+  result: JSONString!
+  metadata: JSONString
+  saved: Boolean!
+  createdAt: DateTime!
+}
+
+"""
+Allows use of a JSON String for input / output from the GraphQL schema.
+
+Use of this type is *not recommended* as you lose the benefits of having a defined, static
+schema (one of the key benefits of GraphQL).
+"""
+scalar JSONString
+
+"""
+The `DateTime` scalar type represents a DateTime
+value as specified by
+[iso8601](https://en.wikipedia.org/wiki/ISO_8601).
+"""
+scalar DateTime
 
 type GoalListPayloadType {
   items: [GoalTypeObject]!

@@ -98,6 +98,22 @@
   },
   {
     "access": "auth_required",
+    "domain": "simulations",
+    "name": "simulations",
+    "operation_type": "query",
+    "source_module": "app.graphql.queries.simulation",
+    "summary": "Lista as simulações persistidas do usuário autenticado, com paginação e filtro opcional por toolId."
+  },
+  {
+    "access": "auth_required",
+    "domain": "simulations",
+    "name": "simulation",
+    "operation_type": "query",
+    "source_module": "app.graphql.queries.simulation",
+    "summary": "Retorna o detalhe de uma simulação persistida do usuário."
+  },
+  {
+    "access": "auth_required",
     "domain": "wallet",
     "name": "walletEntries",
     "operation_type": "query",

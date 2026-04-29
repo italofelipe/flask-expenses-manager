@@ -2358,6 +2358,29 @@
         ]
       }
     },
+    "/auth/sessions": {
+      "delete": {
+        "parameters": [],
+        "responses": {}
+      },
+      "get": {
+        "parameters": [],
+        "responses": {}
+      }
+    },
+    "/auth/sessions/{session_id}": {
+      "delete": {
+        "parameters": [
+          {
+            "in": "path",
+            "name": "session_id",
+            "required": true,
+            "type": "string"
+          }
+        ],
+        "responses": {}
+      }
+    },
     "/budgets": {
       "get": {
         "description": "Lista todos os orçamentos ativos do usuário com valor gasto no período.",
@@ -2789,7 +2812,6 @@
                   "message": "Índice de sobrevivência calculado com sucesso"
                 },
                 "schema": {
-                  "type": "object",
                   "properties": {
                     "data": {
                       "type": "object"
@@ -2804,7 +2826,8 @@
                   "required": [
                     "message",
                     "data"
-                  ]
+                  ],
+                  "type": "object"
                 }
               }
             },
@@ -2828,7 +2851,6 @@
                   "status_code": 401
                 },
                 "schema": {
-                  "type": "object",
                   "properties": {
                     "code": {
                       "type": "string"
@@ -2846,7 +2868,8 @@
                   "required": [
                     "message",
                     "code"
-                  ]
+                  ],
+                  "type": "object"
                 }
               }
             },
@@ -2870,7 +2893,6 @@
                   "status_code": 500
                 },
                 "schema": {
-                  "type": "object",
                   "properties": {
                     "code": {
                       "type": "string"
@@ -2888,7 +2910,8 @@
                   "required": [
                     "message",
                     "code"
-                  ]
+                  ],
+                  "type": "object"
                 }
               }
             },
@@ -3118,6 +3141,256 @@
           }
         ],
         "summary": "Tendências mensais do dashboard",
+        "tags": [
+          "Dashboard"
+        ]
+      }
+    },
+    "/dashboard/weekly-summary": {
+      "get": {
+        "description": "Retorna os totais da semana atual e da semana anterior (receita, despesa, saldo, contagem de transações pagas), o comparativo com deltas absolutos e percentuais, e uma série temporal para alimentar gráficos. Granularidade: diária quando period ≤ 31 dias, semanal caso contrário.",
+        "parameters": [
+          {
+            "description": "Opcional. Envie `v2` para o envelope padronizado.",
+            "example": "v2",
+            "in": "header",
+            "name": "X-API-Contract",
+            "required": false,
+            "type": "string"
+          },
+          {
+            "description": "Data final para período customizado (YYYY-MM-DD)",
+            "example": "2026-04-19",
+            "in": "query",
+            "name": "end_date",
+            "required": false,
+            "type": "string"
+          },
+          {
+            "description": "Preset de período da série: 1m (padrão), 3m, 6m",
+            "example": "1m",
+            "in": "query",
+            "name": "period",
+            "required": false,
+            "type": "string"
+          },
+          {
+            "description": "Data inicial para período customizado (YYYY-MM-DD)",
+            "example": "2026-03-01",
+            "in": "query",
+            "name": "start_date",
+            "required": false,
+            "type": "string"
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "example": {
+                  "data": {
+                    "comparison": {
+                      "balance_delta": 2800.0,
+                      "balance_delta_percent": null,
+                      "expense_delta": -300.0,
+                      "expense_delta_percent": -14.29,
+                      "income_delta": 2500.0,
+                      "income_delta_percent": null
+                    },
+                    "current_week": {
+                      "balance": 700.0,
+                      "end": "2026-04-20",
+                      "expense": 1800.0,
+                      "income": 2500.0,
+                      "start": "2026-04-14",
+                      "transaction_count": 8
+                    },
+                    "period": "1m",
+                    "previous_week": {
+                      "balance": -2100.0,
+                      "end": "2026-04-13",
+                      "expense": 2100.0,
+                      "income": 0.0,
+                      "start": "2026-04-07",
+                      "transaction_count": 5
+                    },
+                    "series": [
+                      {
+                        "balance": -200.0,
+                        "date": "2026-03-20",
+                        "expense": 200.0,
+                        "income": 0.0
+                      }
+                    ],
+                    "series_end": "2026-04-19",
+                    "series_start": "2026-03-20"
+                  },
+                  "message": "Resumo semanal calculado com sucesso"
+                },
+                "schema": {
+                  "properties": {
+                    "data": {
+                      "type": "object"
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "meta": {
+                      "type": "object"
+                    }
+                  },
+                  "required": [
+                    "message",
+                    "data"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Resumo semanal calculado com sucesso",
+            "headers": {
+              "X-Request-ID": {
+                "description": "Identificador único da requisição gerado pela API.",
+                "example": "9fcd2e4f4d8747b4a7d8a2b1b930f52a",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "example": {
+                  "code": "UNAUTHORIZED",
+                  "message": "Token revogado",
+                  "status_code": 401
+                },
+                "schema": {
+                  "properties": {
+                    "code": {
+                      "type": "string"
+                    },
+                    "details": {
+                      "type": "object"
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "status_code": {
+                      "type": "integer"
+                    }
+                  },
+                  "required": [
+                    "message",
+                    "code"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Token inválido",
+            "headers": {
+              "X-Request-ID": {
+                "description": "Identificador único da requisição gerado pela API.",
+                "example": "9fcd2e4f4d8747b4a7d8a2b1b930f52a",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "example": {
+                  "code": "VALIDATION_ERROR",
+                  "message": "Período inválido. Use 1m, 3m, 6m ou forneça start_date e end_date.",
+                  "status_code": 422
+                },
+                "schema": {
+                  "properties": {
+                    "code": {
+                      "type": "string"
+                    },
+                    "details": {
+                      "type": "object"
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "status_code": {
+                      "type": "integer"
+                    }
+                  },
+                  "required": [
+                    "message",
+                    "code"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Parâmetro inválido",
+            "headers": {
+              "X-Request-ID": {
+                "description": "Identificador único da requisição gerado pela API.",
+                "example": "9fcd2e4f4d8747b4a7d8a2b1b930f52a",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "example": {
+                  "code": "INTERNAL_ERROR",
+                  "message": "Erro ao calcular resumo semanal",
+                  "status_code": 500
+                },
+                "schema": {
+                  "properties": {
+                    "code": {
+                      "type": "string"
+                    },
+                    "details": {
+                      "type": "object"
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "status_code": {
+                      "type": "integer"
+                    }
+                  },
+                  "required": [
+                    "message",
+                    "code"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Erro interno",
+            "headers": {
+              "X-Request-ID": {
+                "description": "Identificador único da requisição gerado pela API.",
+                "example": "9fcd2e4f4d8747b4a7d8a2b1b930f52a",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "summary": "Resumo semanal com comparativo (semana atual vs anterior)",
         "tags": [
           "Dashboard"
         ]
@@ -5282,7 +5555,7 @@
     },
     "/transactions/export": {
       "get": {
-        "description": "Gera um arquivo com as transações do usuário no formato solicitado.\n\n**Requer entitlement `export_pdf` (plano Premium ou Trial).**\n\nParâmetros:\n- `format`: `csv` (padrão) ou `pdf`\n- `start_date` / `end_date`: intervalo de `due_date` (YYYY-MM-DD)\n- `type`: `income` | `expense`\n- `status`: `paid` | `pending` | `cancelled` | `postponed` | `overdue`\n\nLimite: máximo de 10 000 transações por export.",
+        "description": "Gera um arquivo com as transações do usuário no formato solicitado.\n\n**Requer entitlement `export_pdf` (plano Premium ou Trial).**\n\nParâmetros:\n- `format`: `csv` (padrão) ou `pdf`\n- `start_date` / `end_date`: intervalo de `due_date` (YYYY-MM-DD)\n- `type`: `income` | `expense`\n- `status`: `paid` | `pending` | `cancelled` | `postponed` | `overdue`\n\nCSV: streamed via chunked transfer — sem limite de linhas.\nPDF: materializado em memória (limitado pela RAM do servidor).",
         "parameters": [],
         "responses": {
           "200": {
