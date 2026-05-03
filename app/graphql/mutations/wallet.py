@@ -12,6 +12,7 @@ from app.application.services.wallet_application_service import (
 )
 from app.graphql.auth import get_current_user_required
 from app.graphql.enums import WalletAssetClassEnum, coerce_enum_kwargs
+from app.graphql.scalars import DecimalScalar
 from app.graphql.types import WalletType
 from app.graphql.wallet_presenters import raise_wallet_graphql_error, to_wallet_type
 
@@ -19,11 +20,11 @@ from app.graphql.wallet_presenters import raise_wallet_graphql_error, to_wallet_
 class AddWalletEntryMutation(graphene.Mutation):
     class Arguments:
         name = graphene.String(required=True)
-        value = graphene.Float()
+        value = DecimalScalar()
         ticker = graphene.String()
         quantity = graphene.Int()
         asset_class = WalletAssetClassEnum()
-        annual_rate = graphene.Float()
+        annual_rate = DecimalScalar()
         register_date = graphene.String()
         target_withdraw_date = graphene.String()
         should_be_on_wallet = graphene.Boolean(required=True)
@@ -58,11 +59,11 @@ class UpdateWalletEntryMutation(graphene.Mutation):
     class Arguments:
         investment_id = graphene.UUID(required=True)
         name = graphene.String()
-        value = graphene.Float()
+        value = DecimalScalar()
         ticker = graphene.String()
         quantity = graphene.Int()
         asset_class = WalletAssetClassEnum()
-        annual_rate = graphene.Float()
+        annual_rate = DecimalScalar()
         register_date = graphene.String()
         target_withdraw_date = graphene.String()
         should_be_on_wallet = graphene.Boolean()
