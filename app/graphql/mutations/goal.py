@@ -10,6 +10,7 @@ from app.application.services.goal_application_service import (
     GoalApplicationService,
 )
 from app.graphql.auth import get_current_user_required
+from app.graphql.decorators import graphql_error_adapter, resolver_with_user_context
 from app.graphql.enums import GoalStatusEnum, coerce_enum_kwargs
 from app.graphql.goal_presenters import (
     raise_goal_graphql_error,
@@ -87,13 +88,15 @@ class DeleteGoalMutation(graphene.Mutation):
     message = graphene.String(required=True)
 
     @log_graphql_resolver("deleteGoal")
-    def mutate(self, info: graphene.ResolveInfo, goal_id: UUID) -> "DeleteGoalMutation":
-        user = get_current_user_required()
-        service = GoalApplicationService.with_defaults(UUID(str(user.id)))
-        try:
-            service.delete_goal(goal_id)
-        except GoalApplicationError as exc:
-            raise_goal_graphql_error(exc)
+    @resolver_with_user_context(GoalApplicationService)
+    @graphql_error_adapter(GoalApplicationError, error_fn=raise_goal_graphql_error)
+    def mutate(
+        self,
+        info: graphene.ResolveInfo,
+        service: GoalApplicationService,
+        goal_id: UUID,
+    ) -> "DeleteGoalMutation":
+        service.delete_goal(goal_id)
         return DeleteGoalMutation(
             ok=True,
             message="Meta removida com sucesso",
