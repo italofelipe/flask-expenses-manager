@@ -8428,14 +8428,14 @@
                   }
                 },
                 {
-                  "defaultValue": "\"pending\"",
+                  "defaultValue": null,
                   "deprecationReason": null,
                   "description": null,
                   "isDeprecated": false,
                   "name": "status",
                   "type": {
-                    "kind": "SCALAR",
-                    "name": "String",
+                    "kind": "ENUM",
+                    "name": "TransactionStatus",
                     "ofType": null
                   }
                 },
@@ -8477,8 +8477,8 @@
                     "kind": "NON_NULL",
                     "name": null,
                     "ofType": {
-                      "kind": "SCALAR",
-                      "name": "String",
+                      "kind": "ENUM",
+                      "name": "TransactionType",
                       "ofType": null
                     }
                   }
@@ -8659,8 +8659,8 @@
                   "isDeprecated": false,
                   "name": "status",
                   "type": {
-                    "kind": "SCALAR",
-                    "name": "String",
+                    "kind": "ENUM",
+                    "name": "TransactionStatus",
                     "ofType": null
                   }
                 },
@@ -8711,8 +8711,8 @@
                   "isDeprecated": false,
                   "name": "type",
                   "type": {
-                    "kind": "SCALAR",
-                    "name": "String",
+                    "kind": "ENUM",
+                    "name": "TransactionType",
                     "ofType": null
                   }
                 }
@@ -8813,8 +8813,8 @@
                   "isDeprecated": false,
                   "name": "status",
                   "type": {
-                    "kind": "SCALAR",
-                    "name": "String",
+                    "kind": "ENUM",
+                    "name": "GoalStatus",
                     "ofType": null
                   }
                 },
@@ -8946,8 +8946,8 @@
                   "isDeprecated": false,
                   "name": "status",
                   "type": {
-                    "kind": "SCALAR",
-                    "name": "String",
+                    "kind": "ENUM",
+                    "name": "GoalStatus",
                     "ofType": null
                   }
                 },
@@ -10491,8 +10491,8 @@
                   "isDeprecated": false,
                   "name": "billingCycle",
                   "type": {
-                    "kind": "SCALAR",
-                    "name": "String",
+                    "kind": "ENUM",
+                    "name": "BillingCycle",
                     "ofType": null
                   }
                 },
@@ -10794,6 +10794,72 @@
           "specifiedByURL": null
         },
         {
+          "description": "An enumeration.",
+          "enumValues": [
+            {
+              "deprecationReason": null,
+              "description": null,
+              "isDeprecated": false,
+              "name": "PAID"
+            },
+            {
+              "deprecationReason": null,
+              "description": null,
+              "isDeprecated": false,
+              "name": "PENDING"
+            },
+            {
+              "deprecationReason": null,
+              "description": null,
+              "isDeprecated": false,
+              "name": "CANCELLED"
+            },
+            {
+              "deprecationReason": null,
+              "description": null,
+              "isDeprecated": false,
+              "name": "POSTPONED"
+            },
+            {
+              "deprecationReason": null,
+              "description": null,
+              "isDeprecated": false,
+              "name": "OVERDUE"
+            }
+          ],
+          "fields": null,
+          "inputFields": null,
+          "interfaces": null,
+          "kind": "ENUM",
+          "name": "TransactionStatus",
+          "possibleTypes": null,
+          "specifiedByURL": null
+        },
+        {
+          "description": "An enumeration.",
+          "enumValues": [
+            {
+              "deprecationReason": null,
+              "description": null,
+              "isDeprecated": false,
+              "name": "INCOME"
+            },
+            {
+              "deprecationReason": null,
+              "description": null,
+              "isDeprecated": false,
+              "name": "EXPENSE"
+            }
+          ],
+          "fields": null,
+          "inputFields": null,
+          "interfaces": null,
+          "kind": "ENUM",
+          "name": "TransactionType",
+          "possibleTypes": null,
+          "specifiedByURL": null
+        },
+        {
           "description": null,
           "enumValues": null,
           "fields": [
@@ -10922,6 +10988,42 @@
           "interfaces": [],
           "kind": "OBJECT",
           "name": "CreateGoalMutation",
+          "possibleTypes": null,
+          "specifiedByURL": null
+        },
+        {
+          "description": "An enumeration.",
+          "enumValues": [
+            {
+              "deprecationReason": null,
+              "description": null,
+              "isDeprecated": false,
+              "name": "ACTIVE"
+            },
+            {
+              "deprecationReason": null,
+              "description": null,
+              "isDeprecated": false,
+              "name": "COMPLETED"
+            },
+            {
+              "deprecationReason": null,
+              "description": null,
+              "isDeprecated": false,
+              "name": "PAUSED"
+            },
+            {
+              "deprecationReason": null,
+              "description": null,
+              "isDeprecated": false,
+              "name": "CANCELLED"
+            }
+          ],
+          "fields": null,
+          "inputFields": null,
+          "interfaces": null,
+          "kind": "ENUM",
+          "name": "GoalStatus",
           "possibleTypes": null,
           "specifiedByURL": null
         },
@@ -12018,6 +12120,36 @@
           "interfaces": [],
           "kind": "OBJECT",
           "name": "CheckoutSessionType",
+          "possibleTypes": null,
+          "specifiedByURL": null
+        },
+        {
+          "description": "An enumeration.",
+          "enumValues": [
+            {
+              "deprecationReason": null,
+              "description": null,
+              "isDeprecated": false,
+              "name": "MONTHLY"
+            },
+            {
+              "deprecationReason": null,
+              "description": null,
+              "isDeprecated": false,
+              "name": "SEMIANNUAL"
+            },
+            {
+              "deprecationReason": null,
+              "description": null,
+              "isDeprecated": false,
+              "name": "ANNUAL"
+            }
+          ],
+          "fields": null,
+          "inputFields": null,
+          "interfaces": null,
+          "kind": "ENUM",
+          "name": "BillingCycle",
           "possibleTypes": null,
           "specifiedByURL": null
         },

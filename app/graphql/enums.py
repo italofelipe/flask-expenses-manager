@@ -24,7 +24,15 @@ from typing import Any
 
 import graphene
 
+from app.models.subscription import BillingCycle, SubscriptionStatus
+from app.models.transaction import TransactionStatus, TransactionType
+from app.schemas.goal_schema import GOAL_STATUSES
 from app.schemas.wallet_schema import ASSET_CLASSES
+
+TransactionStatusEnum = graphene.Enum.from_enum(TransactionStatus)
+TransactionTypeEnum = graphene.Enum.from_enum(TransactionType)
+SubscriptionStatusEnum = graphene.Enum.from_enum(SubscriptionStatus)
+SubscriptionBillingCycleEnum = graphene.Enum.from_enum(BillingCycle)
 
 
 def _enum_from_strings(name: str, values: tuple[str, ...]) -> Any:
@@ -32,6 +40,7 @@ def _enum_from_strings(name: str, values: tuple[str, ...]) -> Any:
     return graphene.Enum(name, list(members.items()))
 
 
+GoalStatusEnum = _enum_from_strings("GoalStatus", tuple(GOAL_STATUSES))
 WalletAssetClassEnum = _enum_from_strings(
     "WalletAssetClass", tuple(sorted(ASSET_CLASSES))
 )
