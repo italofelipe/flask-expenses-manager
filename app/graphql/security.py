@@ -1,7 +1,8 @@
 from __future__ import annotations
 
+import json
 import os
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Any
 
 from graphql import GraphQLError, parse
@@ -13,6 +14,21 @@ GRAPHQL_COMPLEXITY_LIMIT_EXCEEDED = "GRAPHQL_COMPLEXITY_LIMIT_EXCEEDED"
 GRAPHQL_OPERATION_LIMIT_EXCEEDED = "GRAPHQL_OPERATION_LIMIT_EXCEEDED"
 GRAPHQL_OPERATION_NOT_FOUND = "GRAPHQL_OPERATION_NOT_FOUND"
 GRAPHQL_INTROSPECTION_DISABLED = "GRAPHQL_INTROSPECTION_DISABLED"
+
+# Resolvers that make external HTTP calls (BRAPI, billing provider) are weighted
+# higher so that a single expensive request consumes more of the complexity budget.
+# Override via GRAPHQL_FIELD_WEIGHTS_JSON env var (JSON object, field → int).
+_DEFAULT_FIELD_WEIGHTS: dict[str, int] = {
+    # BRAPI market-data calls — each fetches live quotes from an external API
+    "investmentValuation": 10,
+    "portfolioValuation": 10,
+    "portfolioValuationHistory": 8,
+    # Analytics aggregates — multiple DB queries
+    "dashboardOverview": 3,
+    "transactionDashboard": 3,
+    # Billing provider query
+    "billingPlans": 5,
+}
 
 _LIST_ARGUMENT_NAMES = {
     "first",
@@ -43,6 +59,19 @@ def _read_bool_env(name: str, default: bool) -> bool:
     return raw.strip().lower() in {"1", "true", "yes", "on"}
 
 
+def _read_field_weights_env() -> dict[str, int]:
+    raw = os.getenv("GRAPHQL_FIELD_WEIGHTS_JSON", "")
+    if not raw.strip():
+        return dict(_DEFAULT_FIELD_WEIGHTS)
+    try:
+        parsed = json.loads(raw)
+        if isinstance(parsed, dict):
+            return {str(k): max(1, int(v)) for k, v in parsed.items()}
+    except (json.JSONDecodeError, ValueError, TypeError):
+        pass
+    return dict(_DEFAULT_FIELD_WEIGHTS)
+
+
 @dataclass
 class GraphQLSecurityPolicy:
     max_query_bytes: int
@@ -51,6 +80,9 @@ class GraphQLSecurityPolicy:
     max_operations: int
     max_list_multiplier: int
     allow_introspection: bool
+    field_weights: dict[str, int] = field(
+        default_factory=lambda: dict(_DEFAULT_FIELD_WEIGHTS)
+    )
 
     @classmethod
     def from_env(cls) -> "GraphQLSecurityPolicy":
@@ -65,6 +97,7 @@ class GraphQLSecurityPolicy:
                 "GRAPHQL_ALLOW_INTROSPECTION",
                 default_introspection,
             ),
+            field_weights=_read_field_weights_env(),
         )
 
     def update_limits(
@@ -76,6 +109,7 @@ class GraphQLSecurityPolicy:
         max_operations: int | None = None,
         max_list_multiplier: int | None = None,
         allow_introspection: bool | None = None,
+        field_weights: dict[str, int] | None = None,
     ) -> None:
         if max_query_bytes is not None:
             self.max_query_bytes = max(max_query_bytes, 1)
@@ -89,6 +123,10 @@ class GraphQLSecurityPolicy:
             self.max_list_multiplier = max(max_list_multiplier, 1)
         if allow_introspection is not None:
             self.allow_introspection = bool(allow_introspection)
+        if field_weights is not None:
+            self.field_weights = {
+                str(k): max(1, int(v)) for k, v in field_weights.items()
+            }
 
 
 @dataclass(frozen=True)
@@ -152,6 +190,7 @@ def _analyze_selection_set(
     fragments: dict[str, ast.FragmentDefinitionNode],
     variable_values: dict[str, Any] | None,
     max_list_multiplier: int,
+    field_weights: dict[str, int],
     visited_fragments: set[str],
 ) -> tuple[int, int]:
     max_depth = current_depth
@@ -164,6 +203,7 @@ def _analyze_selection_set(
             fragments=fragments,
             variable_values=variable_values,
             max_list_multiplier=max_list_multiplier,
+            field_weights=field_weights,
             visited_fragments=visited_fragments,
         )
         max_depth = max(max_depth, nested_depth)
@@ -179,6 +219,7 @@ def _analyze_single_selection(
     fragments: dict[str, ast.FragmentDefinitionNode],
     variable_values: dict[str, Any] | None,
     max_list_multiplier: int,
+    field_weights: dict[str, int],
     visited_fragments: set[str],
 ) -> tuple[int, int]:
     if isinstance(selection, ast.FieldNode):
@@ -188,6 +229,7 @@ def _analyze_single_selection(
             fragments=fragments,
             variable_values=variable_values,
             max_list_multiplier=max_list_multiplier,
+            field_weights=field_weights,
             visited_fragments=visited_fragments,
         )
     if isinstance(selection, ast.InlineFragmentNode):
@@ -197,6 +239,7 @@ def _analyze_single_selection(
             fragments=fragments,
             variable_values=variable_values,
             max_list_multiplier=max_list_multiplier,
+            field_weights=field_weights,
             visited_fragments=visited_fragments,
         )
     if isinstance(selection, ast.FragmentSpreadNode):
@@ -206,6 +249,7 @@ def _analyze_single_selection(
             fragments=fragments,
             variable_values=variable_values,
             max_list_multiplier=max_list_multiplier,
+            field_weights=field_weights,
             visited_fragments=visited_fragments,
         )
     return current_depth, 0
@@ -218,10 +262,12 @@ def _analyze_field_selection(
     fragments: dict[str, ast.FragmentDefinitionNode],
     variable_values: dict[str, Any] | None,
     max_list_multiplier: int,
+    field_weights: dict[str, int],
     visited_fragments: set[str],
 ) -> tuple[int, int]:
+    field_name = selection.name.value
     field_depth = current_depth + 1
-    field_complexity = 1
+    field_complexity = field_weights.get(field_name, 1)
     if not selection.selection_set:
         return field_depth, field_complexity
 
@@ -231,6 +277,7 @@ def _analyze_field_selection(
         fragments=fragments,
         variable_values=variable_values,
         max_list_multiplier=max_list_multiplier,
+        field_weights=field_weights,
         visited_fragments=visited_fragments.copy(),
     )
     multiplier = _resolve_field_multiplier(
@@ -248,6 +295,7 @@ def _analyze_inline_fragment_selection(
     fragments: dict[str, ast.FragmentDefinitionNode],
     variable_values: dict[str, Any] | None,
     max_list_multiplier: int,
+    field_weights: dict[str, int],
     visited_fragments: set[str],
 ) -> tuple[int, int]:
     if not selection.selection_set:
@@ -258,6 +306,7 @@ def _analyze_inline_fragment_selection(
         fragments=fragments,
         variable_values=variable_values,
         max_list_multiplier=max_list_multiplier,
+        field_weights=field_weights,
         visited_fragments=visited_fragments.copy(),
     )
 
@@ -269,6 +318,7 @@ def _analyze_fragment_spread_selection(
     fragments: dict[str, ast.FragmentDefinitionNode],
     variable_values: dict[str, Any] | None,
     max_list_multiplier: int,
+    field_weights: dict[str, int],
     visited_fragments: set[str],
 ) -> tuple[int, int]:
     fragment_name = selection.name.value
@@ -285,6 +335,7 @@ def _analyze_fragment_spread_selection(
         fragments=fragments,
         variable_values=variable_values,
         max_list_multiplier=max_list_multiplier,
+        field_weights=field_weights,
         visited_fragments=next_visited,
     )
 
@@ -361,6 +412,7 @@ def _calculate_metrics(
     fragments: dict[str, ast.FragmentDefinitionNode],
     variable_values: dict[str, Any] | None,
     max_list_multiplier: int,
+    field_weights: dict[str, int],
     query: str,
 ) -> GraphQLQueryMetrics:
     max_depth = 0
@@ -372,6 +424,7 @@ def _calculate_metrics(
             fragments=fragments,
             variable_values=variable_values,
             max_list_multiplier=max_list_multiplier,
+            field_weights=field_weights,
             visited_fragments=set(),
         )
         max_depth = max(max_depth, operation_depth)
@@ -489,6 +542,7 @@ def analyze_graphql_query(
         fragments=fragments,
         variable_values=variable_values,
         max_list_multiplier=policy.max_list_multiplier,
+        field_weights=policy.field_weights,
         query=query,
     )
     _enforce_depth_and_complexity_limits(metrics, policy)
