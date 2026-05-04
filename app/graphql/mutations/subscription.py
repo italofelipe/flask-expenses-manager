@@ -14,12 +14,12 @@ import graphene
 from app.config.billing_plans import resolve_checkout_plan_offer
 from app.extensions.database import db
 from app.graphql.auth import get_current_user_required
-from app.graphql.enums import SubscriptionBillingCycleEnum, coerce_enum_value
 from app.graphql.errors import (
     GRAPHQL_ERROR_CODE_CONFLICT,
     GRAPHQL_ERROR_CODE_VALIDATION,
     build_public_graphql_error,
 )
+from app.graphql.observability import log_graphql_resolver
 from app.graphql.queries.subscription import (
     _serialize_subscription,
     _to_subscription_type,
@@ -40,7 +40,7 @@ from app.services.subscription_service import (
 class CreateCheckoutSessionMutation(graphene.Mutation):
     class Arguments:
         plan_slug = graphene.String(required=True)
-        billing_cycle = SubscriptionBillingCycleEnum()
+        billing_cycle = graphene.String()
 
     message = graphene.String(required=True)
     checkout = graphene.Field(CheckoutSessionType, required=True)
@@ -49,13 +49,9 @@ class CreateCheckoutSessionMutation(graphene.Mutation):
         self,
         info: graphene.ResolveInfo,
         plan_slug: str,
-        billing_cycle: object | None = None,
+        billing_cycle: str | None = None,
     ) -> "CreateCheckoutSessionMutation":
         user = get_current_user_required()
-        billing_cycle_value = coerce_enum_value(billing_cycle)
-        billing_cycle = (
-            str(billing_cycle_value) if billing_cycle_value is not None else None
-        )
 
         # Resolve plan offer (same logic as REST controller)
         if billing_cycle:
@@ -115,6 +111,7 @@ class CancelSubscriptionMutation(graphene.Mutation):
     message = graphene.String(required=True)
     subscription = graphene.Field(SubscriptionType, required=True)
 
+    @log_graphql_resolver("cancelSubscription")
     def mutate(self, info: graphene.ResolveInfo) -> "CancelSubscriptionMutation":
         user = get_current_user_required()
         sub = get_or_create_subscription(UUID(str(user.id)))

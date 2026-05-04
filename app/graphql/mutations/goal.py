@@ -10,12 +10,12 @@ from app.application.services.goal_application_service import (
     GoalApplicationService,
 )
 from app.graphql.auth import get_current_user_required
-from app.graphql.enums import GoalStatusEnum, coerce_enum_kwargs
 from app.graphql.goal_presenters import (
     raise_goal_graphql_error,
     to_goal_plan_type,
     to_goal_type_object,
 )
+from app.graphql.observability import log_graphql_resolver
 from app.graphql.types import GoalPlanType, GoalTypeObject
 
 
@@ -26,7 +26,7 @@ class CreateGoalMutation(graphene.Mutation):
         current_amount = graphene.String()
         priority = graphene.Int()
         target_date = graphene.String()
-        status = GoalStatusEnum()
+        status = graphene.String()
         description = graphene.String()
         category = graphene.String()
 
@@ -36,7 +36,6 @@ class CreateGoalMutation(graphene.Mutation):
     def mutate(self, info: graphene.ResolveInfo, **kwargs: Any) -> "CreateGoalMutation":
         user = get_current_user_required()
         service = GoalApplicationService.with_defaults(UUID(str(user.id)))
-        coerce_enum_kwargs(kwargs, "status")
         try:
             goal_data = service.create_goal(kwargs)
         except GoalApplicationError as exc:
@@ -55,7 +54,7 @@ class UpdateGoalMutation(graphene.Mutation):
         current_amount = graphene.String()
         priority = graphene.Int()
         target_date = graphene.String()
-        status = GoalStatusEnum()
+        status = graphene.String()
         description = graphene.String()
         category = graphene.String()
 
@@ -67,7 +66,6 @@ class UpdateGoalMutation(graphene.Mutation):
     ) -> "UpdateGoalMutation":
         user = get_current_user_required()
         service = GoalApplicationService.with_defaults(UUID(str(user.id)))
-        coerce_enum_kwargs(kwargs, "status")
         try:
             goal_data = service.update_goal(goal_id, kwargs)
         except GoalApplicationError as exc:
@@ -85,6 +83,7 @@ class DeleteGoalMutation(graphene.Mutation):
     ok = graphene.Boolean(required=True)
     message = graphene.String(required=True)
 
+    @log_graphql_resolver("deleteGoal")
     def mutate(self, info: graphene.ResolveInfo, goal_id: UUID) -> "DeleteGoalMutation":
         user = get_current_user_required()
         service = GoalApplicationService.with_defaults(UUID(str(user.id)))

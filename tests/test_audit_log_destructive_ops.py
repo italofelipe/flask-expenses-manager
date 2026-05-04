@@ -141,7 +141,7 @@ def test_graphql_delete_wallet_entry_records_audit_event(client: Any, app: Any) 
         mutation { addWalletEntry(
             name: "Custom",
             value: 100,
-            assetClass: "custom",
+            assetClass: CUSTOM,
             registerDate: "2026-01-01",
             shouldBeOnWallet: true
         ) { item { id } } }

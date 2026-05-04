@@ -11,12 +11,8 @@ from app.application.services.transaction_application_service import (
 )
 from app.controllers.transaction.utils import _build_installment_amounts
 from app.graphql.auth import get_current_user_required
-from app.graphql.enums import (
-    TransactionStatusEnum,
-    TransactionTypeEnum,
-    coerce_enum_kwargs,
-)
 from app.graphql.errors import build_public_graphql_error, to_public_graphql_code
+from app.graphql.observability import log_graphql_resolver
 from app.graphql.types import TransactionTypeObject
 
 
@@ -24,7 +20,7 @@ class CreateTransactionMutation(graphene.Mutation):
     class Arguments:
         title = graphene.String(required=True)
         amount = graphene.String(required=True)
-        type = TransactionTypeEnum(required=True)
+        type = graphene.String(required=True)
         due_date = graphene.String(required=True)
         description = graphene.String()
         observation = graphene.String()
@@ -32,7 +28,7 @@ class CreateTransactionMutation(graphene.Mutation):
         is_installment = graphene.Boolean(default_value=False)
         installment_count = graphene.Int()
         currency = graphene.String(default_value="BRL")
-        status = TransactionStatusEnum()
+        status = graphene.String(default_value="pending")
         start_date = graphene.String()
         end_date = graphene.String()
         tag_id = graphene.UUID()
@@ -47,9 +43,7 @@ class CreateTransactionMutation(graphene.Mutation):
     ) -> "CreateTransactionMutation":
         user = get_current_user_required()
         service = TransactionApplicationService.with_defaults(UUID(str(user.id)))
-        coerce_enum_kwargs(kwargs, "type", "status")
         payload = dict(kwargs)
-        payload.setdefault("status", "pending")
         payload["tag_id"] = kwargs.get("tag_id") or kwargs.get("tagId")
         payload["account_id"] = kwargs.get("account_id") or kwargs.get("accountId")
         payload["credit_card_id"] = kwargs.get("credit_card_id") or kwargs.get(
@@ -83,6 +77,7 @@ class DeleteTransactionMutation(graphene.Mutation):
     ok = graphene.Boolean(required=True)
     message = graphene.String(required=True)
 
+    @log_graphql_resolver("deleteTransaction")
     def mutate(
         self, info: graphene.ResolveInfo, transaction_id: UUID
     ) -> "DeleteTransactionMutation":
@@ -105,7 +100,7 @@ class UpdateTransactionMutation(graphene.Mutation):
         transaction_id = graphene.UUID(required=True)
         title = graphene.String()
         amount = graphene.String()
-        type = TransactionTypeEnum()
+        type = graphene.String()
         due_date = graphene.String()
         description = graphene.String()
         observation = graphene.String()
@@ -113,7 +108,7 @@ class UpdateTransactionMutation(graphene.Mutation):
         is_installment = graphene.Boolean()
         installment_count = graphene.Int()
         currency = graphene.String()
-        status = TransactionStatusEnum()
+        status = graphene.String()
         start_date = graphene.String()
         end_date = graphene.String()
         tag_id = graphene.UUID()
@@ -132,7 +127,6 @@ class UpdateTransactionMutation(graphene.Mutation):
     ) -> "UpdateTransactionMutation":
         user = get_current_user_required()
         service = TransactionApplicationService.with_defaults(UUID(str(user.id)))
-        coerce_enum_kwargs(kwargs, "type", "status")
         try:
             transaction = service.update_transaction(transaction_id, dict(kwargs))
         except TransactionApplicationError as exc:
