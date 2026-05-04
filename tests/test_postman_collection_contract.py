@@ -116,6 +116,8 @@ OPENAPI_GAPS: set[tuple[str, str]] = {
     # GraphQL
     ("GET", "/graphql"),
     ("POST", "/graphql"),
+    # GraphiQL playground — admin-only HTML UI, not a REST API contract
+    ("GET", "/graphql/playground"),
     # Reminders CLI-only (no REST route)
     # Auth email routes (confirm/resend have REST but via different path convention)
     # Recurrence
