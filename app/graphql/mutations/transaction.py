@@ -11,6 +11,7 @@ from app.application.services.transaction_application_service import (
 )
 from app.controllers.transaction.utils import _build_installment_amounts
 from app.graphql.auth import get_current_user_required
+from app.graphql.decorators import graphql_error_adapter, resolver_with_user_context
 from app.graphql.enums import (
     TransactionStatusEnum,
     TransactionTypeEnum,
@@ -85,18 +86,15 @@ class DeleteTransactionMutation(graphene.Mutation):
     message = graphene.String(required=True)
 
     @log_graphql_resolver("deleteTransaction")
+    @resolver_with_user_context(TransactionApplicationService)
+    @graphql_error_adapter(TransactionApplicationError)
     def mutate(
-        self, info: graphene.ResolveInfo, transaction_id: UUID
+        self,
+        info: graphene.ResolveInfo,
+        service: TransactionApplicationService,
+        transaction_id: UUID,
     ) -> "DeleteTransactionMutation":
-        user = get_current_user_required()
-        service = TransactionApplicationService.with_defaults(UUID(str(user.id)))
-        try:
-            service.delete_transaction(transaction_id)
-        except TransactionApplicationError as exc:
-            raise build_public_graphql_error(
-                exc.message,
-                code=to_public_graphql_code(exc.code),
-            ) from exc
+        service.delete_transaction(transaction_id)
         return DeleteTransactionMutation(
             ok=True, message="Transação deletada com sucesso (soft delete)."
         )

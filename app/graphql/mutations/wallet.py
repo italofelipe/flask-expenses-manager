@@ -11,6 +11,7 @@ from app.application.services.wallet_application_service import (
     WalletApplicationService,
 )
 from app.graphql.auth import get_current_user_required
+from app.graphql.decorators import graphql_error_adapter, resolver_with_user_context
 from app.graphql.enums import WalletAssetClassEnum, coerce_enum_kwargs
 from app.graphql.observability import log_graphql_resolver
 from app.graphql.scalars import DecimalScalar
@@ -106,20 +107,18 @@ class DeleteWalletEntryMutation(graphene.Mutation):
     message = graphene.String(required=True)
 
     @log_graphql_resolver("deleteWalletEntry")
+    @resolver_with_user_context(WalletApplicationService)
+    @graphql_error_adapter(WalletApplicationError, error_fn=raise_wallet_graphql_error)
     def mutate(
-        self, info: graphene.ResolveInfo, investment_id: UUID
+        self,
+        info: graphene.ResolveInfo,
+        service: WalletApplicationService,
+        investment_id: UUID,
     ) -> "DeleteWalletEntryMutation":
-        user = get_current_user_required()
-        service = WalletApplicationService.with_defaults(UUID(str(user.id)))
-        try:
-            service.delete_entry(
-                investment_id,
-                forbidden_message=(
-                    "Você não tem permissão para remover este investimento."
-                ),
-            )
-        except WalletApplicationError as exc:
-            raise_wallet_graphql_error(exc)
+        service.delete_entry(
+            investment_id,
+            forbidden_message="Você não tem permissão para remover este investimento.",
+        )
         return DeleteWalletEntryMutation(
             ok=True, message="Investimento removido com sucesso"
         )
