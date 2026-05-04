@@ -4,7 +4,7 @@
 
 You are an AI software engineer working on the **Auraxis** project — a personal
 financial management platform built with Flask, SQLAlchemy, Marshmallow,
-GraphQL (Ariadne), and PostgreSQL.
+GraphQL (Graphene 3), and PostgreSQL.
 
 You operate independently from the CrewAI multi-agent system in `../ai_squad/`,
 but share the same knowledge base (`.context/`) and tracking system (`TASKS.md`).
@@ -171,3 +171,10 @@ scripts/repo_bin.sh pytest -m "not schemathesis" --cov=app --cov-fail-under=85
 | `.context/` | AI knowledge base (SDD + agentic workflows) |
 | `../ai_squad/` | CrewAI multi-agent system (platform-level workspace) |
 | `docs/` | Runbooks, ADRs, security docs |
+
+## GraphQL Architecture Decisions
+
+Key ADRs governing the GraphQL layer:
+
+- [`docs/adr/0002-graphql-ownership.md`](docs/adr/0002-graphql-ownership.md) — REST vs GraphQL ownership boundaries; when to use each protocol
+- [`docs/adr/0003-graphql-flat-types-no-dataloader.md`](docs/adr/0003-graphql-flat-types-no-dataloader.md) — flat Graphene types, service-layer batching, no DataLoader
