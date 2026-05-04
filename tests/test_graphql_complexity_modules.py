@@ -258,6 +258,7 @@ class TestCalculateMetrics:
             fragments=fragments,
             variable_values=None,
             max_list_multiplier=50,
+            field_weights={},
             query=query,
         )
         assert metrics.depth == 1
@@ -272,6 +273,7 @@ class TestCalculateMetrics:
             fragments=fragments,
             variable_values=None,
             max_list_multiplier=50,
+            field_weights={},
             query=query,
         )
         assert metrics.depth == 3
@@ -285,6 +287,7 @@ class TestCalculateMetrics:
             fragments=fragments,
             variable_values=None,
             max_list_multiplier=50,
+            field_weights={},
             query=query,
         )
         assert "foo" in metrics.root_fields

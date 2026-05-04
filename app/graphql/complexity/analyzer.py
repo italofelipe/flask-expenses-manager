@@ -7,6 +7,8 @@ from graphql import GraphQLError, parse
 from graphql.language import ast
 
 from app.graphql.complexity.policy import (
+    GRAPHQL_COMPLEXITY_LIMIT_EXCEEDED,
+    GRAPHQL_DEPTH_LIMIT_EXCEEDED,
     GRAPHQL_OPERATION_LIMIT_EXCEEDED,
     GRAPHQL_OPERATION_NOT_FOUND,
     GraphQLSecurityPolicy,
@@ -78,6 +80,7 @@ def _analyze_selection_set(
     fragments: dict[str, ast.FragmentDefinitionNode],
     variable_values: dict[str, Any] | None,
     max_list_multiplier: int,
+    field_weights: dict[str, int],
     visited_fragments: set[str],
 ) -> tuple[int, int]:
     max_depth = current_depth
@@ -90,6 +93,7 @@ def _analyze_selection_set(
             fragments=fragments,
             variable_values=variable_values,
             max_list_multiplier=max_list_multiplier,
+            field_weights=field_weights,
             visited_fragments=visited_fragments,
         )
         max_depth = max(max_depth, nested_depth)
@@ -105,6 +109,7 @@ def _analyze_single_selection(
     fragments: dict[str, ast.FragmentDefinitionNode],
     variable_values: dict[str, Any] | None,
     max_list_multiplier: int,
+    field_weights: dict[str, int],
     visited_fragments: set[str],
 ) -> tuple[int, int]:
     if isinstance(selection, ast.FieldNode):
@@ -114,6 +119,7 @@ def _analyze_single_selection(
             fragments=fragments,
             variable_values=variable_values,
             max_list_multiplier=max_list_multiplier,
+            field_weights=field_weights,
             visited_fragments=visited_fragments,
         )
     if isinstance(selection, ast.InlineFragmentNode):
@@ -123,6 +129,7 @@ def _analyze_single_selection(
             fragments=fragments,
             variable_values=variable_values,
             max_list_multiplier=max_list_multiplier,
+            field_weights=field_weights,
             visited_fragments=visited_fragments,
         )
     if isinstance(selection, ast.FragmentSpreadNode):
@@ -132,6 +139,7 @@ def _analyze_single_selection(
             fragments=fragments,
             variable_values=variable_values,
             max_list_multiplier=max_list_multiplier,
+            field_weights=field_weights,
             visited_fragments=visited_fragments,
         )
     return current_depth, 0
@@ -144,10 +152,12 @@ def _analyze_field_selection(
     fragments: dict[str, ast.FragmentDefinitionNode],
     variable_values: dict[str, Any] | None,
     max_list_multiplier: int,
+    field_weights: dict[str, int],
     visited_fragments: set[str],
 ) -> tuple[int, int]:
+    field_name = selection.name.value
     field_depth = current_depth + 1
-    field_complexity = 1
+    field_complexity = field_weights.get(field_name, 1)
     if not selection.selection_set:
         return field_depth, field_complexity
 
@@ -157,6 +167,7 @@ def _analyze_field_selection(
         fragments=fragments,
         variable_values=variable_values,
         max_list_multiplier=max_list_multiplier,
+        field_weights=field_weights,
         visited_fragments=visited_fragments.copy(),
     )
     multiplier = _resolve_field_multiplier(
@@ -174,6 +185,7 @@ def _analyze_inline_fragment_selection(
     fragments: dict[str, ast.FragmentDefinitionNode],
     variable_values: dict[str, Any] | None,
     max_list_multiplier: int,
+    field_weights: dict[str, int],
     visited_fragments: set[str],
 ) -> tuple[int, int]:
     if not selection.selection_set:
@@ -184,6 +196,7 @@ def _analyze_inline_fragment_selection(
         fragments=fragments,
         variable_values=variable_values,
         max_list_multiplier=max_list_multiplier,
+        field_weights=field_weights,
         visited_fragments=visited_fragments.copy(),
     )
 
@@ -195,6 +208,7 @@ def _analyze_fragment_spread_selection(
     fragments: dict[str, ast.FragmentDefinitionNode],
     variable_values: dict[str, Any] | None,
     max_list_multiplier: int,
+    field_weights: dict[str, int],
     visited_fragments: set[str],
 ) -> tuple[int, int]:
     fragment_name = selection.name.value
@@ -211,6 +225,7 @@ def _analyze_fragment_spread_selection(
         fragments=fragments,
         variable_values=variable_values,
         max_list_multiplier=max_list_multiplier,
+        field_weights=field_weights,
         visited_fragments=next_visited,
     )
 
@@ -298,6 +313,7 @@ def calculate_metrics(
     fragments: dict[str, ast.FragmentDefinitionNode],
     variable_values: dict[str, Any] | None,
     max_list_multiplier: int,
+    field_weights: dict[str, int],
     query: str,
 ) -> GraphQLQueryMetrics:
     max_depth = 0
@@ -309,6 +325,7 @@ def calculate_metrics(
             fragments=fragments,
             variable_values=variable_values,
             max_list_multiplier=max_list_multiplier,
+            field_weights=field_weights,
             visited_fragments=set(),
         )
         max_depth = max(max_depth, operation_depth)
@@ -330,7 +347,7 @@ def enforce_depth_and_complexity_limits(
 ) -> None:
     if metrics.depth > policy.max_depth:
         raise GraphQLSecurityViolation(
-            code="GRAPHQL_DEPTH_LIMIT_EXCEEDED",
+            code=GRAPHQL_DEPTH_LIMIT_EXCEEDED,
             message=(
                 "Query GraphQL excedeu a profundidade máxima permitida "
                 f"({policy.max_depth})."
@@ -340,7 +357,7 @@ def enforce_depth_and_complexity_limits(
 
     if metrics.complexity > policy.max_complexity:
         raise GraphQLSecurityViolation(
-            code="GRAPHQL_COMPLEXITY_LIMIT_EXCEEDED",
+            code=GRAPHQL_COMPLEXITY_LIMIT_EXCEEDED,
             message=(
                 "Query GraphQL excedeu a complexidade máxima permitida "
                 f"({policy.max_complexity})."
