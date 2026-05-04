@@ -24,6 +24,8 @@ def register_auth_guard(app: Flask) -> None:
             "resendconfirmationresource",
             "refreshtokenresource",
             "execute_graphql",
+            # Playground handles its own auth (feature flag + admin role check)
+            "graphql_playground",
             "static",
             "swaggerui.index",
             "swaggerui.static",
