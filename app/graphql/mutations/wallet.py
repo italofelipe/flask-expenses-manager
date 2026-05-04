@@ -11,6 +11,7 @@ from app.application.services.wallet_application_service import (
     WalletApplicationService,
 )
 from app.graphql.auth import get_current_user_required
+from app.graphql.enums import WalletAssetClassEnum, coerce_enum_kwargs
 from app.graphql.observability import log_graphql_resolver
 from app.graphql.scalars import DecimalScalar
 from app.graphql.types import WalletType
@@ -23,7 +24,7 @@ class AddWalletEntryMutation(graphene.Mutation):
         value = DecimalScalar()
         ticker = graphene.String()
         quantity = graphene.Int()
-        asset_class = graphene.String()
+        asset_class = WalletAssetClassEnum()
         annual_rate = DecimalScalar()
         register_date = graphene.String()
         target_withdraw_date = graphene.String()
@@ -35,6 +36,7 @@ class AddWalletEntryMutation(graphene.Mutation):
         self, info: graphene.ResolveInfo, **kwargs: Any
     ) -> "AddWalletEntryMutation":
         user = get_current_user_required()
+        coerce_enum_kwargs(kwargs, "asset_class")
         raw_data = {
             "name": kwargs["name"],
             "value": kwargs.get("value"),
@@ -61,7 +63,7 @@ class UpdateWalletEntryMutation(graphene.Mutation):
         value = DecimalScalar()
         ticker = graphene.String()
         quantity = graphene.Int()
-        asset_class = graphene.String()
+        asset_class = WalletAssetClassEnum()
         annual_rate = DecimalScalar()
         register_date = graphene.String()
         target_withdraw_date = graphene.String()
@@ -73,6 +75,7 @@ class UpdateWalletEntryMutation(graphene.Mutation):
         self, info: graphene.ResolveInfo, investment_id: UUID, **kwargs: Any
     ) -> "UpdateWalletEntryMutation":
         user = get_current_user_required()
+        coerce_enum_kwargs(kwargs, "asset_class")
         raw_payload: dict[str, Any] = {
             "name": kwargs.get("name"),
             "value": kwargs.get("value"),
