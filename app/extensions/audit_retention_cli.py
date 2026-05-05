@@ -43,12 +43,23 @@ def register_audit_retention_commands(app: Flask) -> None:
         help="Retention window in days (defaults to AUDIT_RETENTION_DAYS).",
     )
     def purge_expired_command(retention_days: Optional[int]) -> None:
+        import sys
+
         if not _is_audit_retention_enabled():
             click.echo("audit retention disabled (AUDIT_RETENTION_ENABLED=false)")
             return
 
         effective_retention_days = _resolve_retention_days(retention_days)
-        deleted = purge_expired_audit_events(retention_days=effective_retention_days)
-        click.echo(
-            f"deleted={deleted} retention_days={effective_retention_days}",
-        )
+        try:
+            deleted = purge_expired_audit_events(
+                retention_days=effective_retention_days
+            )
+            click.echo(
+                f"deleted={deleted} retention_days={effective_retention_days}",
+            )
+        except Exception as exc:
+            click.echo(
+                f"ERROR: purge-expired failed — {type(exc).__name__}: {exc}",
+                err=True,
+            )
+            sys.exit(1)

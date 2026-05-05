@@ -207,10 +207,11 @@ jobs:
             --query "StandardOutputContent" \
             --output text 2>/dev/null || echo "(diagnostics collection failed)")
 
+          DELIM="DIAG_$(date +%s%N)"
           {
-            echo "diagnostics_output<<DIAG_EOF"
+            echo "diagnostics_output<<${DELIM}"
             echo "${DIAG}" | head -c 3000
-            echo "DIAG_EOF"
+            echo "${DELIM}"
           } >> "${GITHUB_OUTPUT}"
 
       - name: Notify failure via GitHub Issue
