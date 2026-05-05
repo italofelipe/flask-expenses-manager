@@ -10198,7 +10198,7 @@
               "name": "addTicker",
               "type": {
                 "kind": "OBJECT",
-                "name": "AddTickerMutation",
+                "name": "AddTickerPayload",
                 "ofType": null
               }
             },
@@ -10227,7 +10227,7 @@
               "name": "deleteTicker",
               "type": {
                 "kind": "OBJECT",
-                "name": "DeleteTickerMutation",
+                "name": "DeleteTickerPayload",
                 "ofType": null
               }
             },
@@ -10568,7 +10568,7 @@
               "name": "updateNotificationPreferences",
               "type": {
                 "kind": "OBJECT",
-                "name": "UpdateNotificationPreferencesMutation",
+                "name": "UpdateNotificationPreferencesPayload",
                 "ofType": null
               }
             },
@@ -11808,41 +11808,13 @@
           "specifiedByURL": null
         },
         {
-          "description": null,
+          "description": "Canonical payload for addTicker mutation.",
           "enumValues": null,
           "fields": [
             {
               "args": [],
               "deprecationReason": null,
-              "description": null,
-              "isDeprecated": false,
-              "name": "item",
-              "type": {
-                "kind": "NON_NULL",
-                "name": null,
-                "ofType": {
-                  "kind": "OBJECT",
-                  "name": "TickerType",
-                  "ofType": null
-                }
-              }
-            }
-          ],
-          "inputFields": null,
-          "interfaces": [],
-          "kind": "OBJECT",
-          "name": "AddTickerMutation",
-          "possibleTypes": null,
-          "specifiedByURL": null
-        },
-        {
-          "description": null,
-          "enumValues": null,
-          "fields": [
-            {
-              "args": [],
-              "deprecationReason": null,
-              "description": null,
+              "description": "True when the mutation completed without errors.",
               "isDeprecated": false,
               "name": "ok",
               "type": {
@@ -11858,7 +11830,83 @@
             {
               "args": [],
               "deprecationReason": null,
-              "description": null,
+              "description": "Human-readable status message.",
+              "isDeprecated": false,
+              "name": "message",
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "SCALAR",
+                  "name": "String",
+                  "ofType": null
+                }
+              }
+            },
+            {
+              "args": [],
+              "deprecationReason": null,
+              "description": "Field-level validation errors (empty on success).",
+              "isDeprecated": false,
+              "name": "errors",
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "LIST",
+                  "name": null,
+                  "ofType": {
+                    "kind": "NON_NULL",
+                    "name": null,
+                    "ofType": {
+                      "kind": "OBJECT",
+                      "name": "ValidationError",
+                      "ofType": null
+                    }
+                  }
+                }
+              }
+            },
+            {
+              "args": [],
+              "deprecationReason": null,
+              "description": "The newly added ticker.",
+              "isDeprecated": false,
+              "name": "data",
+              "type": {
+                "kind": "OBJECT",
+                "name": "TickerType",
+                "ofType": null
+              }
+            }
+          ],
+          "inputFields": null,
+          "interfaces": [],
+          "kind": "OBJECT",
+          "name": "AddTickerPayload",
+          "possibleTypes": null,
+          "specifiedByURL": null
+        },
+        {
+          "description": "A single field-level validation failure inside a mutation payload.",
+          "enumValues": null,
+          "fields": [
+            {
+              "args": [],
+              "deprecationReason": null,
+              "description": "The input field that failed validation, or null for document-level errors.",
+              "isDeprecated": false,
+              "name": "field",
+              "type": {
+                "kind": "SCALAR",
+                "name": "String",
+                "ofType": null
+              }
+            },
+            {
+              "args": [],
+              "deprecationReason": null,
+              "description": "Human-readable description of the failure.",
               "isDeprecated": false,
               "name": "message",
               "type": {
@@ -11875,7 +11923,75 @@
           "inputFields": null,
           "interfaces": [],
           "kind": "OBJECT",
-          "name": "DeleteTickerMutation",
+          "name": "ValidationError",
+          "possibleTypes": null,
+          "specifiedByURL": null
+        },
+        {
+          "description": "Canonical payload for deleteTicker mutation.",
+          "enumValues": null,
+          "fields": [
+            {
+              "args": [],
+              "deprecationReason": null,
+              "description": "True when the mutation completed without errors.",
+              "isDeprecated": false,
+              "name": "ok",
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "SCALAR",
+                  "name": "Boolean",
+                  "ofType": null
+                }
+              }
+            },
+            {
+              "args": [],
+              "deprecationReason": null,
+              "description": "Human-readable status message.",
+              "isDeprecated": false,
+              "name": "message",
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "SCALAR",
+                  "name": "String",
+                  "ofType": null
+                }
+              }
+            },
+            {
+              "args": [],
+              "deprecationReason": null,
+              "description": "Field-level validation errors (empty on success).",
+              "isDeprecated": false,
+              "name": "errors",
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "LIST",
+                  "name": null,
+                  "ofType": {
+                    "kind": "NON_NULL",
+                    "name": null,
+                    "ofType": {
+                      "kind": "OBJECT",
+                      "name": "ValidationError",
+                      "ofType": null
+                    }
+                  }
+                }
+              }
+            }
+          ],
+          "inputFields": null,
+          "interfaces": [],
+          "kind": "OBJECT",
+          "name": "DeleteTickerPayload",
           "possibleTypes": null,
           "specifiedByURL": null
         },
@@ -12214,13 +12330,29 @@
           "specifiedByURL": null
         },
         {
-          "description": null,
+          "description": "Canonical payload for updateNotificationPreferences mutation.",
           "enumValues": null,
           "fields": [
             {
               "args": [],
               "deprecationReason": null,
-              "description": null,
+              "description": "True when the mutation completed without errors.",
+              "isDeprecated": false,
+              "name": "ok",
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "SCALAR",
+                  "name": "Boolean",
+                  "ofType": null
+                }
+              }
+            },
+            {
+              "args": [],
+              "deprecationReason": null,
+              "description": "Human-readable status message.",
               "isDeprecated": false,
               "name": "message",
               "type": {
@@ -12236,9 +12368,9 @@
             {
               "args": [],
               "deprecationReason": null,
-              "description": null,
+              "description": "Field-level validation errors (empty on success).",
               "isDeprecated": false,
-              "name": "preferences",
+              "name": "errors",
               "type": {
                 "kind": "NON_NULL",
                 "name": null,
@@ -12250,9 +12382,29 @@
                     "name": null,
                     "ofType": {
                       "kind": "OBJECT",
-                      "name": "AlertPreferenceType",
+                      "name": "ValidationError",
                       "ofType": null
                     }
+                  }
+                }
+              }
+            },
+            {
+              "args": [],
+              "deprecationReason": null,
+              "description": "The updated preference records.",
+              "isDeprecated": false,
+              "name": "data",
+              "type": {
+                "kind": "LIST",
+                "name": null,
+                "ofType": {
+                  "kind": "NON_NULL",
+                  "name": null,
+                  "ofType": {
+                    "kind": "OBJECT",
+                    "name": "AlertPreferenceType",
+                    "ofType": null
                   }
                 }
               }
@@ -12261,7 +12413,7 @@
           "inputFields": null,
           "interfaces": [],
           "kind": "OBJECT",
-          "name": "UpdateNotificationPreferencesMutation",
+          "name": "UpdateNotificationPreferencesPayload",
           "possibleTypes": null,
           "specifiedByURL": null
         },

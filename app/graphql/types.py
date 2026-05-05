@@ -68,6 +68,59 @@ class PaginationType(graphene.ObjectType):
     pages = graphene.Int()
 
 
+# ---------------------------------------------------------------------------
+# Canonical mutation output types (#1149)
+# ---------------------------------------------------------------------------
+# All new mutations MUST use one of these shapes.  Existing deprecated CRUD
+# mutations retain their per-entity field layout during the deprecation window
+# (see ADR-0002 / ADR-0004).  Migration tracking: #1149.
+
+
+class ValidationError(graphene.ObjectType):
+    """A single field-level validation failure inside a mutation payload."""
+
+    field = graphene.String(
+        description="The input field that failed validation, or null for "
+        "document-level errors.",
+    )
+    message = graphene.String(
+        required=True,
+        description="Human-readable description of the failure.",
+    )
+
+
+class MutationPayload(graphene.ObjectType):
+    """Base shape for new mutations: ok + message + errors.
+
+    Concrete mutations subclass this and add a typed ``data`` field::
+
+        class AddTickerPayload(MutationPayload):
+            data = graphene.Field(TickerType)
+
+    The ``errors`` list is empty on success; ``ok`` is always present so
+    callers can branch on a single boolean field.
+    """
+
+    ok = graphene.Boolean(
+        required=True,
+        description="True when the mutation completed without errors.",
+    )
+    message = graphene.String(
+        required=True,
+        description="Human-readable status message.",
+    )
+    errors = graphene.List(
+        graphene.NonNull(ValidationError),
+        required=True,
+        description="Field-level validation errors (empty on success).",
+    )
+
+
+# ---------------------------------------------------------------------------
+# Transaction types
+# ---------------------------------------------------------------------------
+
+
 class TransactionListPayloadType(graphene.ObjectType):
     items = graphene.List(TransactionTypeObject, required=True)
     pagination = graphene.Field(PaginationType, required=True)

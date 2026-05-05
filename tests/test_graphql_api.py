@@ -903,7 +903,8 @@ def test_graphql_wallet_and_ticker_queries_mutations(client) -> None:
     add_ticker_mutation = """
     mutation AddTicker {
       addTicker(symbol: "PETR4", quantity: 10, type: "stock") {
-        item { id symbol quantity type }
+        ok message errors { field message }
+        data { id symbol quantity type }
       }
     }
     """
@@ -911,7 +912,8 @@ def test_graphql_wallet_and_ticker_queries_mutations(client) -> None:
     assert add_ticker_response.status_code == 200
     add_ticker_body = add_ticker_response.get_json()
     assert "errors" not in add_ticker_body
-    assert add_ticker_body["data"]["addTicker"]["item"]["symbol"] == "PETR4"
+    assert add_ticker_body["data"]["addTicker"]["ok"] is True
+    assert add_ticker_body["data"]["addTicker"]["data"]["symbol"] == "PETR4"
 
     tickers_query = """
     query Tickers {
