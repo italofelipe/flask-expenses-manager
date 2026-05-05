@@ -2,6 +2,11 @@ name: GraphQL Breaking Change Detection
 
 on:
   pull_request:
+    # labeled/unlabeled included so the check re-runs when the
+    # 'breaking-change-approved' label is added without a new commit.
+    # GitHub evaluates paths against the PR's changed files even for
+    # labeled events, so this only fires for PRs that touch these paths.
+    types: [opened, synchronize, reopened, labeled, unlabeled]
     paths:
       - "app/graphql/**"
       - "schema.graphql"

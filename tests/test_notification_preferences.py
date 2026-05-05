@@ -167,8 +167,10 @@ _NOTIFICATION_PREFS_QUERY = """
 _UPDATE_NOTIFICATION_PREFS = """
 mutation UpdatePrefs($preferences: [PreferenceInput!]!) {
   updateNotificationPreferences(preferences: $preferences) {
+    ok
     message
-    preferences {
+    errors { field message }
+    data {
       category
       enabled
       globalOptOut
@@ -203,9 +205,10 @@ class TestNotificationPreferencesGraphQL:
         assert res.status_code == 200
         body = res.get_json()
         assert "errors" not in body
-        data = body["data"]["updateNotificationPreferences"]
-        assert "Preferências" in data["message"]
-        prefs = data["preferences"]
+        payload = body["data"]["updateNotificationPreferences"]
+        assert payload["ok"] is True
+        assert "Preferências" in payload["message"]
+        prefs = payload["data"]
         assert len(prefs) == 1
         assert prefs[0]["category"] == "due_soon"
         assert prefs[0]["enabled"] is True
