@@ -60,6 +60,7 @@ from app.extensions.email_dlq_cli import register_email_dlq_commands
 from app.extensions.error_handlers import register_error_handlers
 from app.extensions.http_observability import register_http_observability
 from app.extensions.integration_metrics_cli import register_integration_metrics_commands
+from app.extensions.otel import init_otel
 from app.extensions.prometheus_metrics import register_prometheus_middleware
 from app.extensions.reminders_cli import register_reminders_commands
 from app.extensions.sentry import init_sentry
@@ -182,6 +183,7 @@ def create_app(*, enable_http_runtime: bool = True) -> Flask:
     init_sentry()
 
     app = Flask(__name__, instance_relative_config=True)
+
     from config import Config, validate_security_configuration
 
     app.config.from_object(Config)
@@ -217,6 +219,12 @@ def create_app(*, enable_http_runtime: bool = True) -> Flask:
 
     # PERF-3 — slow query log listeners on the default SQLAlchemy engine.
     install_slow_query_log(app)
+
+    # OTel tracing — no-op when OTEL_EXPORTER_OTLP_ENDPOINT is unset.
+    # Must be called after db.init_app() so SQLAlchemy instrumentation can
+    # access the engine.
+    with app.app_context():
+        init_otel(app)
 
     # Schema bootstrap deve ser explicito para evitar drift em runtime seguro.
     auto_create_db = os.getenv("AUTO_CREATE_DB", "false").lower() == "true"
