@@ -76,6 +76,7 @@ def analyze_graphql_query(
         fragments=fragments,
         variable_values=variable_values,
         max_list_multiplier=policy.max_list_multiplier,
+        field_weights=policy.field_weights,
         query=query,
     )
     enforce_depth_and_complexity_limits(metrics, policy)
