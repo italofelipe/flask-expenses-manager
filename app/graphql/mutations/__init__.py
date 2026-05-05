@@ -124,8 +124,13 @@ class Mutation(graphene.ObjectType):
     delete_budget = DeleteBudgetMutation.Field(
         deprecation_reason="ADR-0002: use DELETE /budgets/{id}"
     )
-    create_checkout_session = CreateCheckoutSessionMutation.Field()
-    cancel_subscription = CancelSubscriptionMutation.Field()
+    # ADR-0004: subscription CRUD mutations deprecated — use REST endpoints.
+    create_checkout_session = CreateCheckoutSessionMutation.Field(
+        deprecation_reason="ADR-0004: use POST /subscription/checkout"
+    )
+    cancel_subscription = CancelSubscriptionMutation.Field(
+        deprecation_reason="ADR-0004: use POST /subscription/cancel"
+    )
     update_notification_preferences = UpdateNotificationPreferencesMutation.Field()
     revoke_session = RevokeSessionMutation.Field()
     revoke_all_sessions = RevokeAllSessionsMutation.Field()
