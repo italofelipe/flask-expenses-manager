@@ -1,0 +1,153 @@
+name: GraphQL Breaking Change Detection
+
+on:
+  pull_request:
+    paths:
+      - "app/graphql/**"
+      - "schema.graphql"
+      - "graphql.introspection.json"
+      - "graphql.operations.manifest.json"
+
+permissions:
+  contents: read
+  pull-requests: write
+
+concurrency:
+  group: graphql-diff-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  graphql-diff:
+    name: GraphQL Breaking Change Check
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout PR head
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+          cache: pip
+          cache-dependency-path: requirements.txt
+
+      - name: Install Python dependencies
+        run: pip install -r requirements.txt
+
+      - name: Regenerate schema from PR branch source
+        run: python scripts/export_graphql_docs.py --source runtime
+
+      - name: Check schema.graphql is committed and up-to-date
+        run: |
+          if ! git diff --quiet schema.graphql; then
+            echo "::error file=schema.graphql::schema.graphql is out of sync with the Python source." \
+              "Run 'python scripts/export_graphql_docs.py --source runtime' and commit the result."
+            git diff schema.graphql
+            exit 1
+          fi
+          echo "schema.graphql is up to date."
+
+      - name: Extract base schema (origin/master)
+        id: base_schema
+        run: |
+          if git show origin/master:schema.graphql > /tmp/schema-base.graphql 2>/dev/null; then
+            echo "exists=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "exists=false" >> "$GITHUB_OUTPUT"
+            echo "No base schema found on origin/master — skipping breaking change diff."
+          fi
+
+      - name: Setup Node.js
+        if: steps.base_schema.outputs.exists == 'true'
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Run graphql-inspector diff
+        id: diff
+        if: steps.base_schema.outputs.exists == 'true'
+        run: |
+          set +e
+          npx --yes @graphql-inspector/cli@5 diff \
+            /tmp/schema-base.graphql schema.graphql \
+            --rule suppressRemovalOfDeprecatedField \
+            > /tmp/gql-diff.txt 2>&1
+          DIFF_EXIT=$?
+          set -e
+
+          LABELS="${{ join(github.event.pull_request.labels.*.name, ',') }}"
+          if echo "$LABELS" | grep -q "breaking-change-approved"; then
+            APPROVED="true"
+          else
+            APPROVED="false"
+          fi
+
+          if [ "$DIFF_EXIT" -ne 0 ] && [ "$APPROVED" = "false" ]; then
+            HAS_BREAKING="true"
+          else
+            HAS_BREAKING="false"
+          fi
+
+          echo "has_breaking=$HAS_BREAKING" >> "$GITHUB_OUTPUT"
+          echo "approved=$APPROVED" >> "$GITHUB_OUTPUT"
+
+          {
+            echo "## GraphQL Breaking Change Report"
+            echo ""
+            if [ "$HAS_BREAKING" = "true" ]; then
+              echo "> ⚠️ **Breaking changes detected.** These changes may break existing GraphQL clients."
+              echo "> To intentionally merge breaking changes, add the \`breaking-change-approved\` label."
+            elif [ "$APPROVED" = "true" ]; then
+              echo "> ✅ Breaking change check bypassed via \`breaking-change-approved\` label."
+            else
+              echo "> ✅ No breaking changes detected."
+            fi
+            echo ""
+            echo "<details><summary>Diff output</summary>"
+            echo ""
+            echo '```'
+            cat /tmp/gql-diff.txt
+            echo '```'
+            echo ""
+            echo "</details>"
+          } > /tmp/gql-comment.txt
+
+      - name: Post PR comment (schema in sync but no base)
+        if: steps.base_schema.outputs.exists == 'false'
+        uses: marocchino/sticky-pull-request-comment@v2
+        with:
+          header: graphql-diff
+          message: |
+            ## GraphQL Breaking Change Report
+
+            > ✅ No base `schema.graphql` found on `origin/master` — this appears to be the first schema commit. No diff to report.
+
+      - name: Post or update PR comment
+        if: steps.base_schema.outputs.exists == 'true'
+        uses: marocchino/sticky-pull-request-comment@v2
+        with:
+          header: graphql-diff
+          path: /tmp/gql-comment.txt
+
+      - name: Add graphql-breaking label
+        if: steps.diff.outputs.has_breaking == 'true'
+        uses: actions-ecosystem/action-add-labels@v1
+        with:
+          labels: graphql-breaking
+
+      - name: Remove graphql-breaking label (clean)
+        if: steps.diff.outputs.has_breaking == 'false' && steps.base_schema.outputs.exists == 'true'
+        uses: actions-ecosystem/action-remove-labels@v1
+        with:
+          labels: graphql-breaking
+        continue-on-error: true
+
+      - name: Fail on breaking change
+        if: steps.diff.outputs.has_breaking == 'true'
+        run: |
+          echo "::error::Breaking GraphQL changes detected. Review the diff above." \
+            "Add the 'breaking-change-approved' label to intentionally merge."
+          exit 1
