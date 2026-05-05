@@ -47,6 +47,34 @@ GRAPHQL_FIELD_WEIGHTS_JSON='{"myExpensiveField": 20, "cheapField": 1}'
 
 When the env var is absent or malformed, the compiled defaults apply.
 
+## REST vs GraphQL ownership policy
+
+GraphQL in Auraxis follows the **read-heavy, REST-primary** model defined in ADR-0002 and
+extended by ADR-0004.
+
+### Rules
+
+| Operation type | Canonical surface |
+|---|---|
+| **Domain CRUD** (create/update/delete entities) | REST (`/transactions`, `/goals`, `/wallet`, etc.) |
+| **Complex reads + aggregations** (dashboard, multi-join queries) | GraphQL queries |
+| **Auth operations** (login, register, reset password) | GraphQL mutations (no REST equivalent) |
+| **Composite cross-domain mutations** (simulations) | GraphQL mutations (no REST equivalent) |
+
+### Deprecated mutations
+
+All domain CRUD mutations remain in the schema for backward compatibility but carry a
+`deprecation_reason` pointing to the REST equivalent. They will be removed in a future ADR.
+
+See `docs/adr/0002-graphql-ownership.md` and `docs/adr/0004-graphql-ownership-scope-completion.md`.
+
+### Adding a new mutation
+
+Before adding a GraphQL mutation, ask: **does a REST endpoint for this already exist?**
+
+- Yes → add `deprecation_reason` pointing to the REST endpoint, or don't add the mutation.
+- No → add the mutation (and also add the REST endpoint for parity).
+
 ## Auth policy
 
 Every mutation and non-public query **must** call `get_current_user_required()`

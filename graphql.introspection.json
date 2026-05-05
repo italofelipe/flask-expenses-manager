@@ -10513,9 +10513,9 @@
                   }
                 }
               ],
-              "deprecationReason": null,
+              "deprecationReason": "ADR-0004: use POST /subscription/checkout",
               "description": null,
-              "isDeprecated": false,
+              "isDeprecated": true,
               "name": "createCheckoutSession",
               "type": {
                 "kind": "OBJECT",
@@ -10525,9 +10525,9 @@
             },
             {
               "args": [],
-              "deprecationReason": null,
+              "deprecationReason": "ADR-0004: use POST /subscription/cancel",
               "description": null,
-              "isDeprecated": false,
+              "isDeprecated": true,
               "name": "cancelSubscription",
               "type": {
                 "kind": "OBJECT",

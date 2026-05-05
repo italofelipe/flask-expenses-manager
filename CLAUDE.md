@@ -178,3 +178,4 @@ Key ADRs governing the GraphQL layer:
 
 - [`docs/adr/0002-graphql-ownership.md`](docs/adr/0002-graphql-ownership.md) — REST vs GraphQL ownership boundaries; when to use each protocol
 - [`docs/adr/0003-graphql-flat-types-no-dataloader.md`](docs/adr/0003-graphql-flat-types-no-dataloader.md) — flat Graphene types, service-layer batching, no DataLoader
+- [`docs/adr/0004-graphql-ownership-scope-completion.md`](docs/adr/0004-graphql-ownership-scope-completion.md) — extends ADR-0002 to Subscription mutations; documents ticker exception
