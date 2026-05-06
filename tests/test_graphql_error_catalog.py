@@ -130,7 +130,7 @@ def test_graphql_duplicate_ticker_returns_conflict_code(client: Any) -> None:
     mutation = """
     mutation AddTicker($symbol: String!, $quantity: Float!) {
       addTicker(symbol: $symbol, quantity: $quantity) {
-        item { id symbol quantity }
+        ok data { id symbol quantity }
       }
     }
     """

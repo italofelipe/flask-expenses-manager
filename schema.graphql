@@ -631,14 +631,14 @@ type Mutation {
   addInvestmentOperation(executedAt: String, fees: String, investmentId: UUID!, notes: String, operationType: String!, quantity: String!, unitPrice: String!): AddInvestmentOperationMutation @deprecated(reason: "ADR-0002: use POST /wallet/{id}/operations")
   updateInvestmentOperation(executedAt: String, fees: String, investmentId: UUID!, notes: String, operationId: UUID!, operationType: String, quantity: String, unitPrice: String): UpdateInvestmentOperationMutation @deprecated(reason: "ADR-0002: use PATCH /wallet/{id}/operations/{op_id}")
   deleteInvestmentOperation(investmentId: UUID!, operationId: UUID!): DeleteInvestmentOperationMutation @deprecated(reason: "ADR-0002: use DELETE /wallet/{id}/operations/{op_id}")
-  addTicker(quantity: Float!, symbol: String!, type: String): AddTickerMutation
-  deleteTicker(symbol: String!): DeleteTickerMutation
+  addTicker(quantity: Float!, symbol: String!, type: String): AddTickerPayload
+  deleteTicker(symbol: String!): DeleteTickerPayload
   createBudget(amount: String!, endDate: String, isActive: Boolean, name: String!, period: String!, startDate: String, tagId: String): CreateBudgetMutation @deprecated(reason: "ADR-0002: use POST /budgets")
   updateBudget(amount: String, budgetId: UUID!, endDate: String, isActive: Boolean, name: String, period: String, startDate: String, tagId: String): UpdateBudgetMutation @deprecated(reason: "ADR-0002: use PATCH /budgets/{id}")
   deleteBudget(budgetId: UUID!): DeleteBudgetMutation @deprecated(reason: "ADR-0002: use DELETE /budgets/{id}")
   createCheckoutSession(billingCycle: BillingCycle, planSlug: String!): CreateCheckoutSessionMutation @deprecated(reason: "ADR-0004: use POST /subscription/checkout")
   cancelSubscription: CancelSubscriptionMutation @deprecated(reason: "ADR-0004: use POST /subscription/cancel")
-  updateNotificationPreferences(preferences: [PreferenceInput!]!): UpdateNotificationPreferencesMutation
+  updateNotificationPreferences(preferences: [PreferenceInput!]!): UpdateNotificationPreferencesPayload
 
   """Revoke a specific session by ID (multi-device, #1028)."""
   revokeSession(sessionId: String!): RevokeSessionMutation
@@ -794,13 +794,42 @@ type DeleteInvestmentOperationMutation {
   message: String!
 }
 
-type AddTickerMutation {
-  item: TickerType!
+"""Canonical payload for addTicker mutation."""
+type AddTickerPayload {
+  """True when the mutation completed without errors."""
+  ok: Boolean!
+
+  """Human-readable status message."""
+  message: String!
+
+  """Field-level validation errors (empty on success)."""
+  errors: [ValidationError!]!
+
+  """The newly added ticker."""
+  data: TickerType
 }
 
-type DeleteTickerMutation {
-  ok: Boolean!
+"""A single field-level validation failure inside a mutation payload."""
+type ValidationError {
+  """
+  The input field that failed validation, or null for document-level errors.
+  """
+  field: String
+
+  """Human-readable description of the failure."""
   message: String!
+}
+
+"""Canonical payload for deleteTicker mutation."""
+type DeleteTickerPayload {
+  """True when the mutation completed without errors."""
+  ok: Boolean!
+
+  """Human-readable status message."""
+  message: String!
+
+  """Field-level validation errors (empty on success)."""
+  errors: [ValidationError!]!
 }
 
 type CreateBudgetMutation {
@@ -843,9 +872,19 @@ type CancelSubscriptionMutation {
   subscription: SubscriptionType!
 }
 
-type UpdateNotificationPreferencesMutation {
+"""Canonical payload for updateNotificationPreferences mutation."""
+type UpdateNotificationPreferencesPayload {
+  """True when the mutation completed without errors."""
+  ok: Boolean!
+
+  """Human-readable status message."""
   message: String!
-  preferences: [AlertPreferenceType!]!
+
+  """Field-level validation errors (empty on success)."""
+  errors: [ValidationError!]!
+
+  """The updated preference records."""
+  data: [AlertPreferenceType!]
 }
 
 input PreferenceInput {

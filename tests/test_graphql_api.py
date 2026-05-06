@@ -903,7 +903,8 @@ def test_graphql_wallet_and_ticker_queries_mutations(client) -> None:
     add_ticker_mutation = """
     mutation AddTicker {
       addTicker(symbol: "PETR4", quantity: 10, type: "stock") {
-        item { id symbol quantity type }
+        ok message errors { field message }
+        data { id symbol quantity type }
       }
     }
     """
@@ -911,7 +912,8 @@ def test_graphql_wallet_and_ticker_queries_mutations(client) -> None:
     assert add_ticker_response.status_code == 200
     add_ticker_body = add_ticker_response.get_json()
     assert "errors" not in add_ticker_body
-    assert add_ticker_body["data"]["addTicker"]["item"]["symbol"] == "PETR4"
+    assert add_ticker_body["data"]["addTicker"]["ok"] is True
+    assert add_ticker_body["data"]["addTicker"]["data"]["symbol"] == "PETR4"
 
     tickers_query = """
     query Tickers {
@@ -1089,13 +1091,15 @@ def test_graphql_ticker_duplicate_and_delete_not_found(client) -> None:
     add_ticker_mutation = """
     mutation AddTicker {
       addTicker(symbol: "ITUB4", quantity: 5, type: "stock") {
-        item { id symbol }
+        ok message errors { field message } data { id symbol }
       }
     }
     """
     first = _graphql(client, add_ticker_mutation, token=token)
     assert first.status_code == 200
-    assert "errors" not in first.get_json()
+    first_body = first.get_json()
+    assert "errors" not in first_body
+    assert first_body["data"]["addTicker"]["ok"] is True
 
     duplicate = _graphql(client, add_ticker_mutation, token=token)
     assert duplicate.status_code == 200
@@ -1299,7 +1303,7 @@ def test_tickers_pagination_pages_and_overflow(client) -> None:
     for symbol in symbols:
         add_mutation = (
             'mutation { addTicker(symbol: "' + symbol + '", quantity: 1, '
-            'type: "stock") { item { id } } }'
+            'type: "stock") { ok data { id } } }'
         )
         response = _graphql(client, add_mutation, token=token)
         assert response.status_code == 200, response.get_json()

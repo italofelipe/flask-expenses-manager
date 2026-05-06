@@ -12,7 +12,7 @@ from app.graphql.errors import (
     GRAPHQL_ERROR_CODE_VALIDATION,
     build_public_graphql_error,
 )
-from app.graphql.types import AlertPreferenceType
+from app.graphql.types import AlertPreferenceType, MutationPayload
 from app.services.alert_service import AlertServiceError, upsert_preference
 
 _VALID_CATEGORIES = frozenset(
@@ -26,18 +26,26 @@ class PreferenceInput(graphene.InputObjectType):
     global_opt_out = graphene.Boolean()
 
 
+class UpdateNotificationPreferencesPayload(MutationPayload):
+    """Canonical payload for updateNotificationPreferences mutation."""
+
+    data = graphene.List(
+        graphene.NonNull(AlertPreferenceType),
+        description="The updated preference records.",
+    )
+
+
 class UpdateNotificationPreferencesMutation(graphene.Mutation):
     class Arguments:
         preferences = graphene.List(graphene.NonNull(PreferenceInput), required=True)
 
-    message = graphene.String(required=True)
-    preferences = graphene.List(graphene.NonNull(AlertPreferenceType), required=True)
+    Output = UpdateNotificationPreferencesPayload
 
     def mutate(
         self,
         info: graphene.ResolveInfo,
         preferences: list[Any],
-    ) -> "UpdateNotificationPreferencesMutation":
+    ) -> UpdateNotificationPreferencesPayload:
         user = get_current_user_required()
         user_id = UUID(str(user.id))
 
@@ -68,7 +76,9 @@ class UpdateNotificationPreferencesMutation(graphene.Mutation):
                     exc.message, code=GRAPHQL_ERROR_CODE_VALIDATION
                 ) from exc
 
-        return UpdateNotificationPreferencesMutation(
+        return UpdateNotificationPreferencesPayload(
+            ok=True,
             message="Preferências de notificação atualizadas com sucesso",
-            preferences=updated,
+            errors=[],
+            data=updated,
         )

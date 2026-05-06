@@ -1,3 +1,5 @@
+"""Ticker mutations using the canonical MutationPayload shape (#1149)."""
+
 from __future__ import annotations
 
 import graphene
@@ -9,8 +11,14 @@ from app.graphql.errors import (
     GRAPHQL_ERROR_CODE_NOT_FOUND,
     build_public_graphql_error,
 )
-from app.graphql.types import TickerType
+from app.graphql.types import MutationPayload, TickerType
 from app.models.user_ticker import UserTicker
+
+
+class AddTickerPayload(MutationPayload):
+    """Canonical payload for addTicker mutation."""
+
+    data = graphene.Field(TickerType, description="The newly added ticker.")
 
 
 class AddTickerMutation(graphene.Mutation):
@@ -19,7 +27,7 @@ class AddTickerMutation(graphene.Mutation):
         quantity = graphene.Float(required=True)
         type = graphene.String()
 
-    item = graphene.Field(TickerType, required=True)
+    Output = AddTickerPayload
 
     def mutate(
         self,
@@ -27,7 +35,7 @@ class AddTickerMutation(graphene.Mutation):
         symbol: str,
         quantity: float,
         type: str | None = None,
-    ) -> "AddTickerMutation":
+    ) -> AddTickerPayload:
         user = get_current_user_required()
         normalized_symbol = symbol.upper()
         exists = UserTicker.query.filter_by(
@@ -46,24 +54,30 @@ class AddTickerMutation(graphene.Mutation):
         )
         db.session.add(ticker)
         db.session.commit()
-        return AddTickerMutation(
-            item=TickerType(
+        return AddTickerPayload(
+            ok=True,
+            message="Ticker adicionado com sucesso",
+            errors=[],
+            data=TickerType(
                 id=str(ticker.id),
                 symbol=ticker.symbol,
                 quantity=ticker.quantity,
                 type=ticker.type,
-            )
+            ),
         )
+
+
+class DeleteTickerPayload(MutationPayload):
+    """Canonical payload for deleteTicker mutation."""
 
 
 class DeleteTickerMutation(graphene.Mutation):
     class Arguments:
         symbol = graphene.String(required=True)
 
-    ok = graphene.Boolean(required=True)
-    message = graphene.String(required=True)
+    Output = DeleteTickerPayload
 
-    def mutate(self, info: graphene.ResolveInfo, symbol: str) -> "DeleteTickerMutation":
+    def mutate(self, info: graphene.ResolveInfo, symbol: str) -> DeleteTickerPayload:
         user = get_current_user_required()
         ticker = UserTicker.query.filter_by(
             user_id=user.id, symbol=symbol.upper()
@@ -75,4 +89,6 @@ class DeleteTickerMutation(graphene.Mutation):
             )
         db.session.delete(ticker)
         db.session.commit()
-        return DeleteTickerMutation(ok=True, message="Ticker removido com sucesso")
+        return DeleteTickerPayload(
+            ok=True, message="Ticker removido com sucesso", errors=[]
+        )
