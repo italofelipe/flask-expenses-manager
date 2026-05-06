@@ -269,6 +269,8 @@ def _build_script(
     aws_region: str,
     git_ref: str | None,
     mode: str,
+    web_image: str = "",
+    ghcr_token: str = "",
 ) -> str:
     domain = "api.auraxis.com.br" if env_name == "prod" else "dev.api.auraxis.com.br"
     cors_origins = (
@@ -277,12 +279,16 @@ def _build_script(
         else "http://localhost:3000,http://localhost:5173"
     )
     git_ref_setup = f'GIT_REF="{git_ref}"' if git_ref is not None else 'GIT_REF=""'
+    web_image_setup = f'WEB_IMAGE="{web_image}"'
+    ghcr_token_setup = f'GHCR_TOKEN="{ghcr_token}"'
 
     return f"""\
 set -euo pipefail
 
 MODE="{mode}"
 {git_ref_setup}
+{web_image_setup}
+{ghcr_token_setup}
 
 REPO=""
 CANONICAL_REPO=/opt/auraxis
@@ -383,12 +389,13 @@ if [ "$MODE" = "rollback" ]; then
     echo "[i6] rollback requested but no previous deploy recorded in $STATE_PATH"
     exit 12
   fi
-  GIT_REF="$STATE_PREVIOUS"
+  # Rollback uses the previously deployed image URI from state — not a git ref.
+  WEB_IMAGE="$STATE_PREVIOUS"
+  echo "[i6] rollback: target image=$WEB_IMAGE"
 fi
 
-if [ -z "$GIT_REF" ]; then
-  echo "[i6] missing git ref."
-  echo "[i6] Provide --git-ref for deploy or ensure state has previous for rollback."
+if [ "$MODE" = "deploy" ] && [ -z "$WEB_IMAGE" ]; then
+  echo "[i6] missing --image (WEB_IMAGE). Pass the GHCR image URI to deploy." >&2
   exit 13
 fi
 
@@ -427,38 +434,21 @@ if ! docker info >/dev/null 2>&1; then
   exit 24
 fi
 
-# Pre-flight: proactive Docker cleanup when disk is low.
-# Run BEFORE the hard 5GB check so there's a chance to reclaim space.
+# Pre-flight: disk check. docker pull needs ~1GB buffer; no build = no large cache needed.
 DISK_FREE_GB=$(df / --output=avail -BG | tail -1 | tr -d 'G ')
 echo "[i6] disk: ${{DISK_FREE_GB}}GB free"
-if [ "${{DISK_FREE_GB}}" -lt 8 ]; then
-  echo "[i6] disk < 8GB — pruning Docker cache and stopped containers..."
+if [ "${{DISK_FREE_GB}}" -lt 2 ]; then
+  echo "[i6] disk < 2GB — pruning stopped containers and dangling images..."
   docker system prune -f >/dev/null 2>&1 || true
-  docker builder prune --force >/dev/null 2>&1 || true
   DISK_FREE_GB=$(df / --output=avail -BG | tail -1 | tr -d 'G ')
   echo "[i6] disk after prune: ${{DISK_FREE_GB}}GB free"
 fi
-
-# Pre-flight: disk space hard floor (Docker build needs at least 5GB free)
-if [ "${{DISK_FREE_GB}}" -lt 5 ]; then
-  echo "[i6] ABORT: only ${{DISK_FREE_GB}}GB free even after pruning. Need 5GB for Docker build."
-  echo "[i6] Fix: ssh into EC2 and run: docker system prune -af --volumes"
+if [ "${{DISK_FREE_GB}}" -lt 1 ]; then
+  echo "[i6] ABORT: only ${{DISK_FREE_GB}}GB free — need at least 1GB for docker pull."
+  echo "[i6] Fix: docker system prune -af --volumes on the instance."
   exit 25
 fi
 echo "[i6] disk OK: ${{DISK_FREE_GB}}GB free"
-
-# Pre-flight: swap (Docker build on t2.micro OOMs without swap)
-SWAP_TOTAL=$(free -m | awk '/^Swap:/ {{print $2}}')
-if [ "${{SWAP_TOTAL}}" -lt 512 ]; then
-  echo "[i6] swap is ${{SWAP_TOTAL}}MB — enabling 2GB swapfile to prevent OOM."
-  fallocate -l 2G /swapfile 2>/dev/null \
-    || dd if=/dev/zero of=/swapfile bs=1M count=2048 2>/dev/null \
-    || true
-  chmod 600 /swapfile
-  mkswap /swapfile >/dev/null 2>&1 || true
-  swapon /swapfile 2>/dev/null || true
-  echo "[i6] swap: $(free -m | awk '/^Swap:/ {{print $2}}')MB"
-fi
 
 ensure_env_default() {{
   key="$1"
@@ -493,39 +483,30 @@ if [ "{env_name}" = "prod" ]; then
   require_env_key CERTBOT_EMAIL
 fi
 
-echo "[i6] mode=$MODE git_ref=$GIT_REF"
+echo "[i6] mode=$MODE git_ref=$GIT_REF image=$WEB_IMAGE"
 # Force GitHub SSH traffic over port 443 to avoid environments where port 22
 # is blocked (common in hardened VPC egress policies).
 GIT_SSH_COMMAND_AURAXIS="ssh -o StrictHostKeyChecking=accept-new \\
   -o ConnectTimeout=15 -o HostName=ssh.github.com -p 443"
 echo "[i6] git transport=ssh-over-443"
-if [ "$MODE" = "rollback" ]; then
-  if ! sudo -u "$OP_USER" bash -lc \\
-    "cd '$REPO' && git cat-file -e '$GIT_REF^{{commit}}'"; then
-    echo "[i6] rollback ref not available locally: $GIT_REF"
-    exit 14
-  fi
-  sudo -u "$OP_USER" bash -lc \\
-    "cd '$REPO' \\
-      && git checkout -f '$GIT_REF' \\
-      && git reset --hard '$GIT_REF'"
-else
-  if ! sudo -u "$OP_USER" bash -lc \\
-    "cd '$REPO' \\
-      && git -c core.sshCommand='$GIT_SSH_COMMAND_AURAXIS' \\
-         ls-remote --exit-code origin >/dev/null"; then
-    echo "[i6] git remote authentication failed for user: $OP_USER"
-    echo "[i6] expected: SSH key configured for git@ssh.github.com:443"
-    echo "[i6] fix: configure deploy key for $OP_USER on this instance"
-    echo "[i6] and add it to GitHub repo"
-    exit 15
-  fi
-  sudo -u "$OP_USER" bash -lc \\
-    "cd '$REPO' \\
-      && git -c core.sshCommand='$GIT_SSH_COMMAND_AURAXIS' fetch --all --prune \\
-      && git checkout -f '$GIT_REF' \\
-      && git reset --hard '$GIT_REF'"
+# Fetch + checkout to sync compose files and nginx configs.
+# Application code now lives in the Docker image (GHCR) — git is config-only.
+if ! sudo -u "$OP_USER" bash -lc \\
+  "cd '$REPO' \\
+    && git -c core.sshCommand='$GIT_SSH_COMMAND_AURAXIS' \\
+       ls-remote --exit-code origin >/dev/null"; then
+  echo "[i6] git remote authentication failed for user: $OP_USER"
+  echo "[i6] expected: SSH key configured for git@ssh.github.com:443"
+  echo "[i6] fix: configure deploy key for $OP_USER on this instance"
+  echo "[i6] and add it to GitHub repo"
+  exit 15
 fi
+SYNC_REF="${{GIT_REF:-origin/master}}"
+sudo -u "$OP_USER" bash -lc \\
+  "cd '$REPO' \\
+    && git -c core.sshCommand='$GIT_SSH_COMMAND_AURAXIS' fetch --all --prune \\
+    && git checkout -f '$SYNC_REF' \\
+    && git reset --hard '$SYNC_REF'"
 
 NEW_REF="$(sudo -u "$OP_USER" bash -lc "cd '$REPO' && git rev-parse HEAD")"
 echo "[i6] new_head=$NEW_REF"
@@ -921,14 +902,23 @@ for i in $(seq 1 20); do
   sleep 3
 done
 
-# Phase 3: Build new web image while old container is still serving traffic.
-# --no-cache is intentionally omitted: layer cache speeds up deploys significantly.
-echo "[i6] building new web image (old container still serving)..."
-if ! docker compose --env-file "$ENV_FILE" -f docker-compose.prod.yml build web; then
-  echo "[i6] web image build failed"
-  dump_compose_diagnostics
+# Phase 3: Pull pre-built image from GHCR (built in GitHub Actions — no local build).
+if [ -n "$GHCR_TOKEN" ]; then
+  echo "$GHCR_TOKEN" | docker login ghcr.io -u github-actions --password-stdin >/dev/null
+  echo "[i6] GHCR login OK"
+fi
+echo "[i6] pulling image: $WEB_IMAGE"
+if ! docker pull "$WEB_IMAGE"; then
+  echo "[i6] docker pull failed: $WEB_IMAGE"
   exit 35
 fi
+# Write WEB_IMAGE to env file so compose picks up the exact image tag.
+if grep -q "^WEB_IMAGE=" "$ENV_FILE"; then
+  sed -i "s|^WEB_IMAGE=.*|WEB_IMAGE=$WEB_IMAGE|" "$ENV_FILE"
+else
+  echo "WEB_IMAGE=$WEB_IMAGE" >> "$ENV_FILE"
+fi
+echo "[i6] WEB_IMAGE=$WEB_IMAGE written to $ENV_FILE"
 
 # Phase 4: Swap web container only.
 # --no-deps: do not touch db or redis.
@@ -1022,7 +1012,7 @@ PY
   if [ "$WEB_OK" = "true" ] \\
     && curl $CURL_FLAGS "$EDGE_HEALTH_URL" -H "Host: {domain}" >/dev/null; then
     echo "[i6] OK"
-    python3 - <<'PY' "$STATE_PATH" "$CURRENT_REF" "$NEW_REF"
+    python3 - <<'PY' "$STATE_PATH" "$STATE_CURRENT" "$WEB_IMAGE"
 import json,sys
 path=sys.argv[1]
 prev=sys.argv[2] or ""
@@ -1063,6 +1053,16 @@ def build_parser() -> argparse.ArgumentParser:
     p_deploy = sub.add_parser("deploy", help="Deploy a git ref to DEV/PROD.")
     p_deploy.add_argument("--env", choices=["dev", "prod"], required=True)
     p_deploy.add_argument("--git-ref", default="origin/master")
+    p_deploy.add_argument(
+        "--image",
+        default="",
+        help="Pre-built Docker image URI (GHCR) to deploy instead of building on EC2.",
+    )
+    p_deploy.add_argument(
+        "--ghcr-token",
+        default="",
+        help="GitHub token for 'docker login ghcr.io' on the target EC2 instance.",
+    )
     p_rb = sub.add_parser(
         "rollback",
         help="Rollback DEV/PROD to the previous successfully deployed ref.",
@@ -1096,6 +1096,8 @@ def main() -> int:
             aws_region=ctx.region,
             git_ref=git_ref,
             mode=mode,
+            web_image=str(getattr(args, "image", "") or ""),
+            ghcr_token=str(getattr(args, "ghcr_token", "") or ""),
         )
         cmd_id = ""
         try:
