@@ -46,6 +46,7 @@ TAG_FOLDER_MAP: dict[str, str] = {
     "Wallet": "06 - Wallet",
     "Simulações": "07 - Simulations",
     "Entitlements": "08 - Entitlements",
+    "Notificações": "09 - Notifications",
 }
 DEFAULT_FOLDER = "99 - Other"
 
@@ -168,6 +169,7 @@ FOLDER_ORDER = [
     "06 - Wallet",
     "07 - Simulations",
     "08 - Entitlements",
+    "09 - Notifications",
     "99 - Cleanup",
     "99 - Other",
 ]

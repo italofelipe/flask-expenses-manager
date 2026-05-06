@@ -33,6 +33,8 @@ from app.controllers.fiscal import fiscal_bp
 from app.controllers.goal_controller import goal_bp, register_goal_dependencies
 from app.controllers.graphql_controller import graphql_bp, register_graphql_dependencies
 from app.controllers.health_controller import health_bp
+from app.controllers.notifications import routes as _notification_routes  # noqa: F401
+from app.controllers.notifications.blueprint import notifications_bp
 from app.controllers.observability_controller import observability_bp
 from app.controllers.shared_entries import (
     register_shared_entries_dependencies,
@@ -164,6 +166,7 @@ def _register_documented_endpoints(app: Flask, docs: FlaskApiSpec) -> None:
         "simulation",
         "observability",
         "budget",
+        "notifications",
     }
     for endpoint, view_func in sorted(app.view_functions.items()):
         if "." not in endpoint:
@@ -304,6 +307,7 @@ def create_app(*, enable_http_runtime: bool = True) -> Flask:
     app.register_blueprint(health_bp)
     app.register_blueprint(observability_bp)
     app.register_blueprint(alert_bp)
+    app.register_blueprint(notifications_bp)
     app.register_blueprint(account_bp)
     app.register_blueprint(bank_statement_bp)
     app.register_blueprint(credit_card_bp)

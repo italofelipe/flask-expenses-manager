@@ -51,6 +51,10 @@ TAGS = [
         "description": "Gerenciamento de cartões de crédito (pendente)",
     },
     {"name": "Tags", "description": "Sistema de categorização por tags (pendente)"},
+    {
+        "name": "Notificações",
+        "description": "Registro de tokens de push (Expo, Web Push VAPID)",
+    },
 ]
 
 EXAMPLES = {
