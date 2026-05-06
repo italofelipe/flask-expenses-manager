@@ -286,11 +286,12 @@ def test_postman_collection_has_auth_headers_for_protected_routes() -> None:
 
 
 def test_postman_post_put_patch_have_content_type() -> None:
-    """POST/PUT/PATCH must always include Content-Type: application/json.
+    """POST/PUT/PATCH must always include a Content-Type header.
 
-    Flask returns 415 Unsupported Media Type when Content-Type is missing
-    on endpoints that call request.get_json().
+    Flask returns 415 Unsupported Media Type when Content-Type is missing.
+    Accepted values: application/json (JSON body) or multipart/form-data (file upload).
     """
+    _ACCEPTED = {"application/json", "multipart/form-data"}
     items = _flatten_request_items(_load_postman_items())
     missing: list[str] = []
     for item in items:
@@ -300,7 +301,7 @@ def test_postman_post_put_patch_have_content_type() -> None:
             continue
         headers = req.get("header", [])
         has_ct = any(
-            h.get("key") == "Content-Type" and h.get("value") == "application/json"
+            h.get("key") == "Content-Type" and h.get("value") in _ACCEPTED
             for h in headers
         )
         if not has_ct:

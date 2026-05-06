@@ -194,7 +194,7 @@ def create_app(*, enable_http_runtime: bool = True) -> Flask:
     # Carrega variáveis de ambiente com prefixo FLASK_ do .env
     app.config.from_prefixed_env()
     app.config["MAX_CONTENT_LENGTH"] = int(
-        os.getenv("MAX_REQUEST_BYTES", str(1024 * 1024))
+        os.getenv("MAX_REQUEST_BYTES", str(10 * 1024 * 1024))
     )
     # Prevent SQLite connection pooling in tests to avoid leaked connections
     # surfacing as ResourceWarning under newer Python versions.

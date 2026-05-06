@@ -30,7 +30,9 @@ def _register_and_login(client: Any) -> str:
 
 
 def test_payload_too_large_returns_413(client: Any) -> None:
-    oversized_name = "a" * (1024 * 1024 + 100)
+    # MAX_CONTENT_LENGTH is 10 MB (raised from 1 MB to support avatar uploads).
+    # Send a payload that exceeds the 10 MB limit to trigger Flask's 413 guard.
+    oversized_name = "a" * (11 * 1024 * 1024)
     response = client.post(
         "/auth/register",
         json={

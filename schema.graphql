@@ -604,6 +604,7 @@ type UserType {
   investorProfileSuggested: String
   profileQuizScore: Int
   taxonomyVersion: String
+  avatarUrl: String
 }
 
 type Mutation {

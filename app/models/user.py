@@ -58,6 +58,9 @@ class User(db.Model):
     # Incremented atomically on subscription_status_changed events.
     entitlements_version = db.Column(db.Integer, nullable=False, default=0)
 
+    # User avatar — URL of the uploaded image stored in S3/CDN.
+    avatar_url = db.Column(db.String(500), nullable=True)
+
     # LGPD — soft-delete / account erasure.
     # When set, this account has been anonymised and must be treated as deleted.
     deleted_at = db.Column(db.DateTime, nullable=True)

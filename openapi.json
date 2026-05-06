@@ -8316,6 +8316,363 @@
         ]
       }
     },
+    "/user/me/avatar": {
+      "delete": {
+        "description": "Remove o avatar do usuário autenticado e deleta o arquivo do S3.",
+        "parameters": [
+          {
+            "description": "Opcional. Envie `v2` para o envelope padronizado.",
+            "example": "v2",
+            "in": "header",
+            "name": "X-API-Contract",
+            "required": false,
+            "type": "string"
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "example": {
+                  "data": {},
+                  "message": "Avatar removido com sucesso."
+                },
+                "schema": {
+                  "properties": {
+                    "data": {
+                      "type": "object"
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "meta": {
+                      "type": "object"
+                    }
+                  },
+                  "required": [
+                    "message",
+                    "data"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Avatar removido com sucesso",
+            "headers": {
+              "X-Request-ID": {
+                "description": "Identificador único da requisição gerado pela API.",
+                "example": "9fcd2e4f4d8747b4a7d8a2b1b930f52a",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "example": {
+                  "code": "UNAUTHORIZED",
+                  "message": "Token revogado.",
+                  "status_code": 401
+                },
+                "schema": {
+                  "properties": {
+                    "code": {
+                      "type": "string"
+                    },
+                    "details": {
+                      "type": "object"
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "status_code": {
+                      "type": "integer"
+                    }
+                  },
+                  "required": [
+                    "message",
+                    "code"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Token revogado",
+            "headers": {
+              "X-Request-ID": {
+                "description": "Identificador único da requisição gerado pela API.",
+                "example": "9fcd2e4f4d8747b4a7d8a2b1b930f52a",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "example": {
+                  "code": "NOT_FOUND",
+                  "message": "Nenhum avatar configurado.",
+                  "status_code": 404
+                },
+                "schema": {
+                  "properties": {
+                    "code": {
+                      "type": "string"
+                    },
+                    "details": {
+                      "type": "object"
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "status_code": {
+                      "type": "integer"
+                    }
+                  },
+                  "required": [
+                    "message",
+                    "code"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Nenhum avatar configurado",
+            "headers": {
+              "X-Request-ID": {
+                "description": "Identificador único da requisição gerado pela API.",
+                "example": "9fcd2e4f4d8747b4a7d8a2b1b930f52a",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "summary": "Remover avatar do usuário",
+        "tags": [
+          "Usuário"
+        ]
+      },
+      "post": {
+        "description": "Recebe uma imagem (JPEG, PNG ou WebP, máx. 5 MB) via multipart/form-data e armazena no S3. Retorna a URL pública do avatar atualizado.",
+        "parameters": [
+          {
+            "description": "Opcional. Envie `v2` para o envelope padronizado.",
+            "example": "v2",
+            "in": "header",
+            "name": "X-API-Contract",
+            "required": false,
+            "type": "string"
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "properties": {
+                  "file": {
+                    "format": "binary",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "file"
+                ],
+                "type": "object"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "example": {
+                  "data": {
+                    "avatar_url": "https://cdn.auraxis.com.br/avatars/..."
+                  },
+                  "message": "Avatar atualizado com sucesso."
+                },
+                "schema": {
+                  "properties": {
+                    "data": {
+                      "type": "object"
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "meta": {
+                      "type": "object"
+                    }
+                  },
+                  "required": [
+                    "message",
+                    "data"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Avatar atualizado com sucesso",
+            "headers": {
+              "X-Request-ID": {
+                "description": "Identificador único da requisição gerado pela API.",
+                "example": "9fcd2e4f4d8747b4a7d8a2b1b930f52a",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "example": {
+                  "code": "VALIDATION_ERROR",
+                  "message": "Tipo de arquivo não permitido.",
+                  "status_code": 400
+                },
+                "schema": {
+                  "properties": {
+                    "code": {
+                      "type": "string"
+                    },
+                    "details": {
+                      "type": "object"
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "status_code": {
+                      "type": "integer"
+                    }
+                  },
+                  "required": [
+                    "message",
+                    "code"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Arquivo inválido",
+            "headers": {
+              "X-Request-ID": {
+                "description": "Identificador único da requisição gerado pela API.",
+                "example": "9fcd2e4f4d8747b4a7d8a2b1b930f52a",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "example": {
+                  "code": "UNAUTHORIZED",
+                  "message": "Token revogado.",
+                  "status_code": 401
+                },
+                "schema": {
+                  "properties": {
+                    "code": {
+                      "type": "string"
+                    },
+                    "details": {
+                      "type": "object"
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "status_code": {
+                      "type": "integer"
+                    }
+                  },
+                  "required": [
+                    "message",
+                    "code"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Token revogado",
+            "headers": {
+              "X-Request-ID": {
+                "description": "Identificador único da requisição gerado pela API.",
+                "example": "9fcd2e4f4d8747b4a7d8a2b1b930f52a",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "example": {
+                  "code": "INTERNAL_ERROR",
+                  "message": "Falha ao armazenar avatar.",
+                  "status_code": 500
+                },
+                "schema": {
+                  "properties": {
+                    "code": {
+                      "type": "string"
+                    },
+                    "details": {
+                      "type": "object"
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "status_code": {
+                      "type": "integer"
+                    }
+                  },
+                  "required": [
+                    "message",
+                    "code"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Falha no storage",
+            "headers": {
+              "X-Request-ID": {
+                "description": "Identificador único da requisição gerado pela API.",
+                "example": "9fcd2e4f4d8747b4a7d8a2b1b930f52a",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "summary": "Upload avatar do usuário",
+        "tags": [
+          "Usuário"
+        ]
+      }
+    },
     "/user/notification-preferences": {
       "get": {
         "description": "Lista as preferências de notificação do usuário autenticado.",

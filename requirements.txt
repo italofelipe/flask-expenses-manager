@@ -49,3 +49,4 @@ Werkzeug==3.1.8
 types-python-dateutil==2.9.0.20260408
 types-requests==2.33.0.20260408
 reportlab==4.4.10
+boto3==1.38.12

@@ -82,6 +82,7 @@ def _build_context_service() -> AuthenticatedUserContextService:
         profile_quiz_score=8,
         taxonomy_version="2026.1",
         entitlements_version=3,
+        avatar_url=None,
     )
     wallet_entry = AuthenticatedWalletEntry(
         id="wallet-1",

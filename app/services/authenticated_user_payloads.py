@@ -35,6 +35,7 @@ class UserProfilePayload(TypedDict):
     investor_profile_suggested: str | None
     profile_quiz_score: int | None
     taxonomy_version: str | None
+    avatar_url: str | None
 
 
 class AuthenticatedUserIdentityPayload(TypedDict):
