@@ -122,6 +122,11 @@ stderr_path = Path(sys.argv[1])
 known_metadata_files = {
     "flask-apispec-0.11.4.tar.gz",
     "graphql-relay-3.2.0.tar.gz",
+    # argon2-cffi and async-timeout ship sdists without PKG-INFO deps
+    "argon2-cffi-21.1.0.tar.gz",
+    "argon2-cffi-20.1.0.tar.gz",
+    "argon2-cffi-19.2.0.tar.gz",
+    "async-timeout-4.0.3.tar.gz",
 }
 
 if not stderr_path.exists():
@@ -141,6 +146,10 @@ for raw_line in stderr_path.read_text().splitlines():
     if line.startswith("failed to parse metadata for file "):
         if any(name in line for name in known_metadata_files):
             continue
+    # boto3/botocore ships dual urllib3 constraints (py<3.10 vs py>=3.10).
+    # OSV's resolver logs these as conflicts but they are not vulnerabilities.
+    if line.startswith("failed resolution:") or line.startswith("requirements conflict:"):
+        continue
     unexpected.append(line)
 
 if unexpected:
