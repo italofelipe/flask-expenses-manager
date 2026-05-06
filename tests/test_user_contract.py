@@ -66,6 +66,7 @@ USER_FIELDS = {
     "investor_profile_suggested",
     "profile_quiz_score",
     "taxonomy_version",
+    "avatar_url",
 }
 
 CANONICAL_USER_KEYS = {

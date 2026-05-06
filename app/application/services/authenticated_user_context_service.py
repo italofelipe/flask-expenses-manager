@@ -32,6 +32,7 @@ class AuthenticatedUserProfile:
     profile_quiz_score: int | None
     taxonomy_version: str | None
     entitlements_version: int
+    avatar_url: str | None
 
 
 @dataclass(frozen=True)
@@ -113,6 +114,7 @@ class AuthenticatedUserContextService:
             profile_quiz_score=user.profile_quiz_score,
             taxonomy_version=user.taxonomy_version,
             entitlements_version=int(user.entitlements_version or 0),
+            avatar_url=user.avatar_url,
         )
 
     def build_wallet_entries(

@@ -26,6 +26,7 @@ class UserType(graphene.ObjectType):
     investor_profile_suggested = graphene.String()
     profile_quiz_score = graphene.Int()
     taxonomy_version = graphene.String()
+    avatar_url = graphene.String()
 
 
 class AuthPayloadType(graphene.ObjectType):

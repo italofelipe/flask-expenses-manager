@@ -12,6 +12,7 @@ from app.utils.typed_decorators import typed_doc as doc
 from app.utils.typed_decorators import typed_jwt_required as jwt_required
 from app.utils.typed_decorators import typed_use_kwargs as use_kwargs
 
+from .avatar_resource import AvatarResource
 from .blueprint import user_bp
 from .bootstrap_resource import UserBootstrapResource
 from .contracts import compat_success
@@ -100,6 +101,11 @@ def register_user_routes() -> None:
         "/notification-preferences",
         view_func=NotificationPreferencesResource.as_view("notification_preferences"),
         methods=["GET", "PATCH"],
+    )
+    user_bp.add_url_rule(
+        "/me/avatar",
+        view_func=AvatarResource.as_view("avatar"),
+        methods=["POST", "DELETE"],
     )
     _ROUTES_REGISTERED = True
 
