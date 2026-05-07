@@ -18,10 +18,15 @@ depends_on = None
 
 
 def upgrade() -> None:
-    # Create enum type first, outside the CREATE TABLE statement.
-    # Pattern follows existing migrations (b2_align_shared_entry_enums.py).
+    # Idempotent enum creation — safe even if the type was partially created
+    # by a prior failed migration attempt or by SQLAlchemy model introspection.
     op.execute(
-        "CREATE TYPE push_transport_enum AS ENUM ('web_push', 'expo')"
+        sa.text(
+            "DO $$ BEGIN "
+            "  CREATE TYPE push_transport_enum AS ENUM ('web_push', 'expo'); "
+            "EXCEPTION WHEN duplicate_object THEN null; "
+            "END $$"
+        )
     )
 
     op.create_table(
