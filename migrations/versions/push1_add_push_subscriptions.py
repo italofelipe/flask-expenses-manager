@@ -2,7 +2,7 @@
 
 Revision ID: push1
 Revises: avt1
-Create Date: 2026-05-07
+Create Date: 2026-05-08
 
 """
 from __future__ import annotations
@@ -18,17 +18,8 @@ depends_on = None
 
 
 def upgrade() -> None:
-    # Idempotent enum creation — safe even if the type was partially created
-    # by a prior failed migration attempt or by SQLAlchemy model introspection.
-    op.execute(
-        sa.text(
-            "DO $$ BEGIN "
-            "  CREATE TYPE push_transport_enum AS ENUM ('web_push', 'expo'); "
-            "EXCEPTION WHEN duplicate_object THEN null; "
-            "END $$"
-        )
-    )
-
+    # transport stored as VARCHAR + CHECK constraint (native_enum=False).
+    # Avoids CREATE TYPE entirely — no risk of "type already exists" on retries.
     op.create_table(
         "push_subscriptions",
         sa.Column("id", UUID(as_uuid=True), primary_key=True, nullable=False),
@@ -40,7 +31,11 @@ def upgrade() -> None:
         ),
         sa.Column(
             "transport",
-            sa.Enum("web_push", "expo", name="push_transport_enum", create_type=False),
+            sa.String(32),
+            sa.CheckConstraint(
+                "transport IN ('web_push', 'expo')",
+                name="ck_push_subscriptions_transport",
+            ),
             nullable=False,
         ),
         sa.Column("endpoint", sa.Text, nullable=False),
@@ -72,4 +67,3 @@ def downgrade() -> None:
     op.drop_index("uq_push_subscriptions_user_transport_endpoint")
     op.drop_index("ix_push_subscriptions_user_id")
     op.drop_table("push_subscriptions")
-    op.execute("DROP TYPE IF EXISTS push_transport_enum")

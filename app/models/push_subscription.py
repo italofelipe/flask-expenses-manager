@@ -26,8 +26,10 @@ class PushSubscription(db.Model):
         nullable=False,
         index=True,
     )
+    # native_enum=False: stored as VARCHAR+CHECK constraint, no CREATE TYPE needed.
+    # Avoids migration conflicts when SQLAlchemy auto-emits CREATE TYPE on connection.
     transport = db.Column(
-        db.Enum(PushTransport, name="push_transport_enum"), nullable=False
+        db.Enum(PushTransport, name="push_transport", native_enum=False), nullable=False
     )
     endpoint = db.Column(db.Text, nullable=False)
     keys = db.Column(db.JSON, nullable=True)
