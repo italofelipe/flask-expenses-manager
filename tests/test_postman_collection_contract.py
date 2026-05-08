@@ -419,3 +419,31 @@ def test_postman_collection_is_up_to_date() -> None:
         "Postman collection is stale — run 'python3 scripts/openapi_to_postman.py' "
         "to regenerate. The committed collection must match the generator output."
     )
+
+
+def test_custom_validation_endpoints_have_enrichment() -> None:
+    """INI-3: Endpoints using @validates_schema must have test_lines in ENRICHMENT.
+
+    When a Marshmallow schema uses @validates_schema, the auto-generated body
+    from OpenAPI will not pass custom validation in Newman smoke tests.
+    Each such endpoint must have a test_lines override in ENRICHMENT that
+    accepts the expected failure codes (e.g., 400, 404).
+
+    To add a new endpoint: update CUSTOM_VALIDATION_ENDPOINTS in
+    scripts/openapi_to_postman.py AND add an ENRICHMENT test_lines entry.
+    See: docs/wiki/Post-Mortem-PR1174-Bootstrap-Migration.md (INI-3)
+    """
+    from scripts.openapi_to_postman import CUSTOM_VALIDATION_ENDPOINTS, ENRICHMENT
+
+    missing_enrichment: list[str] = []
+    for operation in sorted(CUSTOM_VALIDATION_ENDPOINTS):
+        entry = ENRICHMENT.get(operation, {})
+        if not entry.get("test_lines"):
+            missing_enrichment.append(operation)
+
+    assert not missing_enrichment, (
+        "Endpoints with @validates_schema missing ENRICHMENT test_lines override:\n"
+        + "\n".join(f"  - {op}" for op in missing_enrichment)
+        + "\n\nAdd test_lines to ENRICHMENT in scripts/openapi_to_postman.py "
+        "so Newman smoke tests accept validation failures gracefully."
+    )

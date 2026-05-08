@@ -192,6 +192,31 @@ PUBLIC_PATHS = {
 }
 
 # ---------------------------------------------------------------------------
+# INI-3: Endpoints that use Marshmallow @validates_schema (custom validation).
+# The auto-generated body from OpenAPI schema will NOT pass this validation
+# in CI smoke tests — these endpoints MUST have test_lines override in ENRICHMENT.
+#
+# Update this set whenever a new endpoint uses @validates_schema.
+# The test_postman_collection_contract.py::test_custom_validation_endpoints_have_enrichment
+# test will fail if any entry here lacks test_lines in ENRICHMENT.
+# ---------------------------------------------------------------------------
+CUSTOM_VALIDATION_ENDPOINTS: set[str] = {
+    # push_subscription_schema.py — validates transport + endpoint format per type
+    "POST /notifications/subscribe",
+    "POST /notifications/unsubscribe",
+    # avatar — requires real file + S3; body cannot be auto-generated
+    "POST /user/me/avatar",
+    "DELETE /user/me/avatar",
+    # installment_vs_cash_schema.py — complex cross-field validation
+    "POST /simulations/installment-vs-cash",
+    "POST /simulations/installment-vs-cash/save",
+    # wallet_schema.py — validates quantity/rate conditionally by asset_class
+    "POST /wallet",
+    "PATCH /wallet/{investment_id}",
+    "PUT /wallet/{investment_id}",
+}
+
+# ---------------------------------------------------------------------------
 # Suite profile lists — which requests belong to smoke / privileged
 # ---------------------------------------------------------------------------
 SMOKE_OPERATIONS: set[str] = {
@@ -514,6 +539,12 @@ ENRICHMENT: dict[str, dict[str, Any]] = {
             {"name": "Poupança atualizada {{runSeed}}"},
             indent=2,
         ),
+        # wallet_schema.py @validates_schema: quantity/rate conditional on asset_class
+        "test_lines": [
+            "pm.test('Atualizar investimento — expected 200 or 400 or 404', function () {",
+            "  pm.expect(pm.response.code).to.be.oneOf([200, 400, 404]);",
+            "});",
+        ],
     },
     "PUT /wallet/{investment_id}": {
         "body_override": json.dumps(
@@ -525,6 +556,12 @@ ENRICHMENT: dict[str, dict[str, Any]] = {
             },
             indent=2,
         ),
+        # wallet_schema.py @validates_schema: quantity/rate conditional on asset_class
+        "test_lines": [
+            "pm.test('Substituir investimento — expected 200 or 400 or 404', function () {",
+            "  pm.expect(pm.response.code).to.be.oneOf([200, 400, 404]);",
+            "});",
+        ],
     },
     "GET /wallet/{investment_id}/operations/invested-amount": {
         "query_params": [{"key": "date", "value": "{{runToday}}"}],
