@@ -225,6 +225,12 @@ jobs:
     runs-on: ubuntu-latest
     needs: [quality]
 
+    env:
+      DATABASE_URL: postgresql://postgres:migration_test@localhost:5432/migration_testdb
+      # Must be ≥32 chars and not in the weak-secret blocklist (config/__init__.py)
+      SECRET_KEY: ci-migration-check-secret-key-32chars-min
+      JWT_SECRET_KEY: ci-migration-check-jwt-secret-key-32chars
+
     services:
       postgres:
         image: public.ecr.aws/docker/library/postgres:16
@@ -256,10 +262,6 @@ jobs:
 
       - name: Migrate up (flask db upgrade)
         run: flask --app run db upgrade
-        env:
-          DATABASE_URL: postgresql://postgres:migration_test@localhost:5432/migration_testdb
-          SECRET_KEY: ci-migration-test
-          JWT_SECRET_KEY: ci-migration-test
 
       - name: Assert single Alembic head
         run: |
@@ -269,17 +271,9 @@ jobs:
             echo "::error::Expected 1 Alembic head, found ${HEAD_COUNT}. Run flask db merge heads."
             exit 1
           fi
-        env:
-          DATABASE_URL: postgresql://postgres:migration_test@localhost:5432/migration_testdb
-          SECRET_KEY: ci-migration-test
-          JWT_SECRET_KEY: ci-migration-test
 
       - name: Migrate down (reversibility check)
         run: flask --app run db downgrade base
-        env:
-          DATABASE_URL: postgresql://postgres:migration_test@localhost:5432/migration_testdb
-          SECRET_KEY: ci-migration-test
-          JWT_SECRET_KEY: ci-migration-test
 
   ci-runtime-images:
     name: CI Runtime Images
