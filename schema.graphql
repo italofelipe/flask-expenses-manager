@@ -1,4 +1,8 @@
 type Query {
+  accounts: AccountListType
+  account(accountId: UUID!): AccountType
+  tags: TagListType
+  tag(tagId: UUID!): TagType
   notificationPreferences: NotificationPreferencesType
   billingPlans: BillingPlanListPayloadType
   mySubscription: SubscriptionType
@@ -29,6 +33,46 @@ type Query {
   dashboardOverview(month: String!): TransactionDashboardPayloadType
   weeklySummary(period: String, startDate: String, endDate: String): WeeklySummaryPayloadType
   me: UserType
+}
+
+type AccountListType {
+  accounts: [AccountType!]!
+  total: Int!
+}
+
+type AccountType {
+  id: ID!
+  name: String!
+  accountType: String!
+  institution: String
+  initialBalance: DecimalScalar
+}
+
+"""
+Arbitrary-precision decimal serialised as a string.
+
+Output: always a string in fixed-point notation (no scientific exponent).
+Input: accepts string, int, float, or Decimal — coerced via ``Decimal(str(x))``.
+Null is preserved.
+"""
+scalar DecimalScalar
+
+"""
+Leverages the internal Python implementation of UUID (uuid.UUID) to provide native UUID objects
+in fields, resolvers and input.
+"""
+scalar UUID
+
+type TagListType {
+  tags: [TagType!]!
+  total: Int!
+}
+
+type TagType {
+  id: ID!
+  name: String!
+  color: String
+  icon: String
 }
 
 type NotificationPreferencesType {
@@ -95,12 +139,6 @@ type BudgetType {
   createdAt: String
   updatedAt: String
 }
-
-"""
-Leverages the internal Python implementation of UUID (uuid.UUID) to provide native UUID objects
-in fields, resolvers and input.
-"""
-scalar UUID
 
 type BudgetSummaryType {
   totalBudgeted: String!
@@ -251,15 +289,6 @@ type WalletType {
   targetWithdrawDate: String
   shouldBeOnWallet: Boolean!
 }
-
-"""
-Arbitrary-precision decimal serialised as a string.
-
-Output: always a string in fixed-point notation (no scientific exponent).
-Input: accepts string, int, float, or Decimal — coerced via ``Decimal(str(x))``.
-Null is preserved.
-"""
-scalar DecimalScalar
 
 type WalletHistoryPayloadType {
   items: [WalletHistoryItemType]!
@@ -634,6 +663,12 @@ type Mutation {
   deleteInvestmentOperation(investmentId: UUID!, operationId: UUID!): DeleteInvestmentOperationMutation @deprecated(reason: "ADR-0002: use DELETE /wallet/{id}/operations/{op_id}")
   addTicker(quantity: Float!, symbol: String!, type: String): AddTickerPayload
   deleteTicker(symbol: String!): DeleteTickerPayload
+  createTag(color: String, icon: String, name: String!): TagPayload
+  updateTag(color: String, icon: String, name: String!, tagId: UUID!): TagPayload
+  deleteTag(tagId: UUID!): TagPayload
+  createAccount(accountType: String, initialBalance: String, institution: String, name: String!): AccountPayload
+  updateAccount(accountId: UUID!, accountType: String, initialBalance: String, institution: String, name: String!): AccountPayload
+  deleteAccount(accountId: UUID!): AccountPayload
   createBudget(amount: String!, endDate: String, isActive: Boolean, name: String!, period: String!, startDate: String, tagId: String): CreateBudgetMutation @deprecated(reason: "ADR-0002: use POST /budgets")
   updateBudget(amount: String, budgetId: UUID!, endDate: String, isActive: Boolean, name: String, period: String, startDate: String, tagId: String): UpdateBudgetMutation @deprecated(reason: "ADR-0002: use PATCH /budgets/{id}")
   deleteBudget(budgetId: UUID!): DeleteBudgetMutation @deprecated(reason: "ADR-0002: use DELETE /budgets/{id}")
@@ -831,6 +866,30 @@ type DeleteTickerPayload {
 
   """Field-level validation errors (empty on success)."""
   errors: [ValidationError!]!
+}
+
+type TagPayload {
+  """True when the mutation completed without errors."""
+  ok: Boolean!
+
+  """Human-readable status message."""
+  message: String!
+
+  """Field-level validation errors (empty on success)."""
+  errors: [ValidationError!]!
+  data: TagType
+}
+
+type AccountPayload {
+  """True when the mutation completed without errors."""
+  ok: Boolean!
+
+  """Human-readable status message."""
+  message: String!
+
+  """Field-level validation errors (empty on success)."""
+  errors: [ValidationError!]!
+  data: AccountType
 }
 
 type CreateBudgetMutation {

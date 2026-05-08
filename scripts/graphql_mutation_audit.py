@@ -52,6 +52,16 @@ ADR_0002_ALLOWED_CRUD_VERBS: set[str] = {
     "create_goal_from_installment_vs_cash_simulation",  # Simulation composite
     "create_planned_expense_from_installment_vs_cash_simulation",  # Simulation
     "create_checkout_session",  # Stripe-specific, no domain CRUD equivalent
+    # Tags (#1148) — canonical GraphQL CRUD surface; REST /tags exists but
+    # GraphQL is exposed as the primary client interface for tag management.
+    "create_tag",
+    "update_tag",
+    "delete_tag",
+    # Accounts (#1148) — canonical GraphQL CRUD surface; REST /accounts exists
+    # but GraphQL is exposed as the primary client interface.
+    "create_account",
+    "update_account",
+    "delete_account",
 }
 
 # Keywords that, if present in a mutation name without deprecation, indicate
