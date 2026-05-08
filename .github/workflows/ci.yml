@@ -225,12 +225,6 @@ jobs:
     runs-on: ubuntu-latest
     needs: [quality]
 
-    env:
-      DATABASE_URL: postgresql://postgres:migration_test@localhost:5432/migration_testdb
-      # Must be ≥32 chars and not in the weak-secret blocklist (config/__init__.py)
-      SECRET_KEY: ci-migration-check-secret-key-32chars-min
-      JWT_SECRET_KEY: ci-migration-check-jwt-secret-key-32chars
-
     services:
       postgres:
         image: public.ecr.aws/docker/library/postgres:16
@@ -259,6 +253,12 @@ jobs:
 
       - name: Install dependencies
         run: pip install -r requirements.txt
+
+      - name: Prepare environment
+        run: |
+          cp .env.dev.example .env
+          # Override DB to point at the CI postgres service
+          echo "DATABASE_URL=postgresql://postgres:migration_test@localhost:5432/migration_testdb" >> .env
 
       - name: Migrate up (flask db upgrade)
         run: flask --app run db upgrade
