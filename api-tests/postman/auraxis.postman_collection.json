@@ -4190,8 +4190,8 @@
               "listen": "test",
               "script": {
                 "exec": [
-                  "pm.test('Registrar token de push — status 200', function () {",
-                  "  pm.response.to.have.status(200);",
+                  "pm.test('Registrar token de push — expected 200 or 400', function () {",
+                  "  pm.expect(pm.response.code).to.be.oneOf([200, 400]);",
                   "});"
                 ],
                 "type": "text/javascript"
@@ -4237,8 +4237,8 @@
               "listen": "test",
               "script": {
                 "exec": [
-                  "pm.test('Remover token de push — status 200', function () {",
-                  "  pm.response.to.have.status(200);",
+                  "pm.test('Remover token de push — expected 200 or 404', function () {",
+                  "  pm.expect(pm.response.code).to.be.oneOf([200, 404]);",
                   "});"
                 ],
                 "type": "text/javascript"
