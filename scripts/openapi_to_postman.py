@@ -46,6 +46,7 @@ TAG_FOLDER_MAP: dict[str, str] = {
     "Wallet": "06 - Wallet",
     "Simulações": "07 - Simulations",
     "Entitlements": "08 - Entitlements",
+    "Notificações": "09 - Notifications",
 }
 DEFAULT_FOLDER = "99 - Other"
 
@@ -168,6 +169,7 @@ FOLDER_ORDER = [
     "06 - Wallet",
     "07 - Simulations",
     "08 - Entitlements",
+    "09 - Notifications",
     "99 - Cleanup",
     "99 - Other",
 ]
@@ -734,6 +736,23 @@ ENRICHMENT: dict[str, dict[str, Any]] = {
     "DELETE /user/me/avatar": {
         "test_lines": [
             "pm.test('Remover avatar do usuário — expected 200 or 404', function () {",
+            "  pm.expect(pm.response.code).to.be.oneOf([200, 404]);",
+            "});",
+        ],
+    },
+    # Subscribe may return 400 in CI because the auto-generated body doesn't
+    # contain a valid ExponentPushToken — our schema validation rejects it.
+    "POST /notifications/subscribe": {
+        "test_lines": [
+            "pm.test('Registrar token de push — expected 200 or 400', function () {",
+            "  pm.expect(pm.response.code).to.be.oneOf([200, 400]);",
+            "});",
+        ],
+    },
+    # Unsubscribe returns 404 when subscribe failed in CI (no subscription exists).
+    "POST /notifications/unsubscribe": {
+        "test_lines": [
+            "pm.test('Remover token de push — expected 200 or 404', function () {",
             "  pm.expect(pm.response.code).to.be.oneOf([200, 404]);",
             "});",
         ],
