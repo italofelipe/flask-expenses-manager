@@ -172,6 +172,61 @@ scripts/repo_bin.sh pytest -m "not schemathesis" --cov=app --cov-fail-under=85
 | `../ai_squad/` | CrewAI multi-agent system (platform-level workspace) |
 | `docs/` | Runbooks, ADRs, security docs |
 
+## Migration Conventions (PostgreSQL)
+
+> Origem: post-mortem PR #1174. Violações causam falhas silenciosas em SQLite e explosões no CI PostgreSQL.
+
+### Enums — usar `native_enum=False` por padrão
+
+```python
+# ✅ Correto — VARCHAR + CHECK constraint, sem CREATE TYPE, sem risco de idempotência
+transport = db.Column(
+    db.Enum(PushTransport, name="push_transport", native_enum=False),
+    nullable=False
+)
+
+# ⚠️  Só usar native_enum=True se houver razão explícita (ex: performance de JOIN)
+#     + migration testada com scripts/test_migrations_local.sh
+```
+
+**Por quê:** `native_enum=True` (default SQLAlchemy) registra DDL listener na metadata.
+Quando `flask db upgrade` executa e Alembic chama `context.configure(target_metadata=...)`,
+esse listener emite `CREATE TYPE` **antes** da migration rodar. A migration tenta criar o mesmo
+tipo → `ERROR: type already exists` → bootstrap do CI falha em loop.
+
+### Antes de fazer push com nova migration
+
+```bash
+bash scripts/test_migrations_local.sh   # sobe postgres:16 efêmero, aplica up + down
+```
+
+O pre-commit hook `migration-pattern-check` também bloqueia padrões proibidos:
+
+| Padrão detectado | Alternativa |
+|---|---|
+| `op.execute("CREATE TYPE ...")` sem verificação | `native_enum=False` ou check em `pg_type` |
+| `op.get_bind()` | `op.get_context().connection` |
+| `ENUM(...).create(op.get_bind())` | `native_enum=False` |
+| `server_default=gen_random_uuid()` | `default=uuid.uuid4` no modelo |
+
+### Endpoints com validação customizada Marshmallow
+
+Ao criar endpoint com `@validates_schema` ou validação condicional por tipo,
+adicionar ENRICHMENT em `scripts/openapi_to_postman.py` **na mesma PR**:
+
+```python
+"POST /meu/endpoint": {
+    "test_lines": [
+        "pm.test('Meu endpoint — expected 200 or 400', function () {",
+        "  pm.expect(pm.response.code).to.be.oneOf([200, 400]);",
+        "});",
+    ],
+},
+```
+
+Sem ENRICHMENT, o Newman smoke test vai falhar porque o body auto-gerado pelo schema
+não passa na validação customizada.
+
 ## GraphQL Architecture Decisions
 
 Key ADRs governing the GraphQL layer:

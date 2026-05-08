@@ -55,6 +55,11 @@ repos:
     language: system
     pass_filenames: false
     files: app/controllers/
+  - id: migration-pattern-check
+    name: Migration anti-pattern check (INI-2)
+    entry: python3 scripts/check_migration_patterns.py
+    language: system
+    files: ^migrations/versions/.*\.py$
   - id: alembic-single-head-check
     name: alembic-single-head-check
     entry: python3 scripts/alembic_single_head_check.py
@@ -68,9 +73,10 @@ repos:
     files: (app/simulations/tools_registry\.py|tools-catalog\.ts)
   - id: mypy
     name: mypy
-    entry: scripts/python_tool.sh mypy --no-incremental app
+    entry: scripts/python_tool.sh mypy app
     language: system
     pass_filenames: false
+    files: \.(py)$
   - id: sonar-local-check
     name: sonar-local-check
     entry: scripts/sonar_local_check.sh
