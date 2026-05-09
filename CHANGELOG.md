@@ -1,5 +1,34 @@
 # Changelog
 
+## [1.34.0](https://github.com/italofelipe/auraxis-api/compare/v1.33.0...v1.34.0) (2026-05-09)
+
+
+### Features
+
+* **audit:** record entity-delete audit events for goals, wallet, subscriptions ([#1160](https://github.com/italofelipe/auraxis-api/issues/1160)) ([ef89098](https://github.com/italofelipe/auraxis-api/commit/ef890984cf9d72ff43c39bf5189a20e277f0b113))
+* **ci:** production watchdog ([#1191](https://github.com/italofelipe/auraxis-api/issues/1191)) ([f7753a7](https://github.com/italofelipe/auraxis-api/commit/f7753a7e0e24d2f7403d4038d51ad1475d89523e))
+* **deploy:** Sentry canary check + auto-rollback ([#1194](https://github.com/italofelipe/auraxis-api/issues/1194)) ([0f585f9](https://github.com/italofelipe/auraxis-api/commit/0f585f9cfb14e24e594780315433827b43def41d))
+* **dx:** P2 DX initiatives from PR [#1174](https://github.com/italofelipe/auraxis-api/issues/1174) post-mortem (INI-3/4) ([#1182](https://github.com/italofelipe/auraxis-api/issues/1182)) ([1649592](https://github.com/italofelipe/auraxis-api/commit/1649592bdd22ff602889d72b604b3d21ce2118e5))
+* **entitlements:** add focus_mode to premium plan ([#1117](https://github.com/italofelipe/auraxis-api/issues/1117)) ([893820f](https://github.com/italofelipe/auraxis-api/commit/893820fa0a6a44b5fc7fb22098bc24fff71d6e78))
+* **graphql:** /graphql/playground — GraphiQL endpoint (feature-flagged, admin-only) ([#1165](https://github.com/italofelipe/auraxis-api/issues/1165)) ([e681db8](https://github.com/italofelipe/auraxis-api/commit/e681db8d64284b208b80e2bff7af933e51709af2))
+* **graphql:** CI breaking-change detection + OTel tracing + canonical MutationPayload ([#1170](https://github.com/italofelipe/auraxis-api/issues/1170)) ([2be6539](https://github.com/italofelipe/auraxis-api/commit/2be6539fa130b408fdc219fb708ef9494295197b))
+* **graphql:** enforce enum types on mutation inputs (status/type/asset_class/billing_cycle) ([#1159](https://github.com/italofelipe/auraxis-api/issues/1159)) ([eb13b16](https://github.com/italofelipe/auraxis-api/commit/eb13b16b3484da79971241f8124032839ff99f7a))
+* **graphql:** per-field complexity weights — apply to split module structure ([#1167](https://github.com/italofelipe/auraxis-api/issues/1167)) ([2481ba6](https://github.com/italofelipe/auraxis-api/commit/2481ba6e21fd9059ad03a4b4f6bd2eeec01ad21a)), closes [#1154](https://github.com/italofelipe/auraxis-api/issues/1154)
+* **graphql:** structured resolver logging + parameterized auth-required regression test ([#1161](https://github.com/italofelipe/auraxis-api/issues/1161)) ([c462f53](https://github.com/italofelipe/auraxis-api/commit/c462f531393026498abd5abab5afc70919921374))
+* **graphql:** Tags + Accounts GraphQL domains — REST↔GraphQL parity ([#1148](https://github.com/italofelipe/auraxis-api/issues/1148)) ([#1183](https://github.com/italofelipe/auraxis-api/issues/1183)) ([5dfddbe](https://github.com/italofelipe/auraxis-api/commit/5dfddbeb80e335d666116a73a5c6d83f5eb9c51d))
+* **infra:** migrate Docker build from EC2 to GitHub Actions + GHCR ([#1171](https://github.com/italofelipe/auraxis-api/issues/1171)) ([#1172](https://github.com/italofelipe/auraxis-api/issues/1172)) ([e08e3c5](https://github.com/italofelipe/auraxis-api/commit/e08e3c54973eea58eaaa59d440ab020b8d6a540c))
+* **notifications:** push subscription registration (Expo + Web Push) ([#1174](https://github.com/italofelipe/auraxis-api/issues/1174)) ([4c34cdc](https://github.com/italofelipe/auraxis-api/commit/4c34cdc4067b8cbd07345e9f6bebc11fb9ad1e8e))
+* **simulations:** allowlist aposentadoria + desconto-markup in TOOLS_REGISTRY ([#1132](https://github.com/italofelipe/auraxis-api/issues/1132)) ([3cb8147](https://github.com/italofelipe/auraxis-api/commit/3cb8147408ac63c1bbf0efa9f3e6e19347a8df24))
+* **simulations:** canonical generic /simulations endpoint ([#1128](https://github.com/italofelipe/auraxis-api/issues/1128)) ([#1130](https://github.com/italofelipe/auraxis-api/issues/1130)) ([2124a9e](https://github.com/italofelipe/auraxis-api/commit/2124a9e270561be906e1a78b07e2c93c59df541e))
+* **user:** avatar upload endpoint + S3 storage ([#1173](https://github.com/italofelipe/auraxis-api/issues/1173)) ([962ce6e](https://github.com/italofelipe/auraxis-api/commit/962ce6e76de7200b3d7c2865626e7451c31a3658))
+
+
+### Bug Fixes
+
+* **graphql:** replace Float with DecimalScalar on monetary fields, paginate tickers ([#1158](https://github.com/italofelipe/auraxis-api/issues/1158)) ([e6dab69](https://github.com/italofelipe/auraxis-api/commit/e6dab693bcff0ae959d88696e76c252f98a612bb))
+* **jobs:** scheduled job observability — DIAG_EOF delimiter + audit-events error handling ([#1168](https://github.com/italofelipe/auraxis-api/issues/1168)) ([f600e83](https://github.com/italofelipe/auraxis-api/commit/f600e835f4509def018cd14ccc9e1d50b1ebf8d2))
+* **tags:** accept hex with alpha channel and normalize ([#1125](https://github.com/italofelipe/auraxis-api/issues/1125)) ([347450d](https://github.com/italofelipe/auraxis-api/commit/347450dd08db94595e192dfb90a0e194ab9fa890))
+
 ## [1.33.0](https://github.com/italofelipe/auraxis-api/compare/v1.32.0...v1.33.0) (2026-04-20)
 
 
