@@ -2,12 +2,9 @@
 
 ## Identity
 
-You are an AI software engineer working on the **Auraxis** project — a personal
-financial management platform built with Flask, SQLAlchemy, Marshmallow,
-GraphQL (Graphene 3), and PostgreSQL.
-
-You operate independently from the CrewAI multi-agent system in `../ai_squad/`,
-but share the same knowledge base (`.context/`) and tracking system (`TASKS.md`).
+You are an AI software engineer working on **auraxis-api** — the Auraxis backend
+service, a personal financial management platform built with Flask, SQLAlchemy,
+Marshmallow, GraphQL (Graphene 3), and PostgreSQL.
 
 ## Session Bootstrap (MANDATORY — execute in order)
 
@@ -18,7 +15,7 @@ Before starting any work, read these files in sequence:
 3. `.context/04_architecture_snapshot.md` — codebase structure
 4. `steering.md` — execution governance, branching, quality gates
 5. `product.md` — product vision and functional scope
-6. `TASKS.md` — current status, backlog, and priorities
+6. **GitHub Projects** — backlog and task status (do NOT read `TASKS.md`; it is a deprecated tombstone)
 7. `.context/05_quality_and_gates.md` — quality gates and Definition of Done
 
 If resuming a session, also check `.context/handoffs/` for pending handoffs.
@@ -27,7 +24,7 @@ If resuming a session, also check `.context/handoffs/` for pending handoffs.
 
 When documents conflict, follow this priority order:
 
-1. **TASKS.md** — status, priority, progress tracking
+1. **GitHub Projects** — status, priority, progress tracking (canonical source of truth)
 2. **product.md** — product intent, scope, business direction
 3. **steering.md** — execution governance, branching, quality gates
 4. **.context/** — operational workflows and architecture reference
@@ -42,7 +39,7 @@ When documents conflict, follow this priority order:
 - Create branches following conventional branching (`feat/`, `fix/`, `refactor/`, etc.)
 - Write code in: `app/`, `tests/`, `migrations/`, `scripts/`, `docs/`
 - Run existing test suites
-- Update `TASKS.md` status after completing work
+- Update GitHub Projects status when work is complete (via `gh issue close` or PR with `Closes #N`)
 - Create handoff documents in `.context/handoffs/`
 
 ### You MUST ask before proceeding
@@ -84,18 +81,19 @@ Templates:
 
 ## Multi-Agent Collaboration
 
-Three AI agents + one automated pipeline share this project:
-
-| Agent | Strengths | Primary use |
+| Agent | Role | Status |
 | :--- | :--- | :--- |
-| **Claude** | Direct implementation, review, analysis, docs | Interactive sessions with PO |
-| **Gemini** | Architecture review, orchestration analysis | Alternative perspectives, review |
-| **Gepeto (GPT)** | Implementation, code generation, problem-solving | Feature implementation, debugging |
-| **CrewAI** | Automated multi-agent pipeline (PM→Backend→QA) | Well-defined tasks from TASKS.md |
+| **Claude** | Primary executor: implementation, review, analysis | Default |
+| **GPT** | Consultive: alternate analysis | On-demand only |
+| **Gemini** | Consultive: architecture second opinions | On-demand only |
+| **CrewAI** | Automated pipeline | Paused indefinitely |
+
+For autonomous execution, issues labeled `agent:claude` trigger `agent-implement.yml`
+in GitHub Actions, which uses the `backend-agent.md` skill.
 
 All agents share:
 - Knowledge base: `.context/`
-- Task tracking: `TASKS.md`
+- Task tracking: **GitHub Projects** (canonical)
 - Handoffs: `.context/handoffs/`
 - Delivery reports: `.context/reports/`
 - Quality gates: `.context/05_quality_and_gates.md`
@@ -137,7 +135,7 @@ scripts/repo_bin.sh pytest -m "not schemathesis" --cov=app --cov-fail-under=85
 - Feature implemented with adequate tests
 - No REST/GraphQL contract regression
 - All linters, type-check, and tests passing
-- Documentation and traceability updated (`TASKS.md`, affected docs)
+- Documentation and traceability updated (affected docs, GitHub Projects card updated to Done)
 - Branch pushed with granular commits and clear messages
 - Technical debt registered when applicable
 
@@ -169,7 +167,6 @@ scripts/repo_bin.sh pytest -m "not schemathesis" --cov=app --cov-fail-under=85
 | `tests/` | Pytest test suite |
 | `migrations/` | Alembic database migrations |
 | `.context/` | AI knowledge base (SDD + agentic workflows) |
-| `../ai_squad/` | CrewAI multi-agent system (platform-level workspace) |
 | `docs/` | Runbooks, ADRs, security docs |
 
 ## Migration Conventions (PostgreSQL)

@@ -54,7 +54,7 @@ Quando documentos conflitam, a ordem acima é a prioridade.
 | Framework | Flask | latest compat. |
 | ORM | SQLAlchemy + Flask-SQLAlchemy | — |
 | Serialização | Marshmallow | — |
-| API | GraphQL (Ariadne) + REST (Flask controllers) | — |
+| API | GraphQL (Graphene 3) + REST (Flask controllers) | — |
 | Migrações | Alembic via Flask-Migrate | — |
 | Testes | Pytest | ≥ 85% coverage |
 | Banco | PostgreSQL | — |
