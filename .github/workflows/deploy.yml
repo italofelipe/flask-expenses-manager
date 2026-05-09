@@ -353,6 +353,20 @@ jobs:
             echo "[readiness-gate] PASS ${endpoint} returned HTTP ${STATUS}"
           done
 
+      - name: Canary observation window (Sentry — 10 min)
+        if: success()
+        run: |
+          echo "Aguardando 10 minutos para observacao pos-deploy..."
+          sleep 600
+          python3 scripts/sentry_canary_check.py \
+            --project auraxis-api \
+            --window 10 \
+            --baseline-window 60 \
+            --baseline-multiplier 2.0
+        env:
+          SENTRY_TOKEN: ${{ secrets.SENTRY_TOKEN }}
+          SENTRY_ORG: ${{ secrets.SENTRY_ORG }}
+
       - name: Auto-rollback PROD on deploy failure
         if: ${{ failure() }}
         continue-on-error: true
