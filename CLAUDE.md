@@ -231,3 +231,28 @@ Key ADRs governing the GraphQL layer:
 - [`docs/adr/0002-graphql-ownership.md`](docs/adr/0002-graphql-ownership.md) — REST vs GraphQL ownership boundaries; when to use each protocol
 - [`docs/adr/0003-graphql-flat-types-no-dataloader.md`](docs/adr/0003-graphql-flat-types-no-dataloader.md) — flat Graphene types, service-layer batching, no DataLoader
 - [`docs/adr/0004-graphql-ownership-scope-completion.md`](docs/adr/0004-graphql-ownership-scope-completion.md) — extends ADR-0002 to Subscription mutations; documents ticker exception
+
+## Mapa de dominios disponíveis
+
+Use esta tabela antes de criar qualquer novo controller, service ou model.
+**Verifique primeiro se o dominio ja existe — evite duplicar logica.**
+
+| Dominio | Controllers | Services principais | Models |
+|---------|-------------|---------------------|--------|
+| auth | `auth_controller` | `auth_security_policy_service`, `login_identity_service`, `session_service`, `email_confirmation_service`, `password_reset_service`, `password_verification_service` | `User`, `RefreshToken` |
+| transactions | `transaction_controller` | `transaction_application_service`, `transaction_ledger_service`, `transaction_query_service`, `transaction_reminder_service` | `Transaction`, `Tag`, `SharedEntry` |
+| goals | `goal_controller` | `goal_application_service` | `Goal` |
+| wallet | `wallet_controller` | `wallet_application_service`, `investment_application_service` | `WalletEntry`, `UserTicker`, `InvestmentOperation` |
+| budget | `budget/` (subpkg) | — | `BudgetEnvelope` |
+| simulation | `simulation_controller` | `simulation_application_service`, `installment_vs_cash_application_service`, `installment_vs_cash_bridge_service` | `Simulation` |
+| subscription | `subscription_controller` | `entitlement_application_service`, `billing_email_service` | `Subscription`, `Entitlement` |
+| alerts | `alert_controller` | — | `Alert` |
+| user | `user_controller` | `user_profile_service`, `authenticated_user_context_service`, `authenticated_user_bootstrap_service` | `User`, `Account` |
+| advisory | — | `advisory_service` | — |
+| fiscal | `fiscal/` (subpkg) | — | `Fiscal` |
+| credit_card | `credit_card/` (subpkg) | — | `CreditCard` |
+| dashboard | `dashboard/` (subpkg) | — | — |
+| observability | `observability_controller` | — | `AuditEvent`, `WebhookEvent` |
+
+**Antes de criar um novo service**: consulte `app/application/services/CLAUDE.md`.
+**Antes de criar um novo controller**: consulte `app/controllers/CLAUDE.md`.
