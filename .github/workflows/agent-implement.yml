@@ -1,0 +1,195 @@
+name: Agent — Implement Issue
+
+on:
+  issues:
+    types: [labeled]
+
+jobs:
+  implement:
+    name: Backend Agent — Implement
+    runs-on: ubuntu-latest
+    if: github.event.label.name == 'agent:claude'
+    timeout-minutes: 30
+    permissions:
+      contents: write
+      pull-requests: write
+      issues: write
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.TOKEN_GITHUB_ADMIN }}
+          fetch-depth: 0
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+          cache: pip
+          cache-dependency-path: |
+            requirements.txt
+            requirements-dev.txt
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -r requirements.txt -r requirements-dev.txt
+
+      - uses: anthropics/claude-code-action@beta
+        id: claude
+        with:
+          anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+          github_token: ${{ secrets.TOKEN_GITHUB_ADMIN }}
+          max_turns: "40"
+          prompt: |
+            You are the autonomous backend implementation agent for Auraxis — a personal finance
+            platform built with Python 3.13, Flask, SQLAlchemy, Marshmallow, Graphene 3 (GraphQL),
+            and PostgreSQL.
+
+            Your task: implement GitHub issue #${{ github.event.issue.number }} in this repository
+            (${{ github.repository }}) from start to finish, including tests and opening a PR.
+
+            ## Identity and constraints
+
+            - You operate FULLY AUTONOMOUSLY — no human will answer questions during this run
+            - Every decision must be resolved by reading existing code and following established patterns
+            - Budget: maximum 40 turns. If stuck after 3 attempts at the same problem, follow the
+              fallback protocol below
+            - Never commit directly to master
+            - Never use `git add .` or `git add -A` — always stage files selectively
+
+            ## Step 1 — Read the issue
+
+            ```bash
+            gh issue view ${{ github.event.issue.number }} --repo ${{ github.repository }} \
+              --json title,body,labels
+            ```
+
+            Extract: objective, sub-tasks, acceptance criteria, any breaking change warnings.
+
+            ## Step 2 — Quick risk analysis
+
+            Answer these before writing any code:
+            1. Does this touch a database model? → migration needed → use `native_enum=False`
+            2. Does this change a REST or GraphQL contract? → REST+GraphQL parity required
+            3. Does this touch auth, billing, or user data? → HIGH risk, smaller commits
+
+            ## Step 3 — Create branch
+
+            ```bash
+            git checkout master && git pull origin master
+            git checkout -b feat/${{ github.event.issue.number }}-<short-description>
+            ```
+
+            ## Step 4 — TDD: write the test BEFORE the code
+
+            Write a failing test first. Confirm it FAILS before implementing.
+
+            ```bash
+            scripts/repo_bin.sh pytest tests/test_<domain>.py::Test<Class>::<method> -v
+            ```
+
+            If the test passes before implementation: the test is wrong. Rewrite it.
+
+            ## Step 5 — Implement
+
+            Key rules:
+            - REST and GraphQL parity is MANDATORY: if you add a REST endpoint, add the GraphQL equivalent
+            - Use `compat_success_response` / `compat_error_response` for dual-contract v1/v2
+            - Controllers must inherit `MethodResource` with `@doc` decorator
+            - Migrations: always `native_enum=False` — never `native_enum=True` (causes CI failures)
+            - Zero `# type: ignore` without an explanatory comment
+
+            Granular commits — one responsibility per commit:
+            ```bash
+            git add app/models/<file>.py && git commit -m "feat(<domain>): add <Model>"
+            git add migrations/ && git commit -m "feat(<domain>): migration for <Model>"
+            git add app/schemas/ && git commit -m "feat(<domain>): add <Schema>"
+            git add app/services/ && git commit -m "feat(<domain>): implement <Service>"
+            git add app/controllers/ && git commit -m "feat(<domain>): REST controller"
+            git add app/graphql/ && git commit -m "feat(<domain>): GraphQL query/mutation"
+            git add tests/ && git commit -m "test(<domain>): integration tests"
+            ```
+
+            ## Step 6 — Quality gates (MANDATORY before push)
+
+            ```bash
+            bash scripts/run_ci_quality_local.sh --local
+            ```
+
+            If the script doesn't exist, run individually:
+            ```bash
+            scripts/python_tool.sh ruff format .
+            scripts/python_tool.sh ruff check app tests
+            scripts/python_tool.sh mypy app
+            scripts/repo_bin.sh pytest -m "not schemathesis" --cov=app --cov-fail-under=85 -q
+            ```
+
+            Do NOT push if any gate fails. Fix the failure first.
+
+            ## Step 7 — Open PR
+
+            ```bash
+            git push -u origin <branch>
+
+            gh pr create \
+              --title "feat(<scope>): <description>" \
+              --body "## What changes
+            <implemented features>
+
+            ## Context
+            Closes #${{ github.event.issue.number }}
+
+            ## Quality gates
+            - [x] ruff format + lint: PASS
+            - [x] mypy: PASS
+            - [x] pytest + coverage ≥ 85%: PASS
+
+            ## Risk
+            <LOW/MEDIUM/HIGH> — <one-line justification>"
+            ```
+
+            ## Step 8 — Update issue
+
+            ```bash
+            gh issue comment ${{ github.event.issue.number }} \
+              --repo ${{ github.repository }} \
+              --body "Implementation complete. PR: <PR_URL>"
+
+            gh issue edit ${{ github.event.issue.number }} \
+              --repo ${{ github.repository }} \
+              --remove-label "agent:claude"
+            ```
+
+            ## Fallback protocol (if stuck)
+
+            If after 3 attempts at the same problem there is no progress:
+
+            ```bash
+            gh issue comment ${{ github.event.issue.number }} \
+              --repo ${{ github.repository }} \
+              --body "**Blocker after 3 attempts:**
+
+            **Problem:** <exact error description>
+            **Files involved:** <list>
+            **Already tried:** <list>
+            **Suggested next step:** <suggestion for PO>
+
+            Implementation paused. Branch \`<name>\` has current progress."
+
+            gh issue edit ${{ github.event.issue.number }} \
+              --repo ${{ github.repository }} \
+              --add-label "blocked" --remove-label "agent:claude"
+
+            git push -u origin <branch>
+            ```
+
+      - name: Fallback — add blocked label if no PR was created
+        if: failure()
+        run: |
+          gh issue edit ${{ github.event.issue.number }} \
+            --add-label "blocked" --remove-label "agent:claude"
+          gh issue comment ${{ github.event.issue.number }} \
+            --body "Agent run failed (CI timeout or unexpected error). Check workflow logs: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+        env:
+          GH_TOKEN: ${{ secrets.TOKEN_GITHUB_ADMIN }}
