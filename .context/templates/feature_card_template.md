@@ -10,7 +10,7 @@ WHO WRITES THIS: The Product Owner provides the spec in natural language.
 The first agent to pick up the feature formalizes it into this card and
 submits for PO approval before any code is written.
 
-WHO READS THIS: All agents (Claude, Gemini, Gepeto, CrewAI pipeline).
+WHO READS THIS: Claude (primary executor).
 This card must be self-contained — an agent starting a fresh session
 should be able to understand the feature from this card alone, combined
 with the .context/ knowledge base.

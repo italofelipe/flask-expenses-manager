@@ -11,11 +11,11 @@ Ela nao substitui os documentos oficiais; ela organiza o que ler, em que ordem, 
 4. `.context/03_agentic_workflow.md`
 5. `.context/05_quality_and_gates.md`
 6. `.context/07_operational_cycle.md`
-7. `TASKS.md` (status e backlog)
+7. **GitHub Projects** (status e backlog — não ler `TASKS.md`, é tombstone)
 8. `.context/handoffs/` (check only for active pending handoffs; the directory should usually stay almost empty)
 
 ## Invariantes do projeto
-- Backlog, status e progresso: `TASKS.md`.
+- Backlog, status e progresso: **GitHub Projects** (canonical source of truth).
 - Direcao de produto e escopo funcional: `product.md`.
 - Modo de execucao de engenharia/IA: `steering.md`.
 - `README.md` do repo fica curto; detalhes ficam em docs dedicadas.

@@ -1,0 +1,120 @@
+name: Agent — QA Review
+
+on:
+  pull_request:
+    types: [labeled]
+
+jobs:
+  qa-review:
+    name: QA Agent — Review PR
+    runs-on: ubuntu-latest
+    if: github.event.label.name == 'needs-qa'
+    timeout-minutes: 20
+    permissions:
+      contents: read
+      pull-requests: write
+      issues: write
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: anthropics/claude-code-action@beta
+        with:
+          anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+          github_token: ${{ secrets.TOKEN_GITHUB_ADMIN }}
+          max_turns: "20"
+          prompt: |
+            You are the QA agent for Auraxis — a personal finance platform built with
+            Python 3.13, Flask, SQLAlchemy, Graphene 3 (GraphQL), and PostgreSQL.
+
+            Your task: review PR #${{ github.event.pull_request.number }} in ${{ github.repository }}.
+            You do NOT block the merge — the PR auto-merges when CI passes.
+            Your job is to flag issues and create follow-up issues for anything that needs fixing.
+
+            ## Step 1 — Read the PR
+
+            ```bash
+            gh pr view ${{ github.event.pull_request.number }} --repo ${{ github.repository }} \
+              --json title,body,files,additions,deletions
+            gh pr diff ${{ github.event.pull_request.number }}
+            ```
+
+            ## Step 2 — Check tests
+
+            List test files modified or added:
+            ```bash
+            gh pr diff ${{ github.event.pull_request.number }} --name-only | grep -E "(test|spec)\.(py)$"
+            ```
+
+            Verify:
+            - Every new function/class has a corresponding test
+            - Tests cover happy path AND error cases
+            - No `@pytest.mark.skip` or `# pragma: no cover` on real logic
+            - No tests were deleted without justification
+
+            ## Step 3 — Check code quality
+
+            Read the changed files and verify:
+            - No `print()` statements in production code
+            - No hardcoded credentials or secrets
+            - REST + GraphQL parity: if a REST endpoint was added, GraphQL equivalent exists
+            - Migrations use `native_enum=False`
+            - No `# type: ignore` without explanation
+            - New endpoints have ENRICHMENT in Postman script (if custom validation)
+
+            ## Step 4 — Decision
+
+            ### If everything looks good:
+            ```bash
+            gh pr review ${{ github.event.pull_request.number }} --approve \
+              --body "QA Agent review: tests adequate, no regressions detected, quality OK."
+            gh pr edit ${{ github.event.pull_request.number }} --remove-label "needs-qa"
+            ```
+
+            ### If there are blocking issues:
+            ```bash
+            gh pr review ${{ github.event.pull_request.number }} --comment \
+              --body "**QA Agent findings (non-blocking — PR will auto-merge when CI passes):**
+
+            Issues found:
+            - <file:line — specific issue>
+
+            Creating follow-up issues for required fixes."
+            ```
+
+            Then for EACH issue found, create a follow-up:
+            ```bash
+            gh issue create --repo ${{ github.repository }} \
+              --title "fix: <specific problem found in PR #${{ github.event.pull_request.number }}>" \
+              --label "bug,agent:claude" \
+              --body "Found during QA review of PR #${{ github.event.pull_request.number }}.
+
+            **Problem:** <description>
+            **File:** <file:line>
+            **Expected:** <what should happen>
+            **Actual:** <what happens now>"
+            ```
+
+            ### If there is non-blocking tech debt:
+            ```bash
+            gh issue create --repo ${{ github.repository }} \
+              --title "tech-debt: <description from PR #${{ github.event.pull_request.number }}>" \
+              --label "tech-debt" \
+              --body "Identified during QA review of PR #${{ github.event.pull_request.number }}.
+
+            **Debt:** <description>
+            **Impact:** LOW/MEDIUM
+            **File:** <file:line>"
+
+            gh pr review ${{ github.event.pull_request.number }} --approve \
+              --body "QA Agent: approved. Tech debt logged as separate issue."
+            gh pr edit ${{ github.event.pull_request.number }} --remove-label "needs-qa"
+            ```
+
+            ## Rules
+            - Never block the merge — create issues for problems instead
+            - Only flag real issues: logic errors, missing tests, security problems, contract breaks
+            - Don't flag style issues the linter already catches — that's noise
+            - Coverage below 85% IS a blocking issue → create bug issue with agent:claude label
