@@ -661,3 +661,46 @@ class WeeklySummaryPayloadType(graphene.ObjectType):
     period = graphene.String(required=True)
     series_start = graphene.String(required=True)
     series_end = graphene.String(required=True)
+
+
+# ---------------------------------------------------------------------------
+# Tags (#1148 — GraphQL parity with REST /tags)
+# ---------------------------------------------------------------------------
+
+
+class TagType(graphene.ObjectType):
+    id = graphene.ID(required=True)
+    name = graphene.String(required=True)
+    color = graphene.String()
+    icon = graphene.String()
+
+
+class TagListType(graphene.ObjectType):
+    tags = graphene.List(graphene.NonNull(TagType), required=True)
+    total = graphene.Int(required=True)
+
+
+class TagPayload(MutationPayload):
+    data = graphene.Field(TagType)
+
+
+# ---------------------------------------------------------------------------
+# Accounts (#1148 — GraphQL parity with REST /accounts)
+# ---------------------------------------------------------------------------
+
+
+class AccountType(graphene.ObjectType):
+    id = graphene.ID(required=True)
+    name = graphene.String(required=True)
+    account_type = graphene.String(required=True)
+    institution = graphene.String()
+    initial_balance = DecimalScalar()
+
+
+class AccountListType(graphene.ObjectType):
+    accounts = graphene.List(graphene.NonNull(AccountType), required=True)
+    total = graphene.Int(required=True)
+
+
+class AccountPayload(MutationPayload):
+    data = graphene.Field(AccountType)

@@ -6,6 +6,7 @@ from typing import Literal
 GraphQLOperationType = Literal["query", "mutation"]
 GraphQLOperationAccess = Literal["public", "auth_required"]
 GraphQLDomain = Literal[
+    "accounts",
     "auth",
     "billing",
     "dashboard",
@@ -13,6 +14,7 @@ GraphQLDomain = Literal[
     "investments",
     "notifications",
     "simulations",
+    "tags",
     "transactions",
     "user",
     "wallet",
@@ -38,6 +40,10 @@ QUERY_NOTIFICATION_MODULE = "app.graphql.queries.notification"
 MUTATION_BUDGET_MODULE = "app.graphql.mutations.budget"
 MUTATION_SUBSCRIPTION_MODULE = "app.graphql.mutations.subscription"
 MUTATION_NOTIFICATION_MODULE = "app.graphql.mutations.notification"
+QUERY_TAG_MODULE = "app.graphql.queries.tag"
+QUERY_ACCOUNT_MODULE = "app.graphql.queries.account"
+MUTATION_TAG_MODULE = "app.graphql.mutations.tag"
+MUTATION_ACCOUNT_MODULE = "app.graphql.mutations.account"
 ADVANCED_SIMULATIONS = "advanced_simulations"
 
 
@@ -595,6 +601,88 @@ GRAPHQL_OPERATION_CATALOG: tuple[GraphQLOperationDoc, ...] = (
         access="auth_required",
         summary="Revoga todas as sessões ativas — logout global.",
         source_module=MUTATION_AUTH_MODULE,
+    ),
+    # Tags (#1148)
+    GraphQLOperationDoc(
+        name="tags",
+        operation_type="query",
+        domain="tags",
+        access="auth_required",
+        summary="Lista todas as tags do usuário autenticado.",
+        source_module=QUERY_TAG_MODULE,
+    ),
+    GraphQLOperationDoc(
+        name="tag",
+        operation_type="query",
+        domain="tags",
+        access="auth_required",
+        summary="Retorna uma tag pelo ID.",
+        source_module=QUERY_TAG_MODULE,
+    ),
+    GraphQLOperationDoc(
+        name="createTag",
+        operation_type="mutation",
+        domain="tags",
+        access="auth_required",
+        summary="Cria uma nova tag para o usuário.",
+        source_module=MUTATION_TAG_MODULE,
+    ),
+    GraphQLOperationDoc(
+        name="updateTag",
+        operation_type="mutation",
+        domain="tags",
+        access="auth_required",
+        summary="Atualiza nome, cor ou ícone de uma tag existente.",
+        source_module=MUTATION_TAG_MODULE,
+    ),
+    GraphQLOperationDoc(
+        name="deleteTag",
+        operation_type="mutation",
+        domain="tags",
+        access="auth_required",
+        summary="Remove uma tag do usuário.",
+        source_module=MUTATION_TAG_MODULE,
+    ),
+    # Accounts (#1148)
+    GraphQLOperationDoc(
+        name="accounts",
+        operation_type="query",
+        domain="accounts",
+        access="auth_required",
+        summary="Lista todas as contas bancárias do usuário autenticado.",
+        source_module=QUERY_ACCOUNT_MODULE,
+    ),
+    GraphQLOperationDoc(
+        name="account",
+        operation_type="query",
+        domain="accounts",
+        access="auth_required",
+        summary="Retorna uma conta bancária pelo ID.",
+        source_module=QUERY_ACCOUNT_MODULE,
+    ),
+    GraphQLOperationDoc(
+        name="createAccount",
+        operation_type="mutation",
+        domain="accounts",
+        access="auth_required",
+        summary="Cria uma nova conta bancária para o usuário.",
+        source_module=MUTATION_ACCOUNT_MODULE,
+    ),
+    GraphQLOperationDoc(
+        name="updateAccount",
+        operation_type="mutation",
+        domain="accounts",
+        access="auth_required",
+        summary="Atualiza dados de uma conta bancária existente.",
+        source_module=MUTATION_ACCOUNT_MODULE,
+    ),
+    GraphQLOperationDoc(
+        name="deleteAccount",
+        operation_type="mutation",
+        domain="accounts",
+        access="auth_required",
+        summary="Remove uma conta bancária do usuário.",
+        source_module=MUTATION_ACCOUNT_MODULE,
     ),
 )
 

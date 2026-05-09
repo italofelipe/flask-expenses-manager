@@ -2,6 +2,11 @@ from __future__ import annotations
 
 import graphene
 
+from app.graphql.mutations.account import (
+    CreateAccountMutation,
+    DeleteAccountMutation,
+    UpdateAccountMutation,
+)
 from app.graphql.mutations.auth import (
     ConfirmEmailMutation,
     ForgotPasswordMutation,
@@ -39,6 +44,11 @@ from app.graphql.mutations.simulation import (
 from app.graphql.mutations.subscription import (
     CancelSubscriptionMutation,
     CreateCheckoutSessionMutation,
+)
+from app.graphql.mutations.tag import (
+    CreateTagMutation,
+    DeleteTagMutation,
+    UpdateTagMutation,
 )
 from app.graphql.mutations.ticker import AddTickerMutation, DeleteTickerMutation
 from app.graphql.mutations.transaction import (
@@ -114,6 +124,14 @@ class Mutation(graphene.ObjectType):
     )
     add_ticker = AddTickerMutation.Field()
     delete_ticker = DeleteTickerMutation.Field()
+    # Tags — canonical surface (no REST equivalent for bulk ops; CRUD exposed here)
+    create_tag = CreateTagMutation.Field()
+    update_tag = UpdateTagMutation.Field()
+    delete_tag = DeleteTagMutation.Field()
+    # Accounts — canonical surface
+    create_account = CreateAccountMutation.Field()
+    update_account = UpdateAccountMutation.Field()
+    delete_account = DeleteAccountMutation.Field()
     # ADR-0002: CRUD mutations deprecated — use REST endpoints.
     create_budget = CreateBudgetMutation.Field(
         deprecation_reason="ADR-0002: use POST /budgets"

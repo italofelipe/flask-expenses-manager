@@ -517,5 +517,85 @@
     "operation_type": "mutation",
     "source_module": "app.graphql.mutations.auth",
     "summary": "Revoga todas as sessões ativas — logout global."
+  },
+  {
+    "access": "auth_required",
+    "domain": "tags",
+    "name": "tags",
+    "operation_type": "query",
+    "source_module": "app.graphql.queries.tag",
+    "summary": "Lista todas as tags do usuário autenticado."
+  },
+  {
+    "access": "auth_required",
+    "domain": "tags",
+    "name": "tag",
+    "operation_type": "query",
+    "source_module": "app.graphql.queries.tag",
+    "summary": "Retorna uma tag pelo ID."
+  },
+  {
+    "access": "auth_required",
+    "domain": "tags",
+    "name": "createTag",
+    "operation_type": "mutation",
+    "source_module": "app.graphql.mutations.tag",
+    "summary": "Cria uma nova tag para o usuário."
+  },
+  {
+    "access": "auth_required",
+    "domain": "tags",
+    "name": "updateTag",
+    "operation_type": "mutation",
+    "source_module": "app.graphql.mutations.tag",
+    "summary": "Atualiza nome, cor ou ícone de uma tag existente."
+  },
+  {
+    "access": "auth_required",
+    "domain": "tags",
+    "name": "deleteTag",
+    "operation_type": "mutation",
+    "source_module": "app.graphql.mutations.tag",
+    "summary": "Remove uma tag do usuário."
+  },
+  {
+    "access": "auth_required",
+    "domain": "accounts",
+    "name": "accounts",
+    "operation_type": "query",
+    "source_module": "app.graphql.queries.account",
+    "summary": "Lista todas as contas bancárias do usuário autenticado."
+  },
+  {
+    "access": "auth_required",
+    "domain": "accounts",
+    "name": "account",
+    "operation_type": "query",
+    "source_module": "app.graphql.queries.account",
+    "summary": "Retorna uma conta bancária pelo ID."
+  },
+  {
+    "access": "auth_required",
+    "domain": "accounts",
+    "name": "createAccount",
+    "operation_type": "mutation",
+    "source_module": "app.graphql.mutations.account",
+    "summary": "Cria uma nova conta bancária para o usuário."
+  },
+  {
+    "access": "auth_required",
+    "domain": "accounts",
+    "name": "updateAccount",
+    "operation_type": "mutation",
+    "source_module": "app.graphql.mutations.account",
+    "summary": "Atualiza dados de uma conta bancária existente."
+  },
+  {
+    "access": "auth_required",
+    "domain": "accounts",
+    "name": "deleteAccount",
+    "operation_type": "mutation",
+    "source_module": "app.graphql.mutations.account",
+    "summary": "Remove uma conta bancária do usuário."
   }
 ]
