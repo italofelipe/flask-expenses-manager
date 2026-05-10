@@ -18,7 +18,7 @@ Garantir que implementacoes sejam dirigidas por especificacao explicita antes de
 
 4. Planejamento
 - Quebrar entrega em tarefas pequenas e rollback-safe.
-- Atualizar `TASKS.md` com status inicial e riscos.
+- Registrar no GitHub Projects com status inicial e riscos.
 
 5. Execucao
 - Criar branch convencional.
@@ -29,7 +29,7 @@ Garantir que implementacoes sejam dirigidas por especificacao explicita antes de
 - Validar comportamento em testes de regressao.
 
 7. Registro
-- Atualizar `TASKS.md` e docs impactadas.
+- Atualizar GitHub Projects e docs impactadas.
 - Registrar debito tecnico residual quando aplicavel.
 
 ## Definicao de pronto para SDD

@@ -1,29 +1,39 @@
-## Summary
+## Descrição
 
-<!-- What changed and why -->
+<!-- Explique o que foi implementado e por quê. -->
 
-## Task Reference
+Closes #<!-- número da issue -->
 
-- Task ID: `A/B/C/...` (ex.: `B11`, `PLT1`)
-- Backlog updated in `/Users/italochagas/Desktop/projetos/auraxis-platform/repos/auraxis-api/TASKS.md`: [ ] yes
+## Tipo de mudança
 
-## Validation
+- [ ] Feature nova (endpoint REST ou mutation GraphQL)
+- [ ] Bug fix
+- [ ] Refactor
+- [ ] Migration de banco de dados
+- [ ] Documentação / infraestrutura
 
-- [ ] `bash scripts/run_ci_like_actions_local.sh --local --fast`
-- [ ] `pytest` for affected domain(s)
-- [ ] `mypy` for affected module(s)
+## Checklist de qualidade
 
-## API Contract Checklist (Mandatory)
+- [ ] `bash scripts/run_ci_quality_local.sh --local` passou
+- [ ] Coverage **não** regrediu abaixo de 85%
+- [ ] Testes unitários e de integração criados/atualizados
 
-- [ ] OpenAPI/Swagger was validated for changed endpoints.
-- [ ] REST and GraphQL parity reviewed when applicable.
-- [ ] Backward compatibility policy respected (`.context/16_contract_compatibility_policy.md`).
+## Checklist de migrations (se houver)
 
-## Backend -> Frontend Handoff (Mandatory when contract changed)
+- [ ] **Sem migration** — OU —
+- [ ] `bash scripts/test_migrations_local.sh` passou (up + down)
+- [ ] Migration usa `native_enum=False` para enums (não `native_enum=True`)
+- [ ] Sem `op.get_bind()` — usar `op.get_context().connection`
 
-- [ ] `Feature Contract Pack` published (`.context/feature_contracts/<TASK_ID>.json/.md`).
-- [ ] `auth`, `error_contract`, `examples` and rollout notes included in the pack.
+## Checklist de contratos (se houver endpoint novo/modificado)
 
-## Risks / Follow-ups
+- [ ] **Sem mudança de contrato** — OU —
+- [ ] Endpoint documentado no OpenAPI (`openapi.json` atualizado)
+- [ ] Snapshot propagado para consumers (auraxis-web, auraxis-app)
+- [ ] ENRICHMENT adicionado em `scripts/openapi_to_postman.py` se endpoint tem validação customizada
 
-<!-- Residual risk, technical debt, and next action -->
+## Checklist de segurança
+
+- [ ] Nenhum secret, token ou credencial commitada
+- [ ] Endpoint novo protegido com `@require_auth` (se aplicável)
+- [ ] Sem `print()` com dados sensíveis nos logs
