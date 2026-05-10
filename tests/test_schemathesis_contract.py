@@ -84,7 +84,10 @@ def _load_normalized_openapi_spec() -> dict[str, object]:
 
 
 _NORMALIZED_SPEC = _load_normalized_openapi_spec()
-_RAW_SCHEMA = schemathesis.openapi.from_dict(_NORMALIZED_SPEC, app=_APP)
+_RAW_SCHEMA = schemathesis.openapi.from_dict(_NORMALIZED_SPEC)
+_RAW_SCHEMA.app = (
+    _APP  # schemathesis 4.x: set app after from_dict() to enable WSGI transport
+)
 SCHEMA = _RAW_SCHEMA.include(
     path_regex=(
         r"^/auth/(login|register)$|^/transactions(?:/[^/]+)?$|"
