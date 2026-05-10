@@ -4,16 +4,52 @@ Provider pattern: configure via LLM_PROVIDER env var.
   - "stub"   (default) — rule-based insights, no external calls
   - "openai" — OpenAI chat completions (requires OPENAI_API_KEY)
   - "claude" — Anthropic Messages API (requires ANTHROPIC_API_KEY)
+
+Required env vars (do NOT set here — configure in .env):
+  - LLM_PROVIDER: "openai" | "claude" | "stub"
+  - OPENAI_API_KEY: required when LLM_PROVIDER=openai
+  - ANTHROPIC_API_KEY: required when LLM_PROVIDER=claude
 """
 
 from __future__ import annotations
 
 import os
+import time
+from dataclasses import dataclass
 from typing import Protocol, runtime_checkable
 
 
 class LLMProviderError(Exception):
     """Raised when the LLM provider fails."""
+
+
+@dataclass
+class LLMResponse:
+    """Structured response from an LLM provider, including usage metadata."""
+
+    content: str
+    prompt_tokens: int
+    completion_tokens: int
+    total_tokens: int
+    model: str
+    latency_ms: int
+
+    @property
+    def estimated_cost_usd(self) -> float:
+        """Estimate cost in USD based on token counts and model pricing.
+
+        Prices per 1M tokens (input_price, output_price).
+        Falls back to conservative defaults for unknown models.
+        """
+        _PRICES: dict[str, tuple[float, float]] = {
+            "gpt-4o-mini": (0.15, 0.60),
+            "gpt-4.1-mini": (0.40, 1.60),
+            "claude-haiku-4-5-20251001": (0.25, 1.25),
+        }
+        input_price, output_price = _PRICES.get(self.model, (0.002, 0.008))
+        return (
+            self.prompt_tokens * input_price + self.completion_tokens * output_price
+        ) / 1_000_000
 
 
 @runtime_checkable
@@ -22,16 +58,33 @@ class LLMProvider(Protocol):
         """Generate a response for *prompt*. Raises LLMProviderError on failure."""
         ...
 
+    def generate_with_usage(self, prompt: str) -> LLMResponse:
+        """Generate a response and return structured usage data."""
+        ...
+
 
 class StubLLMProvider:
     """Canned response — useful for testing and environments without API keys."""
 
+    _STUB_MODEL = "stub"
+    _STUB_CONTENT = (
+        "Com base nos seus dados financeiros, identifiquei os seguintes insights: "
+        "1. Gastos discricionários >30% das despesas — revise esses valores. "
+        "2. Você tem metas ativas que podem estar em risco caso o ritmo de gastos atual continue. "  # noqa: E501
+        "3. Há uma oportunidade de economia de até 15% caso reduza gastos variáveis nos próximos 60 dias."  # noqa: E501
+    )
+
     def generate(self, prompt: str) -> str:  # noqa: ARG002
-        return (  # noqa: E501
-            "Com base nos seus dados financeiros, identifiquei os seguintes insights: "
-            "1. Gastos discricionários >30% das despesas — revise esses valores. "  # noqa: E501
-            "2. Você tem metas ativas que podem estar em risco caso o ritmo de gastos atual continue. "  # noqa: E501
-            "3. Há uma oportunidade de economia de até 15% caso reduza gastos variáveis nos próximos 60 dias."  # noqa: E501
+        return self._STUB_CONTENT
+
+    def generate_with_usage(self, prompt: str) -> LLMResponse:  # noqa: ARG002
+        return LLMResponse(
+            content=self._STUB_CONTENT,
+            prompt_tokens=150,
+            completion_tokens=80,
+            total_tokens=230,
+            model=self._STUB_MODEL,
+            latency_ms=0,
         )
 
 
@@ -45,10 +98,14 @@ class OpenAILLMProvider:
         self._model = os.getenv("OPENAI_ADVISORY_MODEL", "gpt-4o-mini")
 
     def generate(self, prompt: str) -> str:
+        return self.generate_with_usage(prompt).content
+
+    def generate_with_usage(self, prompt: str) -> LLMResponse:
         if not self._api_key:
             raise LLMProviderError("OPENAI_API_KEY is not configured.")
         import requests  # lazy import to keep startup fast
 
+        start = time.monotonic()
         try:
             resp = requests.post(
                 self._BASE_URL,
@@ -65,7 +122,18 @@ class OpenAILLMProvider:
                 timeout=20,
             )
             resp.raise_for_status()
-            return str(resp.json()["choices"][0]["message"]["content"])
+            latency_ms = int((time.monotonic() - start) * 1000)
+            data = resp.json()
+            usage = data.get("usage", {})
+            content = str(data["choices"][0]["message"]["content"])
+            return LLMResponse(
+                content=content,
+                prompt_tokens=int(usage.get("prompt_tokens", 0)),
+                completion_tokens=int(usage.get("completion_tokens", 0)),
+                total_tokens=int(usage.get("total_tokens", 0)),
+                model=str(data.get("model", self._model)),
+                latency_ms=latency_ms,
+            )
         except Exception as exc:
             raise LLMProviderError(f"OpenAI call failed: {exc}") from exc
 
@@ -80,10 +148,14 @@ class ClaudeLLMProvider:
         self._model = os.getenv("ANTHROPIC_ADVISORY_MODEL", "claude-haiku-4-5-20251001")
 
     def generate(self, prompt: str) -> str:
+        return self.generate_with_usage(prompt).content
+
+    def generate_with_usage(self, prompt: str) -> LLMResponse:
         if not self._api_key:
             raise LLMProviderError("ANTHROPIC_API_KEY is not configured.")
         import requests
 
+        start = time.monotonic()
         try:
             resp = requests.post(
                 self._BASE_URL,
@@ -100,7 +172,19 @@ class ClaudeLLMProvider:
                 timeout=20,
             )
             resp.raise_for_status()
-            return str(resp.json()["content"][0]["text"])
+            latency_ms = int((time.monotonic() - start) * 1000)
+            data = resp.json()
+            usage = data.get("usage", {})
+            content = str(data["content"][0]["text"])
+            return LLMResponse(
+                content=content,
+                prompt_tokens=int(usage.get("input_tokens", 0)),
+                completion_tokens=int(usage.get("output_tokens", 0)),
+                total_tokens=int(usage.get("input_tokens", 0))
+                + int(usage.get("output_tokens", 0)),
+                model=str(data.get("model", self._model)),
+                latency_ms=latency_ms,
+            )
         except Exception as exc:
             raise LLMProviderError(f"Claude call failed: {exc}") from exc
 
@@ -119,6 +203,7 @@ __all__ = [
     "ClaudeLLMProvider",
     "LLMProvider",
     "LLMProviderError",
+    "LLMResponse",
     "OpenAILLMProvider",
     "StubLLMProvider",
     "get_llm_provider",
