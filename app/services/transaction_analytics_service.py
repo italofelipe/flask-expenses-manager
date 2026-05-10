@@ -3,7 +3,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Any, cast
 from uuid import UUID
 
-from sqlalchemy import case, func
+from sqlalchemy import case, func, literal
 
 from app.extensions.database import db
 from app.models.tag import Tag
@@ -176,6 +176,196 @@ class TransactionAnalyticsService:
             }
             for tag_id, tag_name, total_amount, transactions_count in rows
         ]
+
+    def get_dashboard_overview_coalesced(
+        self, *, year: int, month_number: int
+    ) -> dict[str, Any]:
+        """Coalesce aggregates + status into 1 SQL query (down from 2).
+
+        PERF: antes get_month_aggregates + get_status_counts emitiam 2
+        queries separadas. Este metodo combina ambos em uma unica passagem
+        via CASE/conditional aggregation.
+
+        Usado por get_month_dashboard junto com get_top_categories_both
+        para reduzir o total do dashboard de 4 queries para 2.
+        """
+        _base = (
+            Transaction.user_id == self.user_id,
+            Transaction.deleted.is_(False),
+            db.extract("year", Transaction.due_date) == year,
+            db.extract("month", Transaction.due_date) == month_number,
+        )
+
+        row = (
+            db.session.query(
+                func.coalesce(
+                    func.sum(
+                        case(
+                            (
+                                Transaction.type == TransactionType.INCOME,
+                                Transaction.amount,
+                            ),
+                            else_=0,
+                        )
+                    ),
+                    0,
+                ).label("income_total"),
+                func.coalesce(
+                    func.sum(
+                        case(
+                            (
+                                Transaction.type == TransactionType.EXPENSE,
+                                Transaction.amount,
+                            ),
+                            else_=0,
+                        )
+                    ),
+                    0,
+                ).label("expense_total"),
+                func.count(Transaction.id).label("total_transactions"),
+                func.coalesce(
+                    func.sum(
+                        case(
+                            (Transaction.type == TransactionType.INCOME, 1),
+                            else_=0,
+                        )
+                    ),
+                    0,
+                ).label("income_transactions"),
+                func.coalesce(
+                    func.sum(
+                        case(
+                            (Transaction.type == TransactionType.EXPENSE, 1),
+                            else_=0,
+                        )
+                    ),
+                    0,
+                ).label("expense_transactions"),
+                func.coalesce(
+                    func.sum(case((Transaction.status.in_(["paid"]), 1), else_=0)),
+                    0,
+                ).label("status_paid"),
+                func.coalesce(
+                    func.sum(case((Transaction.status.in_(["pending"]), 1), else_=0)),
+                    0,
+                ).label("status_pending"),
+                func.coalesce(
+                    func.sum(case((Transaction.status.in_(["cancelled"]), 1), else_=0)),
+                    0,
+                ).label("status_cancelled"),
+                func.coalesce(
+                    func.sum(case((Transaction.status.in_(["postponed"]), 1), else_=0)),
+                    0,
+                ).label("status_postponed"),
+                func.coalesce(
+                    func.sum(case((Transaction.status.in_(["overdue"]), 1), else_=0)),
+                    0,
+                ).label("status_overdue"),
+            )
+            .filter(*_base)
+            .one()
+        )
+
+        income_total = row.income_total or 0
+        expense_total = row.expense_total or 0
+
+        return {
+            "income_total": income_total,
+            "expense_total": expense_total,
+            "balance": income_total - expense_total,
+            "total_transactions": int(row.total_transactions or 0),
+            "income_transactions": int(row.income_transactions or 0),
+            "expense_transactions": int(row.expense_transactions or 0),
+            "status": {
+                "paid": int(row.status_paid or 0),
+                "pending": int(row.status_pending or 0),
+                "cancelled": int(row.status_cancelled or 0),
+                "postponed": int(row.status_postponed or 0),
+                "overdue": int(row.status_overdue or 0),
+            },
+        }
+
+    def get_top_categories_both(
+        self,
+        *,
+        year: int,
+        month_number: int,
+        limit: int = 5,
+    ) -> dict[str, list[dict[str, Any]]]:
+        """Return top-categories for INCOME and EXPENSE in a UNION ALL query.
+
+        PERF: replaces two get_top_categories calls with a single query
+        that fetches both sets in one round-trip to the database.
+        """
+        _common = (
+            Transaction.user_id == self.user_id,
+            Transaction.deleted.is_(False),
+            db.extract("year", Transaction.due_date) == year,
+            db.extract("month", Transaction.due_date) == month_number,
+        )
+
+        def _subq(tx_type: TransactionType) -> Any:
+            label = "income" if tx_type == TransactionType.INCOME else "expense"
+            return (
+                db.session.query(
+                    Transaction.tag_id,
+                    Tag.name.label("tag_name"),
+                    func.coalesce(func.sum(Transaction.amount), 0).label(
+                        "total_amount"
+                    ),
+                    func.count(Transaction.id).label("transactions_count"),
+                    literal(label).label("tx_type"),
+                )
+                .outerjoin(Tag, Tag.id == Transaction.tag_id)
+                .filter(*_common)
+                .filter(Transaction.type == tx_type)
+                .group_by(Transaction.tag_id, Tag.name)
+                .order_by(func.sum(Transaction.amount).desc())
+                .limit(limit)
+                .subquery()
+            )
+
+        exp_sub = _subq(TransactionType.EXPENSE)
+        inc_sub = _subq(TransactionType.INCOME)
+
+        rows = (
+            db.session.query(
+                exp_sub.c.tag_id,
+                exp_sub.c.tag_name,
+                exp_sub.c.total_amount,
+                exp_sub.c.transactions_count,
+                exp_sub.c.tx_type,
+            )
+            .union_all(
+                db.session.query(
+                    inc_sub.c.tag_id,
+                    inc_sub.c.tag_name,
+                    inc_sub.c.total_amount,
+                    inc_sub.c.transactions_count,
+                    inc_sub.c.tx_type,
+                )
+            )
+            .all()
+        )
+
+        expense_categories: list[dict[str, Any]] = []
+        income_categories: list[dict[str, Any]] = []
+        for tag_id, tag_name, total_amount, transactions_count, tx_type in rows:
+            entry: dict[str, Any] = {
+                "tag_id": str(tag_id) if tag_id else None,
+                "category_name": tag_name or "Sem categoria",
+                "total_amount": float(total_amount),
+                "transactions_count": int(transactions_count),
+            }
+            if tx_type == "expense":
+                expense_categories.append(entry)
+            else:
+                income_categories.append(entry)
+
+        return {
+            "top_expense_categories": expense_categories,
+            "top_income_categories": income_categories,
+        }
 
     def get_dashboard_trends(self, *, months: int) -> TransactionTrendsResult:
         return compute_dashboard_trends(user_id=self.user_id, months=months)
