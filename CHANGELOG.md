@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.36.0](https://github.com/italofelipe/auraxis-api/compare/v1.35.2...v1.36.0) (2026-05-10)
+
+
+### Features
+
+* **notifications:** gate premium em reminders + notificacao analise pronta ([#1212](https://github.com/italofelipe/auraxis-api/issues/1212)) ([51614a0](https://github.com/italofelipe/auraxis-api/commit/51614a0bd4aae6401d8bac595893a9fc4428eeed))
+
 ## [1.35.2](https://github.com/italofelipe/auraxis-api/compare/v1.35.1...v1.35.2) (2026-05-10)
 
 
