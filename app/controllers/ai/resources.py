@@ -10,6 +10,7 @@ All endpoints require a valid JWT and the "advanced_simulations" entitlement.
 
 from __future__ import annotations
 
+import logging
 import uuid
 from decimal import Decimal, InvalidOperation
 from typing import Any
@@ -29,10 +30,15 @@ from app.docs.openapi_helpers import (
     json_success_response,
 )
 from app.services.ai_advisory_service import AIAdvisoryService
+from app.services.analysis_ready_notification_service import (
+    dispatch_analysis_ready_notification,
+)
 from app.services.entitlement_service import has_entitlement
 from app.services.llm_provider import LLMProviderError
 from app.utils.typed_decorators import typed_doc as doc
 from app.utils.typed_decorators import typed_jwt_required as jwt_required
+
+log = logging.getLogger(__name__)
 
 _ENTITLEMENT_KEY = "advanced_simulations"
 
@@ -356,12 +362,45 @@ class AIWeeklySummaryResource(MethodResource):
                 error_code="INTERNAL_ERROR",
             )
 
+        # Notify the user that a new analysis is ready (fire-and-forget).
+        # Truncate narrative to 280 chars for the email preview.
+        _notify_analysis_ready(
+            user_id=user_id, narrative=str(result.get("narrative", ""))
+        )
+
         return compat_success_response(
             legacy_payload=result,
             status_code=200,
             message="Briefing semanal gerado com sucesso",
             data=result,
         )
+
+
+# ---------------------------------------------------------------------------
+# Internal helpers
+# ---------------------------------------------------------------------------
+
+
+def _notify_analysis_ready(*, user_id: UUID, narrative: str) -> None:
+    """Fire-and-forget: send 'analysis ready' notification to the user.
+
+    Swallows all exceptions so notification failures never break the response.
+    The notification service itself handles entitlement gating — free users
+    are silently skipped without reaching this point in practice because the
+    endpoint already requires 'advanced_simulations', but the service enforces
+    'email_reminders' independently.
+    """
+    try:
+        preview = (
+            narrative[:280].rsplit(" ", 1)[0] if len(narrative) > 280 else narrative
+        )
+        dispatch_analysis_ready_notification(
+            user_id=user_id,
+            summary_preview=preview
+            or "Sua análise financeira semanal está disponível.",  # noqa: E501
+        )
+    except Exception as exc:
+        log.warning("ai.weekly_summary.notify_failed user_id=%s error=%s", user_id, exc)
 
 
 __all__ = [

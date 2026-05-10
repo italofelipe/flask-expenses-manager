@@ -14,6 +14,7 @@ PLAN_FEATURES: dict[str, list[str]] = {
         "export_pdf",
         "shared_entries",
         "focus_mode",
+        "email_reminders",
     ],
     "trial": [
         "basic_simulations",
@@ -22,6 +23,7 @@ PLAN_FEATURES: dict[str, list[str]] = {
         "export_pdf",
         "shared_entries",
         "focus_mode",
+        "email_reminders",
     ],
 }
 

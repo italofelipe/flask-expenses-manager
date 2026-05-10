@@ -18,7 +18,10 @@ from app.services.email_provider import (
     get_default_email_provider,
 )
 from app.services.email_templates.base import render_due_soon_email
+from app.services.entitlement_service import has_entitlement
 from app.utils.datetime_utils import utc_now_naive
+
+_EMAIL_REMINDERS_FEATURE = "email_reminders"
 
 _REMINDER_WINDOWS = {
     7: "due_soon_7_days",
@@ -123,6 +126,10 @@ def dispatch_due_transaction_reminders(
             skipped += 1
             continue
         if not _is_dispatch_allowed(transaction.user_id, category):
+            skipped += 1
+            continue
+
+        if not has_entitlement(transaction.user_id, _EMAIL_REMINDERS_FEATURE):
             skipped += 1
             continue
 

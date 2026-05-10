@@ -8,6 +8,7 @@ from app.extensions.database import db
 from app.models.transaction import Transaction, TransactionStatus, TransactionType
 from app.models.user import User
 from app.services.email_provider import get_email_outbox
+from app.services.entitlement_service import activate_premium
 
 
 def test_dispatch_due_soon_sends_reminders(app) -> None:
@@ -21,6 +22,7 @@ def test_dispatch_due_soon_sends_reminders(app) -> None:
         )
         db.session.add(user)
         db.session.flush()
+        activate_premium(user.id, expires_at=None)
 
         tx_7 = Transaction(
             user_id=user.id,
@@ -98,6 +100,7 @@ def test_dispatch_due_soon_email_provider_error_queues_to_dlq_and_exits_zero(
             )
             db.session.add(user)
             db.session.flush()
+            activate_premium(user.id, expires_at=None)
             tx = Transaction(
                 user_id=user.id,
                 title="Conta teste",

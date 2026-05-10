@@ -483,8 +483,94 @@ def render_due_soon_email(
     return html, text
 
 
+def render_analysis_ready_email(
+    *,
+    first_name: str,
+    summary_preview: str,
+) -> tuple[str, str]:
+    """Render the 'AI analysis ready' notification email.
+
+    Args:
+        first_name: User's first name for personalisation.
+        summary_preview: Short 1-2 sentence AI-generated preview to include.
+
+    Returns:
+        (html, text) tuple ready to pass to EmailMessage.
+    """
+    email_title = f"Sua análise financeira está pronta, {first_name}!"
+    preview = "Novos insights sobre suas finanças estão disponíveis no Auraxis."
+    dashboard_url = f"{_APP_URL}/dashboard"
+
+    body_html = f"""
+      <h1 style="font-family: {_FONT_HEADING}; font-size: 26px; font-weight: 700;
+                 color: {_COLOR_TEXT_PRIMARY}; margin: 0 0 8px; line-height: 1.2;">
+        Sua análise financeira está pronta
+      </h1>
+      <p style="font-family: {_FONT_BODY}; font-size: 13px; font-weight: 600;
+                color: {_COLOR_BRAND}; margin: 0 0 24px; text-transform: uppercase;
+                letter-spacing: 1px;">
+        Auraxis &mdash; Inteligência Financeira
+      </p>
+
+      <div style="border-top: 1px solid {_COLOR_BG_ELEVATED}; margin: 0 0 28px;"></div>
+
+      <p style="font-family: {_FONT_BODY}; font-size: 15px; color: {_COLOR_TEXT_SECONDARY};
+                line-height: 1.65; margin: 0 0 16px;">
+        Olá, <strong style="color: {_COLOR_TEXT_PRIMARY};">{first_name}</strong>!
+        Geramos uma nova análise das suas finanças com inteligência artificial.
+      </p>
+
+      <div style="background: {_COLOR_BG_SURFACE}; border-left: 3px solid {_COLOR_BRAND};
+                  border-radius: 4px; padding: 16px 20px; margin: 0 0 28px;">
+        <p style="font-family: {_FONT_BODY}; font-size: 14px; color: {_COLOR_TEXT_SECONDARY};
+                  line-height: 1.6; margin: 0; font-style: italic;">
+          {summary_preview}
+        </p>
+      </div>
+
+      <!-- CTA -->
+      <table role="presentation" cellpadding="0" cellspacing="0" border="0" style="margin: 8px 0 32px;">
+        <tr>
+          <td align="left" style="border-radius: 8px; background-color: {_COLOR_BRAND};">
+            <a href="{dashboard_url}"
+               style="display: inline-block; padding: 14px 28px; font-family: {_FONT_BODY};
+                      font-size: 15px; font-weight: 700; color: #0b0909; text-decoration: none;
+                      border-radius: 8px; letter-spacing: 0.3px;">
+              Ver análise completa
+            </a>
+          </td>
+        </tr>
+      </table>
+
+      <p style="font-family: {_FONT_BODY}; font-size: 12px; color: {_COLOR_TEXT_MUTED};
+                line-height: 1.6; margin: 0;">
+        Para gerenciar suas preferências de notificação, acesse as configurações no aplicativo.
+      </p>
+    """
+
+    html = _base_layout(
+        title=email_title,
+        preview_text=preview,
+        body_html=body_html,
+    )
+
+    text = (
+        f"Sua análise financeira está pronta — Auraxis\n"
+        f"=============================================\n\n"
+        f"Olá, {first_name}!\n\n"
+        f"{summary_preview}\n\n"
+        f"Acesse o Auraxis para ver a análise completa:\n"
+        f"{dashboard_url}\n\n"
+        f"Para gerenciar preferências de notificação, acesse as configurações no app.\n\n"
+        f"— Equipe Auraxis\n"
+    )
+
+    return html, text
+
+
 __all__ = [
     "render_account_deletion_email",
+    "render_analysis_ready_email",
     "render_confirmation_email",
     "render_due_soon_email",
     "render_password_reset_email",

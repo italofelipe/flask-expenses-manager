@@ -23,6 +23,7 @@ from app.models.alert import Alert, AlertStatus
 from app.models.transaction import Transaction, TransactionStatus, TransactionType
 from app.models.user import User
 from app.services.email_provider import get_email_outbox
+from app.services.entitlement_service import activate_premium
 
 # ---------------------------------------------------------------------------
 # Integration tests — happy path + idempotency
@@ -40,6 +41,7 @@ def test_transaction_reminder_service_dispatches_due_soon_email(app) -> None:
         )
         db.session.add(user)
         db.session.flush()
+        activate_premium(user.id, expires_at=None)
         transaction = Transaction(
             user_id=user.id,
             title="Conta de energia",
@@ -72,6 +74,7 @@ def test_transaction_reminder_service_is_idempotent_per_day(app) -> None:
         )
         db.session.add(user)
         db.session.flush()
+        activate_premium(user.id, expires_at=None)
         transaction = Transaction(
             user_id=user.id,
             title="Conta de internet",
