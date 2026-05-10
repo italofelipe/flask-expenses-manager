@@ -6,7 +6,7 @@ Permitir que agentes diferentes (ou sessoes diferentes) consigam continuar o tra
 ## Loop operacional de agente
 1. Bootstrap
 - Ler `.context/README.md` e `01_sources_of_truth.md`.
-- Ler `TASKS.md` para identificar estado atual.
+- Verificar GitHub Projects para estado atual da task.
 - Ler docs tecnicas diretamente relacionadas ao bloco atual.
 
 2. Planejamento curto

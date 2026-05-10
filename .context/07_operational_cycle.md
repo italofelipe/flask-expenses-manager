@@ -11,17 +11,17 @@ for how work flows from a human idea to deployed code with feedback.
 | Role | Who | Responsibility |
 |:-----|:----|:---------------|
 | **Product Owner (PO)** | Italo (human) | Provides specs, approves plans, supervises, makes product decisions |
-| **Claude** | Anthropic Claude | Direct implementation, review, analysis, documentation |
-| **Gemini** | Google Gemini | Architecture review, orchestration analysis, alternative perspectives |
-| **Gepeto** | OpenAI GPT | Implementation, code generation, problem-solving |
-| **CrewAI** | ai_squad/ pipeline | Automated multi-agent pipeline (PM + Backend + QA) |
+| **Claude** | Anthropic Claude | Primary executor: implementation, review, analysis, documentation |
+| **GPT** | OpenAI GPT | Consultive: alternate analysis (on-demand only) |
+| **Gemini** | Google Gemini | Consultive: architecture second opinions (on-demand only) |
+| **CrewAI** | ai_squad/ pipeline | Automated multi-agent pipeline (paused indefinitely) |
 
 ## The Cycle
 
 ### Phase 1: SPEC (PO → Agent)
 
 **Input:** PO describes the feature in natural language.
-**Output:** Formalized feature card in TASKS.md.
+**Output:** Formalized feature card in GitHub Projects.
 
 The PO provides any combination of:
 - Problem description
@@ -112,7 +112,7 @@ before autonomous execution begins.
 ### Phase 5: DELIVERY + FEEDBACK (Agent → PO)
 
 **Input:** All tasks done, quality gates passing.
-**Output:** Delivery report + updated TASKS.md.
+**Output:** Delivery report + GitHub Projects updated.
 
 **Agent action:**
 1. Create delivery report using `templates/delivery_report_template.md`.
@@ -124,9 +124,9 @@ before autonomous execution begins.
    - Attention points for PO.
    - Technical debt generated (mandatory — "None" if clean).
    - Recommendations for next step.
-3. Update TASKS.md:
-   - Feature card status → Done.
-   - Technical debt items → added to backlog as future tasks.
+3. Update GitHub Projects:
+   - Feature card status → Done (via PR `Closes #N` or `gh issue close`).
+   - Technical debt items → added as new issues in GitHub Projects.
 4. Present the delivery report to PO.
 
 **Gate:** PO reviews delivery report and confirms acceptance.
@@ -188,7 +188,7 @@ If two agents have different opinions on implementation:
 
 | Artifact | Location | Created by |
 |:---------|:---------|:-----------|
-| Feature card | TASKS.md (inline) | Agent (from PO briefing) |
+| Feature card | GitHub Projects | Agent (from PO briefing) |
 | Feature spec (detailed) | docs/specs/FEAT-XXX.md | Agent (for L/XL features) |
 | Delivery report | .context/reports/FEAT-XXX_delivery.md | Delivering agent |
 | Handoff | .context/handoffs/FEAT-XXX_handoff_DATE.md | Agent stopping work |
@@ -204,7 +204,7 @@ If you are an AI agent reading this for the first time:
 1. Read `.context/README.md` → understand the knowledge base.
 2. Read `.context/01_sources_of_truth.md` → understand document hierarchy.
 3. Read this file → understand the delivery cycle.
-4. Read `TASKS.md` → find what needs to be done.
+4. Check GitHub Projects → find what needs to be done.
 5. Read `.context/04_architecture_snapshot.md` → understand the codebase.
 6. Read `steering.md` → understand execution rules.
 7. Read `product.md` → understand product direction.

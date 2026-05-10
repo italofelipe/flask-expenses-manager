@@ -1,0 +1,75 @@
+name: Agent — Watchdog
+
+on:
+  workflow_run:
+    workflows: ["CI"]
+    types: [completed]
+    branches: [master]
+
+jobs:
+  watchdog:
+    name: Watchdog — CI failure triage
+    runs-on: ubuntu-latest
+    if: github.event.workflow_run.conclusion == 'failure'
+    permissions:
+      contents: read
+      issues: write
+      actions: read
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check for existing open incident issue
+        id: check_existing
+        run: |
+          EXISTING=$(gh issue list \
+            --repo ${{ github.repository }} \
+            --label "incident" \
+            --state open \
+            --json number,title \
+            --jq ".[0].number // empty")
+          echo "existing=$EXISTING" >> $GITHUB_OUTPUT
+        env:
+          GH_TOKEN: ${{ secrets.TOKEN_GITHUB_ADMIN }}
+
+      - name: Create incident issue
+        if: steps.check_existing.outputs.existing == ''
+        run: |
+          WORKFLOW_URL="${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.event.workflow_run.id }}"
+          BRANCH="${{ github.event.workflow_run.head_branch }}"
+          COMMIT="${{ github.event.workflow_run.head_sha }}"
+          SHORT_SHA="${COMMIT:0:7}"
+
+          gh issue create \
+            --repo ${{ github.repository }} \
+            --title "incident: CI failure on ${BRANCH} @ ${SHORT_SHA}" \
+            --label "incident,bug" \
+            --body "## CI Failure Detected
+
+          **Branch:** \`${BRANCH}\`
+          **Commit:** \`${SHORT_SHA}\`
+          **Workflow run:** ${WORKFLOW_URL}
+          **Time:** $(date -u '+%Y-%m-%d %H:%M UTC')
+
+          ## What to do
+
+          1. Check the workflow run logs at the link above
+          2. Identify failing job(s)
+          3. Add label \`agent:claude\` to assign investigation to the backend agent
+
+          > This issue was created automatically by the Watchdog agent."
+        env:
+          GH_TOKEN: ${{ secrets.TOKEN_GITHUB_ADMIN }}
+
+      - name: Comment on existing incident
+        if: steps.check_existing.outputs.existing != ''
+        run: |
+          WORKFLOW_URL="${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.event.workflow_run.id }}"
+          COMMIT="${{ github.event.workflow_run.head_sha }}"
+          SHORT_SHA="${COMMIT:0:7}"
+
+          gh issue comment ${{ steps.check_existing.outputs.existing }} \
+            --repo ${{ github.repository }} \
+            --body "CI still failing — commit \`${SHORT_SHA}\`. Run: ${WORKFLOW_URL}"
+        env:
+          GH_TOKEN: ${{ secrets.TOKEN_GITHUB_ADMIN }}
