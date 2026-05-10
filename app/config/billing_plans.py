@@ -56,9 +56,9 @@ PREMIUM_MONTHLY_PLAN = BillingPlanOffer(
     tier="premium",
     display_name="Premium Mensal",
     description="Analises com IA, alertas e briefing semanal.",
-    # DEC-168: R$27,90/mês — founder-confirmed 2026-04-05
-    # Canonical: docs/wiki/MVP-1-Monetizacao-e-Assinaturas.md
-    price_cents=2790,
+    # ADR #669: R$29,90/mês — founder-confirmed 2026-05-10
+    # Canonical: ADR #669 (auraxis-platform)
+    price_cents=2990,
     billing_cycle=BillingCycle.MONTHLY,
     trial_days=7,
     highlighted=True,
@@ -71,9 +71,9 @@ PREMIUM_ANNUAL_PLAN = BillingPlanOffer(
     tier="premium",
     display_name="Premium Anual",
     description="Mesmo pacote premium com desconto anual.",
-    # DEC-168: R$220,00/ano (equiv. R$18,33/mês, 34% off) — founder-confirmed 2026-04-05
-    # Canonical: docs/wiki/MVP-1-Monetizacao-e-Assinaturas.md
-    price_cents=22000,
+    # ADR #669: R$287,04/ano (equiv. R$23,92/mês, 20% off)
+    # Canonical: ADR #669 (auraxis-platform)
+    price_cents=28704,
     billing_cycle=BillingCycle.ANNUAL,
     trial_days=7,
     legacy_aliases=("pro_annual",),
