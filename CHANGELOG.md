@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.35.2](https://github.com/italofelipe/auraxis-api/compare/v1.35.1...v1.35.2) (2026-05-10)
+
+
+### Bug Fixes
+
+* **pricing:** atualizar preço canônico premium para R$29,90/mês (ADR [#669](https://github.com/italofelipe/auraxis-api/issues/669)) ([#1208](https://github.com/italofelipe/auraxis-api/issues/1208)) ([2ab7a5d](https://github.com/italofelipe/auraxis-api/commit/2ab7a5d89c5c2cdf677c2e44b0c192ff2293142b))
+
 ## [1.35.1](https://github.com/italofelipe/auraxis-api/compare/v1.35.0...v1.35.1) (2026-05-10)
 
 
