@@ -704,3 +704,50 @@ class AccountListType(graphene.ObjectType):
 
 class AccountPayload(MutationPayload):
     data = graphene.Field(AccountType)
+
+
+# ---------------------------------------------------------------------------
+# Bank Statement Import (#1148 — GraphQL surface for bank_import_service)
+# ---------------------------------------------------------------------------
+
+
+class BankImportPreviewEntryType(graphene.ObjectType):
+    external_id = graphene.String(required=True)
+    date = graphene.String(required=True)
+    description = graphene.String(required=True)
+    amount = graphene.String(required=True)
+    transaction_type = graphene.String(required=True)
+    bank_name = graphene.String(required=True)
+    is_duplicate = graphene.Boolean(required=True)
+    duplicate_reason = graphene.String()
+
+
+class BankImportPreviewType(graphene.ObjectType):
+    bank_name = graphene.String(required=True)
+    entries = graphene.List(graphene.NonNull(BankImportPreviewEntryType), required=True)
+    total_entries = graphene.Int(required=True)
+    duplicate_entries = graphene.Int(required=True)
+    new_entries = graphene.Int(required=True)
+
+
+class BankImportPreviewPayload(MutationPayload):
+    data = graphene.Field(BankImportPreviewType)
+
+
+class ImportedTransactionType(graphene.ObjectType):
+    id = graphene.ID(required=True)
+    title = graphene.String(required=True)
+    amount = graphene.String(required=True)
+    type = graphene.String(required=True)
+    due_date = graphene.String(required=True)
+    bank_name = graphene.String()
+    external_id = graphene.String()
+
+
+class BankImportConfirmationPayload(MutationPayload):
+    bank_name = graphene.String()
+    month = graphene.String()
+    imported_count = graphene.Int()
+    skipped_duplicates = graphene.Int()
+    replaced_count = graphene.Int()
+    transactions = graphene.List(graphene.NonNull(ImportedTransactionType))
