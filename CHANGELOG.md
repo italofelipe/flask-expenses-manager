@@ -1,5 +1,28 @@
 # Changelog
 
+## [1.35.0](https://github.com/italofelipe/auraxis-api/compare/v1.34.0...v1.35.0) (2026-05-10)
+
+
+### Features
+
+* **graphql/infra:** SQL coalescing + Postgres cleanup + GraphQL rate limit ([8c94821](https://github.com/italofelipe/auraxis-api/commit/8c94821eb077a3d62f5205dfd3f8f164f8d5eae0))
+* **graphql:** add Bank Statement Import domain — [#1148](https://github.com/italofelipe/auraxis-api/issues/1148) ([0147130](https://github.com/italofelipe/auraxis-api/commit/01471306b718240a309c01ebe0c30b5fcff337cb))
+* **graphql:** add missing domains — Account, Tags, Bank Statement ([a4de088](https://github.com/italofelipe/auraxis-api/commit/a4de088ccb5f6f40ab3577d984a165f2d70a26f8))
+
+
+### Bug Fixes
+
+* **graphql:** use TransactionStatus enum in coalesced status counts ([ee0dbda](https://github.com/italofelipe/auraxis-api/commit/ee0dbdacbef7128b12bf0aaaa875a73f71781201))
+* **merge:** resolve conflicts — keep bank statement types and catalog entries ([78c133a](https://github.com/italofelipe/auraxis-api/commit/78c133ab2cef64a39da875f2bcdcce1b08b032e1))
+* **merge:** resolve types.py conflict — take master (bank statement types) ([f78475b](https://github.com/italofelipe/auraxis-api/commit/f78475b5498a6fcd50613471d1f6824827d77517))
+* **merge:** take master enum-based status counts in analytics service ([b7ae891](https://github.com/italofelipe/auraxis-api/commit/b7ae891fc465ba545d9b6995fd911d06eae6f0fd))
+
+
+### Performance Improvements
+
+* **graphql:** coalesce dashboard SQL queries 4 -&gt; 2 ([d12a13c](https://github.com/italofelipe/auraxis-api/commit/d12a13cc8cf035696e0fcce1dbf6614e9550b121)), closes [#1156](https://github.com/italofelipe/auraxis-api/issues/1156)
+* **graphql:** coalesce dashboard SQL queries 4 -&gt; 2 ([c721293](https://github.com/italofelipe/auraxis-api/commit/c72129350af37d598fb979993cb1a5439926a0a8)), closes [#1156](https://github.com/italofelipe/auraxis-api/issues/1156)
+
 ## [1.34.0](https://github.com/italofelipe/auraxis-api/compare/v1.33.0...v1.34.0) (2026-05-09)
 
 
