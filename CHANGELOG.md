@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.35.1](https://github.com/italofelipe/auraxis-api/compare/v1.35.0...v1.35.1) (2026-05-10)
+
+
+### Bug Fixes
+
+* **ci:** schemathesis 4.x API migration + pydantic &gt;=2.13.4 (closes Dependabot [#1123](https://github.com/italofelipe/auraxis-api/issues/1123)) ([#1203](https://github.com/italofelipe/auraxis-api/issues/1203)) ([d40f022](https://github.com/italofelipe/auraxis-api/commit/d40f02214b57d31ba6a75e565d17e97693ae421c))
+
 ## [1.35.0](https://github.com/italofelipe/auraxis-api/compare/v1.34.0...v1.35.0) (2026-05-10)
 
 
