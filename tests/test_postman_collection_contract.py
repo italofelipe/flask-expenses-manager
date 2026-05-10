@@ -156,6 +156,10 @@ OPENAPI_GAPS: set[tuple[str, str]] = {
     ("POST", "/bank-statements/confirm"),
     # Advisory (not yet in apispec-documented blueprints)
     ("GET", "/advisory/insights"),
+    # AI Advisory (not yet in apispec-documented blueprints — #1206)
+    ("GET", "/ai/insights/spending"),
+    ("POST", "/ai/goals/{param}/projection"),
+    ("GET", "/ai/insights/weekly-summary"),
     # Dashboard routes not yet in apispec-documented blueprints
     ("GET", "/dashboard/survival-index"),
     ("GET", "/dashboard/weekly-summary"),

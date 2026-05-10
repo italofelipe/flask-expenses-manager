@@ -19,6 +19,7 @@ from app.controllers.account import account_bp
 from app.controllers.admin.audit_trail import admin_audit_trail_bp
 from app.controllers.admin.feature_flags import admin_feature_flags_bp
 from app.controllers.advisory import advisory_bp
+from app.controllers.ai import ai_bp
 from app.controllers.alert_controller import alert_bp, register_alert_dependencies
 from app.controllers.auth_controller import auth_bp, register_auth_dependencies
 from app.controllers.bank_statement import bank_statement_bp
@@ -86,6 +87,7 @@ from app.models.fiscal import (  # noqa: F401
 )
 from app.models.goal import Goal  # noqa: F401
 from app.models.investment_operation import InvestmentOperation  # noqa: F401
+from app.models.llm_audit_log import LLMAuditLog  # noqa: F401
 from app.models.refresh_token import RefreshToken  # noqa: F401
 from app.models.shared_entry import Invitation, SharedEntry  # noqa: F401
 from app.models.sharing_audit import SharingAuditEvent  # noqa: F401
@@ -319,6 +321,7 @@ def create_app(*, enable_http_runtime: bool = True) -> Flask:
     app.register_blueprint(tag_bp)
     app.register_blueprint(budget_bp)
     app.register_blueprint(advisory_bp)
+    app.register_blueprint(ai_bp)
     app.register_blueprint(admin_feature_flags_bp, url_prefix="/admin")
     app.register_blueprint(admin_audit_trail_bp)
 

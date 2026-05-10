@@ -1,0 +1,36 @@
+from __future__ import annotations
+
+from .blueprint import ai_bp
+from .resources import (
+    AIGoalProjectionResource,
+    AISpendingInsightsResource,
+    AIWeeklySummaryResource,
+)
+
+_ROUTES_REGISTERED = False
+
+
+def register_ai_routes() -> None:
+    global _ROUTES_REGISTERED
+    if _ROUTES_REGISTERED:
+        return
+
+    ai_bp.add_url_rule(
+        "/insights/spending",
+        view_func=AISpendingInsightsResource.as_view("ai_spending_insights"),
+        methods=["GET"],
+    )
+    ai_bp.add_url_rule(
+        "/goals/<goal_id>/projection",
+        view_func=AIGoalProjectionResource.as_view("ai_goal_projection"),
+        methods=["POST"],
+    )
+    ai_bp.add_url_rule(
+        "/insights/weekly-summary",
+        view_func=AIWeeklySummaryResource.as_view("ai_weekly_summary"),
+        methods=["GET"],
+    )
+    _ROUTES_REGISTERED = True
+
+
+register_ai_routes()
