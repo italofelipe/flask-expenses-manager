@@ -597,5 +597,21 @@
     "operation_type": "mutation",
     "source_module": "app.graphql.mutations.account",
     "summary": "Remove uma conta bancária do usuário."
+  },
+  {
+    "access": "auth_required",
+    "domain": "transactions",
+    "name": "previewBankStatement",
+    "operation_type": "mutation",
+    "source_module": "app.graphql.mutations.bank_statement",
+    "summary": "Faz o parse de um extrato bancário (CSV ou OFX) e retorna preview com detecção de duplicatas. Nenhum dado é gravado."
+  },
+  {
+    "access": "auth_required",
+    "domain": "transactions",
+    "name": "confirmBankImport",
+    "operation_type": "mutation",
+    "source_module": "app.graphql.mutations.bank_statement",
+    "summary": "Persiste as entradas selecionadas do extrato bancário como transações. Suporta modos 'selective' e 'replace_month'."
   }
 ]
