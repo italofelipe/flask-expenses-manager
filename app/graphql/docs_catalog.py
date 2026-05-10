@@ -44,6 +44,7 @@ QUERY_TAG_MODULE = "app.graphql.queries.tag"
 QUERY_ACCOUNT_MODULE = "app.graphql.queries.account"
 MUTATION_TAG_MODULE = "app.graphql.mutations.tag"
 MUTATION_ACCOUNT_MODULE = "app.graphql.mutations.account"
+MUTATION_BANK_STATEMENT_MODULE = "app.graphql.mutations.bank_statement"
 ADVANCED_SIMULATIONS = "advanced_simulations"
 
 
@@ -683,6 +684,29 @@ GRAPHQL_OPERATION_CATALOG: tuple[GraphQLOperationDoc, ...] = (
         access="auth_required",
         summary="Remove uma conta bancária do usuário.",
         source_module=MUTATION_ACCOUNT_MODULE,
+    ),
+    # Bank Statement Import (#1148)
+    GraphQLOperationDoc(
+        name="previewBankStatement",
+        operation_type="mutation",
+        domain="transactions",
+        access="auth_required",
+        summary=(
+            "Faz o parse de um extrato bancário (CSV ou OFX) e retorna preview "
+            "com detecção de duplicatas. Nenhum dado é gravado."
+        ),
+        source_module=MUTATION_BANK_STATEMENT_MODULE,
+    ),
+    GraphQLOperationDoc(
+        name="confirmBankImport",
+        operation_type="mutation",
+        domain="transactions",
+        access="auth_required",
+        summary=(
+            "Persiste as entradas selecionadas do extrato bancário como transações. "
+            "Suporta modos 'selective' e 'replace_month'."
+        ),
+        source_module=MUTATION_BANK_STATEMENT_MODULE,
     ),
 )
 

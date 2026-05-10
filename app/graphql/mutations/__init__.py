@@ -19,6 +19,10 @@ from app.graphql.mutations.auth import (
     RevokeSessionMutation,
     UpdateUserProfileMutation,
 )
+from app.graphql.mutations.bank_statement import (
+    ConfirmBankImportMutation,
+    PreviewBankStatementMutation,
+)
 from app.graphql.mutations.budget import (
     CreateBudgetMutation,
     DeleteBudgetMutation,
@@ -152,6 +156,9 @@ class Mutation(graphene.ObjectType):
     update_notification_preferences = UpdateNotificationPreferencesMutation.Field()
     revoke_session = RevokeSessionMutation.Field()
     revoke_all_sessions = RevokeAllSessionsMutation.Field()
+    # Bank Statement Import — canonical GraphQL surface (#1148)
+    preview_bank_statement = PreviewBankStatementMutation.Field()
+    confirm_bank_import = ConfirmBankImportMutation.Field()
 
 
 __all__ = ["Mutation"]
