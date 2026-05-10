@@ -7,7 +7,7 @@ from sqlalchemy import case, func, literal
 
 from app.extensions.database import db
 from app.models.tag import Tag
-from app.models.transaction import Transaction, TransactionType
+from app.models.transaction import Transaction, TransactionStatus, TransactionType
 from app.services.transaction_trends import (
     classify_survival as classify_survival,  # re-export
 )
@@ -242,23 +242,45 @@ class TransactionAnalyticsService:
                     0,
                 ).label("expense_transactions"),
                 func.coalesce(
-                    func.sum(case((Transaction.status.in_(["paid"]), 1), else_=0)),
+                    func.sum(
+                        case((Transaction.status == TransactionStatus.PAID, 1), else_=0)
+                    ),
                     0,
                 ).label("status_paid"),
                 func.coalesce(
-                    func.sum(case((Transaction.status.in_(["pending"]), 1), else_=0)),
+                    func.sum(
+                        case(
+                            (Transaction.status == TransactionStatus.PENDING, 1),
+                            else_=0,
+                        )
+                    ),
                     0,
                 ).label("status_pending"),
                 func.coalesce(
-                    func.sum(case((Transaction.status.in_(["cancelled"]), 1), else_=0)),
+                    func.sum(
+                        case(
+                            (Transaction.status == TransactionStatus.CANCELLED, 1),
+                            else_=0,
+                        )
+                    ),
                     0,
                 ).label("status_cancelled"),
                 func.coalesce(
-                    func.sum(case((Transaction.status.in_(["postponed"]), 1), else_=0)),
+                    func.sum(
+                        case(
+                            (Transaction.status == TransactionStatus.POSTPONED, 1),
+                            else_=0,
+                        )
+                    ),
                     0,
                 ).label("status_postponed"),
                 func.coalesce(
-                    func.sum(case((Transaction.status.in_(["overdue"]), 1), else_=0)),
+                    func.sum(
+                        case(
+                            (Transaction.status == TransactionStatus.OVERDUE, 1),
+                            else_=0,
+                        )
+                    ),
                     0,
                 ).label("status_overdue"),
             )

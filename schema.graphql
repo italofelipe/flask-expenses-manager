@@ -681,6 +681,40 @@ type Mutation {
 
   """Revoke all active sessions — global logout (#1028)."""
   revokeAllSessions: RevokeAllSessionsMutation
+
+  """
+  Parse a bank statement text and return a deduplication preview.
+  
+  The client submits the raw text content (CSV for Nubank, OFX for others)
+  together with a bank identifier.  No data is written to the database.
+  """
+  previewBankStatement(
+    """Bank identifier (e.g. 'nubank', 'itau')."""
+    bankName: String!
+
+    """Raw bank statement text (CSV or OFX)."""
+    content: String!
+  ): BankImportPreviewPayload
+
+  """
+  Persist a subset of bank statement entries as transactions.
+  
+  ``mode`` controls how existing data is handled:
+  
+  - ``selective``: skip duplicates, import only new entries.
+  - ``replace_month``: delete all existing bank-imported transactions for
+    the given month/bank before importing the selected set.
+  """
+  confirmBankImport(
+    bankName: String!
+
+    """'selective' or 'replace_month'."""
+    mode: String!
+
+    """Month in YYYY-MM format."""
+    month: String!
+    selectedEntries: [SelectedEntryInput!]!
+  ): BankImportConfirmationPayload
 }
 
 type AuthPayloadType {
@@ -963,4 +997,71 @@ type RevokeSessionMutation {
 type RevokeAllSessionsMutation {
   ok: Boolean!
   revoked: Int!
+}
+
+type BankImportPreviewPayload {
+  """True when the mutation completed without errors."""
+  ok: Boolean!
+
+  """Human-readable status message."""
+  message: String!
+
+  """Field-level validation errors (empty on success)."""
+  errors: [ValidationError!]!
+  data: BankImportPreviewType
+}
+
+type BankImportPreviewType {
+  bankName: String!
+  entries: [BankImportPreviewEntryType!]!
+  totalEntries: Int!
+  duplicateEntries: Int!
+  newEntries: Int!
+}
+
+type BankImportPreviewEntryType {
+  externalId: String!
+  date: String!
+  description: String!
+  amount: String!
+  transactionType: String!
+  bankName: String!
+  isDuplicate: Boolean!
+  duplicateReason: String
+}
+
+type BankImportConfirmationPayload {
+  """True when the mutation completed without errors."""
+  ok: Boolean!
+
+  """Human-readable status message."""
+  message: String!
+
+  """Field-level validation errors (empty on success)."""
+  errors: [ValidationError!]!
+  bankName: String
+  month: String
+  importedCount: Int
+  skippedDuplicates: Int
+  replacedCount: Int
+  transactions: [ImportedTransactionType!]
+}
+
+type ImportedTransactionType {
+  id: ID!
+  title: String!
+  amount: String!
+  type: String!
+  dueDate: String!
+  bankName: String
+  externalId: String
+}
+
+input SelectedEntryInput {
+  externalId: String!
+  date: String!
+  description: String!
+  amount: String!
+  transactionType: String!
+  bankName: String!
 }
