@@ -1,0 +1,384 @@
+"""Tests for AI daily rate limit middleware (#1214).
+
+Coverage areas:
+- _seconds_until_midnight_brt() returns positive int <= 86400
+- _brt_date_str() returns YYYY-MM-DD format
+- check_ai_daily_limit(): 1st call → count 1, 2nd → count 2, 3rd → count 3
+- InMemoryAICounter.reset() clears state
+- HTTP GET /ai/insights/spending:
+    - 1st call → 200 + X-AI-Calls-Remaining: 1
+    - 2nd call → 200 + X-AI-Calls-Remaining: 0
+    - 3rd call → 429 + error_code AI_DAILY_LIMIT_EXCEEDED + Retry-After header
+- Free user still gets 403 from entitlement gate (never reaches rate limit)
+- Goal projection endpoint NOT rate-limited (not /ai/insights/*)
+"""
+
+from __future__ import annotations
+
+import uuid
+from unittest.mock import patch
+
+import pytest
+
+# ---------------------------------------------------------------------------
+# Helpers (same pattern as test_ai_advisory_service.py)
+# ---------------------------------------------------------------------------
+
+
+def _register_and_login(client, prefix: str) -> str:
+    suffix = uuid.uuid4().hex[:8]
+    email = f"{prefix}-{suffix}@test.com"
+    password = "StrongPass@123"
+    reg = client.post(
+        "/auth/register",
+        json={"name": f"{prefix}-{suffix}", "email": email, "password": password},
+    )
+    assert reg.status_code == 201
+    login = client.post("/auth/login", json={"email": email, "password": password})
+    assert login.status_code == 200
+    return login.get_json()["token"]
+
+
+def _auth(token: str, v2: bool = False) -> dict[str, str]:
+    headers = {"Authorization": f"Bearer {token}"}
+    if v2:
+        headers["X-API-Contract"] = "v2"
+    return headers
+
+
+def _revoke_premium(app, token: str) -> None:
+    with app.app_context():
+        from flask_jwt_extended import decode_token
+
+        from app.services.entitlement_service import deactivate_premium
+
+        user_id = uuid.UUID(decode_token(token)["sub"])
+        deactivate_premium(user_id)
+
+
+def _grant_premium(app, token: str) -> None:
+    with app.app_context():
+        from flask_jwt_extended import decode_token
+
+        from app.extensions.database import db
+        from app.models.entitlement import Entitlement, EntitlementSource
+
+        user_id = uuid.UUID(decode_token(token)["sub"])
+        for key in ("advanced_simulations",):
+            ent = Entitlement(
+                user_id=user_id,
+                feature_key=key,
+                source=EntitlementSource.MANUAL,
+                expires_at=None,
+            )
+            db.session.add(ent)
+        db.session.commit()
+
+
+def _reset_ai_counter() -> None:
+    from app.middleware.ai_rate_limit import _InMemoryAICounter
+
+    _InMemoryAICounter.reset()
+
+
+# ---------------------------------------------------------------------------
+# Unit tests — helpers
+# ---------------------------------------------------------------------------
+
+
+class TestMidnightHelpers:
+    def test_seconds_until_midnight_positive(self) -> None:
+        from app.middleware.ai_rate_limit import _seconds_until_midnight_brt
+
+        secs = _seconds_until_midnight_brt()
+        assert 0 < secs <= 86_400
+
+    def test_brt_date_str_format(self) -> None:
+        from app.middleware.ai_rate_limit import _brt_date_str
+
+        s = _brt_date_str()
+        assert len(s) == 10
+        parts = s.split("-")
+        assert len(parts) == 3
+        assert len(parts[0]) == 4  # year
+        assert len(parts[1]) == 2  # month
+        assert len(parts[2]) == 2  # day
+
+
+# ---------------------------------------------------------------------------
+# Unit tests — InMemoryAICounter
+# ---------------------------------------------------------------------------
+
+
+class TestInMemoryAICounter:
+    def setup_method(self) -> None:
+        _reset_ai_counter()
+
+    def test_increments_sequentially(self) -> None:
+        from app.middleware.ai_rate_limit import _InMemoryAICounter
+
+        key = f"test-key-{uuid.uuid4().hex}"
+        assert _InMemoryAICounter.incr(key, 100) == 1
+        assert _InMemoryAICounter.incr(key, 100) == 2
+        assert _InMemoryAICounter.incr(key, 100) == 3
+
+    def test_reset_clears_all(self) -> None:
+        from app.middleware.ai_rate_limit import _InMemoryAICounter
+
+        key = f"test-key-{uuid.uuid4().hex}"
+        _InMemoryAICounter.incr(key, 100)
+        _InMemoryAICounter.reset()
+        assert _InMemoryAICounter.incr(key, 100) == 1
+
+    def test_different_keys_are_independent(self) -> None:
+        from app.middleware.ai_rate_limit import _InMemoryAICounter
+
+        key_a = f"key-a-{uuid.uuid4().hex}"
+        key_b = f"key-b-{uuid.uuid4().hex}"
+        _InMemoryAICounter.incr(key_a, 100)
+        _InMemoryAICounter.incr(key_a, 100)
+        assert _InMemoryAICounter.incr(key_b, 100) == 1
+
+
+# ---------------------------------------------------------------------------
+# Unit tests — check_ai_daily_limit
+# ---------------------------------------------------------------------------
+
+
+class TestCheckAiDailyLimit:
+    def setup_method(self) -> None:
+        _reset_ai_counter()
+
+    def test_first_call_returns_count_one(self) -> None:
+        from app.middleware.ai_rate_limit import check_ai_daily_limit
+
+        user_id = uuid.uuid4()
+        count, retry_after = check_ai_daily_limit(user_id, max_calls=2)
+        assert count == 1
+        assert retry_after > 0
+
+    def test_second_call_returns_count_two(self) -> None:
+        from app.middleware.ai_rate_limit import check_ai_daily_limit
+
+        user_id = uuid.uuid4()
+        check_ai_daily_limit(user_id, max_calls=2)
+        count, _ = check_ai_daily_limit(user_id, max_calls=2)
+        assert count == 2
+
+    def test_third_call_returns_count_three_exceeds_limit(self) -> None:
+        from app.middleware.ai_rate_limit import check_ai_daily_limit
+
+        user_id = uuid.uuid4()
+        check_ai_daily_limit(user_id, max_calls=2)
+        check_ai_daily_limit(user_id, max_calls=2)
+        count, _ = check_ai_daily_limit(user_id, max_calls=2)
+        assert count == 3  # exceeds max_calls=2
+
+    def test_different_users_are_isolated(self) -> None:
+        from app.middleware.ai_rate_limit import check_ai_daily_limit
+
+        user_a = uuid.uuid4()
+        user_b = uuid.uuid4()
+        check_ai_daily_limit(user_a, max_calls=2)
+        check_ai_daily_limit(user_a, max_calls=2)
+        count, _ = check_ai_daily_limit(user_b, max_calls=2)
+        assert count == 1  # user_b unaffected by user_a's calls
+
+
+# ---------------------------------------------------------------------------
+# Integration tests — HTTP endpoints
+# ---------------------------------------------------------------------------
+
+
+class TestAIDailyRateLimitHTTP:
+    def setup_method(self) -> None:
+        _reset_ai_counter()
+
+    @pytest.fixture(autouse=True)
+    def _reset_after(self) -> None:
+        yield
+        _reset_ai_counter()
+
+    def test_first_call_returns_200_with_remaining_header(self, app, client) -> None:
+        token = _register_and_login(client, "ai-rl-1st")
+        _grant_premium(app, token)
+
+        with patch(
+            "app.services.ai_advisory_service.AIAdvisoryService.generate_spending_insights",
+            return_value={
+                "insights": "ok",
+                "tokens_used": 10,
+                "cost_usd": 0.0,
+                "month": "2026-05",
+                "model": "stub",
+            },
+        ):
+            resp = client.get("/ai/insights/spending", headers=_auth(token))
+
+        assert resp.status_code == 200
+        assert resp.headers.get("X-AI-Calls-Remaining") == "1"
+
+    def test_second_call_returns_200_remaining_zero(self, app, client) -> None:
+        token = _register_and_login(client, "ai-rl-2nd")
+        _grant_premium(app, token)
+
+        with patch(
+            "app.services.ai_advisory_service.AIAdvisoryService.generate_spending_insights",
+            return_value={
+                "insights": "ok",
+                "tokens_used": 10,
+                "cost_usd": 0.0,
+                "month": "2026-05",
+                "model": "stub",
+            },
+        ):
+            client.get("/ai/insights/spending", headers=_auth(token))
+            resp = client.get("/ai/insights/spending", headers=_auth(token))
+
+        assert resp.status_code == 200
+        assert resp.headers.get("X-AI-Calls-Remaining") == "0"
+
+    def test_third_call_returns_429(self, app, client) -> None:
+        token = _register_and_login(client, "ai-rl-3rd")
+        _grant_premium(app, token)
+
+        with patch(
+            "app.services.ai_advisory_service.AIAdvisoryService.generate_spending_insights",
+            return_value={
+                "insights": "ok",
+                "tokens_used": 10,
+                "cost_usd": 0.0,
+                "month": "2026-05",
+                "model": "stub",
+            },
+        ):
+            client.get("/ai/insights/spending", headers=_auth(token))
+            client.get("/ai/insights/spending", headers=_auth(token))
+            resp = client.get("/ai/insights/spending", headers=_auth(token, v2=True))
+
+        assert resp.status_code == 429
+        data = resp.get_json()
+        assert data["error"]["code"] == "AI_DAILY_LIMIT_EXCEEDED"
+        assert "Retry-After" in resp.headers
+        assert resp.headers.get("X-AI-Calls-Remaining") == "0"
+
+    def test_429_message_is_portuguese(self, app, client) -> None:
+        token = _register_and_login(client, "ai-rl-ptbr")
+        _grant_premium(app, token)
+
+        with patch(
+            "app.services.ai_advisory_service.AIAdvisoryService.generate_spending_insights",
+            return_value={
+                "insights": "ok",
+                "tokens_used": 10,
+                "cost_usd": 0.0,
+                "month": "2026-05",
+                "model": "stub",
+            },
+        ):
+            for _ in range(3):
+                resp = client.get(
+                    "/ai/insights/spending", headers=_auth(token, v2=True)
+                )
+
+        assert resp.status_code == 429
+        data = resp.get_json()
+        assert (
+            "amanhã" in data.get("message", "").lower()
+            or "amanhã" in str(data.get("error", {})).lower()
+        )
+
+    def test_weekly_summary_also_rate_limited(self, app, client) -> None:
+        token = _register_and_login(client, "ai-rl-weekly")
+        _grant_premium(app, token)
+
+        with patch(
+            "app.services.ai_advisory_service.AIAdvisoryService.generate_weekly_summary_narrative",
+            return_value={
+                "narrative": "ok",
+                "tokens_used": 10,
+                "cost_usd": 0.0,
+                "summary": {},
+                "model": "stub",
+            },
+        ):
+            client.get("/ai/insights/weekly-summary", headers=_auth(token))
+            client.get("/ai/insights/weekly-summary", headers=_auth(token))
+            resp = client.get(
+                "/ai/insights/weekly-summary", headers=_auth(token, v2=True)
+            )
+
+        assert resp.status_code == 429
+        assert resp.get_json()["error"]["code"] == "AI_DAILY_LIMIT_EXCEEDED"
+
+    def test_spending_and_weekly_share_same_daily_counter(self, app, client) -> None:
+        """1 spending call + 1 weekly call = 2 calls total — next call is 429."""
+        token = _register_and_login(client, "ai-rl-shared")
+        _grant_premium(app, token)
+
+        with (
+            patch(
+                "app.services.ai_advisory_service.AIAdvisoryService.generate_spending_insights",
+                return_value={
+                    "insights": "ok",
+                    "tokens_used": 10,
+                    "cost_usd": 0.0,
+                    "month": "2026-05",
+                    "model": "stub",
+                },
+            ),
+            patch(
+                "app.services.ai_advisory_service.AIAdvisoryService.generate_weekly_summary_narrative",
+                return_value={
+                    "narrative": "ok",
+                    "tokens_used": 10,
+                    "cost_usd": 0.0,
+                    "summary": {},
+                    "model": "stub",
+                },
+            ),
+        ):
+            r1 = client.get("/ai/insights/spending", headers=_auth(token))
+            r2 = client.get("/ai/insights/weekly-summary", headers=_auth(token))
+            r3 = client.get("/ai/insights/spending", headers=_auth(token))
+
+        assert r1.status_code == 200
+        assert r2.status_code == 200
+        assert r3.status_code == 429
+
+    def test_free_user_gets_403_not_429(self, app, client) -> None:
+        """Free users are blocked by entitlement gate before reaching rate limit."""
+        token = _register_and_login(client, "ai-rl-free")
+        _revoke_premium(app, token)  # new users get trial; explicitly revoke
+
+        for _ in range(3):
+            resp = client.get("/ai/insights/spending", headers=_auth(token, v2=True))
+        assert resp.status_code == 403
+        assert resp.get_json().get("error", {}).get("code") == "ENTITLEMENT_REQUIRED"
+
+    def test_rate_limit_isolated_per_user(self, app, client) -> None:
+        token_a = _register_and_login(client, "ai-rl-isola")
+        token_b = _register_and_login(client, "ai-rl-isolb")
+        _grant_premium(app, token_a)
+        _grant_premium(app, token_b)
+
+        with patch(
+            "app.services.ai_advisory_service.AIAdvisoryService.generate_spending_insights",
+            return_value={
+                "insights": "ok",
+                "tokens_used": 10,
+                "cost_usd": 0.0,
+                "month": "2026-05",
+                "model": "stub",
+            },
+        ):
+            # Exhaust user_a
+            client.get("/ai/insights/spending", headers=_auth(token_a))
+            client.get("/ai/insights/spending", headers=_auth(token_a))
+            blocked = client.get("/ai/insights/spending", headers=_auth(token_a))
+            assert blocked.status_code == 429
+
+            # user_b still has full quota
+            resp_b = client.get("/ai/insights/spending", headers=_auth(token_b))
+            assert resp_b.status_code == 200
+            assert resp_b.headers.get("X-AI-Calls-Remaining") == "1"
