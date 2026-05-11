@@ -29,6 +29,7 @@ from app.docs.openapi_helpers import (
     json_error_response,
     json_success_response,
 )
+from app.middleware.ai_rate_limit import ai_daily_limit
 from app.services.ai_advisory_service import AIAdvisoryService
 from app.services.analysis_ready_notification_service import (
     dispatch_analysis_ready_notification,
@@ -108,6 +109,7 @@ class AISpendingInsightsResource(MethodResource):
         },
     )
     @jwt_required()
+    @ai_daily_limit()
     def get(self) -> Response:
         token_error = _guard_revoked_token()
         if token_error is not None:
@@ -333,6 +335,7 @@ class AIWeeklySummaryResource(MethodResource):
         },
     )
     @jwt_required()
+    @ai_daily_limit()
     def get(self) -> Response:
         token_error = _guard_revoked_token()
         if token_error is not None:
