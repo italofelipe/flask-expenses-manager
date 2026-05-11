@@ -23,7 +23,7 @@ services:
       FLASK_DEBUG: "false"
       DOCS_EXPOSURE_POLICY: "${DOCS_EXPOSURE_POLICY:-disabled}"
       AUTO_CREATE_DB: "${AUTO_CREATE_DB:-false}"
-      MIGRATE_ON_START: "${MIGRATE_ON_START:-true}"
+      MIGRATE_ON_START: "${MIGRATE_ON_START:-false}"
       # DATABASE_URL in .env.prod points to RDS:
       # auraxis-prod.cav02gmeg759.us-east-1.rds.amazonaws.com:5432
       RATE_LIMIT_REDIS_URL: "${RATE_LIMIT_REDIS_URL:-redis://redis:6379/0}"
