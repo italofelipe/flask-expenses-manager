@@ -12,6 +12,7 @@ from flask_marshmallow import Marshmallow
 from flask_migrate import Migrate
 from sqlalchemy.pool import NullPool
 
+from app.cli.ai_insights_cli import register_ai_insights_commands
 from app.cli.features import features as features_cli_group
 from app.cli.openapi_export import openapi_export_command
 from app.cli.worker_cli import worker_cli_group
@@ -289,6 +290,7 @@ def create_app(*, enable_http_runtime: bool = True) -> Flask:
     register_integration_metrics_commands(app)
     register_billing_webhooks_commands(app)
     register_reminders_commands(app)
+    register_ai_insights_commands(app)
     register_email_dlq_commands(app)
     app.cli.add_command(features_cli_group, "features")
     app.cli.add_command(openapi_export_command)
