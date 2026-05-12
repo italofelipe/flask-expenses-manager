@@ -613,5 +613,13 @@
     "operation_type": "mutation",
     "source_module": "app.graphql.mutations.bank_statement",
     "summary": "Persiste as entradas selecionadas do extrato bancário como transações. Suporta modos 'selective' e 'replace_month'."
+  },
+  {
+    "access": "auth_required",
+    "domain": "ai_advisory",
+    "name": "aiInsightHistory",
+    "operation_type": "query",
+    "source_module": "app.graphql.queries.ai_insight",
+    "summary": "Retorna o histórico paginado de insights gerados por IA para o usuário autenticado, ordenado do mais recente ao mais antigo."
   }
 ]

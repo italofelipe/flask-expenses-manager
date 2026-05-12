@@ -3,6 +3,7 @@ from __future__ import annotations
 import graphene
 
 from .account import AccountQueryMixin
+from .ai_insight import AIInsightQueryMixin
 from .budget import BudgetQueryMixin
 from .dashboard import DashboardQueryMixin
 from .goal import GoalQueryMixin
@@ -29,6 +30,7 @@ class Query(
     NotificationQueryMixin,
     TagQueryMixin,
     AccountQueryMixin,
+    AIInsightQueryMixin,
     graphene.ObjectType,
 ):
     pass
@@ -48,4 +50,5 @@ __all__ = [
     "NotificationQueryMixin",
     "TagQueryMixin",
     "AccountQueryMixin",
+    "AIInsightQueryMixin",
 ]
