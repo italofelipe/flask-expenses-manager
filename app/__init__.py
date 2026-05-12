@@ -88,6 +88,7 @@ from app.models.fiscal import (  # noqa: F401
     ReceivableEntry,
 )
 from app.models.goal import Goal  # noqa: F401
+from app.models.goal_contribution import GoalContribution  # noqa: F401
 from app.models.investment_operation import InvestmentOperation  # noqa: F401
 from app.models.llm_audit_log import LLMAuditLog  # noqa: F401
 from app.models.refresh_token import RefreshToken  # noqa: F401
