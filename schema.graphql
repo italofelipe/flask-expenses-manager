@@ -1,4 +1,5 @@
 type Query {
+  aiInsightHistory(page: Int = 1, perPage: Int = 20): AIInsightHistoryResultType
   accounts: AccountListType
   account(accountId: UUID!): AccountType
   tags: TagListType
@@ -33,6 +34,26 @@ type Query {
   dashboardOverview(month: String!): TransactionDashboardPayloadType
   weeklySummary(period: String, startDate: String, endDate: String): WeeklySummaryPayloadType
   me: UserType
+}
+
+type AIInsightHistoryResultType {
+  items: [AIInsightType!]!
+  page: Int!
+  perPage: Int!
+  total: Int!
+}
+
+type AIInsightType {
+  id: ID!
+  content: String!
+  insightType: String!
+  periodLabel: String!
+  periodStart: String!
+  periodEnd: String!
+  model: String!
+  tokensUsed: Int!
+  costUsd: Float!
+  createdAt: String!
 }
 
 type AccountListType {

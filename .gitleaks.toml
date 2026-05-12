@@ -29,4 +29,13 @@ regexes = [
   '''TestPass\w*''',
   '''Password@\w*''',
   '''Senha@\w*''',
+  '''StrongPass@\w+''',
+]
+
+[[allowlists]]
+description = "HTTP status codes in comments/docstrings — not secrets"
+stopwords = [
+  "401-equivalent",
+  "HTTP 401",
+  "HTTP 403",
 ]

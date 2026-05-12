@@ -7,6 +7,7 @@ GraphQLOperationType = Literal["query", "mutation"]
 GraphQLOperationAccess = Literal["public", "auth_required"]
 GraphQLDomain = Literal[
     "accounts",
+    "ai_advisory",
     "auth",
     "billing",
     "dashboard",
@@ -20,6 +21,7 @@ GraphQLDomain = Literal[
     "wallet",
 ]
 
+QUERY_AI_INSIGHT_MODULE = "app.graphql.queries.ai_insight"
 QUERY_USER_MODULE = "app.graphql.queries.user"
 QUERY_DASHBOARD_MODULE = "app.graphql.queries.dashboard"
 QUERY_TRANSACTION_MODULE = "app.graphql.queries.transaction"
@@ -707,6 +709,18 @@ GRAPHQL_OPERATION_CATALOG: tuple[GraphQLOperationDoc, ...] = (
             "Suporta modos 'selective' e 'replace_month'."
         ),
         source_module=MUTATION_BANK_STATEMENT_MODULE,
+    ),
+    # AI Advisory (#1231)
+    GraphQLOperationDoc(
+        name="aiInsightHistory",
+        operation_type="query",
+        domain="ai_advisory",
+        access="auth_required",
+        summary=(
+            "Retorna o histórico paginado de insights gerados por IA para o usuário "
+            "autenticado, ordenado do mais recente ao mais antigo."
+        ),
+        source_module=QUERY_AI_INSIGHT_MODULE,
     ),
 )
 
