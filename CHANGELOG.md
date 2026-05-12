@@ -1,5 +1,25 @@
 # Changelog
 
+## [1.37.0](https://github.com/italofelipe/auraxis-api/compare/v1.36.0...v1.37.0) (2026-05-12)
+
+
+### Features
+
+* **ai:** AIInsight model + migration ai2 ([#1227](https://github.com/italofelipe/auraxis-api/issues/1227)) ([#1229](https://github.com/italofelipe/auraxis-api/issues/1229)) ([37ab0c3](https://github.com/italofelipe/auraxis-api/commit/37ab0c3e92ca2c46c4814177dfc40a2292c31232))
+* **ai:** apply daily rate limit decorator to /ai/insights/* endpoints ([dfca463](https://github.com/italofelipe/auraxis-api/commit/dfca463682fe022d7c08b9d46933fe8e269b1d36))
+* **ai:** daily rate limit para insights manuais — 2x/dia por usuário Premium ([#1214](https://github.com/italofelipe/auraxis-api/issues/1214)) ([8e55508](https://github.com/italofelipe/auraxis-api/commit/8e55508fa17e406193bad702ff906cf0269887dd))
+* **ai:** Flask CLI commands for weekly and monthly AI insights batch jobs ([934da99](https://github.com/italofelipe/auraxis-api/commit/934da9976c03dfb8a9b1ac1622a7d98d43da2e32))
+* **ai:** jobs semanal e mensal de insights — CLI + SSM + workflows ([#1215](https://github.com/italofelipe/auraxis-api/issues/1215), [#1216](https://github.com/italofelipe/auraxis-api/issues/1216)) ([830691b](https://github.com/italofelipe/auraxis-api/commit/830691bf8528d77326099007ecfcb8a0fc669cde))
+* **ai:** per-user daily rate limit middleware for AI insights endpoints ([356f6a8](https://github.com/italofelipe/auraxis-api/commit/356f6a8c875ab90174ebd320f132137da98a680c))
+* **ai:** persistência de insights + context injection + recap + GET history ([#1228](https://github.com/italofelipe/auraxis-api/issues/1228)) ([#1230](https://github.com/italofelipe/auraxis-api/issues/1230)) ([c3bc94a](https://github.com/italofelipe/auraxis-api/commit/c3bc94a77f63e4e6b6d246c6ebeda8e8836c19a9))
+* **ai:** SSM script, GH Actions workflows, tests for weekly+monthly batch jobs ([7e1914a](https://github.com/italofelipe/auraxis-api/commit/7e1914adac030f2697ea567983547a4339c43477))
+* **graphql:** AIInsightType + aiInsightHistory query — GraphQL parity ([#1233](https://github.com/italofelipe/auraxis-api/issues/1233)) ([26a2de6](https://github.com/italofelipe/auraxis-api/commit/26a2de6ab82ff977576d4f7edd3152a40d7d20b5)), closes [#1231](https://github.com/italofelipe/auraxis-api/issues/1231)
+
+
+### Bug Fixes
+
+* **infra:** default MIGRATE_ON_START to false in prod ([#1225](https://github.com/italofelipe/auraxis-api/issues/1225)) ([b1a9912](https://github.com/italofelipe/auraxis-api/commit/b1a9912d701162f6ec8d902e0801db963d0a5f79))
+
 ## [1.36.0](https://github.com/italofelipe/auraxis-api/compare/v1.35.2...v1.36.0) (2026-05-10)
 
 
