@@ -406,8 +406,121 @@ def _notify_analysis_ready(*, user_id: UUID, narrative: str) -> None:
         log.warning("ai.weekly_summary.notify_failed user_id=%s error=%s", user_id, exc)
 
 
+class AIInsightHistoryResource(MethodResource):
+    """GET /ai/insights/history — paginated AI insight history."""
+
+    @doc(
+        summary="Histórico de insights de IA",
+        description=(
+            "Retorna a lista paginada de insights gerados por IA para o usuário "  # noqa: E501
+            "autenticado, ordenada do mais recente para o mais antigo. "
+            "Acessível sem entitlement premium."
+        ),
+        tags=["AI Advisory"],
+        security=[{"BearerAuth": []}],
+        params={
+            "page": {
+                "in": "query",
+                "type": "integer",
+                "required": False,
+                "description": "Número da página (base 1). Padrão: 1.",
+                "example": 1,
+            },
+            "per_page": {
+                "in": "query",
+                "type": "integer",
+                "required": False,
+                "description": "Itens por página (máx. 50). Padrão: 20.",
+                "example": 20,
+            },
+        },
+        responses={
+            200: json_success_response(
+                description="Lista de insights",
+                message="Histórico de insights carregado",
+                data_example={
+                    "items": [
+                        {
+                            "id": "uuid",
+                            "content": "3 insights...",
+                            "insight_type": "daily",
+                            "period_label": "2026-05-11",
+                            "period_start": "2026-05-11",
+                            "period_end": "2026-05-11",
+                            "model": "gpt-4o-mini",
+                            "tokens_used": 320,
+                            "cost_usd": 0.000048,
+                            "created_at": "2026-05-11T19:00:00",
+                        }
+                    ],
+                    "page": 1,
+                    "per_page": 20,
+                    "total": 1,
+                },
+            ),
+            401: json_error_response(
+                description="Não autenticado",
+                message="Token inválido",
+                error_code="UNAUTHORIZED",
+                status_code=401,
+            ),
+        },
+    )
+    @jwt_required()
+    def get(self) -> Response:
+        from app.extensions.database import db
+        from app.models.ai_insight import AIInsight
+
+        token_error = _guard_revoked_token()
+        if token_error is not None:
+            return token_error
+
+        user_id = current_user_id()
+
+        try:
+            page = max(1, int(request.args.get("page", 1)))
+            per_page = min(50, max(1, int(request.args.get("per_page", 20))))
+        except (ValueError, TypeError):
+            page, per_page = 1, 20
+
+        total = db.session.query(AIInsight).filter_by(user_id=user_id).count()
+        rows = (
+            db.session.query(AIInsight)
+            .filter_by(user_id=user_id)
+            .order_by(AIInsight.created_at.desc())
+            .offset((page - 1) * per_page)
+            .limit(per_page)
+            .all()
+        )
+
+        items = [
+            {
+                "id": str(r.id),
+                "content": r.content,
+                "insight_type": r.insight_type.value,
+                "period_label": r.period_label,
+                "period_start": r.period_start.isoformat() if r.period_start else None,
+                "period_end": r.period_end.isoformat() if r.period_end else None,
+                "model": r.model,
+                "tokens_used": r.tokens_used,
+                "cost_usd": float(r.cost_usd),
+                "created_at": r.created_at.isoformat() if r.created_at else None,
+            }
+            for r in rows
+        ]
+
+        payload = {"items": items, "page": page, "per_page": per_page, "total": total}
+        return compat_success_response(
+            legacy_payload=payload,
+            status_code=200,
+            message="Histórico de insights carregado",
+            data=payload,
+        )
+
+
 __all__ = [
     "AIGoalProjectionResource",
+    "AIInsightHistoryResource",
     "AISpendingInsightsResource",
     "AIWeeklySummaryResource",
 ]

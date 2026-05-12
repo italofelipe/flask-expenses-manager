@@ -26,6 +26,7 @@ from uuid import UUID
 from sqlalchemy import case, func
 
 from app.extensions.database import db
+from app.models.ai_insight import AIInsight, InsightType
 from app.models.goal import Goal
 from app.models.llm_audit_log import LLMAuditLog
 from app.models.transaction import Transaction, TransactionStatus, TransactionType
@@ -34,6 +35,72 @@ from app.services.llm_provider import LLMProvider, LLMProviderError, get_llm_pro
 from app.services.weekly_summary import compute_weekly_summary
 
 log = logging.getLogger(__name__)
+
+
+# ---------------------------------------------------------------------------
+# AIInsight persistence helpers
+# ---------------------------------------------------------------------------
+
+
+def _get_cached_insight(
+    *,
+    user_id: UUID,
+    insight_type: InsightType,
+    period_label: str,
+) -> AIInsight | None:
+    """Return an existing AIInsight for this user/type/period, or None."""
+    return (
+        db.session.query(AIInsight)
+        .filter_by(
+            user_id=user_id,
+            insight_type=insight_type,
+            period_label=period_label,
+        )
+        .first()
+    )
+
+
+def _get_latest_insight(*, user_id: UUID) -> AIInsight | None:
+    """Return the most recently created AIInsight for this user, or None."""
+    return (
+        db.session.query(AIInsight)
+        .filter_by(user_id=user_id)
+        .order_by(AIInsight.created_at.desc())
+        .first()
+    )
+
+
+def _save_insight(
+    *,
+    user_id: UUID,
+    content: str,
+    insight_type: InsightType,
+    period_label: str,
+    period_start: date,
+    period_end: date,
+    model: str,
+    tokens_used: int,
+    cost_usd: float,
+    previous_insight_id: UUID | None,
+) -> AIInsight:
+    """Persist a new AIInsight record and return it."""
+    from decimal import Decimal as _Decimal
+
+    insight = AIInsight(
+        user_id=user_id,
+        content=content,
+        insight_type=insight_type,
+        period_label=period_label,
+        period_start=period_start,
+        period_end=period_end,
+        model=model,
+        tokens_used=tokens_used,
+        cost_usd=_Decimal(str(cost_usd)),
+        previous_insight_id=previous_insight_id,
+    )
+    db.session.add(insight)
+    db.session.commit()
+    return insight
 
 
 # ---------------------------------------------------------------------------
@@ -109,12 +176,18 @@ class AIAdvisoryService:
     def generate_spending_insights(self, month: str | None = None) -> dict[str, Any]:
         """Analyse spending for the given month and return AI-generated insights.
 
+        Idempotent: if an insight for today already exists, returns it without
+        calling the LLM. On the last calendar day of the month, generates a
+        comprehensive recap (InsightType.recap) instead of a daily insight.
+        The previous insight is injected into the prompt so the LLM can track
+        what changed since the last generation.
+
         Args:
             month: "YYYY-MM" string. Defaults to the current calendar month.
 
         Returns:
             {"insights": str, "tokens_used": int, "cost_usd": float,
-             "month": "YYYY-MM", "model": str}
+             "month": "YYYY-MM", "model": str, "cached": bool}
         """
         today = date.today()
         if month:
@@ -125,8 +198,39 @@ class AIAdvisoryService:
         start = date(year, mon, 1)
         end = date(year, mon, monthrange(year, mon)[1])
 
+        is_recap = today == end
+        insight_type = InsightType.recap if is_recap else InsightType.daily
+        period_label = (
+            f"{year}-{mon:02d}-recap" if is_recap else today.strftime("%Y-%m-%d")
+        )
+
+        # Idempotency: return cached insight if already generated today
+        cached = _get_cached_insight(
+            user_id=self._user_id,
+            insight_type=insight_type,
+            period_label=period_label,
+        )
+        if cached is not None:
+            return {
+                "insights": cached.content,
+                "tokens_used": cached.tokens_used,
+                "cost_usd": float(cached.cost_usd),
+                "month": f"{year}-{mon:02d}",
+                "model": cached.model,
+                "cached": True,
+            }
+
+        # Context: fetch most recent previous insight for this user
+        previous = _get_latest_insight(user_id=self._user_id)
+        previous_content = previous.content if previous else None
+
         snapshot = self._build_spending_snapshot(start=start, end=end)
-        prompt = _build_spending_prompt(snapshot, month_label=f"{year}-{mon:02d}")
+        prompt = _build_spending_prompt(
+            snapshot,
+            month_label=f"{year}-{mon:02d}",
+            previous_insight=previous_content,
+            is_recap=is_recap,
+        )
 
         try:
             llm_resp = self._provider.generate_with_usage(prompt)
@@ -145,12 +249,26 @@ class AIAdvisoryService:
             llm_response=llm_resp,
         )
 
+        _save_insight(
+            user_id=self._user_id,
+            content=llm_resp.content,
+            insight_type=insight_type,
+            period_label=period_label,
+            period_start=start,
+            period_end=end,
+            model=llm_resp.model,
+            tokens_used=llm_resp.total_tokens,
+            cost_usd=llm_resp.estimated_cost_usd,
+            previous_insight_id=previous.id if previous else None,
+        )
+
         return {
             "insights": llm_resp.content,
             "tokens_used": llm_resp.total_tokens,
             "cost_usd": llm_resp.estimated_cost_usd,
             "month": f"{year}-{mon:02d}",
             "model": llm_resp.model,
+            "cached": False,
         }
 
     def _build_spending_snapshot(self, *, start: date, end: date) -> dict[str, Any]:
@@ -365,15 +483,45 @@ class AIAdvisoryService:
 # ---------------------------------------------------------------------------
 
 
-def _build_spending_prompt(snapshot: dict[str, Any], month_label: str) -> str:
+def _build_spending_prompt(
+    snapshot: dict[str, Any],
+    month_label: str,
+    *,
+    previous_insight: str | None = None,
+    is_recap: bool = False,
+) -> str:
     context = json.dumps(snapshot, ensure_ascii=False, default=str)
+
+    previous_block = ""
+    if previous_insight:
+        previous_block = (
+            f"\nInsight do dia anterior (use para identificar o que mudou):\n"
+            f"{previous_insight}\n"
+        )
+
+    if is_recap:
+        return (
+            f"Você é um consultor financeiro pessoal. Hoje é o último dia de {month_label}. "  # noqa: E501
+            "Faça uma análise completa: identifique padrões, conquistas e pontos de melhoria. "  # noqa: E501
+            "Gere um recap em português brasileiro com: "
+            "1) Resumo executivo do mês, "
+            "2) Top 3 gastos do período, "
+            "3) Comparação com o comportamento esperado, "
+            "4) 3 direcionamentos práticos para o próximo mês.\n"
+            f"{previous_block}"
+            f"\nDados financeiros de {month_label}:\n{context}\n\n"
+            "Retorne um JSON array no formato:\n"
+            '[{"type": "...", "title": "...", "message": "..."}]'
+        )
+
     return (
         f"Você é um consultor financeiro pessoal. Analise os dados de gastos de {month_label} "  # noqa: E501
         "abaixo e gere 3 insights práticos e personalizados em português brasileiro. "
         "Para cada insight, identifique o tipo (gasto_elevado, oportunidade_economia, "
         "saude_financeira, alerta_orcamento, padrao_gasto), um título curto e "
-        "uma recomendação específica e acionável.\n\n"
-        f"Dados financeiros do período:\n{context}\n\n"
+        "uma recomendação específica e acionável.\n"
+        f"{previous_block}"
+        f"\nDados financeiros do período:\n{context}\n\n"
         "Retorne um JSON array no formato:\n"
         '[{"type": "...", "title": "...", "message": "..."}]'
     )
