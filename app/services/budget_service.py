@@ -119,7 +119,15 @@ class BudgetService:
             Transaction.deleted.is_(False),
         )
 
-        if budget.tag_id is not None:
+        if budget.category is not None:
+            # Filter by structured category field (preferred over tag_id)
+            from app.models.transaction import TransactionCategory
+
+            query = query.filter(
+                Transaction.category == TransactionCategory(budget.category)
+            )
+        elif budget.tag_id is not None:
+            # Legacy: fall back to tag_id filtering for budgets not yet migrated
             query = query.filter(Transaction.tag_id == budget.tag_id)
 
         if budget.period == "monthly":

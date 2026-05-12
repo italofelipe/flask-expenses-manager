@@ -13,6 +13,23 @@ class BudgetSchema(Schema):
 
     id = fields.UUID(dump_only=True)
     user_id = fields.UUID(dump_only=True)
+    category = fields.Str(
+        allow_none=True,
+        load_default=None,
+        validate=validate.OneOf(
+            [
+                "alimentacao",
+                "transporte",
+                "moradia",
+                "saude",
+                "lazer",
+                "educacao",
+                "investimentos",
+                "poupanca",
+                "outros",
+            ]
+        ),
+    )
     tag_id = fields.UUID(allow_none=True, load_default=None)
     name = fields.Str(required=True, validate=validate.Length(min=1, max=100))
     amount = fields.Decimal(

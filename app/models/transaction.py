@@ -16,6 +16,20 @@ class TransactionType(enum.Enum):
     EXPENSE = "expense"
 
 
+class TransactionCategory(enum.Enum):
+    """Structured category for budget tracking — separate from free-form tags."""
+
+    alimentacao = "alimentacao"
+    transporte = "transporte"
+    moradia = "moradia"
+    saude = "saude"
+    lazer = "lazer"
+    educacao = "educacao"
+    investimentos = "investimentos"
+    poupanca = "poupanca"
+    outros = "outros"
+
+
 class TransactionStatus(enum.Enum):
     PAID = "paid"
     PENDING = "pending"
@@ -45,6 +59,15 @@ class Transaction(db.Model):
     due_date = db.Column(db.Date, nullable=False)
     start_date = db.Column(db.Date, nullable=True)
     end_date = db.Column(db.Date, nullable=True)
+    category = db.Column(
+        db.Enum(
+            TransactionCategory,
+            name="transaction_category_enum",
+            native_enum=False,
+            values_callable=lambda e: [m.value for m in e],
+        ),
+        nullable=True,
+    )
     tag_id = db.Column(UUID(as_uuid=True), db.ForeignKey("tags.id"), nullable=True)
     account_id = db.Column(
         UUID(as_uuid=True), db.ForeignKey("accounts.id"), nullable=True

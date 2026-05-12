@@ -14,7 +14,12 @@ from sqlalchemy import case, func
 
 from app.application.services.transaction.validators import _validation_error
 from app.models.credit_card import CreditCard
-from app.models.transaction import Transaction, TransactionStatus, TransactionType
+from app.models.transaction import (
+    Transaction,
+    TransactionCategory,
+    TransactionStatus,
+    TransactionType,
+)
 from app.services.transaction_analytics_service import TransactionAnalyticsService
 from app.services.transaction_serialization import (
     TransactionPayload,
@@ -40,6 +45,7 @@ _MUTABLE_TRANSACTION_FIELDS = frozenset(
         "due_date",
         "start_date",
         "end_date",
+        "category",
         "tag_id",
         "account_id",
         "credit_card_id",
@@ -118,6 +124,13 @@ def _apply_transaction_updates(
             continue
         if field == "status" and value is not None:
             setattr(transaction, field, TransactionStatus(str(value).lower()))
+            continue
+        if field == "category":
+            setattr(
+                transaction,
+                field,
+                TransactionCategory(str(value).lower()) if value else None,
+            )
             continue
         setattr(transaction, field, value)
 

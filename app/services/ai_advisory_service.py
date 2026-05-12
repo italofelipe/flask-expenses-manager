@@ -238,6 +238,32 @@ class AIAdvisoryService:
             total_expense_brl=snapshot["total_expense"],
         )
 
+        monthly_budget_by_category: list[dict[str, Any]] = []
+        monthly_goals_evolution: list[dict[str, Any]] = []
+        savings_rate_ctx: dict[str, Any] | None = None
+
+        if is_recap:
+            monthly_budget_by_category = _build_monthly_budget_by_category(
+                user_id=self._user_id,
+                period_start=start,
+                period_end=end,
+            )
+            monthly_goals_evolution = _build_monthly_goals_evolution(
+                user_id=self._user_id,
+                period_start=start,
+                period_end=end,
+            )
+            # Pull user monthly_income for savings rate benchmark
+            from app.models.user import User
+
+            user_row = db.session.query(User).filter_by(id=self._user_id).first()
+            monthly_income = float(user_row.monthly_income or 0) if user_row else 0.0
+            savings_rate_ctx = _build_savings_rate_context(
+                monthly_income=monthly_income,
+                total_income=snapshot["total_income"],
+                balance=snapshot["balance"],
+            )
+
         prompt = _build_spending_prompt(
             snapshot,
             month_label=f"{year}-{mon:02d}",
@@ -245,6 +271,9 @@ class AIAdvisoryService:
             is_recap=is_recap,
             goals=goals_ctx,
             budget=budget_ctx,
+            monthly_budget_by_category=monthly_budget_by_category,
+            monthly_goals_evolution=monthly_goals_evolution,
+            savings_rate_ctx=savings_rate_ctx,
         )
 
         try:
@@ -464,8 +493,26 @@ class AIAdvisoryService:
         Raises:
             LLMProviderError: On provider failure.
         """
+        today = date.today()
+        week_start = today - relativedelta(days=today.weekday())
+        week_end = week_start + relativedelta(days=6)
+
         summary = compute_weekly_summary(user_id=self._user_id)
-        prompt = _build_weekly_summary_prompt(summary)
+        top_categories = _build_weekly_top_categories(
+            user_id=self._user_id, week_start=week_start, week_end=week_end
+        )
+        budget_snapshot = _build_weekly_budget_snapshot(
+            user_id=self._user_id, week_start=week_start, week_end=week_end
+        )
+        goals_snapshot = _build_weekly_goals_snapshot(
+            user_id=self._user_id, week_start=week_start, week_end=week_end
+        )
+        prompt = _build_weekly_summary_prompt(
+            summary,
+            top_categories=top_categories,
+            budget_snapshot=budget_snapshot,
+            goals_snapshot=goals_snapshot,
+        )
 
         try:
             llm_resp = self._provider.generate_with_usage(prompt)
@@ -624,6 +671,320 @@ def _build_overall_budget_snapshot(
 
 
 # ---------------------------------------------------------------------------
+# Weekly-specific helpers
+# ---------------------------------------------------------------------------
+
+
+def _build_weekly_top_categories(
+    *,
+    user_id: UUID,
+    week_start: date,
+    week_end: date,
+    top_n: int = 3,
+) -> list[dict[str, Any]]:
+    """Return top N expense categories by spend in the given week.
+
+    Only transactions with category IS NOT NULL are counted.
+    """
+
+    rows = (
+        db.session.query(
+            Transaction.category.label("category"),
+            func.sum(Transaction.amount).label("total"),
+        )
+        .filter(
+            Transaction.user_id == user_id,
+            Transaction.type == TransactionType.EXPENSE,
+            Transaction.status == TransactionStatus.PAID,
+            Transaction.deleted.is_(False),
+            Transaction.category.isnot(None),
+            Transaction.due_date >= week_start,
+            Transaction.due_date <= week_end,
+        )
+        .group_by(Transaction.category)
+        .order_by(func.sum(Transaction.amount).desc())
+        .limit(top_n)
+        .all()
+    )
+
+    total_spent = sum(float(r.total or 0) for r in rows) or 1.0
+    return [
+        {
+            "category": r.category.value
+            if hasattr(r.category, "value")
+            else str(r.category),
+            "total": round(float(r.total or 0), 2),
+            "pct_of_total": round(float(r.total or 0) / total_spent * 100, 1),
+        }
+        for r in rows
+    ]
+
+
+def _build_weekly_budget_snapshot(
+    *,
+    user_id: UUID,
+    week_start: date,
+    week_end: date,
+) -> list[dict[str, Any]]:
+    """Return pro-rata utilization per active category budget for the current week."""
+    from calendar import monthrange
+
+    budgets = (
+        db.session.query(Budget)
+        .filter(
+            Budget.user_id == user_id,
+            Budget.is_active.is_(True),
+            Budget.category.isnot(None),
+            Budget.period == "monthly",
+        )
+        .all()
+    )
+    if not budgets:
+        return []
+
+    today = date.today()
+    days_in_month = monthrange(today.year, today.month)[1]
+    # Days elapsed in month up to end of week (capped at month end)
+    days_elapsed = min(
+        (week_end - date(today.year, today.month, 1)).days + 1, days_in_month
+    )
+
+    result: list[dict[str, Any]] = []
+    for budget in budgets:
+        budget_amount = float(budget.amount)
+        prorated_limit = round(budget_amount * days_elapsed / days_in_month, 2)
+
+        # Spending for this category this week
+        spent_row = db.session.query(
+            func.coalesce(func.sum(Transaction.amount), 0)
+        ).filter(
+            Transaction.user_id == user_id,
+            Transaction.type == TransactionType.EXPENSE,
+            Transaction.status == TransactionStatus.PAID,
+            Transaction.deleted.is_(False),
+            Transaction.due_date >= week_start,
+            Transaction.due_date <= week_end,
+        )
+        from app.models.transaction import TransactionCategory
+
+        try:
+            cat_enum = TransactionCategory(budget.category)
+            spent_row = spent_row.filter(Transaction.category == cat_enum)
+        except ValueError:
+            continue
+
+        weekly_spent = round(float(spent_row.scalar() or 0), 2)
+
+        if weekly_spent > prorated_limit:
+            pace = "exceeded"
+        elif prorated_limit > 0 and weekly_spent / prorated_limit >= 0.8:
+            pace = "alert"
+        else:
+            pace = "ok"
+
+        result.append(
+            {
+                "category": budget.category,
+                "monthly_budget": budget_amount,
+                "weekly_spent": weekly_spent,
+                "prorated_limit": prorated_limit,
+                "pace_status": pace,
+            }
+        )
+
+    return result
+
+
+def _build_weekly_goals_snapshot(
+    *,
+    user_id: UUID,
+    week_start: date,
+    week_end: date,
+) -> list[dict[str, Any]]:
+    """Return active goals with their contribution amount this week."""
+    goals = (
+        db.session.query(Goal)
+        .filter_by(user_id=user_id, status="active")
+        .order_by(Goal.priority, Goal.created_at)
+        .all()
+    )
+    if not goals:
+        return []
+
+    # Batch-fetch weekly contributions
+    from datetime import datetime
+
+    week_start_dt = datetime(week_start.year, week_start.month, week_start.day)
+    week_end_dt = datetime(week_end.year, week_end.month, week_end.day, 23, 59, 59)
+    contrib_rows = (
+        db.session.query(
+            GoalContribution.goal_id,
+            func.sum(GoalContribution.amount).label("total"),
+        )
+        .filter(
+            GoalContribution.user_id == user_id,
+            GoalContribution.created_at >= week_start_dt,
+            GoalContribution.created_at <= week_end_dt,
+        )
+        .group_by(GoalContribution.goal_id)
+        .all()
+    )
+    weekly_by_goal = {str(r.goal_id): float(r.total or 0) for r in contrib_rows}
+
+    return [
+        {
+            "title": goal.title,
+            "progress_pct": round(
+                float(goal.current_amount or 0) / float(goal.target_amount) * 100, 1
+            )
+            if goal.target_amount
+            else 0.0,
+            "weekly_contribution": weekly_by_goal.get(str(goal.id), 0.0),
+        }
+        for goal in goals
+    ]
+
+
+# ---------------------------------------------------------------------------
+# Recap-specific helpers
+# ---------------------------------------------------------------------------
+
+
+def _build_monthly_goals_evolution(
+    *,
+    user_id: UUID,
+    period_start: date,
+    period_end: date,
+) -> list[dict[str, Any]]:
+    """Return active goals with total contributions made during the period."""
+    from datetime import datetime
+
+    goals = (
+        db.session.query(Goal)
+        .filter_by(user_id=user_id, status="active")
+        .order_by(Goal.priority, Goal.created_at)
+        .all()
+    )
+    if not goals:
+        return []
+
+    start_dt = datetime(period_start.year, period_start.month, period_start.day)
+    end_dt = datetime(period_end.year, period_end.month, period_end.day, 23, 59, 59)
+
+    contrib_rows = (
+        db.session.query(
+            GoalContribution.goal_id,
+            func.sum(GoalContribution.amount).label("total"),
+        )
+        .filter(
+            GoalContribution.user_id == user_id,
+            GoalContribution.created_at >= start_dt,
+            GoalContribution.created_at <= end_dt,
+        )
+        .group_by(GoalContribution.goal_id)
+        .all()
+    )
+    monthly_by_goal = {str(r.goal_id): float(r.total or 0) for r in contrib_rows}
+
+    return [
+        {
+            "title": goal.title,
+            "progress_pct": round(
+                float(goal.current_amount or 0) / float(goal.target_amount) * 100, 1
+            )
+            if goal.target_amount
+            else 0.0,
+            "monthly_contributions": monthly_by_goal.get(str(goal.id), 0.0),
+            "target_date": goal.target_date.isoformat() if goal.target_date else None,
+        }
+        for goal in goals
+    ]
+
+
+def _build_savings_rate_context(
+    *,
+    monthly_income: float,
+    total_income: float,
+    balance: float,
+) -> dict[str, Any] | None:
+    """Return savings rate vs 20% benchmark. Returns None if no income data."""
+    income = total_income or monthly_income
+    if income <= 0:
+        return None
+
+    actual_rate = round(balance / income * 100, 1)
+    benchmark = 20.0
+    gap = round(actual_rate - benchmark, 1)
+    return {
+        "actual_rate_pct": actual_rate,
+        "benchmark_pct": benchmark,
+        "gap_pct": gap,
+        "assessment": "above" if actual_rate >= benchmark else "below",
+    }
+
+
+def _build_monthly_budget_by_category(
+    *,
+    user_id: UUID,
+    period_start: date,
+    period_end: date,
+) -> list[dict[str, Any]]:
+    """Return budget utilization per category for the given period."""
+    budgets = (
+        db.session.query(Budget)
+        .filter(
+            Budget.user_id == user_id,
+            Budget.is_active.is_(True),
+            Budget.category.isnot(None),
+        )
+        .all()
+    )
+    if not budgets:
+        return []
+
+    from app.models.transaction import TransactionCategory
+
+    result: list[dict[str, Any]] = []
+    for budget in budgets:
+        try:
+            cat_enum = TransactionCategory(budget.category)
+        except ValueError:
+            continue
+
+        spent_val = (
+            db.session.query(func.coalesce(func.sum(Transaction.amount), 0))
+            .filter(
+                Transaction.user_id == user_id,
+                Transaction.type == TransactionType.EXPENSE,
+                Transaction.status == TransactionStatus.PAID,
+                Transaction.deleted.is_(False),
+                Transaction.category == cat_enum,
+                Transaction.due_date >= period_start,
+                Transaction.due_date <= period_end,
+            )
+            .scalar()
+        )
+
+        budget_amount = float(budget.amount)
+        spent = round(float(spent_val or 0), 2)
+        utilization = (
+            round(spent / budget_amount * 100, 1) if budget_amount > 0 else 0.0
+        )
+
+        result.append(
+            {
+                "category": budget.category,
+                "budget_amount": budget_amount,
+                "spent": spent,
+                "utilization_pct": utilization,
+                "exceeded": spent > budget_amount,
+            }
+        )
+
+    return result
+
+
+# ---------------------------------------------------------------------------
 # Prompt builders
 # ---------------------------------------------------------------------------
 
@@ -636,6 +997,9 @@ def _build_spending_prompt(
     is_recap: bool = False,
     goals: list[dict[str, Any]] | None = None,
     budget: dict[str, Any] | None = None,
+    monthly_budget_by_category: list[dict[str, Any]] | None = None,
+    monthly_goals_evolution: list[dict[str, Any]] | None = None,
+    savings_rate_ctx: dict[str, Any] | None = None,
 ) -> str:
     context = json.dumps(snapshot, ensure_ascii=False, default=str)
 
@@ -662,6 +1026,36 @@ def _build_spending_prompt(
         "orcamento_ultrapassado, planejamento_meta"
     )
 
+    # Extra recap sections
+    budget_by_cat_block = ""
+    if monthly_budget_by_category:
+        budget_by_cat_block = (
+            "\nUtilização de orçamentos por categoria no mês:\n"
+            + json.dumps(monthly_budget_by_category, ensure_ascii=False, default=str)
+            + "\n"
+        )
+
+    goals_ev_block = ""
+    if monthly_goals_evolution:
+        goals_ev_block = (
+            "\nEvolução de metas no mês (aportes realizados):\n"
+            + json.dumps(monthly_goals_evolution, ensure_ascii=False, default=str)
+            + "\n"
+        )
+
+    savings_rate_block = ""
+    if savings_rate_ctx:
+        savings_rate_block = (
+            "\nTaxa de poupança do mês vs benchmark (20%):\n"
+            + json.dumps(savings_rate_ctx, ensure_ascii=False, default=str)
+            + "\n"
+        )
+
+    recap_types = (
+        cross_domain_types
+        + ", saude_orcamento_mensal, conquista_meta, savings_rate_gap"
+    )
+
     if is_recap:
         return (
             f"Você é um consultor financeiro pessoal. Hoje é o último dia de {month_label}. "  # noqa: E501
@@ -669,16 +1063,20 @@ def _build_spending_prompt(
             "Gere um recap em português brasileiro com: "
             "1) Resumo executivo do mês, "
             "2) Top 3 gastos do período, "
-            "3) Comparação com o comportamento esperado, "
-            "4) 3 direcionamentos práticos para o próximo mês.\n"
+            "3) Saúde dos orçamentos por categoria, "
+            "4) Progresso nas metas, "
+            "5) Taxa de poupança vs meta, "
+            "6) 3 direcionamentos práticos para o próximo mês.\n"
             f"{previous_block}"
             f"\nDados financeiros de {month_label}:\n{context}\n"
             f"{goals_block}"
-            f"{budget_block}\n"
-            f"Tipos de insight disponíveis: {cross_domain_types}.\n"
-            "Se houver metas em risco ou orçamento próximo do limite, inclua insights "
-            "dos tipos alerta_meta, progresso_meta, "
-            "orcamento_ultrapassado ou planejamento_meta.\n\n"
+            f"{budget_block}"
+            f"{budget_by_cat_block}"
+            f"{goals_ev_block}"
+            f"{savings_rate_block}\n"
+            f"Tipos de insight disponíveis: {recap_types}.\n"
+            "Inclua insights dos tipos saude_orcamento_mensal, conquista_meta e "
+            "savings_rate_gap quando relevantes.\n\n"
             "Retorne um JSON array no formato:\n"
             '[{"type": "...", "title": "...", "message": "..."}]'
         )
@@ -723,7 +1121,13 @@ def _build_goal_projection_prompt(
     )
 
 
-def _build_weekly_summary_prompt(summary: Any) -> str:
+def _build_weekly_summary_prompt(
+    summary: Any,
+    *,
+    top_categories: list[dict[str, Any]] | None = None,
+    budget_snapshot: list[dict[str, Any]] | None = None,
+    goals_snapshot: list[dict[str, Any]] | None = None,
+) -> str:
     context = json.dumps(
         {
             "semana_atual": summary.get("current_week"),
@@ -733,13 +1137,43 @@ def _build_weekly_summary_prompt(summary: Any) -> str:
         ensure_ascii=False,
         default=str,
     )
+
+    top_cats_block = ""
+    if top_categories:
+        top_cats_block = (
+            "\nTop categorias desta semana:\n"
+            + json.dumps(top_categories, ensure_ascii=False, default=str)
+            + "\n"
+        )
+
+    budget_block = ""
+    if budget_snapshot:
+        budget_block = (
+            "\nRitmo de orçamentos por categoria (pro-rata semanal):\n"
+            + json.dumps(budget_snapshot, ensure_ascii=False, default=str)
+            + "\n"
+        )
+
+    goals_block = ""
+    if goals_snapshot:
+        goals_block = (
+            "\nAportes em metas esta semana:\n"
+            + json.dumps(goals_snapshot, ensure_ascii=False, default=str)
+            + "\n"
+        )
+
     return (
         "Você é um consultor financeiro pessoal. Analise o resumo financeiro semanal "
-        "abaixo e gere um briefing conciso em português brasileiro (máximo 150 palavras) que:\n"  # noqa: E501
+        "abaixo e gere um briefing conciso em português brasileiro (máximo 200 palavras) que:\n"  # noqa: E501
         "1. Destaque o desempenho desta semana vs. semana anterior\n"
         "2. Aponte o ponto mais crítico (gasto ou renda) que merece atenção\n"
-        "3. Termine com uma dica prática para a próxima semana\n\n"
-        f"Dados do resumo semanal:\n{context}\n\n"
+        "3. Comente sobre categorias de alto gasto e ritmo de orçamentos\n"
+        "4. Mencione aportes em metas se houver\n"
+        "5. Termine com uma dica prática para a próxima semana\n\n"
+        f"Dados do resumo semanal:\n{context}\n"
+        f"{top_cats_block}"
+        f"{budget_block}"
+        f"{goals_block}\n"
         "Retorne apenas o texto do briefing, sem JSON."
     )
 
