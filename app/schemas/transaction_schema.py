@@ -103,6 +103,24 @@ class TransactionSchema(Schema):
             "example": "2024-12-31",
         },
     )
+    category = fields.Str(
+        allow_none=True,
+        load_default=None,
+        validate=validate.OneOf(
+            [
+                "alimentacao",
+                "transporte",
+                "moradia",
+                "saude",
+                "lazer",
+                "educacao",
+                "investimentos",
+                "poupanca",
+                "outros",
+            ]
+        ),
+        metadata={"description": "Categoria estruturada para controle de orçamento"},
+    )
     tag_id = fields.UUID(
         allow_none=True,
         metadata={"description": "ID da tag associada à transação"},

@@ -19,7 +19,10 @@ class Budget(db.Model):
     user_id = db.Column(UUID(as_uuid=True), db.ForeignKey("users.id"), nullable=False)
     tag_id = db.Column(
         UUID(as_uuid=True), db.ForeignKey("tags.id"), nullable=True
-    )  # null = overall budget (no category)
+    )  # deprecated — use category instead
+    # Structured category for budget tracking. Null = overall budget (no category).
+    # Values mirror TransactionCategory enum values.
+    category = db.Column(db.String(20), nullable=True)
 
     name = db.Column(db.String(100), nullable=False)
     amount = db.Column(db.Numeric(12, 2), nullable=False)

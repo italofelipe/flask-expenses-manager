@@ -28,7 +28,12 @@ from app.application.services.transaction.validators import (
     normalize_transaction_status,
     normalize_transaction_type,
 )
-from app.models.transaction import Transaction, TransactionStatus, TransactionType
+from app.models.transaction import (
+    Transaction,
+    TransactionCategory,
+    TransactionStatus,
+    TransactionType,
+)
 from app.services.transaction_reference_authorization_service import (
     TransactionReferenceAuthorizationError,
     enforce_transaction_reference_ownership,
@@ -98,6 +103,8 @@ def build_transaction_kwargs(
     end_date: date | None,
 ) -> dict[str, Any]:
     """Map a pre-normalised payload to ``Transaction`` constructor kwargs."""
+    raw_category = normalized.get("category")
+    category = TransactionCategory(raw_category) if raw_category else None
     return {
         "user_id": user_id,
         "title": str(normalized.get("title", "")),
@@ -111,6 +118,7 @@ def build_transaction_kwargs(
         "is_recurring": bool(normalized.get("is_recurring", False)),
         "is_installment": bool(normalized.get("is_installment", False)),
         "installment_count": normalized.get("installment_count"),
+        "category": category,
         "tag_id": normalized.get("tag_id"),
         "account_id": normalized.get("account_id"),
         "credit_card_id": normalized.get("credit_card_id"),
@@ -135,6 +143,8 @@ def build_installment_transactions(
     group_id = uuid4()
     title = str(normalized.get("title", "")).strip()
     currency = normalize_currency(normalized.get("currency"))
+    raw_category = normalized.get("category")
+    category = TransactionCategory(raw_category) if raw_category else None
     return [
         Transaction(
             user_id=user_id,
@@ -149,6 +159,7 @@ def build_installment_transactions(
             is_recurring=bool(normalized.get("is_recurring", False)),
             is_installment=True,
             installment_count=count,
+            category=category,
             tag_id=normalized.get("tag_id"),
             account_id=normalized.get("account_id"),
             credit_card_id=normalized.get("credit_card_id"),

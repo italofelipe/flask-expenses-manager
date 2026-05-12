@@ -18,6 +18,7 @@ class TransactionPayload(TypedDict):
     is_recurring: bool
     is_installment: bool
     installment_count: int | None
+    category: str | None
     tag_id: str | None
     account_id: str | None
     credit_card_id: str | None
@@ -51,6 +52,11 @@ def serialize_transaction_payload(transaction: Transaction) -> TransactionPayloa
         "is_recurring": transaction.is_recurring,
         "is_installment": transaction.is_installment,
         "installment_count": transaction.installment_count,
+        "category": (
+            transaction.category.value
+            if getattr(transaction, "category", None)
+            else None
+        ),
         "tag_id": str(transaction.tag_id) if transaction.tag_id else None,
         "account_id": str(transaction.account_id) if transaction.account_id else None,
         "credit_card_id": (
