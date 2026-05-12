@@ -109,3 +109,78 @@ setting `GRAPHQL_ALLOW_INTROSPECTION=true` explicitly.
 
 Do **not** enable introspection in production — it exposes the full schema
 surface to potential attackers.
+
+## GraphQL Codegen pipeline (auraxis-web + auraxis-app)
+
+### Source of truth
+
+`schema.graphql` committed in this repo (`repos/auraxis-api/schema.graphql`) is the
+canonical SDL used by every consumer. It is auto-regenerated from the Python source
+via `scripts/export_graphql_docs.py --source runtime` and validated on every PR by
+the `graphql-breaking-change.yml` workflow.
+
+### How consumer types are generated
+
+Both `auraxis-web` and `auraxis-app` use `@graphql-codegen/cli` to generate
+TypeScript types from `schema.graphql`. Each consumer repo has a `codegen.ts` config
+at its root.
+
+| Consumer | Config file | Output |
+|----------|-------------|--------|
+| `auraxis-web` | `codegen.ts` | `app/shared/types/generated/graphql.ts` |
+| `auraxis-app` | `codegen.ts` | `shared/types/generated/graphql.ts` |
+
+Plugins used: `typescript` (schema types) + `typescript-operations` (operation types) +
+`typed-document-node` (typed DocumentNode objects, compatible with TanStack Query).
+
+### Full lifecycle: backend schema change → client types update
+
+1. **Modify Python GraphQL schema** in `app/graphql/` (queries, mutations, types).
+2. **Regenerate SDL** locally:
+   ```bash
+   python scripts/export_graphql_docs.py --source runtime
+   ```
+   This updates `schema.graphql`, `graphql.introspection.json`, and `graphql.operations.manifest.json`.
+3. **Commit the updated `schema.graphql`** in auraxis-api (required — CI fails otherwise).
+4. In each consumer repo, **regenerate client types**:
+   ```bash
+   # auraxis-web (requires schema available at ../auraxis-api/schema.graphql or GRAPHQL_SCHEMA_PATH)
+   pnpm codegen
+
+   # auraxis-app
+   npm run codegen
+   ```
+5. **Commit the updated `graphql.ts`** in the consumer repo.
+6. CI runs `codegen:check` in each consumer: regenerates types and fails if `git diff` shows changes.
+
+### CI enforcement
+
+Each consumer CI pipeline (`.github/workflows/ci.yml`) has a `graphql-codegen` job that:
+1. Fetches `schema.graphql` via `GRAPHQL_SCHEMA_PATH` (set to the raw GitHub URL of `master`).
+2. Runs `pnpm codegen:check` / `npm run codegen:check`.
+3. Fails if the regenerated types differ from what is committed.
+
+This means: **if you change the schema without updating the committed `graphql.ts` in consumers,
+the consumer CI will fail**.
+
+### Developer workflow (local)
+
+```bash
+# In auraxis-platform (monorepo layout), ../auraxis-api/schema.graphql is on the path.
+# Run from the consumer repo root:
+
+# auraxis-web
+cd repos/auraxis-web
+pnpm codegen        # regenerate types
+pnpm codegen:check  # regenerate + git diff (CI-equivalent)
+
+# auraxis-app
+cd repos/auraxis-app
+npm run codegen
+npm run codegen:check
+```
+
+To override the schema source (e.g. testing with a local non-committed schema):
+```bash
+GRAPHQL_SCHEMA_PATH=/path/to/schema.graphql pnpm codegen
+```
