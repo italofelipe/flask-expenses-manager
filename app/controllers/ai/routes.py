@@ -3,6 +3,7 @@ from __future__ import annotations
 from .blueprint import ai_bp
 from .resources import (
     AIGoalProjectionResource,
+    AIInsightHistoryResource,
     AISpendingInsightsResource,
     AIWeeklySummaryResource,
 )
@@ -28,6 +29,11 @@ def register_ai_routes() -> None:
     ai_bp.add_url_rule(
         "/insights/weekly-summary",
         view_func=AIWeeklySummaryResource.as_view("ai_weekly_summary"),
+        methods=["GET"],
+    )
+    ai_bp.add_url_rule(
+        "/insights/history",
+        view_func=AIInsightHistoryResource.as_view("ai_insight_history"),
         methods=["GET"],
     )
     _ROUTES_REGISTERED = True
