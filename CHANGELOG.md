@@ -1,5 +1,14 @@
 # Changelog
 
+## [1.38.0](https://github.com/italofelipe/auraxis-api/compare/v1.37.0...v1.38.0) (2026-05-12)
+
+
+### Features
+
+* **ai:** enriquecer daily insight com contexto de metas e orçamento geral ([#1235](https://github.com/italofelipe/auraxis-api/issues/1235)) ([#1238](https://github.com/italofelipe/auraxis-api/issues/1238)) ([4d8bbc6](https://github.com/italofelipe/auraxis-api/commit/4d8bbc676740fffc0136fbfba66d4ac66f437104))
+* **ai:** TransactionCategory + Budget category + weekly/recap cross-domain insights ([#1239](https://github.com/italofelipe/auraxis-api/issues/1239) [#1240](https://github.com/italofelipe/auraxis-api/issues/1240) [#1241](https://github.com/italofelipe/auraxis-api/issues/1241) [#1242](https://github.com/italofelipe/auraxis-api/issues/1242)) ([#1244](https://github.com/italofelipe/auraxis-api/issues/1244)) ([418dc05](https://github.com/italofelipe/auraxis-api/commit/418dc055a6a53be462e2fde2b6c1009018f591b2))
+* **goals:** GoalContribution tracking — registro automático de aportes em metas ([#1234](https://github.com/italofelipe/auraxis-api/issues/1234)) ([#1236](https://github.com/italofelipe/auraxis-api/issues/1236)) ([1bf6091](https://github.com/italofelipe/auraxis-api/commit/1bf6091b60fe202909082c55ff7c69983b029131))
+
 ## [1.37.0](https://github.com/italofelipe/auraxis-api/compare/v1.36.0...v1.37.0) (2026-05-12)
 
 
