@@ -23,11 +23,14 @@ from decimal import Decimal
 from typing import Any
 from uuid import UUID
 
+from dateutil.relativedelta import relativedelta
 from sqlalchemy import case, func
 
 from app.extensions.database import db
 from app.models.ai_insight import AIInsight, InsightType
+from app.models.budget import Budget
 from app.models.goal import Goal
+from app.models.goal_contribution import GoalContribution
 from app.models.llm_audit_log import LLMAuditLog
 from app.models.transaction import Transaction, TransactionStatus, TransactionType
 from app.services.goal_projection_service import GoalProjectionService
@@ -225,11 +228,23 @@ class AIAdvisoryService:
         previous_content = previous.content if previous else None
 
         snapshot = self._build_spending_snapshot(start=start, end=end)
+
+        goals_ctx = _build_goals_snapshot(
+            user_id=self._user_id,
+            monthly_savings_brl=snapshot["balance"],
+        )
+        budget_ctx = _build_overall_budget_snapshot(
+            user_id=self._user_id,
+            total_expense_brl=snapshot["total_expense"],
+        )
+
         prompt = _build_spending_prompt(
             snapshot,
             month_label=f"{year}-{mon:02d}",
             previous_insight=previous_content,
             is_recap=is_recap,
+            goals=goals_ctx,
+            budget=budget_ctx,
         )
 
         try:
@@ -479,6 +494,136 @@ class AIAdvisoryService:
 
 
 # ---------------------------------------------------------------------------
+# Cross-domain context helpers
+# ---------------------------------------------------------------------------
+
+_THIRTY_DAYS_AGO_DELTA = relativedelta(days=30)
+
+
+def _build_goals_snapshot(
+    *,
+    user_id: UUID,
+    monthly_savings_brl: float,
+) -> list[dict[str, Any]]:
+    """Return a snapshot of active goals with projection data and recent contributions.
+
+    Uses the current month's savings as a proxy for monthly_contribution,
+    distributed equally across all active goals (monthly_savings / num_goals).
+    """
+    goals = (
+        db.session.query(Goal)
+        .filter_by(user_id=user_id, status="active")
+        .order_by(Goal.priority, Goal.created_at)
+        .all()
+    )
+    if not goals:
+        return []
+
+    today = date.today()
+    cutoff = today - _THIRTY_DAYS_AGO_DELTA
+    monthly_contribution_proxy = Decimal(
+        str(max(monthly_savings_brl, 0.0) / max(len(goals), 1))
+    )
+
+    # Batch-fetch recent contributions for all goals of this user (single query)
+    recent_rows = (
+        db.session.query(
+            GoalContribution.goal_id,
+            func.sum(GoalContribution.amount).label("total"),
+        )
+        .filter(
+            GoalContribution.user_id == user_id,
+            GoalContribution.created_at >= cutoff,
+        )
+        .group_by(GoalContribution.goal_id)
+        .all()
+    )
+    recent_by_goal: dict[object, float] = {
+        str(r.goal_id): float(r.total) for r in recent_rows
+    }
+
+    projection_service = GoalProjectionService(
+        monthly_contribution=monthly_contribution_proxy
+    )
+
+    result: list[dict[str, Any]] = []
+    for goal in goals:
+        current = Decimal(str(goal.current_amount or 0))
+        target = Decimal(str(goal.target_amount or 0))
+        progress_pct = round(float(current / target * 100), 1) if target > 0 else 0.0
+
+        projection = projection_service.project(
+            goal_id=goal.id,
+            user_id=user_id,
+            current_amount=current,
+            target_amount=target,
+            target_date=goal.target_date,
+        )
+
+        days_remaining: int | None = None
+        if goal.target_date:
+            days_remaining = max((goal.target_date - today).days, 0)
+
+        serialized = projection_service.serialize(projection)
+        result.append(
+            {
+                "title": goal.title,
+                "progress_pct": progress_pct,
+                "current_amount": float(current),
+                "target_amount": float(target),
+                "target_date": goal.target_date.isoformat()
+                if goal.target_date
+                else None,
+                "days_remaining": days_remaining,
+                "recent_contributions_30d": recent_by_goal.get(str(goal.id), 0.0),
+                "on_track": serialized["on_track"],
+                "months_to_completion": serialized["months_to_completion"],
+                "suggested_monthly_contribution": serialized[
+                    "suggested_monthly_contribution"
+                ],
+            }
+        )
+
+    return result
+
+
+def _build_overall_budget_snapshot(
+    *,
+    user_id: UUID,
+    total_expense_brl: float,
+) -> dict[str, Any] | None:
+    """Return utilization of the overall monthly budget (tag_id IS NULL), or None.
+
+    Category budgets linked via tag_id are excluded intentionally — tags are labels,
+    not categories, so tag-based calculations risk misleading insights.
+    """
+    budget: Budget | None = (
+        db.session.query(Budget)
+        .filter(
+            Budget.user_id == user_id,
+            Budget.is_active.is_(True),
+            Budget.tag_id.is_(None),
+            Budget.period == "monthly",
+        )
+        .first()
+    )
+    if budget is None:
+        return None
+
+    budget_amount = float(budget.amount)
+    utilization_pct = (
+        round(total_expense_brl / budget_amount * 100, 1) if budget_amount > 0 else 0.0
+    )
+    return {
+        "name": budget.name,
+        "budget_amount": budget_amount,
+        "spent": round(total_expense_brl, 2),
+        "utilization_pct": utilization_pct,
+        "exceeded": total_expense_brl > budget_amount,
+    }
+
+
+# ---------------------------------------------------------------------------
 # Prompt builders
 # ---------------------------------------------------------------------------
 
@@ -489,6 +634,8 @@ def _build_spending_prompt(
     *,
     previous_insight: str | None = None,
     is_recap: bool = False,
+    goals: list[dict[str, Any]] | None = None,
+    budget: dict[str, Any] | None = None,
 ) -> str:
     context = json.dumps(snapshot, ensure_ascii=False, default=str)
 
@@ -498,6 +645,22 @@ def _build_spending_prompt(
             f"\nInsight do dia anterior (use para identificar o que mudou):\n"
             f"{previous_insight}\n"
         )
+
+    goals_block = ""
+    if goals:
+        goals_json = json.dumps(goals, ensure_ascii=False, default=str)
+        goals_block = f"\nMetas financeiras ativas do usuário:\n{goals_json}\n"
+
+    budget_block = ""
+    if budget:
+        budget_json = json.dumps(budget, ensure_ascii=False, default=str)
+        budget_block = f"\nOrçamento mensal geral configurado:\n{budget_json}\n"
+
+    cross_domain_types = (
+        "gasto_elevado, oportunidade_economia, saude_financeira, "
+        "alerta_orcamento, padrao_gasto, alerta_meta, progresso_meta, "
+        "orcamento_ultrapassado, planejamento_meta"
+    )
 
     if is_recap:
         return (
@@ -509,7 +672,13 @@ def _build_spending_prompt(
             "3) Comparação com o comportamento esperado, "
             "4) 3 direcionamentos práticos para o próximo mês.\n"
             f"{previous_block}"
-            f"\nDados financeiros de {month_label}:\n{context}\n\n"
+            f"\nDados financeiros de {month_label}:\n{context}\n"
+            f"{goals_block}"
+            f"{budget_block}\n"
+            f"Tipos de insight disponíveis: {cross_domain_types}.\n"
+            "Se houver metas em risco ou orçamento próximo do limite, inclua insights "
+            "dos tipos alerta_meta, progresso_meta, "
+            "orcamento_ultrapassado ou planejamento_meta.\n\n"
             "Retorne um JSON array no formato:\n"
             '[{"type": "...", "title": "...", "message": "..."}]'
         )
@@ -517,11 +686,15 @@ def _build_spending_prompt(
     return (
         f"Você é um consultor financeiro pessoal. Analise os dados de gastos de {month_label} "  # noqa: E501
         "abaixo e gere 3 insights práticos e personalizados em português brasileiro. "
-        "Para cada insight, identifique o tipo (gasto_elevado, oportunidade_economia, "
-        "saude_financeira, alerta_orcamento, padrao_gasto), um título curto e "
-        "uma recomendação específica e acionável.\n"
+        f"Para cada insight, identifique o tipo ({cross_domain_types}), "
+        "um título curto e uma recomendação específica e acionável.\n"
         f"{previous_block}"
-        f"\nDados financeiros do período:\n{context}\n\n"
+        f"\nDados financeiros do período:\n{context}\n"
+        f"{goals_block}"
+        f"{budget_block}\n"
+        "Ao identificar cruzamentos entre gastos e metas (ex: crescimento de gastos "
+        "comprometendo prazo de uma meta), priorize insights dos tipos alerta_meta, "
+        "progresso_meta ou planejamento_meta.\n\n"
         "Retorne um JSON array no formato:\n"
         '[{"type": "...", "title": "...", "message": "..."}]'
     )
