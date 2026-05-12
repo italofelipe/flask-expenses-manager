@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 from dataclasses import dataclass
 from decimal import Decimal
 from typing import Any, Callable, cast
@@ -7,11 +8,15 @@ from uuid import UUID
 
 from marshmallow import ValidationError
 
+from app.extensions.database import db
+from app.models.goal_contribution import GoalContribution
 from app.models.user import User
 from app.schemas.goal_planning_schema import GoalSimulationSchema
 from app.services.goal_planning_service import GoalPlanningInput, GoalPlanningService
 from app.services.goal_projection_service import GoalProjectionService
 from app.services.goal_service import GoalService, GoalServiceError
+
+log = logging.getLogger(__name__)
 
 
 @dataclass(frozen=True)
@@ -81,10 +86,29 @@ class GoalApplicationService:
         return self._goal_service.serialize(goal)
 
     def update_goal(self, goal_id: UUID, payload: dict[str, Any]) -> dict[str, Any]:
+        old_amount: Decimal | None = None
+        if "current_amount" in payload:
+            try:
+                old_goal = self._goal_service.get_goal(goal_id)
+                old_amount = Decimal(str(old_goal.current_amount or 0))
+            except GoalServiceError:
+                old_amount = None
+
         try:
             goal = self._goal_service.update_goal(goal_id, payload)
         except GoalServiceError as exc:
             raise _to_goal_application_error(exc) from exc
+
+        if old_amount is not None and "current_amount" in payload:
+            new_amount = Decimal(str(goal.current_amount or 0))
+            delta = new_amount - old_amount
+            if delta != 0:
+                _record_contribution(
+                    goal_id=goal.id,
+                    user_id=self._user_id,
+                    delta=delta,
+                )
+
         return self._goal_service.serialize(goal)
 
     def delete_goal(self, goal_id: UUID) -> None:
@@ -189,3 +213,24 @@ def _to_goal_application_error(exc: GoalServiceError) -> GoalApplicationError:
 
 def _default_get_user_by_id(user_id: UUID) -> User | None:
     return cast(User | None, User.query.filter_by(id=user_id).first())
+
+
+def _record_contribution(*, goal_id: UUID, user_id: UUID, delta: Decimal) -> None:
+    """Persist a GoalContribution row. Swallows exceptions so that tracking
+    failures never break the goal update flow."""
+    try:
+        contribution = GoalContribution(
+            goal_id=goal_id,
+            user_id=user_id,
+            amount=delta,
+        )
+        db.session.add(contribution)
+        db.session.commit()
+    except Exception as exc:
+        log.warning(
+            "goal_contribution.record_failed goal_id=%s user_id=%s error=%s",
+            goal_id,
+            user_id,
+            exc,
+        )
+        db.session.rollback()
