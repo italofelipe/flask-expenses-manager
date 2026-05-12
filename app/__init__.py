@@ -76,6 +76,7 @@ from app.middleware.cors import register_cors
 from app.middleware.docs_access import register_docs_access_guard
 from app.middleware.security_headers import register_security_headers
 from app.models.account import Account  # noqa: F401
+from app.models.ai_insight import AIInsight  # noqa: F401
 from app.models.audit_event import AuditEvent  # noqa: F401
 from app.models.budget import Budget  # noqa: F401
 from app.models.credit_card import CreditCard  # noqa: F401

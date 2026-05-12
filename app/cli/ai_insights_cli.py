@@ -62,14 +62,19 @@ def _all_active_user_ids() -> list[uuid.UUID]:
 
 
 def _already_run_today(user_id: uuid.UUID, endpoint: str) -> bool:
-    """Return True if a batch insight was already generated today (BRT)."""
-    today = _brt_today()
+    """Return True if a batch insight was already generated today (UTC).
+
+    created_at is stored as a naive UTC datetime, so db.func.date() returns
+    the UTC calendar date. We compare it to the current UTC date explicitly
+    to avoid mismatches when the local system timezone differs from UTC.
+    """
+    today_utc = datetime.now(timezone.utc).date()
     exists = (
         db.session.query(LLMAuditLog.id)
         .filter(
             LLMAuditLog.user_id == user_id,
             LLMAuditLog.endpoint == endpoint,
-            db.func.date(LLMAuditLog.created_at) == today,
+            db.func.date(LLMAuditLog.created_at) == today_utc,
         )
         .first()
     )
