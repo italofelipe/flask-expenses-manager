@@ -794,6 +794,35 @@ ENRICHMENT: dict[str, dict[str, Any]] = {
             "});",
         ],
     },
+    # ── AI Advisory ───────────────────────────────────────────────────
+    "GET /ai/insights/spending": {
+        "test_lines": [
+            "pm.test('AI spending insights — expected 200 or 403 or 429', function () {",
+            "  pm.expect(pm.response.code).to.be.oneOf([200, 403, 429]);",
+            "});",
+        ],
+    },
+    "GET /ai/insights/weekly-summary": {
+        "test_lines": [
+            "pm.test('AI weekly summary — expected 200 or 403 or 429', function () {",
+            "  pm.expect(pm.response.code).to.be.oneOf([200, 403, 429]);",
+            "});",
+        ],
+    },
+    "POST /ai/goals/{goal_id}/projection": {
+        "test_lines": [
+            "pm.test('AI goal projection — expected 200 or 400 or 403 or 404', function () {",
+            "  pm.expect(pm.response.code).to.be.oneOf([200, 400, 403, 404]);",
+            "});",
+        ],
+    },
+    "GET /ai/insights/history": {
+        "test_lines": [
+            "pm.test('AI insights history — expected 200 or 401', function () {",
+            "  pm.expect(pm.response.code).to.be.oneOf([200, 401]);",
+            "});",
+        ],
+    },
 }
 
 # ---------------------------------------------------------------------------
