@@ -1,4 +1,15 @@
 type Query {
+  receivables(
+    """Filter: pending | received | cancelled"""
+    status: String
+  ): ReceivableListType
+  receivablesSummary: ReceivableSummaryType
+  fiscalDocuments(
+    """
+    Filter by document type: service_invoice | product_invoice | receipt | debit_note | credit_note
+    """
+    type: String
+  ): FiscalDocumentListType
   aiInsightHistory(page: Int = 1, perPage: Int = 20): AIInsightHistoryResultType
   accounts: AccountListType
   account(accountId: UUID!): AccountType
@@ -36,6 +47,65 @@ type Query {
   me: UserType
 }
 
+type ReceivableListType {
+  receivables: [ReceivableEntryType!]!
+  total: Int!
+}
+
+"""
+IMPORTANT: expected_net_amount is advisory-only. Clients MUST display
+the ``disclaimer`` field alongside any monetary value derived from it.
+"""
+type ReceivableEntryType {
+  id: ID!
+  fiscalDocumentId: ID!
+  expectedNetAmount: DecimalScalar
+  receivedAmount: DecimalScalar
+  outstandingAmount: DecimalScalar
+  reconciliationStatus: String!
+  receivedAt: String
+  createdAt: String!
+  disclaimer: String!
+}
+
+"""
+Arbitrary-precision decimal serialised as a string.
+
+Output: always a string in fixed-point notation (no scientific exponent).
+Input: accepts string, int, float, or Decimal — coerced via ``Decimal(str(x))``.
+Null is preserved.
+"""
+scalar DecimalScalar
+
+"""
+IMPORTANT: all monetary values are advisory-only estimates.
+Always display the ``disclaimer`` field.
+"""
+type ReceivableSummaryType {
+  expectedTotal: String!
+  receivedTotal: String!
+  pendingTotal: String!
+  disclaimer: String!
+}
+
+type FiscalDocumentListType {
+  fiscalDocuments: [FiscalDocumentType!]!
+  total: Int!
+}
+
+type FiscalDocumentType {
+  id: ID!
+  externalId: String!
+  type: String!
+  status: String!
+  issuedAt: String!
+  counterparty: String!
+  grossAmount: DecimalScalar!
+  currency: String!
+  description: String
+  createdAt: String!
+}
+
 type AIInsightHistoryResultType {
   items: [AIInsightType!]!
   page: Int!
@@ -68,15 +138,6 @@ type AccountType {
   institution: String
   initialBalance: DecimalScalar
 }
-
-"""
-Arbitrary-precision decimal serialised as a string.
-
-Output: always a string in fixed-point notation (no scientific exponent).
-Input: accepts string, int, float, or Decimal — coerced via ``Decimal(str(x))``.
-Null is preserved.
-"""
-scalar DecimalScalar
 
 """
 Leverages the internal Python implementation of UUID (uuid.UUID) to provide native UUID objects
@@ -737,6 +798,33 @@ type Mutation {
     month: String!
     selectedEntries: [SelectedEntryInput!]!
   ): BankImportConfirmationPayload
+  createReceivable(
+    amount: String!
+    category: String
+    description: String!
+
+    """YYYY-MM-DD"""
+    expectedDate: String!
+  ): ReceivablePayload @deprecated(reason: "ADR-0002: use POST /fiscal/receivables")
+  markReceivableReceived(
+    entryId: UUID!
+    receivedAmount: String
+
+    """YYYY-MM-DD"""
+    receivedDate: String!
+  ): ReceivablePayload @deprecated(reason: "ADR-0002: use PATCH /fiscal/receivables/{id}/receive")
+  cancelReceivable(entryId: UUID!): ReceivablePayload @deprecated(reason: "ADR-0002: use DELETE /fiscal/receivables/{id}")
+  createFiscalDocument(
+    amount: String!
+    counterpartName: String
+    externalId: String
+
+    """YYYY-MM-DD"""
+    issuedAt: String!
+
+    """service_invoice | product_invoice | receipt | debit_note | credit_note"""
+    type: String!
+  ): FiscalDocumentPayload @deprecated(reason: "ADR-0002: use POST /fiscal/fiscal-documents")
 }
 
 type AuthPayloadType {
@@ -1086,4 +1174,28 @@ input SelectedEntryInput {
   amount: String!
   transactionType: String!
   bankName: String!
+}
+
+type ReceivablePayload {
+  """True when the mutation completed without errors."""
+  ok: Boolean!
+
+  """Human-readable status message."""
+  message: String!
+
+  """Field-level validation errors (empty on success)."""
+  errors: [ValidationError!]!
+  data: ReceivableEntryType
+}
+
+type FiscalDocumentPayload {
+  """True when the mutation completed without errors."""
+  ok: Boolean!
+
+  """Human-readable status message."""
+  message: String!
+
+  """Field-level validation errors (empty on success)."""
+  errors: [ValidationError!]!
+  data: FiscalDocumentType
 }

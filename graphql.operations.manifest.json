@@ -616,6 +616,62 @@
   },
   {
     "access": "auth_required",
+    "domain": "fiscal",
+    "name": "receivables",
+    "operation_type": "query",
+    "source_module": "app.graphql.queries.fiscal",
+    "summary": "Lista recebíveis do usuário. Filtro opcional por status: pending | received | cancelled. Valores estimativos — exibir disclaimer."
+  },
+  {
+    "access": "auth_required",
+    "domain": "fiscal",
+    "name": "receivablesSummary",
+    "operation_type": "query",
+    "source_module": "app.graphql.queries.fiscal",
+    "summary": "Retorna totais agregados de receitas esperadas, recebidas e pendentes. Valores são estimativos — exibir o campo 'disclaimer' ao usuário."
+  },
+  {
+    "access": "auth_required",
+    "domain": "fiscal",
+    "name": "fiscalDocuments",
+    "operation_type": "query",
+    "source_module": "app.graphql.queries.fiscal",
+    "summary": "Lista documentos fiscais do usuário. Filtro opcional por tipo: service_invoice | product_invoice | receipt | debit_note | credit_note."
+  },
+  {
+    "access": "auth_required",
+    "domain": "fiscal",
+    "name": "createReceivable",
+    "operation_type": "mutation",
+    "source_module": "app.graphql.mutations.fiscal",
+    "summary": "Cria um recebível manual. Deprecated: preferir POST /fiscal/receivables (ADR-0002)."
+  },
+  {
+    "access": "auth_required",
+    "domain": "fiscal",
+    "name": "markReceivableReceived",
+    "operation_type": "mutation",
+    "source_module": "app.graphql.mutations.fiscal",
+    "summary": "Marca um recebível como recebido com data e valor. Deprecated: preferir PATCH /fiscal/receivables/{id}/receive (ADR-0002)."
+  },
+  {
+    "access": "auth_required",
+    "domain": "fiscal",
+    "name": "cancelReceivable",
+    "operation_type": "mutation",
+    "source_module": "app.graphql.mutations.fiscal",
+    "summary": "Cancela um recebível pendente. Deprecated: preferir DELETE /fiscal/receivables/{id} (ADR-0002)."
+  },
+  {
+    "access": "auth_required",
+    "domain": "fiscal",
+    "name": "createFiscalDocument",
+    "operation_type": "mutation",
+    "source_module": "app.graphql.mutations.fiscal",
+    "summary": "Cria um documento fiscal. Deprecated: preferir POST /fiscal/fiscal-documents (ADR-0002)."
+  },
+  {
+    "access": "auth_required",
     "domain": "ai_advisory",
     "name": "aiInsightHistory",
     "operation_type": "query",
