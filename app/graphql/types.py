@@ -752,3 +752,70 @@ class BankImportConfirmationPayload(MutationPayload):
     skipped_duplicates = graphene.Int()
     replaced_count = graphene.Int()
     transactions = graphene.List(graphene.NonNull(ImportedTransactionType))
+
+
+# ---------------------------------------------------------------------------
+# Fiscal domain (#1247 — GraphQL parity with REST /fiscal/*)
+# ---------------------------------------------------------------------------
+
+
+class FiscalDocumentType(graphene.ObjectType):
+    id = graphene.ID(required=True)
+    external_id = graphene.String(required=True)
+    type = graphene.String(required=True)
+    status = graphene.String(required=True)
+    issued_at = graphene.String(required=True)
+    counterparty = graphene.String(required=True)
+    gross_amount = DecimalScalar(required=True)
+    currency = graphene.String(required=True)
+    description = graphene.String()
+    created_at = graphene.String(required=True)
+
+
+class FiscalDocumentListType(graphene.ObjectType):
+    fiscal_documents = graphene.List(
+        graphene.NonNull(FiscalDocumentType), required=True
+    )
+    total = graphene.Int(required=True)
+
+
+class FiscalDocumentPayload(MutationPayload):
+    data = graphene.Field(FiscalDocumentType)
+
+
+class ReceivableEntryType(graphene.ObjectType):
+    """
+    IMPORTANT: expected_net_amount is advisory-only. Clients MUST display
+    the ``disclaimer`` field alongside any monetary value derived from it.
+    """
+
+    id = graphene.ID(required=True)
+    fiscal_document_id = graphene.ID(required=True)
+    expected_net_amount = DecimalScalar()
+    received_amount = DecimalScalar()
+    outstanding_amount = DecimalScalar()
+    reconciliation_status = graphene.String(required=True)
+    received_at = graphene.String()
+    created_at = graphene.String(required=True)
+    disclaimer = graphene.String(required=True)
+
+
+class ReceivableListType(graphene.ObjectType):
+    receivables = graphene.List(graphene.NonNull(ReceivableEntryType), required=True)
+    total = graphene.Int(required=True)
+
+
+class ReceivablePayload(MutationPayload):
+    data = graphene.Field(ReceivableEntryType)
+
+
+class ReceivableSummaryType(graphene.ObjectType):
+    """
+    IMPORTANT: all monetary values are advisory-only estimates.
+    Always display the ``disclaimer`` field.
+    """
+
+    expected_total = graphene.String(required=True)
+    received_total = graphene.String(required=True)
+    pending_total = graphene.String(required=True)
+    disclaimer = graphene.String(required=True)

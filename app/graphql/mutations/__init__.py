@@ -28,6 +28,12 @@ from app.graphql.mutations.budget import (
     DeleteBudgetMutation,
     UpdateBudgetMutation,
 )
+from app.graphql.mutations.fiscal import (
+    CancelReceivableMutation,
+    CreateFiscalDocumentMutation,
+    CreateReceivableMutation,
+    MarkReceivableReceivedMutation,
+)
 from app.graphql.mutations.goal import (
     CreateGoalMutation,
     DeleteGoalMutation,
@@ -159,6 +165,19 @@ class Mutation(graphene.ObjectType):
     # Bank Statement Import — canonical GraphQL surface (#1148)
     preview_bank_statement = PreviewBankStatementMutation.Field()
     confirm_bank_import = ConfirmBankImportMutation.Field()
+    # Fiscal domain (#1247) — ADR-0002: REST is canonical for writes
+    create_receivable = CreateReceivableMutation.Field(
+        deprecation_reason="ADR-0002: use POST /fiscal/receivables"
+    )
+    mark_receivable_received = MarkReceivableReceivedMutation.Field(
+        deprecation_reason="ADR-0002: use PATCH /fiscal/receivables/{id}/receive"
+    )
+    cancel_receivable = CancelReceivableMutation.Field(
+        deprecation_reason="ADR-0002: use DELETE /fiscal/receivables/{id}"
+    )
+    create_fiscal_document = CreateFiscalDocumentMutation.Field(
+        deprecation_reason="ADR-0002: use POST /fiscal/fiscal-documents"
+    )
 
 
 __all__ = ["Mutation"]

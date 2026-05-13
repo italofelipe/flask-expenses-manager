@@ -11,6 +11,7 @@ GraphQLDomain = Literal[
     "auth",
     "billing",
     "dashboard",
+    "fiscal",
     "goals",
     "investments",
     "notifications",
@@ -22,6 +23,8 @@ GraphQLDomain = Literal[
 ]
 
 QUERY_AI_INSIGHT_MODULE = "app.graphql.queries.ai_insight"
+QUERY_FISCAL_MODULE = "app.graphql.queries.fiscal"
+MUTATION_FISCAL_MODULE = "app.graphql.mutations.fiscal"
 QUERY_USER_MODULE = "app.graphql.queries.user"
 QUERY_DASHBOARD_MODULE = "app.graphql.queries.dashboard"
 QUERY_TRANSACTION_MODULE = "app.graphql.queries.transaction"
@@ -709,6 +712,84 @@ GRAPHQL_OPERATION_CATALOG: tuple[GraphQLOperationDoc, ...] = (
             "Suporta modos 'selective' e 'replace_month'."
         ),
         source_module=MUTATION_BANK_STATEMENT_MODULE,
+    ),
+    # Fiscal domain (#1247)
+    GraphQLOperationDoc(
+        name="receivables",
+        operation_type="query",
+        domain="fiscal",
+        access="auth_required",
+        summary=(
+            "Lista recebíveis do usuário. Filtro opcional por status: "
+            "pending | received | cancelled. Valores estimativos — exibir disclaimer."
+        ),
+        source_module=QUERY_FISCAL_MODULE,
+    ),
+    GraphQLOperationDoc(
+        name="receivablesSummary",
+        operation_type="query",
+        domain="fiscal",
+        access="auth_required",
+        summary=(
+            "Retorna totais agregados de receitas esperadas, recebidas e pendentes. "
+            "Valores são estimativos — exibir o campo 'disclaimer' ao usuário."
+        ),
+        source_module=QUERY_FISCAL_MODULE,
+    ),
+    GraphQLOperationDoc(
+        name="fiscalDocuments",
+        operation_type="query",
+        domain="fiscal",
+        access="auth_required",
+        summary=(
+            "Lista documentos fiscais do usuário. Filtro opcional por tipo: "
+            "service_invoice | product_invoice | receipt | debit_note | credit_note."
+        ),
+        source_module=QUERY_FISCAL_MODULE,
+    ),
+    GraphQLOperationDoc(
+        name="createReceivable",
+        operation_type="mutation",
+        domain="fiscal",
+        access="auth_required",
+        summary=(
+            "Cria um recebível manual. "
+            "Deprecated: preferir POST /fiscal/receivables (ADR-0002)."
+        ),
+        source_module=MUTATION_FISCAL_MODULE,
+    ),
+    GraphQLOperationDoc(
+        name="markReceivableReceived",
+        operation_type="mutation",
+        domain="fiscal",
+        access="auth_required",
+        summary=(
+            "Marca um recebível como recebido com data e valor. "
+            "Deprecated: preferir PATCH /fiscal/receivables/{id}/receive (ADR-0002)."
+        ),
+        source_module=MUTATION_FISCAL_MODULE,
+    ),
+    GraphQLOperationDoc(
+        name="cancelReceivable",
+        operation_type="mutation",
+        domain="fiscal",
+        access="auth_required",
+        summary=(
+            "Cancela um recebível pendente. "
+            "Deprecated: preferir DELETE /fiscal/receivables/{id} (ADR-0002)."
+        ),
+        source_module=MUTATION_FISCAL_MODULE,
+    ),
+    GraphQLOperationDoc(
+        name="createFiscalDocument",
+        operation_type="mutation",
+        domain="fiscal",
+        access="auth_required",
+        summary=(
+            "Cria um documento fiscal. "
+            "Deprecated: preferir POST /fiscal/fiscal-documents (ADR-0002)."
+        ),
+        source_module=MUTATION_FISCAL_MODULE,
     ),
     # AI Advisory (#1231)
     GraphQLOperationDoc(
