@@ -36,6 +36,7 @@ import argparse
 import base64
 import json
 import os
+import re
 import subprocess
 import sys
 import time
@@ -50,6 +51,43 @@ DEFAULT_PROD_INSTANCE_ID = "i-0057e3b52162f78f8"
 DEFAULT_DEV_INSTANCE_ID = "i-0bddcfc8ea56c2ba3"
 
 DEPLOY_STATE_PATH = "/var/lib/auraxis/deploy_state.json"
+
+# Bump this when the on-disk shape of deploy_state.json changes. Older state
+# files (no schema_version key) trigger a warning on read so operators know to
+# repair them. See issue #1253.
+DEPLOY_STATE_SCHEMA_VERSION = 2
+
+# Canonical GHCR image URI pattern. Used in two places:
+#  - Python validator (is_valid_ghcr_image_uri) for unit-testable behavior.
+#  - Bash regex inside the SSM script for in-instance rollback validation.
+# Both must agree; tests pin the shape via GHCR_IMAGE_URI_PATTERN. The pattern
+# is intentionally minimal (matches the AC in issue #1253) so it works under
+# both Python ``re`` and POSIX ERE (``grep -E``) without character-class
+# portability issues.
+GHCR_IMAGE_URI_PATTERN = r"^ghcr\.io/.+:.+$"
+# Stricter pure-Python check used by ``is_valid_ghcr_image_uri``: forbids
+# whitespace inside the path/tag, which the bash regex also rejects (the
+# rollback validator pipes the value through ``printf '%s'`` and ``grep -Eq``,
+# and any embedded newline would already break the bash branch).
+_GHCR_IMAGE_URI_RE = re.compile(r"^ghcr\.io/[^:\s]+:[^\s]+$")
+
+
+def is_valid_ghcr_image_uri(value: Any) -> bool:
+    """Return True iff ``value`` looks like a canonical GHCR image URI.
+
+    Accepts: ``ghcr.io/<owner>/<repo>:<tag>`` (tag = git SHA, semver, etc.).
+    Rejects: bare git SHAs, Docker Hub references, empty/whitespace, non-strings.
+
+    This is the validator used in the rollback path of ``aws_deploy_i6.py`` to
+    catch legacy state files (issue #1253) where ``previous`` was stored as a
+    bare 40-char git SHA — which ``docker pull`` then interprets as Docker Hub
+    and refuses with an opaque "access denied" error.
+    """
+    if not isinstance(value, str):
+        return False
+    if not value.strip():
+        return False
+    return _GHCR_IMAGE_URI_RE.match(value) is not None
 
 
 @dataclass(frozen=True)
@@ -281,6 +319,8 @@ def _build_script(
     git_ref_setup = f'GIT_REF="{git_ref}"' if git_ref is not None else 'GIT_REF=""'
     web_image_setup = f'WEB_IMAGE="{web_image}"'
     ghcr_token_setup = f'GHCR_TOKEN="{ghcr_token}"'
+    ghcr_pattern = GHCR_IMAGE_URI_PATTERN
+    schema_version = DEPLOY_STATE_SCHEMA_VERSION
 
     return f"""\
 set -euo pipefail
@@ -355,6 +395,7 @@ CURRENT_BRANCH="$(
 
 STATE_CURRENT=""
 STATE_PREVIOUS=""
+STATE_SCHEMA_VERSION=""
 if [ -f "$STATE_PATH" ]; then
   STATE_CURRENT="$(python3 - <<'PY' "$STATE_PATH"
 import json,sys
@@ -376,6 +417,22 @@ except Exception:
   print('')
 PY
 )"
+  STATE_SCHEMA_VERSION="$(python3 - <<'PY' "$STATE_PATH"
+import json,sys
+p=sys.argv[1]
+try:
+  data=json.load(open(p,'r',encoding='utf-8'))
+  v=data.get('schema_version','')
+  print(v if v == '' else str(v))
+except Exception:
+  print('')
+PY
+)"
+  if [ -z "$STATE_SCHEMA_VERSION" ]; then
+    echo "[i6] WARNING: deploy_state.json missing 'schema_version'; \
+treating as legacy v1 — will be upgraded to v{schema_version} on next \
+successful deploy."
+  fi
 fi
 
 if [ "$MODE" = "status" ]; then
@@ -388,6 +445,20 @@ if [ "$MODE" = "rollback" ]; then
   if [ -z "$STATE_PREVIOUS" ]; then
     echo "[i6] rollback requested but no previous deploy recorded in $STATE_PATH"
     exit 12
+  fi
+  # Defensive: 'previous' must be a fully-qualified GHCR image URI. Legacy
+  # state files (pre-#1253) stored bare 40-char git SHAs here, which docker
+  # pull then interpreted as Docker Hub references and rejected with an
+  # opaque "access denied" error. Fail fast with an actionable message so
+  # on-call can repair $STATE_PATH instead of chasing a docker auth red
+  # herring.
+  if ! printf '%s' "$STATE_PREVIOUS" \\
+       | grep -Eq '{ghcr_pattern}'; then
+    echo "[i6] rollback aborted: previous='$STATE_PREVIOUS' is not a valid \
+GHCR image URI (expected 'ghcr.io/<owner>/<repo>:<tag>')."
+    echo "[i6] inspect $STATE_PATH and repair the 'previous' field (or clear \
+it to fail-fast on the next rollback)."
+    exit 14
   fi
   # Rollback uses the previously deployed image URI from state — not a git ref.
   WEB_IMAGE="$STATE_PREVIOUS"
@@ -971,6 +1042,53 @@ if [ "$WEB_HEALTH" != "healthy" ]; then
   exit 34
 fi
 
+# Apply pending Alembic migrations against the canonical DB (RDS in prod).
+# This runs inside the freshly-started web container, after the container is
+# healthy (gunicorn up, DATABASE_URL connectable) but BEFORE the /healthz
+# smoke check validates the deploy. Rationale: /healthz does not exercise
+# schema-bound endpoints, so it passes even when the DB is N revisions behind
+# the deployed code — meaning a broken schema would ship and only break on
+# the first real request. Failing here aborts the deploy and blocks traffic.
+# See issue #1252.
+#
+# We intentionally do NOT run this in rollback mode: rolling back schema is
+# risky with multi-head merges and out-of-scope for the rollback path
+# (forward-only migrations is the policy).
+if [ "$MODE" = "deploy" ]; then
+  echo "[i6] applying pending alembic migrations (flask db upgrade)..."
+  ALEMBIC_STDERR="$(mktemp)"
+  if ! docker compose --env-file "$ENV_FILE" -f docker-compose.prod.yml \\
+       exec -T web flask db upgrade 2>"$ALEMBIC_STDERR"; then
+    echo "[i6] alembic upgrade failed"
+    echo "[i6] stderr:"
+    cat "$ALEMBIC_STDERR" || true
+    rm -f "$ALEMBIC_STDERR" || true
+    dump_compose_diagnostics
+    exit 36
+  fi
+  rm -f "$ALEMBIC_STDERR" || true
+  echo "[i6] alembic upgrade OK"
+
+  # Drift gate: assert flask db current == flask db heads. Mirrors the
+  # alembic_single_head CI gate but at deploy-time against the live DB. If
+  # this fails the deploy has applied migrations but the resulting tip
+  # diverges from the code's expected head — indicates alembic config drift
+  # or a manual edit to the live DB. Abort before flipping traffic.
+  CUR_REV="$(docker compose --env-file "$ENV_FILE" -f docker-compose.prod.yml \\
+    exec -T web flask db current 2>/dev/null \\
+    | awk '{{print $1}}' | tail -1)"
+  HEAD_REV="$(docker compose --env-file "$ENV_FILE" -f docker-compose.prod.yml \\
+    exec -T web flask db heads 2>/dev/null \\
+    | awk '{{print $1}}' | tail -1)"
+  echo "[i6] alembic current=$CUR_REV heads=$HEAD_REV"
+  if [ -z "$CUR_REV" ] || [ -z "$HEAD_REV" ] || [ "$CUR_REV" != "$HEAD_REV" ]; then
+    echo "[i6] alembic drift detected after upgrade: current='$CUR_REV' \
+heads='$HEAD_REV' — aborting deploy before traffic flips."
+    dump_compose_diagnostics
+    exit 37
+  fi
+fi
+
 echo "[i6] ensuring runtime TLS mode..."
 AUTO_REQUEST_TLS_CERT="true"
 if [ "{env_name}" = "dev" ]; then
@@ -1012,12 +1130,17 @@ PY
   if [ "$WEB_OK" = "true" ] \\
     && curl $CURL_FLAGS "$EDGE_HEALTH_URL" -H "Host: {domain}" >/dev/null; then
     echo "[i6] OK"
-    python3 - <<'PY' "$STATE_PATH" "$STATE_CURRENT" "$WEB_IMAGE"
+    python3 - <<'PY' "$STATE_PATH" "$STATE_CURRENT" "$WEB_IMAGE" "{schema_version}"
 import json,sys
 path=sys.argv[1]
 prev=sys.argv[2] or ""
 cur=sys.argv[3] or ""
-data={{"previous": prev, "current": cur}}
+schema_version=int(sys.argv[4])
+data={{
+  "schema_version": schema_version,
+  "previous": prev,
+  "current": cur,
+}}
 with open(path,"w",encoding="utf-8") as f:
   json.dump(data,f,indent=2,sort_keys=True)
 print("[i6] wrote deploy state:", path, data)
