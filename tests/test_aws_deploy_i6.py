@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import re
 import subprocess
 from pathlib import Path
 from typing import Any
@@ -8,6 +9,215 @@ from typing import Any
 import pytest
 
 from scripts import aws_deploy_i6
+
+# ---------------------------------------------------------------------------
+# GHCR URI validator (#1253)
+# ---------------------------------------------------------------------------
+
+
+def test_is_valid_ghcr_image_uri_accepts_canonical_ghcr_form() -> None:
+    assert (
+        aws_deploy_i6.is_valid_ghcr_image_uri("ghcr.io/italofelipe/auraxis-api:abc123")
+        is True
+    )
+
+
+def test_is_valid_ghcr_image_uri_accepts_full_sha_tag() -> None:
+    sha = "3d8274a495d97980753586a0fb80f71e595a7a9d"
+    assert (
+        aws_deploy_i6.is_valid_ghcr_image_uri(f"ghcr.io/italofelipe/auraxis-api:{sha}")
+        is True
+    )
+
+
+def test_is_valid_ghcr_image_uri_rejects_bare_git_sha() -> None:
+    bare_sha = "347450dd08db94595e192dfb90a0e194ab9fa890"
+    assert aws_deploy_i6.is_valid_ghcr_image_uri(bare_sha) is False
+
+
+def test_is_valid_ghcr_image_uri_rejects_dockerhub_form() -> None:
+    assert aws_deploy_i6.is_valid_ghcr_image_uri("library/auraxis-api:latest") is False
+
+
+def test_is_valid_ghcr_image_uri_rejects_missing_tag() -> None:
+    assert (
+        aws_deploy_i6.is_valid_ghcr_image_uri("ghcr.io/italofelipe/auraxis-api")
+        is False
+    )
+
+
+def test_is_valid_ghcr_image_uri_rejects_empty_string() -> None:
+    assert aws_deploy_i6.is_valid_ghcr_image_uri("") is False
+
+
+def test_is_valid_ghcr_image_uri_rejects_whitespace_only() -> None:
+    assert aws_deploy_i6.is_valid_ghcr_image_uri("   ") is False
+
+
+def test_is_valid_ghcr_image_uri_rejects_none_like_inputs() -> None:
+    assert aws_deploy_i6.is_valid_ghcr_image_uri(None) is False  # type: ignore[arg-type]
+    assert aws_deploy_i6.is_valid_ghcr_image_uri(123) is False  # type: ignore[arg-type]
+
+
+def test_ghcr_image_uri_pattern_matches_bash_regex() -> None:
+    """The Python validator and the bash regex must agree on the same shape.
+
+    The deploy script embeds an extended-regex (ERE) variant of this pattern
+    inside the SSM bash heredoc for in-container validation. If they diverge,
+    operators get inconsistent behavior between dry-run and live-run paths.
+    """
+    pattern = aws_deploy_i6.GHCR_IMAGE_URI_PATTERN
+    assert pattern.startswith("^ghcr\\.io/")
+    # The pattern must require a tag (":<something>").
+    assert ":" in pattern
+    compiled = re.compile(pattern)
+    assert compiled.match("ghcr.io/italofelipe/auraxis-api:v1") is not None
+    assert compiled.match("347450dd08db94595e192dfb90a0e194ab9fa890") is None
+
+
+# ---------------------------------------------------------------------------
+# Rollback bash-template assertions (#1253)
+# ---------------------------------------------------------------------------
+
+
+def test_build_script_rollback_validates_state_previous_against_ghcr_regex() -> None:
+    script = aws_deploy_i6._build_script(
+        env_name="prod",
+        aws_region="us-east-1",
+        git_ref=None,
+        mode="rollback",
+    )
+    # The rollback branch must guard STATE_PREVIOUS with the canonical pattern
+    # before assigning it to WEB_IMAGE.
+    assert 'if [ "$MODE" = "rollback" ]; then' in script
+    assert "ghcr\\.io/" in script
+    # The error message must mention the state file path so operators can
+    # locate and repair it.
+    assert aws_deploy_i6.DEPLOY_STATE_PATH in script
+    assert "not a valid GHCR image URI" in script
+    # Must use a distinct exit code from "no previous deploy recorded" (12).
+    assert "exit 14" in script
+
+
+def test_build_script_rollback_preserves_empty_state_previous_path() -> None:
+    """Empty STATE_PREVIOUS must still hit the original 'no previous deploy
+    recorded' branch (exit 12), not the new invalid-URI branch (exit 14).
+    """
+    script = aws_deploy_i6._build_script(
+        env_name="prod",
+        aws_region="us-east-1",
+        git_ref=None,
+        mode="rollback",
+    )
+    # Empty-string guard appears before the format validation guard.
+    empty_guard_idx = script.find('if [ -z "$STATE_PREVIOUS" ]; then')
+    format_guard_idx = script.find("not a valid GHCR image URI")
+    assert empty_guard_idx != -1, "expected empty-state guard"
+    assert format_guard_idx != -1, "expected format-validation guard"
+    assert empty_guard_idx < format_guard_idx, (
+        "empty-state guard must run before format-validation guard so empty "
+        "STATE_PREVIOUS exits 12, not 14"
+    )
+
+
+# ---------------------------------------------------------------------------
+# Deploy-state schema versioning (#1253)
+# ---------------------------------------------------------------------------
+
+
+def test_deploy_state_schema_version_constant_is_defined() -> None:
+    assert isinstance(aws_deploy_i6.DEPLOY_STATE_SCHEMA_VERSION, int)
+    assert aws_deploy_i6.DEPLOY_STATE_SCHEMA_VERSION >= 2
+
+
+def test_build_script_writes_schema_version_to_deploy_state() -> None:
+    script = aws_deploy_i6._build_script(
+        env_name="prod",
+        aws_region="us-east-1",
+        git_ref="origin/master",
+        mode="deploy",
+    )
+    # The script must persist the schema_version so future state migrations
+    # can detect this format.
+    assert "schema_version" in script
+    assert f"{aws_deploy_i6.DEPLOY_STATE_SCHEMA_VERSION}" in script
+
+
+# ---------------------------------------------------------------------------
+# Migration step on deploy (#1252)
+# ---------------------------------------------------------------------------
+
+
+def test_build_script_deploy_runs_flask_db_upgrade_before_healthz_validation() -> None:
+    script = aws_deploy_i6._build_script(
+        env_name="prod",
+        aws_region="us-east-1",
+        git_ref="origin/master",
+        mode="deploy",
+    )
+
+    # Must invoke 'flask db upgrade' inside the running web container.
+    assert "flask db upgrade" in script
+
+    # Position check: the migration step must appear AFTER 'compose ... up -d'
+    # for the web container, and BEFORE the /healthz curl validation loop.
+    upgrade_idx = script.find("flask db upgrade")
+    healthz_idx = script.find("validating healthz")
+    web_up_idx = script.find("swapping web container")
+
+    assert web_up_idx != -1, "expected web container swap section"
+    assert upgrade_idx != -1, "expected flask db upgrade invocation"
+    assert healthz_idx != -1, "expected /healthz validation section"
+    assert web_up_idx < upgrade_idx < healthz_idx, (
+        "flask db upgrade must run after the web container is up and "
+        "before the /healthz validation loop"
+    )
+
+
+def test_build_script_aborts_when_alembic_upgrade_fails() -> None:
+    script = aws_deploy_i6._build_script(
+        env_name="prod",
+        aws_region="us-east-1",
+        git_ref="origin/master",
+        mode="deploy",
+    )
+    # The script must abort with a distinct exit code if the alembic upgrade
+    # exits non-zero. We use exit 36 (next free slot after the existing
+    # 30-35 deploy-stage exits).
+    assert "exit 36" in script
+    # Must surface the alembic stderr in the log so on-call has a starting
+    # point — the existing dump_compose_diagnostics helper covers this.
+    assert "alembic upgrade failed" in script
+
+
+def test_build_script_asserts_alembic_current_equals_heads_after_upgrade() -> None:
+    """AC: post-deploy assertion that flask db current == flask db heads."""
+    script = aws_deploy_i6._build_script(
+        env_name="prod",
+        aws_region="us-east-1",
+        git_ref="origin/master",
+        mode="deploy",
+    )
+    assert "flask db current" in script
+    assert "flask db heads" in script
+    # Drift exit code, distinct from upgrade failure (36).
+    assert "exit 37" in script
+
+
+def test_build_script_rollback_does_not_run_flask_db_upgrade() -> None:
+    """Rollback must NOT run migrations — schema downgrades are out of scope."""
+    script = aws_deploy_i6._build_script(
+        env_name="prod",
+        aws_region="us-east-1",
+        git_ref=None,
+        mode="rollback",
+    )
+    # Note: the script template is the same for deploy and rollback; the
+    # migration block must be gated by MODE so it only runs on deploy.
+    # We assert the gate is present.
+    assert 'if [ "$MODE" = "deploy" ]; then' in script or (
+        '[ "$MODE" = "deploy" ]' in script
+    )
 
 
 def test_extract_invocation_report_truncates_and_maps_fields() -> None:
