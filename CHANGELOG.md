@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.38.1](https://github.com/italofelipe/auraxis-api/compare/v1.38.0...v1.38.1) (2026-05-16)
+
+
+### Bug Fixes
+
+* **deploy:** apply alembic migrations + validate rollback target URI ([#1261](https://github.com/italofelipe/auraxis-api/issues/1261)) ([84f4e75](https://github.com/italofelipe/auraxis-api/commit/84f4e75f8ebf05f86e9af5b9f62aebfd77bce49c)), closes [#1252](https://github.com/italofelipe/auraxis-api/issues/1252) [#1253](https://github.com/italofelipe/auraxis-api/issues/1253)
+* **infra:** make entrypoint RDS-aware to unblock prod deploys ([#1254](https://github.com/italofelipe/auraxis-api/issues/1254)) ([#1260](https://github.com/italofelipe/auraxis-api/issues/1260)) ([ce0695a](https://github.com/italofelipe/auraxis-api/commit/ce0695abdecffcf5d2e12ff52318ea196c53b21a))
+
 ## [1.38.0](https://github.com/italofelipe/auraxis-api/compare/v1.37.0...v1.38.0) (2026-05-12)
 
 
