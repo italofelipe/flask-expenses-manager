@@ -1,18 +1,57 @@
 #!/bin/sh
 set -eu
 
-DB_HOST="${DB_HOST:-db}"
-DB_PORT="${DB_PORT:-5432}"
+# ── Resolve database connection target ────────────────────────────────────────
+# Production uses RDS via DATABASE_URL (canonical). The legacy DB_HOST/DB_PORT
+# pair is kept as a fallback for dev/test compose stacks where a local
+# Postgres service is reachable as `db:5432`.
+#
+# Issue #1254: previously this script defaulted DB_HOST to the literal "db",
+# which made the wait-for-db loop hang on prod (where no `db` container
+# exists) and brought the API down with 502s every time the web container was
+# recreated. Now we derive host/port from DATABASE_URL when present and only
+# fall back to DB_HOST/DB_PORT when explicitly set — no implicit `db` default.
+
 DB_WAIT_TIMEOUT="${DB_WAIT_TIMEOUT:-60}"
 
-echo "Waiting for database at ${DB_HOST}:${DB_PORT}..."
+# Resolve DB_HOST/DB_PORT for the wait-for-db loop. Prefer DATABASE_URL.
+if [ -n "${DATABASE_URL:-}" ]; then
+  RESOLVED_HOST_PORT="$(
+    DATABASE_URL="${DATABASE_URL}" python - <<'PY'
+import os
+from urllib.parse import urlparse
+
+url = os.environ["DATABASE_URL"]
+parsed = urlparse(url)
+host = parsed.hostname or ""
+port = parsed.port or 5432
+print(f"{host}:{port}")
+PY
+  )"
+  RESOLVED_HOST="${RESOLVED_HOST_PORT%:*}"
+  RESOLVED_PORT="${RESOLVED_HOST_PORT##*:}"
+else
+  RESOLVED_HOST="${DB_HOST:-}"
+  RESOLVED_PORT="${DB_PORT:-5432}"
+fi
+
+if [ -z "${RESOLVED_HOST}" ]; then
+  echo "ERROR: cannot determine database host." >&2
+  echo "Set DATABASE_URL (preferred) or DB_HOST in the environment." >&2
+  exit 1
+fi
+
+export DB_WAIT_HOST="${RESOLVED_HOST}"
+export DB_WAIT_PORT="${RESOLVED_PORT}"
+
+echo "Waiting for database at ${DB_WAIT_HOST}:${DB_WAIT_PORT}..."
 python - <<'PY'
 import os
 import socket
 import time
 
-host = os.getenv("DB_HOST", "db")
-port = int(os.getenv("DB_PORT", "5432"))
+host = os.environ["DB_WAIT_HOST"]
+port = int(os.environ["DB_WAIT_PORT"])
 timeout = int(os.getenv("DB_WAIT_TIMEOUT", "60"))
 deadline = time.time() + timeout
 
@@ -34,16 +73,26 @@ if [ "${MIGRATE_ON_START:-true}" = "true" ]; then
     BASELINE_ACTION="$(
       python - <<'PY'
 import os
+from urllib.parse import urlparse
 
 import psycopg2
 
-host = os.getenv("DB_HOST", "db")
-port = int(os.getenv("DB_PORT", "5432"))
-dbname = os.getenv("DB_NAME")
-user = os.getenv("DB_USER")
-password = os.getenv("DB_PASS")
+database_url = os.getenv("DATABASE_URL")
+if database_url:
+    parsed = urlparse(database_url)
+    host = parsed.hostname or ""
+    port = parsed.port or 5432
+    dbname = (parsed.path or "").lstrip("/") or None
+    user = parsed.username
+    password = parsed.password
+else:
+    host = os.getenv("DB_HOST", "")
+    port = int(os.getenv("DB_PORT", "5432"))
+    dbname = os.getenv("DB_NAME")
+    user = os.getenv("DB_USER")
+    password = os.getenv("DB_PASS")
 
-if not all([dbname, user, password]):
+if not all([host, dbname, user, password]):
     print("skip_missing_db_env")
     raise SystemExit(0)
 

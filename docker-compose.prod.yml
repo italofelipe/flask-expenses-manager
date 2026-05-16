@@ -1,3 +1,10 @@
+# Production compose is RDS-canonical: no local `db` service is provisioned.
+# The web container resolves the database via DATABASE_URL loaded from
+# .env.prod (points to the RDS endpoint at
+# auraxis-prod.cav02gmeg759.us-east-1.rds.amazonaws.com:5432).
+# Local Postgres for offline dev lives in docker-compose.dev.yml.
+# Re-introducing a `db` service here will reopen issue #1254 (wait-for-db hang
+# on deploy) — keep this file RDS-only.
 services:
   redis:
     image: ${REDIS_IMAGE:-public.ecr.aws/docker/library/redis:7-alpine}
