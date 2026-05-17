@@ -160,18 +160,24 @@ def _minimize_amount(value: Any, *, total_for_pct: float | None = None) -> Any:
     return ">R$100k"
 
 
-def _minimize_description(value: Any) -> str:
+_MINIMIZED_DESCRIPTION_PLACEHOLDER = "item"
+
+
+def _minimize_description(_value: Any) -> str:
     """Reduce a transaction-description string to a non-PII shape signal.
 
     Implementation choice: free-text descriptions can carry merchant names,
     Pix payee names, recipient phone numbers, addresses. None of those are
     needed by the LLM to identify *patterns*. We collapse the description to
-    a single token (`"item"`) — the LLM still receives count + bucket info
-    via the surrounding structure (totals, ranks).
+    a single token regardless of input — the LLM still receives count +
+    bucket info via the surrounding structure (totals, ranks).
+
+    The parameter is intentionally ignored (underscore-prefixed). The helper
+    stays as a function (rather than inlining the constant) so the
+    minimisation contract is documented and easy to evolve without touching
+    every call site.
     """
-    if value is None:
-        return "item"
-    return "item"
+    return _MINIMIZED_DESCRIPTION_PLACEHOLDER
 
 
 def minimize_prompt_data(raw: dict[str, Any]) -> dict[str, Any]:
