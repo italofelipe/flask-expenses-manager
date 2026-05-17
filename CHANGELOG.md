@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.40.1](https://github.com/italofelipe/auraxis-api/compare/v1.40.0...v1.40.1) (2026-05-17)
+
+
+### Bug Fixes
+
+* **billing:** grant founder premium entitlement ([#1282](https://github.com/italofelipe/auraxis-api/issues/1282)) ([9e77eaa](https://github.com/italofelipe/auraxis-api/commit/9e77eaa32c0528502b3087243f62aebd4fe16c84))
+
 ## [1.40.0](https://github.com/italofelipe/auraxis-api/compare/v1.39.0...v1.40.0) (2026-05-17)
 
 
