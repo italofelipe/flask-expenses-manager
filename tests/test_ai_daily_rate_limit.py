@@ -312,6 +312,37 @@ class TestAIDailyRateLimitHTTP:
         assert resp.status_code == 200
         assert resp.headers.get("X-AI-Calls-Remaining") == "2"
 
+    def test_cached_period_generate_does_not_consume_daily_limit(
+        self, app, client
+    ) -> None:
+        token = _register_and_login(client, "ai-rl-generate-cached")
+        _grant_premium(app, token)
+
+        with patch(
+            "app.services.ai_advisory_service.AIAdvisoryService.generate_financial_insights",
+            return_value={
+                "period_type": "daily",
+                "period_label": "2026-05-17",
+                "period_start": "2026-05-17",
+                "period_end": "2026-05-17",
+                "summary": "cached",
+                "items": [],
+                "context_version": "financial_insight_snapshot.v1",
+                "cached": True,
+                "model": "stub",
+                "tokens_used": 10,
+                "cost_usd": 0.0,
+            },
+        ):
+            resp = client.post(
+                "/ai/insights/generate",
+                json={"period_type": "daily", "anchor_date": "2026-05-17"},
+                headers=_auth(token),
+            )
+
+        assert resp.status_code == 200
+        assert resp.headers.get("X-AI-Calls-Remaining") == "2"
+
     def test_429_message_is_portuguese(self, app, client) -> None:
         token = _register_and_login(client, "ai-rl-ptbr")
         _grant_premium(app, token)

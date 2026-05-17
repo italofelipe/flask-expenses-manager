@@ -48,6 +48,7 @@ TAG_FOLDER_MAP: dict[str, str] = {
     "Entitlements": "08 - Entitlements",
     "Notificações": "09 - Notifications",
     "LGPD": "10 - LGPD",
+    "AI Advisory": "11 - AI Advisory",
 }
 DEFAULT_FOLDER = "99 - Other"
 
@@ -172,6 +173,7 @@ FOLDER_ORDER = [
     "08 - Entitlements",
     "09 - Notifications",
     "10 - LGPD",
+    "11 - AI Advisory",
     "99 - Cleanup",
     "99 - Other",
 ]
@@ -886,6 +888,17 @@ ENRICHMENT: dict[str, dict[str, Any]] = {
     "GET /ai/insights/weekly-summary": {
         "test_lines": [
             "pm.test('AI weekly summary — expected 200 or 403 or 429', function () {",
+            "  pm.expect(pm.response.code).to.be.oneOf([200, 403, 429]);",
+            "});",
+        ],
+    },
+    "POST /ai/insights/generate": {
+        "body_override": json.dumps(
+            {"period_type": "daily", "anchor_date": "{{runToday}}"},
+            indent=2,
+        ),
+        "test_lines": [
+            "pm.test('AI period insight — expected 200 or 403 or 429', function () {",
             "  pm.expect(pm.response.code).to.be.oneOf([200, 403, 429]);",
             "});",
         ],

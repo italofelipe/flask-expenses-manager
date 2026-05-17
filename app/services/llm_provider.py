@@ -89,7 +89,17 @@ class StubLLMProvider:
         response_schema: dict[str, Any] | None = None,
     ) -> LLMResponse:
         content = self._STUB_CONTENT
-        if response_schema is not None:
+        if (
+            response_schema
+            and response_schema.get("name") == "financial_insight_response"
+        ):
+            content = (
+                '{"summary":"Resumo financeiro gerado com sucesso.",'
+                '"items":[{"type":"saude_financeira","title":"Resumo financeiro",'
+                '"message":"Seus dados financeiros foram analisados com sucesso.",'
+                '"evidence":["current_period.paid.balance"]}]}'
+            )
+        elif response_schema is not None:
             content = (
                 '{"items":[{"type":"saude_financeira","title":"Resumo financeiro",'
                 '"message":"Seus dados financeiros foram analisados com sucesso."}]}'

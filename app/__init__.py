@@ -176,6 +176,7 @@ def _register_documented_endpoints(app: Flask, docs: FlaskApiSpec) -> None:
         "budget",
         "notifications",
         "consents",
+        "ai",
     }
     for endpoint, view_func in sorted(app.view_functions.items()):
         if "." not in endpoint:

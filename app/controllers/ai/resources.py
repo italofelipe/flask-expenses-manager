@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import logging
 import uuid
+from datetime import date
 from decimal import Decimal, InvalidOperation
 from typing import Any
 from uuid import UUID
@@ -27,9 +28,11 @@ from app.controllers.response_contract import (
 from app.controllers.transaction.utils import _guard_revoked_token
 from app.docs.openapi_helpers import (
     json_error_response,
+    json_request_body,
     json_success_response,
 )
 from app.middleware.ai_rate_limit import ai_daily_limit
+from app.schemas.ai_insight_schema import AIInsightGenerateRequestSchema
 from app.services.ai_advisory_service import AIAdvisoryService
 from app.services.ai_lgpd import AIConsentRequiredError
 from app.services.analysis_ready_notification_service import (
@@ -43,6 +46,7 @@ from app.utils.typed_decorators import typed_jwt_required as jwt_required
 log = logging.getLogger(__name__)
 
 _ENTITLEMENT_KEY = "advanced_simulations"
+_AI_INSIGHT_PERIOD_TYPES = {"daily", "weekly", "monthly"}
 
 
 def _check_entitlement(user_id: UUID) -> Response | None:
@@ -70,10 +74,10 @@ def _ai_consent_required_response(exc: AIConsentRequiredError) -> Response:
 def _parse_goal_projection_body(
     goal_id_raw: str,
     body: dict[str, Any],
-) -> tuple[Response, None, None] | tuple[None, UUID, Decimal, str]:
+) -> tuple[Response, None, None, None] | tuple[None, UUID, Decimal, str]:
     """Validate the goal projection request payload.
 
-    Returns either ``(error_response, None, None)`` when something is invalid
+    Returns either ``(error_response, None, None, None)`` when something is invalid
     or ``(None, parsed_goal_id, monthly_contribution, user_context)`` on
     success. Extracted from :meth:`AIGoalProjectionResource.post` so the
     controller method stays under the cognitive-complexity threshold.
@@ -90,6 +94,7 @@ def _parse_goal_projection_body(
             ),
             None,
             None,
+            None,
         )
 
     user_context = str(body.get("user_context", ""))
@@ -102,6 +107,7 @@ def _parse_goal_projection_body(
                 message="monthly_contribution é obrigatório",
                 error_code="VALIDATION_ERROR",
             ),
+            None,
             None,
             None,
         )
@@ -122,9 +128,162 @@ def _parse_goal_projection_body(
             ),
             None,
             None,
+            None,
         )
 
     return None, parsed_goal_id, monthly_contribution, user_context
+
+
+def _parse_ai_insight_generate_body(
+    body: dict[str, Any],
+) -> tuple[Response, None, None] | tuple[None, str, date | None]:
+    period_type = str(body.get("period_type", "")).strip().lower()
+    if period_type not in _AI_INSIGHT_PERIOD_TYPES:
+        return (
+            compat_error_response(
+                legacy_payload={
+                    "error": "period_type deve ser daily, weekly ou monthly"
+                },
+                status_code=400,
+                message="period_type deve ser daily, weekly ou monthly",
+                error_code="VALIDATION_ERROR",
+            ),
+            None,
+            None,
+        )
+
+    raw_anchor_date = body.get("anchor_date")
+    if raw_anchor_date in (None, ""):
+        return None, period_type, None
+
+    try:
+        anchor_date = date.fromisoformat(str(raw_anchor_date))
+    except ValueError:
+        return (
+            compat_error_response(
+                legacy_payload={
+                    "error": "anchor_date deve estar no formato YYYY-MM-DD"
+                },
+                status_code=400,
+                message="anchor_date deve estar no formato YYYY-MM-DD",
+                error_code="VALIDATION_ERROR",
+            ),
+            None,
+            None,
+        )
+
+    return None, period_type, anchor_date
+
+
+class AIInsightGenerateResource(MethodResource):
+    """POST /ai/insights/generate — period-aware AI financial insights."""
+
+    @doc(
+        summary="Gerar insight financeiro period-aware com IA (Premium)",
+        description=(
+            "Gera insights financeiros com contexto daily, weekly ou monthly, "
+            "incluindo evidências estruturadas extraídas do snapshot financeiro."
+        ),
+        tags=["AI Advisory"],
+        security=[{"BearerAuth": []}],
+        requestBody=json_request_body(
+            schema=AIInsightGenerateRequestSchema,
+            description="Período que deve ser consolidado antes da chamada à IA.",
+            example={"period_type": "daily", "anchor_date": "2026-05-17"},
+        ),
+        responses={
+            200: json_success_response(
+                description="Insight gerado com sucesso",
+                message="Insight financeiro gerado com sucesso",
+                data_example={
+                    "period_type": "daily",
+                    "period_label": "2026-05-17",
+                    "period_start": "2026-05-17",
+                    "period_end": "2026-05-17",
+                    "summary": "Resumo do período.",
+                    "items": [
+                        {
+                            "type": "saude_financeira",
+                            "title": "Saldo positivo",
+                            "message": "Você terminou o período com saldo positivo.",
+                            "evidence": ["current_period.paid.balance"],
+                        }
+                    ],
+                    "context_version": "financial_insight_snapshot.v1",
+                    "cached": False,
+                    "model": "gpt-4o-mini",
+                    "tokens_used": 420,
+                    "cost_usd": 0.000063,
+                },
+            ),
+            400: json_error_response(
+                description="Parâmetros inválidos",
+                message="period_type deve ser daily, weekly ou monthly",
+                error_code="VALIDATION_ERROR",
+                status_code=400,
+            ),
+            403: json_error_response(
+                description="Entitlement insuficiente",
+                message="Recurso exclusivo para assinantes Premium.",
+                error_code="ENTITLEMENT_REQUIRED",
+                status_code=403,
+            ),
+            500: json_error_response(
+                description="Erro interno ou falha do provider LLM",
+                message="Erro ao gerar insight financeiro",
+                error_code="INTERNAL_ERROR",
+                status_code=500,
+            ),
+        },
+    )
+    @jwt_required()
+    @ai_daily_limit()
+    def post(self) -> Response:
+        token_error = _guard_revoked_token()
+        if token_error is not None:
+            return token_error
+
+        user_id = current_user_id()
+
+        entitlement_error = _check_entitlement(user_id)
+        if entitlement_error is not None:
+            return entitlement_error
+
+        body = request.get_json(silent=True) or {}
+        parse_error, period_type, anchor_date = _parse_ai_insight_generate_body(body)
+        if parse_error is not None:
+            return parse_error
+        assert period_type is not None
+
+        service = AIAdvisoryService(user_id=user_id)
+        try:
+            result = service.generate_financial_insights(
+                period_type=period_type,
+                anchor_date=anchor_date,
+            )
+        except AIConsentRequiredError as exc:
+            return _ai_consent_required_response(exc)
+        except LLMProviderError as exc:
+            return compat_error_response(
+                legacy_payload={"error": str(exc)},
+                status_code=500,
+                message="Erro ao gerar insight financeiro",
+                error_code="INTERNAL_ERROR",
+            )
+        except Exception:
+            return compat_error_response(
+                legacy_payload={"error": "Erro interno ao gerar insight financeiro"},
+                status_code=500,
+                message="Erro interno ao gerar insight financeiro",
+                error_code="INTERNAL_ERROR",
+            )
+
+        return compat_success_response(
+            legacy_payload=result,
+            status_code=200,
+            message="Insight financeiro gerado com sucesso",
+            data=result,
+        )
 
 
 class AISpendingInsightsResource(MethodResource):
@@ -576,6 +735,7 @@ class AIInsightHistoryResource(MethodResource):
 
 __all__ = [
     "AIGoalProjectionResource",
+    "AIInsightGenerateResource",
     "AIInsightHistoryResource",
     "AISpendingInsightsResource",
     "AIWeeklySummaryResource",
