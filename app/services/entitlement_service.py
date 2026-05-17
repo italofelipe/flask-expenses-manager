@@ -66,6 +66,18 @@ def has_entitlement(user_id: str | UUID, feature_key: str) -> bool:
     Redis is unavailable the function falls through to the database query so
     that a cache outage never incorrectly blocks a legitimate user.
     """
+    try:
+        from app.services.subscription_service import (
+            ensure_premium_override_subscription,
+            is_premium_override_user_id,
+        )
+
+        normalized_user_id = UUID(str(user_id))
+        if is_premium_override_user_id(normalized_user_id):
+            ensure_premium_override_subscription(normalized_user_id)
+    except (TypeError, ValueError):
+        pass
+
     cache = get_cache_service()
     cache_key = _entitlement_cache_key(user_id, feature_key)
 
@@ -377,6 +389,13 @@ class EntitlementService:
         self.user_id = user_id
 
     def list_entitlements(self) -> list[Entitlement]:
+        from app.services.subscription_service import (
+            ensure_premium_override_subscription,
+            is_premium_override_user_id,
+        )
+
+        if is_premium_override_user_id(self.user_id):
+            ensure_premium_override_subscription(self.user_id)
         now = utc_now_naive()
         return list(
             Entitlement.query.filter_by(user_id=self.user_id)

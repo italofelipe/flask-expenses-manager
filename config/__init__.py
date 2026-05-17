@@ -102,6 +102,9 @@ class Config:
     # Keep False until legacy clients have migrated. Header X-Refresh-Cookie-Only
     # lets individual requests opt in without flipping the global switch.
     AURAXIS_REFRESH_COOKIE_ONLY = _read_bool_env("AURAXIS_REFRESH_COOKIE_ONLY", False)
+    AURAXIS_PREMIUM_OVERRIDE_USER_IDS = os.getenv(
+        "AURAXIS_PREMIUM_OVERRIDE_USER_IDS", ""
+    )
 
     DEBUG = _read_bool_env("FLASK_DEBUG", False)
 
