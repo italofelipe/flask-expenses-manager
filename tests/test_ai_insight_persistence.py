@@ -357,6 +357,60 @@ class TestAIInsightHistoryEndpoint:
         for field in ("id", "content", "insight_type", "period_label", "created_at"):
             assert field in item, f"Missing field: {field}"
 
+    def test_response_exposes_structured_insight_without_client_parsing(
+        self, app, client
+    ) -> None:
+        token = _register_and_login(client, "hist-structured")
+
+        with app.app_context():
+            from flask_jwt_extended import decode_token
+
+            from app.extensions.database import db
+
+            user_id = uuid.UUID(decode_token(token)["sub"])
+            today = date(2026, 5, 17)
+            content = {
+                "summary": "Resumo financeiro estruturado.",
+                "items": [
+                    {
+                        "type": "saude_financeira",
+                        "title": "Saldo positivo",
+                        "message": "Você fechou o período com saldo positivo.",
+                        "evidence": ["current_period.paid.balance"],
+                    }
+                ],
+                "metadata": {
+                    "context_schema_version": "financial_insight_snapshot.v1",
+                    "context_hash": "abc123",
+                },
+            }
+            db.session.add(
+                AIInsight(
+                    user_id=user_id,
+                    content=json.dumps(content),
+                    insight_type=InsightType.weekly,
+                    period_label="2026-W20",
+                    period_start=today,
+                    period_end=today + timedelta(days=6),
+                    model="gpt-4o-mini",
+                    tokens_used=150,
+                    cost_usd=0.000022,
+                )
+            )
+            db.session.commit()
+
+        resp = client.get("/ai/insights/history", headers=_auth(token))
+        assert resp.status_code == 200
+        data = resp.get_json()
+        items = (data.get("data") or {}).get("items") or []
+        assert len(items) == 1
+        item = items[0]
+        assert item["period_type"] == "weekly"
+        assert item["summary"] == "Resumo financeiro estruturado."
+        assert item["items"] == content["items"]
+        assert item["context_schema_version"] == "financial_insight_snapshot.v1"
+        assert item["context_hash"] == "abc123"
+
     def test_user_only_sees_own_insights(self, app, client) -> None:
         token_a = _register_and_login(client, "hist-isola")
         token_b = _register_and_login(client, "hist-isolb")

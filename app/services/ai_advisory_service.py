@@ -15,6 +15,7 @@ Required env vars (configure in .env — never set here):
 
 from __future__ import annotations
 
+import hashlib
 import json
 import logging
 from calendar import monthrange
@@ -264,9 +265,53 @@ def _coerce_spending_insight_items(content: str) -> list[InsightItem]:
     return items
 
 
+def _coerce_financial_insight_item(candidate: object) -> FinancialInsightItem:
+    if not isinstance(candidate, dict):
+        raise LLMProviderError("Invalid financial insight item.")
+
+    item_type = candidate.get("type")
+    title = candidate.get("title")
+    message = candidate.get("message")
+    evidence = candidate.get("evidence")
+    if (
+        not isinstance(item_type, str)
+        or item_type.strip() not in _SPENDING_INSIGHT_TYPES
+        or not isinstance(title, str)
+        or not title.strip()
+        or not isinstance(message, str)
+        or not message.strip()
+        or not isinstance(evidence, list)
+        or not evidence
+        or not all(isinstance(item, str) and item.strip() for item in evidence)
+    ):
+        raise LLMProviderError("Invalid financial insight item fields.")
+
+    return {
+        "type": item_type.strip(),
+        "title": title.strip(),
+        "message": message.strip(),
+        "evidence": [item.strip() for item in evidence],
+    }
+
+
+def _coerce_financial_insight_metadata(parsed: dict[str, Any]) -> dict[str, str]:
+    metadata: dict[str, str] = {}
+    candidate_metadata = parsed.get("metadata")
+    if not isinstance(candidate_metadata, dict):
+        return metadata
+
+    context_schema_version = candidate_metadata.get("context_schema_version")
+    context_hash = candidate_metadata.get("context_hash")
+    if isinstance(context_schema_version, str) and context_schema_version.strip():
+        metadata["context_schema_version"] = context_schema_version.strip()
+    if isinstance(context_hash, str) and context_hash.strip():
+        metadata["context_hash"] = context_hash.strip()
+    return metadata
+
+
 def _coerce_financial_insight_response(
     content: str,
-) -> tuple[str, list[FinancialInsightItem]]:
+) -> tuple[str, list[FinancialInsightItem], dict[str, str]]:
     raw = _strip_json_code_fence(content)
     try:
         parsed = json.loads(raw)
@@ -284,38 +329,10 @@ def _coerce_financial_insight_response(
     if not isinstance(candidate_items, list) or not candidate_items:
         raise LLMProviderError("Invalid financial insight items.")
 
-    items: list[FinancialInsightItem] = []
-    for candidate in candidate_items:
-        if not isinstance(candidate, dict):
-            raise LLMProviderError("Invalid financial insight item.")
+    items = [_coerce_financial_insight_item(item) for item in candidate_items]
+    metadata = _coerce_financial_insight_metadata(parsed)
 
-        item_type = candidate.get("type")
-        title = candidate.get("title")
-        message = candidate.get("message")
-        evidence = candidate.get("evidence")
-        if (
-            not isinstance(item_type, str)
-            or item_type.strip() not in _SPENDING_INSIGHT_TYPES
-            or not isinstance(title, str)
-            or not title.strip()
-            or not isinstance(message, str)
-            or not message.strip()
-            or not isinstance(evidence, list)
-            or not evidence
-            or not all(isinstance(item, str) and item.strip() for item in evidence)
-        ):
-            raise LLMProviderError("Invalid financial insight item fields.")
-
-        items.append(
-            {
-                "type": item_type.strip(),
-                "title": title.strip(),
-                "message": message.strip(),
-                "evidence": [item.strip() for item in evidence],
-            }
-        )
-
-    return summary.strip(), items
+    return summary.strip(), items, metadata
 
 
 def _serialize_spending_insight_items(items: list[InsightItem]) -> str:
@@ -326,12 +343,27 @@ def _serialize_financial_insight_response(
     *,
     summary: str,
     items: list[FinancialInsightItem],
+    metadata: dict[str, str] | None = None,
 ) -> str:
+    payload: dict[str, Any] = {"summary": summary, "items": items}
+    if metadata:
+        payload["metadata"] = metadata
     return json.dumps(
-        {"summary": summary, "items": items},
+        payload,
         ensure_ascii=False,
         separators=(",", ":"),
     )
+
+
+def _financial_context_hash(snapshot: dict[str, Any]) -> str:
+    serialized = json.dumps(
+        snapshot,
+        ensure_ascii=False,
+        sort_keys=True,
+        default=str,
+        separators=(",", ":"),
+    )
+    return hashlib.sha256(serialized.encode("utf-8")).hexdigest()
 
 
 def _log_llm_call(
@@ -449,9 +481,11 @@ class AIAdvisoryService:
         )
         if cached is not None:
             try:
-                cached_summary, cached_items = _coerce_financial_insight_response(
-                    cached.content
-                )
+                (
+                    cached_summary,
+                    cached_items,
+                    cached_metadata,
+                ) = _coerce_financial_insight_response(cached.content)
             except LLMProviderError:
                 log.warning(
                     "ai_advisory.financial_insights.cached_parse_failed "
@@ -467,7 +501,10 @@ class AIAdvisoryService:
                     "period_end": cached.period_end.isoformat(),
                     "summary": cached_summary,
                     "items": cached_items,
-                    "context_version": context_version,
+                    "context_version": cached_metadata.get(
+                        "context_schema_version", context_version
+                    ),
+                    "context_hash": cached_metadata.get("context_hash"),
                     "tokens_used": cached.tokens_used,
                     "cost_usd": float(cached.cost_usd),
                     "model": cached.model,
@@ -475,8 +512,10 @@ class AIAdvisoryService:
                 }
 
         previous = _get_latest_insight(user_id=self._user_id)
+        prompt_snapshot = minimize_prompt_data(snapshot)
+        context_hash = _financial_context_hash(prompt_snapshot)
         prompt = _build_financial_insight_prompt(
-            minimize_prompt_data(snapshot),
+            prompt_snapshot,
             period_type=normalized_period_type,
             previous_insight=previous.content if previous else None,
         )
@@ -496,10 +535,15 @@ class AIAdvisoryService:
             )
             raise
 
-        summary, items = _coerce_financial_insight_response(llm_resp.content)
+        summary, items, _ = _coerce_financial_insight_response(llm_resp.content)
+        metadata = {
+            "context_schema_version": context_version,
+            "context_hash": context_hash,
+        }
         serialized_content = _serialize_financial_insight_response(
             summary=summary,
             items=items,
+            metadata=metadata,
         )
 
         _log_llm_call(
@@ -531,6 +575,7 @@ class AIAdvisoryService:
             "summary": summary,
             "items": items,
             "context_version": context_version,
+            "context_hash": context_hash,
             "tokens_used": llm_resp.total_tokens,
             "cost_usd": llm_resp.estimated_cost_usd,
             "model": llm_resp.model,

@@ -23,8 +23,8 @@ from flask import Flask
 from flask.cli import AppGroup
 
 from app.extensions.database import db
+from app.models.ai_insight import AIInsight, InsightType
 from app.models.entitlement import Entitlement
-from app.models.llm_audit_log import LLMAuditLog
 from app.models.user import User
 from app.services.ai_advisory_service import AIAdvisoryService
 from app.services.llm_provider import LLMProviderError
@@ -32,8 +32,6 @@ from app.services.llm_provider import LLMProviderError
 ai_insights_cli = AppGroup("ai", help="Scheduled AI insights batch commands.")
 
 _BRT = timezone(timedelta(hours=-3))
-_WEEKLY_ENDPOINT = "weekly_summary_batch"
-_MONTHLY_ENDPOINT = "spending_insights_batch"
 
 
 def _brt_today() -> date:
@@ -61,20 +59,38 @@ def _all_active_user_ids() -> list[uuid.UUID]:
     return [r.id for r in rows]
 
 
-def _already_run_today(user_id: uuid.UUID, endpoint: str) -> bool:
-    """Return True if a batch insight was already generated today (UTC).
+def _monthly_anchor(month: str | None) -> date:
+    if month is not None:
+        year, mon = int(month[:4]), int(month[5:7])
+        return date(year, mon, 1)
 
-    created_at is stored as a naive UTC datetime, so db.func.date() returns
-    the UTC calendar date. We compare it to the current UTC date explicitly
-    to avoid mismatches when the local system timezone differs from UTC.
-    """
-    today_utc = datetime.now(timezone.utc).date()
+    today = _brt_today()
+    first_of_month = today.replace(day=1)
+    prev_month_last = first_of_month - timedelta(days=1)
+    return prev_month_last.replace(day=1)
+
+
+def _period_label(*, insight_type: InsightType, anchor_date: date) -> str:
+    if insight_type == InsightType.weekly:
+        iso = anchor_date.isocalendar()
+        return f"{iso.year}-W{iso.week:02d}"
+    if insight_type == InsightType.monthly:
+        return anchor_date.strftime("%Y-%m")
+    return anchor_date.isoformat()
+
+
+def _already_has_insight(
+    *,
+    user_id: uuid.UUID,
+    insight_type: InsightType,
+    period_label: str,
+) -> bool:
     exists = (
-        db.session.query(LLMAuditLog.id)
-        .filter(
-            LLMAuditLog.user_id == user_id,
-            LLMAuditLog.endpoint == endpoint,
-            db.func.date(LLMAuditLog.created_at) == today_utc,
+        db.session.query(AIInsight.id)
+        .filter_by(
+            user_id=user_id,
+            insight_type=insight_type,
+            period_label=period_label,
         )
         .first()
     )
@@ -84,10 +100,11 @@ def _already_run_today(user_id: uuid.UUID, endpoint: str) -> bool:
 def _run_batch(
     *,
     user_ids: list[uuid.UUID],
-    endpoint: str,
-    generate_fn_name: str,
+    insight_type: InsightType,
+    anchor_date: date,
     label: str,
     dry_run: bool,
+    dry_run_subject: str,
 ) -> int:
     """Run a batch insight generation job.
 
@@ -100,25 +117,36 @@ def _run_batch(
 
     if dry_run:
         click.echo(
-            f"{label} dry-run: {len(user_ids)} eligible Premium users — no calls made."
+            f"{label} dry-run: {len(user_ids)} {dry_run_subject} — no calls made."
         )
         return 0
 
+    period_label = _period_label(insight_type=insight_type, anchor_date=anchor_date)
     processed = 0
     failures = 0
     skipped = 0
     total_cost = 0.0
 
     for user_id in user_ids:
-        if _already_run_today(user_id, endpoint):
+        if _already_has_insight(
+            user_id=user_id,
+            insight_type=insight_type,
+            period_label=period_label,
+        ):
             skipped += 1
             continue
 
         service = AIAdvisoryService(user_id=user_id)
         try:
-            result = getattr(service, generate_fn_name)()
-            total_cost += float(result.get("cost_usd", 0))
-            processed += 1
+            result = service.generate_financial_insights(
+                period_type=insight_type.value,
+                anchor_date=anchor_date,
+            )
+            if result.get("cached") is True:
+                skipped += 1
+            else:
+                total_cost += float(result.get("cost_usd", 0))
+                processed += 1
         except (LLMProviderError, Exception) as exc:  # noqa: BLE001
             click.echo(
                 f"{label} ERROR user={user_id} error={exc}",
@@ -128,7 +156,7 @@ def _run_batch(
 
     click.echo(
         f"{label}: processed={processed} failures={failures} "
-        f"skipped={skipped} cost_usd={total_cost:.6f}"
+        f"skipped={skipped} cost_usd={total_cost:.6f} period={period_label}"
     )
 
     if failures > 0 and processed == 0 and skipped == 0:
@@ -157,10 +185,11 @@ def weekly_insights(dry_run: bool) -> None:
     user_ids = _premium_user_ids()
     exit_code = _run_batch(
         user_ids=user_ids,
-        endpoint=_WEEKLY_ENDPOINT,
-        generate_fn_name="generate_weekly_summary_narrative",
+        insight_type=InsightType.weekly,
+        anchor_date=_brt_today(),
         label="weekly_insights",
         dry_run=dry_run,
+        dry_run_subject="eligible Premium users",
     )
     sys.exit(exit_code)
 
@@ -189,50 +218,20 @@ def monthly_insights(month: str | None, dry_run: bool) -> None:
     Intended to run on the 1st of each month at 03:00 UTC (00:00 BRT).
     Idempotent: skips users who already have a monthly summary today.
     """
-    if month is None:
-        today = _brt_today()
-        first_of_month = today.replace(day=1)
-        prev_month_last = first_of_month - timedelta(days=1)
-        month = prev_month_last.strftime("%Y-%m")
-
+    anchor_date = _monthly_anchor(month)
+    month_label = anchor_date.strftime("%Y-%m")
     user_ids = _all_active_user_ids()
-
-    if dry_run:
-        click.echo(
-            f"monthly_insights dry-run: {len(user_ids)} eligible users "
-            f"(Free + Premium) for month={month} — no calls made."
-        )
-        sys.exit(0)
-
-    processed = 0
-    failures = 0
-    skipped = 0
-    total_cost = 0.0
-
-    for user_id in user_ids:
-        if _already_run_today(user_id, _MONTHLY_ENDPOINT):
-            skipped += 1
-            continue
-
-        service = AIAdvisoryService(user_id=user_id)
-        try:
-            result = service.generate_spending_insights(month=month)
-            total_cost += float(result.get("cost_usd", 0))
-            processed += 1
-        except (LLMProviderError, Exception) as exc:  # noqa: BLE001
-            click.echo(
-                f"monthly_insights ERROR user={user_id} error={exc}",
-                err=True,
-            )
-            failures += 1
-
-    click.echo(
-        f"monthly_insights: processed={processed} failures={failures} "
-        f"skipped={skipped} cost_usd={total_cost:.6f} month={month}"
+    exit_code = _run_batch(
+        user_ids=user_ids,
+        insight_type=InsightType.monthly,
+        anchor_date=anchor_date,
+        label="monthly_insights",
+        dry_run=dry_run,
+        dry_run_subject=f"eligible users (Free + Premium) for month={month_label}",
     )
-
-    if failures > 0 and processed == 0 and skipped == 0:
-        sys.exit(1)
+    if not dry_run:
+        click.echo(f"monthly_insights month={month_label}")
+    sys.exit(exit_code)
 
 
 def register_ai_insights_commands(app: Flask) -> None:

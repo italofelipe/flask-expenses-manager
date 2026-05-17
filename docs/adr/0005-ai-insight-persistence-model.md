@@ -48,6 +48,32 @@ Precisávamos decidir: usar `llm_audit_logs` como store primário ou criar uma n
 - Metadados técnicos mínimos: `model`, `tokens_used`, `cost_usd`
 - Self-referential FK: `previous_insight_id` → cadeia de contexto entre dias
 
+Para o contrato period-aware, `content` passa a armazenar JSON canônico no formato:
+
+```json
+{
+  "summary": "Resumo do período.",
+  "items": [
+    {
+      "type": "saude_financeira",
+      "title": "Saldo positivo",
+      "message": "Mensagem acionável.",
+      "evidence": ["current_period.paid.balance"]
+    }
+  ],
+  "metadata": {
+    "context_schema_version": "financial_insight_snapshot.v1",
+    "context_hash": "sha256-do-snapshot-sanitizado"
+  }
+}
+```
+
+Decisão: não criar colunas dedicadas para `context_schema_version` e
+`context_hash` neste ciclo. A alternativa auditável é persistir esses campos no
+JSON de produto e expô-los no DTO de histórico. O hash é calculado sobre o
+snapshot já sanitizado/minimizado que alimenta o prompt, permitindo comparar
+reexecuções sem guardar o snapshot completo em `ai_insights`.
+
 ### llm_audit_logs (inalterado)
 - Continua recebendo TODA chamada LLM (via `_log_llm_call()`)
 - Inclui `prompt` completo, `response_text` completo, latência
