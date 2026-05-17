@@ -119,7 +119,11 @@ class TestMinimizeText:
         assert "[redacted]" in out
 
     def test_jwt_like_token_is_redacted(self) -> None:
-        token = "eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIxIn0.abcdef"
+        # gitleaks:allow — synthetic JWT fixture (header decodes to {"alg":"HS256"});
+        # not a real secret. Exists purely to exercise the redaction regex.
+        token = (  # pragma: allowlist secret
+            "eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIxIn0.abcdef"
+        )
         out = minimize_text(f"Authorization: Bearer {token}")
         assert token not in out
 

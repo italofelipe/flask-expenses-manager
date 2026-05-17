@@ -30,6 +30,8 @@ regexes = [
   '''Password@\w*''',
   '''Senha@\w*''',
   '''StrongPass@\w+''',
+  # Synthetic JWT header {"alg":"HS256"} used by AI minimization tests (#1258)
+  '''eyJhbGciOiJIUzI1NiJ9\.eyJzdWIiOiIxIn0\.abcdef''',
 ]
 
 [[allowlists]]
