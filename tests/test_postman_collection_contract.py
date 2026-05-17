@@ -186,6 +186,7 @@ def test_postman_collection_uses_domain_folders() -> None:
         "07 - Simulations",
         "08 - Entitlements",
         "09 - Notifications",
+        "10 - LGPD",
         "99 - Cleanup",
     ]
     assert folder_names == expected
