@@ -275,12 +275,35 @@ if ! docker info >/dev/null 2>&1; then
   exit 5
 fi
 
-docker compose --env-file "$ENV_FILE" -f "$COMPOSE_FILE" up -d db redis
+COMPOSE_SERVICES="$(
+  docker compose --env-file "$ENV_FILE" -f "$COMPOSE_FILE" config --services
+)"
+
+service_is_defined() {{
+  service="$1"
+  printf '%s\n' "$COMPOSE_SERVICES" | grep -Fxq "$service"
+}}
+
+SERVICE_START_ARGS=()
+for SERVICE in db redis; do
+  if service_is_defined "$SERVICE"; then
+    SERVICE_START_ARGS+=("$SERVICE")
+  else
+    echo "[ai-insights] skipping $SERVICE; not defined in compose"
+  fi
+done
+
+if [ "${{#SERVICE_START_ARGS[@]}}" -gt 0 ]; then
+  docker compose --env-file "$ENV_FILE" -f "$COMPOSE_FILE" \\
+    up -d "${{SERVICE_START_ARGS[@]}}"
+else
+  echo "[ai-insights] no optional infrastructure services to start"
+fi
 
 INSPECT_HEALTH='{{{{if .State.Health}}}}{{{{.State.Health.Status}}}}\
 {{{{else}}}}{{{{.State.Status}}}}{{{{end}}}}'
 
-for SERVICE in db redis; do
+for SERVICE in "${{SERVICE_START_ARGS[@]}}"; do
   CID=""
   for _ in $(seq 1 30); do
     CID="$(docker compose --env-file "$ENV_FILE" -f "$COMPOSE_FILE" ps -q "$SERVICE")"
@@ -293,7 +316,7 @@ for SERVICE in db redis; do
     sleep 2
   done
   if [ -z "$CID" ]; then
-    echo "[ai-insights] $SERVICE container was not created"
+    echo "[ai-insights] $SERVICE container was not created or is not running"
     exit 6
   fi
 done
