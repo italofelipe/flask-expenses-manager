@@ -9555,6 +9555,136 @@
         ]
       }
     },
+    "/user/me/export": {
+      "get": {
+        "description": "Gera um pacote JSON com todos os dados pessoais do usuário autenticado, organizados por entidade do registry LGPD. Inclui metadados de geração e seção ``retentions`` que explica os dados retidos por obrigação legal (ex: documentos fiscais com retenção de 5 anos).",
+        "parameters": [
+          {
+            "description": "Opcional. Envie `v2` para o envelope padronizado.",
+            "example": "v2",
+            "in": "header",
+            "name": "X-API-Contract",
+            "required": false,
+            "type": "string"
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "example": {
+                  "data": {
+                    "consents": [],
+                    "metadata": {
+                      "generated_at": "2026-05-17T06:00:00+00:00",
+                      "registry_version": "1.0",
+                      "scope": "lgpd_full_export",
+                      "user_id": "uuid"
+                    },
+                    "retentions": [
+                      {
+                        "entity": "fiscal_documents",
+                        "explanation": "Fiscal documents (NF, receipts) — Brazilian tax retention",
+                        "reason": "fiscal",
+                        "retention_days": 1825
+                      }
+                    ],
+                    "transactions": [],
+                    "users": [
+                      {
+                        "email": "...",
+                        "id": "uuid",
+                        "name": "..."
+                      }
+                    ]
+                  },
+                  "message": "Pacote LGPD gerado com sucesso."
+                },
+                "schema": {
+                  "properties": {
+                    "data": {
+                      "type": "object"
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "meta": {
+                      "type": "object"
+                    }
+                  },
+                  "required": [
+                    "message",
+                    "data"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Pacote LGPD gerado",
+            "headers": {
+              "X-Request-ID": {
+                "description": "Identificador único da requisição gerado pela API.",
+                "example": "9fcd2e4f4d8747b4a7d8a2b1b930f52a",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "example": {
+                  "code": "UNAUTHORIZED",
+                  "message": "Token revogado.",
+                  "status_code": 401
+                },
+                "schema": {
+                  "properties": {
+                    "code": {
+                      "type": "string"
+                    },
+                    "details": {
+                      "type": "object"
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "status_code": {
+                      "type": "integer"
+                    }
+                  },
+                  "required": [
+                    "message",
+                    "code"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Token revogado ou ausente",
+            "headers": {
+              "X-Request-ID": {
+                "description": "Identificador único da requisição gerado pela API.",
+                "example": "9fcd2e4f4d8747b4a7d8a2b1b930f52a",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "summary": "Exportar pacote LGPD do usuário",
+        "tags": [
+          "LGPD"
+        ]
+      }
+    },
     "/user/notification-preferences": {
       "get": {
         "description": "Lista as preferências de notificação do usuário autenticado.",

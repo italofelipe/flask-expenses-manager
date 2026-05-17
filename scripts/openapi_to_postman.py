@@ -830,6 +830,27 @@ ENRICHMENT: dict[str, dict[str, Any]] = {
             "});",
         ],
     },
+    # ── LGPD export (#1256) ───────────────────────────────────────────
+    "GET /user/me/export": {
+        "test_lines": [
+            "pm.test('LGPD export — expected 200', function () {",
+            "  pm.response.to.have.status(200);",
+            "});",
+            "pm.test('LGPD export — has metadata block', function () {",
+            "  const body = pm.response.json();",
+            "  const data = body.data || body;",
+            "  pm.expect(data).to.have.property('metadata');",
+            "  pm.expect(data.metadata).to.have.property('scope', 'lgpd_full_export');",
+            "  pm.expect(data.metadata).to.have.property('registry_version');",
+            "});",
+            "pm.test('LGPD export — has retentions section', function () {",
+            "  const body = pm.response.json();",
+            "  const data = body.data || body;",
+            "  pm.expect(data).to.have.property('retentions');",
+            "  pm.expect(data.retentions).to.be.an('array');",
+            "});",
+        ],
+    },
     # ── AI Advisory ───────────────────────────────────────────────────
     "GET /ai/insights/spending": {
         "test_lines": [

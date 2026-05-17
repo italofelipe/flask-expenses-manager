@@ -18,6 +18,7 @@ from .bootstrap_resource import UserBootstrapResource
 from .contracts import compat_success
 from .delete_me_resource import DeleteMeResource
 from .helpers import validate_user_token
+from .me_export_resource import MeExportResource
 from .me_resource import UserMeResource
 from .notification_preferences_resource import NotificationPreferencesResource
 from .profile_resource import UserProfileResource
@@ -96,6 +97,11 @@ def register_user_routes() -> None:
         "/me",
         view_func=DeleteMeResource.as_view("delete_me"),
         methods=["DELETE"],
+    )
+    user_bp.add_url_rule(
+        "/me/export",
+        view_func=MeExportResource.as_view("me_export"),
+        methods=["GET"],
     )
     user_bp.add_url_rule(
         "/notification-preferences",
