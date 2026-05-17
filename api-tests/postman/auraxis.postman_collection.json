@@ -1,7 +1,7 @@
 {
   "info": {
     "name": "Auraxis API",
-    "description": "Auto-generated from openapi.json (70 paths). Do not edit manually — regenerate with: npm run postman:build",
+    "description": "Auto-generated from openapi.json (71 paths). Do not edit manually — regenerate with: npm run postman:build",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "item": [
@@ -4290,6 +4290,59 @@
                 "exec": [
                   "pm.test('Revogar consentimento — expected 204', function () {",
                   "  pm.response.to.have.status(204);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "GET — Exportar pacote LGPD do usuário",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "X-API-Contract",
+                "value": "v2"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{authToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/user/me/export",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "user",
+                "me",
+                "export"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('LGPD export — expected 200', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "});",
+                  "pm.test('LGPD export — has metadata block', function () {",
+                  "  const body = pm.response.json();",
+                  "  const data = body.data || body;",
+                  "  pm.expect(data).to.have.property('metadata');",
+                  "  pm.expect(data.metadata).to.have.property('scope', 'lgpd_full_export');",
+                  "  pm.expect(data.metadata).to.have.property('registry_version');",
+                  "});",
+                  "pm.test('LGPD export — has retentions section', function () {",
+                  "  const body = pm.response.json();",
+                  "  const data = body.data || body;",
+                  "  pm.expect(data).to.have.property('retentions');",
+                  "  pm.expect(data.retentions).to.be.an('array');",
                   "});"
                 ],
                 "type": "text/javascript"
