@@ -19,6 +19,7 @@ from __future__ import annotations
 
 import importlib
 import pkgutil
+from collections.abc import Iterator, MutableSequence
 from dataclasses import dataclass
 from enum import Enum
 
@@ -441,6 +442,30 @@ def _model_user_link_columns(model: type) -> set[str]:
     return matches
 
 
+def _is_concrete_user_linked_model(obj: object) -> bool:
+    """Return True if ``obj`` is a concrete SQLAlchemy model with a user link."""
+    if not isinstance(obj, type):
+        return False
+    if obj is db.Model or not issubclass(obj, db.Model):
+        return False
+    # Declarative bases / mixins may not have __table__ resolved yet.
+    if not hasattr(obj, "__table__"):
+        return False
+    return bool(_model_user_link_columns(obj))
+
+
+def _iter_models_in_package(package_path: MutableSequence[str]) -> Iterator[type]:
+    """Yield concrete user-linked model classes discovered under ``package_path``."""
+    for _, modname, _ in pkgutil.iter_modules(package_path):
+        if modname.startswith("_"):
+            continue
+        module = importlib.import_module(f"app.models.{modname}")
+        for name in dir(module):
+            obj = getattr(module, name)
+            if _is_concrete_user_linked_model(obj):
+                yield obj
+
+
 def find_unregistered_models() -> list[str]:
     """Walk ``app.models`` and return user-linked models not in the registry.
 
@@ -455,27 +480,9 @@ def find_unregistered_models() -> list[str]:
     import app.models as models_package
 
     registered = get_registered_models()
-    unregistered: set[str] = set()
-
-    for _, modname, _ in pkgutil.iter_modules(models_package.__path__):
-        if modname.startswith("_"):
-            continue
-        module = importlib.import_module(f"app.models.{modname}")
-        for name in dir(module):
-            obj = getattr(module, name)
-            if not isinstance(obj, type):
-                continue
-            if not issubclass(obj, db.Model):
-                continue
-            if obj is db.Model:
-                continue
-            # Some declarative bases / mixins may not have __table__ yet.
-            if not hasattr(obj, "__table__"):
-                continue
-            if not _model_user_link_columns(obj):
-                continue
-            if obj in registered:
-                continue
-            unregistered.add(f"{obj.__module__}.{obj.__name__}")
-
+    unregistered = {
+        f"{obj.__module__}.{obj.__name__}"
+        for obj in _iter_models_in_package(models_package.__path__)
+        if obj not in registered
+    }
     return sorted(unregistered)
