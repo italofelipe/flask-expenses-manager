@@ -81,11 +81,22 @@ class AISpendingInsightsResource(MethodResource):
                 description="Insights gerados com sucesso",
                 message="Insights de gastos gerados com sucesso",
                 data_example={
-                    "insights": "1. Gasto elevado em alimentação...",
+                    "insights": (
+                        '[{"type":"saude_financeira","title":"Resumo",'
+                        '"message":"Mensagem acionável."}]'
+                    ),
+                    "items": [
+                        {
+                            "type": "saude_financeira",
+                            "title": "Resumo",
+                            "message": "Mensagem acionável.",
+                        }
+                    ],
                     "tokens_used": 320,
                     "cost_usd": 0.000048,
                     "month": "2026-05",
                     "model": "gpt-4o-mini",
+                    "cached": False,
                 },
             ),
             401: json_error_response(

@@ -53,6 +53,37 @@ class TestOpenAILLMProvider:
 
         assert result == "AI insight here"
 
+    def test_generate_with_usage_passes_structured_response_format(self):
+        provider = OpenAILLMProvider()
+        provider._api_key = "test-key"
+        schema = {
+            "name": "spending_insight_items",
+            "strict": True,
+            "schema": {
+                "type": "object",
+                "properties": {"items": {"type": "array", "items": {"type": "object"}}},
+                "required": ["items"],
+                "additionalProperties": False,
+            },
+        }
+
+        mock_resp = MagicMock()
+        mock_resp.json.return_value = {
+            "choices": [{"message": {"content": '{"items":[]}'}}],
+            "usage": {"prompt_tokens": 1, "completion_tokens": 1, "total_tokens": 2},
+            "model": "gpt-4o-mini-2024-07-18",
+        }
+        mock_resp.raise_for_status.return_value = None
+
+        with patch("requests.post", return_value=mock_resp) as post:
+            provider.generate_with_usage("analyze my finances", response_schema=schema)
+
+        payload = post.call_args.kwargs["json"]
+        assert payload["response_format"] == {
+            "type": "json_schema",
+            "json_schema": schema,
+        }
+
     def test_generate_raises_on_request_failure(self):
         provider = OpenAILLMProvider()
         provider._api_key = "test-key"
