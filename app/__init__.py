@@ -25,6 +25,8 @@ from app.controllers.alert_controller import alert_bp, register_alert_dependenci
 from app.controllers.auth_controller import auth_bp, register_auth_dependencies
 from app.controllers.bank_statement import bank_statement_bp
 from app.controllers.budget import budget_bp
+from app.controllers.consents import consents_bp
+from app.controllers.consents import routes as _consent_routes  # noqa: F401
 from app.controllers.credit_card import credit_card_bp
 from app.controllers.dashboard import dashboard_bp
 from app.controllers.entitlement import (
@@ -79,6 +81,7 @@ from app.models.account import Account  # noqa: F401
 from app.models.ai_insight import AIInsight  # noqa: F401
 from app.models.audit_event import AuditEvent  # noqa: F401
 from app.models.budget import Budget  # noqa: F401
+from app.models.consent import Consent  # noqa: F401
 from app.models.credit_card import CreditCard  # noqa: F401
 from app.models.entitlement import Entitlement  # noqa: F401
 from app.models.fiscal import (  # noqa: F401
@@ -172,6 +175,7 @@ def _register_documented_endpoints(app: Flask, docs: FlaskApiSpec) -> None:
         "observability",
         "budget",
         "notifications",
+        "consents",
     }
     for endpoint, view_func in sorted(app.view_functions.items()):
         if "." not in endpoint:
@@ -326,6 +330,7 @@ def create_app(*, enable_http_runtime: bool = True) -> Flask:
     app.register_blueprint(budget_bp)
     app.register_blueprint(advisory_bp)
     app.register_blueprint(ai_bp)
+    app.register_blueprint(consents_bp)
     app.register_blueprint(admin_feature_flags_bp, url_prefix="/admin")
     app.register_blueprint(admin_audit_trail_bp)
 

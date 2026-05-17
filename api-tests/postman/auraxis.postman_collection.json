@@ -1,7 +1,7 @@
 {
   "info": {
     "name": "Auraxis API",
-    "description": "Auto-generated from openapi.json (68 paths). Do not edit manually — regenerate with: npm run postman:build",
+    "description": "Auto-generated from openapi.json (70 paths). Do not edit manually — regenerate with: npm run postman:build",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "item": [
@@ -4239,6 +4239,143 @@
                 "exec": [
                   "pm.test('Remover token de push — expected 200 or 404', function () {",
                   "  pm.expect(pm.response.code).to.be.oneOf([200, 404]);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "10 - LGPD",
+      "item": [
+        {
+          "name": "DELETE — Revogar consentimento LGPD",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "X-API-Contract",
+                "value": "v2"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{authToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/me/consents/:kind",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "me",
+                "consents",
+                ":kind"
+              ],
+              "variable": [
+                {
+                  "key": "kind",
+                  "value": "terms"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Revogar consentimento — expected 204', function () {",
+                  "  pm.response.to.have.status(204);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "GET — Listar consentimentos LGPD do usuário",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "X-API-Contract",
+                "value": "v2"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{authToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/me/consents",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "me",
+                "consents"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Listar consentimentos — expected 200', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "POST — Registrar consentimento LGPD",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "X-API-Contract",
+                "value": "v2"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{authToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/me/consents",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "me",
+                "consents"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"kind\": \"terms\",\n  \"version\": \"1.0\",\n  \"action\": \"granted\",\n  \"source\": \"api\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Registrar consentimento — expected 201', function () {",
+                  "  pm.response.to.have.status(201);",
                   "});"
                 ],
                 "type": "text/javascript"

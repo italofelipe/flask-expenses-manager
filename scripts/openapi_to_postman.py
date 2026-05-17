@@ -47,6 +47,7 @@ TAG_FOLDER_MAP: dict[str, str] = {
     "Simulações": "07 - Simulations",
     "Entitlements": "08 - Entitlements",
     "Notificações": "09 - Notifications",
+    "LGPD": "10 - LGPD",
 }
 DEFAULT_FOLDER = "99 - Other"
 
@@ -170,6 +171,7 @@ FOLDER_ORDER = [
     "07 - Simulations",
     "08 - Entitlements",
     "09 - Notifications",
+    "10 - LGPD",
     "99 - Cleanup",
     "99 - Other",
 ]
@@ -794,6 +796,40 @@ ENRICHMENT: dict[str, dict[str, Any]] = {
             "});",
         ],
     },
+    # ── LGPD consents (#1259) ─────────────────────────────────────────
+    # POST creates (201); the smoke run replays the same body so the
+    # second pass exercises the idempotent path and may return 201 again
+    # (record_consent returns the original row).
+    "POST /me/consents": {
+        "body_override": json.dumps(
+            {
+                "kind": "terms",
+                "version": "1.0",
+                "action": "granted",
+                "source": "api",
+            },
+            indent=2,
+        ),
+        "test_lines": [
+            "pm.test('Registrar consentimento — expected 201', function () {",
+            "  pm.response.to.have.status(201);",
+            "});",
+        ],
+    },
+    "GET /me/consents": {
+        "test_lines": [
+            "pm.test('Listar consentimentos — expected 200', function () {",
+            "  pm.response.to.have.status(200);",
+            "});",
+        ],
+    },
+    "DELETE /me/consents/{kind}": {
+        "test_lines": [
+            "pm.test('Revogar consentimento — expected 204', function () {",
+            "  pm.response.to.have.status(204);",
+            "});",
+        ],
+    },
     # ── AI Advisory ───────────────────────────────────────────────────
     "GET /ai/insights/spending": {
         "test_lines": [
@@ -926,6 +962,8 @@ def _postman_path_variables(path: str) -> list[dict[str, str]]:
             "simulation_id": "{{simulationId}}",
             "budget_id": "{{budgetId}}",
             "entitlement_id": "{{entitlementId}}",
+            # LGPD consents (#1259): static valid enum value for smoke tests.
+            "kind": "terms",
         }
         variables.append({"key": name, "value": var_map.get(name, f"<{name}>")})
     return variables

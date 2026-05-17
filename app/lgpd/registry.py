@@ -98,6 +98,7 @@ def _build_registry() -> list[EntityRule]:
     from app.models.alert import Alert, AlertPreference
     from app.models.audit_event import AuditEvent
     from app.models.budget import Budget
+    from app.models.consent import Consent
     from app.models.credit_card import CreditCard
     from app.models.entitlement import Entitlement
     from app.models.fiscal import (
@@ -414,6 +415,21 @@ def _build_registry() -> list[EntityRule]:
             description=(
                 "Sharing invitations (from_user_id sender, to_user_id recipient)"
             ),
+        ),
+        # === LGPD process evidence (#1259) ==================================
+        # Versioned consent grants/revocations are themselves LGPD-process
+        # records. They are exported with the user data and anonymised
+        # (not hard-deleted) on account erasure so the historical audit of
+        # which versions were ever accepted survives.
+        EntityRule(
+            model=Consent,
+            user_id_field="user_id",
+            table_name="consents",
+            deletion_strategy=DeletionStrategy.ANONYMIZE,
+            export_included=True,
+            retention_reason=RetentionReason.LGPD_PROCESS,
+            retention_days=None,
+            description="Versioned consent grants/revocations (LGPD evidence)",
         ),
     ]
 

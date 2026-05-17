@@ -55,6 +55,12 @@ TAGS = [
         "name": "Notificações",
         "description": "Registro de tokens de push (Expo, Web Push VAPID)",
     },
+    {
+        "name": "LGPD",
+        "description": (
+            "Gestão de consentimentos versionados, export e remoção de dados"
+        ),
+    },
 ]
 
 EXAMPLES = {

@@ -302,6 +302,24 @@
             "minimum": 0.01,
             "type": "number"
           },
+          "category": {
+            "default": null,
+            "description": "Categoria estruturada para controle de orçamento",
+            "enum": [
+              "alimentacao",
+              "transporte",
+              "moradia",
+              "saude",
+              "lazer",
+              "educacao",
+              "investimentos",
+              "poupanca",
+              "outros",
+              null
+            ],
+            "nullable": true,
+            "type": "string"
+          },
           "created_at": {
             "description": "Data de criação da transação",
             "format": "date-time",
@@ -464,6 +482,24 @@
             "example": "150.50",
             "minimum": 0.01,
             "type": "number"
+          },
+          "category": {
+            "default": null,
+            "description": "Categoria estruturada para controle de orçamento",
+            "enum": [
+              "alimentacao",
+              "transporte",
+              "moradia",
+              "saude",
+              "lazer",
+              "educacao",
+              "investimentos",
+              "poupanca",
+              "outros",
+              null
+            ],
+            "nullable": true,
+            "type": "string"
           },
           "created_at": {
             "description": "Data de criação da transação",
@@ -687,6 +723,49 @@
         "required": [
           "new_password",
           "token"
+        ],
+        "type": "object"
+      },
+      "app_schemas_consent_schemas_ConsentRecordSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "action": {
+            "enum": [
+              "granted",
+              "revoked"
+            ],
+            "type": "string"
+          },
+          "kind": {
+            "enum": [
+              "terms",
+              "privacy",
+              "cookies",
+              "ai",
+              "marketing"
+            ],
+            "type": "string"
+          },
+          "source": {
+            "enum": [
+              "web",
+              "app",
+              "api",
+              "system"
+            ],
+            "type": "string"
+          },
+          "version": {
+            "maxLength": 32,
+            "minLength": 1,
+            "type": "string"
+          }
+        },
+        "required": [
+          "action",
+          "kind",
+          "source",
+          "version"
         ],
         "type": "object"
       },
@@ -3856,6 +3935,404 @@
         },
         "tags": [
           "Health"
+        ]
+      }
+    },
+    "/me/consents": {
+      "get": {
+        "description": "Retorna o evento mais recente para cada tipo de consentimento que o usuário já registrou. Tipos nunca registrados não aparecem na lista.",
+        "parameters": [
+          {
+            "description": "Opcional. Envie `v2` para o envelope padronizado.",
+            "example": "v2",
+            "in": "header",
+            "name": "X-API-Contract",
+            "required": false,
+            "type": "string"
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "example": {
+                  "data": {
+                    "items": [
+                      {
+                        "action": "granted",
+                        "created_at": "2026-05-17T12:00:00",
+                        "id": "uuid",
+                        "kind": "terms",
+                        "source": "web",
+                        "version": "1.0"
+                      }
+                    ],
+                    "total": 1
+                  },
+                  "message": "Consentimentos listados com sucesso."
+                },
+                "schema": {
+                  "properties": {
+                    "data": {
+                      "type": "object"
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "meta": {
+                      "type": "object"
+                    }
+                  },
+                  "required": [
+                    "message",
+                    "data"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Lista de consentimentos atual",
+            "headers": {
+              "X-Request-ID": {
+                "description": "Identificador único da requisição gerado pela API.",
+                "example": "9fcd2e4f4d8747b4a7d8a2b1b930f52a",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "example": {
+                  "code": "UNAUTHORIZED",
+                  "message": "Token revogado.",
+                  "status_code": 401
+                },
+                "schema": {
+                  "properties": {
+                    "code": {
+                      "type": "string"
+                    },
+                    "details": {
+                      "type": "object"
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "status_code": {
+                      "type": "integer"
+                    }
+                  },
+                  "required": [
+                    "message",
+                    "code"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Token revogado",
+            "headers": {
+              "X-Request-ID": {
+                "description": "Identificador único da requisição gerado pela API.",
+                "example": "9fcd2e4f4d8747b4a7d8a2b1b930f52a",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "summary": "Listar consentimentos LGPD do usuário",
+        "tags": [
+          "LGPD"
+        ]
+      },
+      "post": {
+        "description": "Registra um evento de aceite ou revogação de um tipo de consentimento em uma versão específica. Idempotente sobre (kind, version, action) — replay do mesmo evento retorna a linha original.",
+        "parameters": [
+          {
+            "in": "body",
+            "name": "body",
+            "required": false,
+            "schema": {
+              "$ref": "#/components/schemas/app_schemas_consent_schemas_ConsentRecordSchema"
+            }
+          },
+          {
+            "description": "Opcional. Envie `v2` para o envelope padronizado.",
+            "example": "v2",
+            "in": "header",
+            "name": "X-API-Contract",
+            "required": false,
+            "type": "string"
+          }
+        ],
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "example": {
+                  "data": {
+                    "action": "granted",
+                    "created_at": "2026-05-17T12:00:00",
+                    "id": "uuid",
+                    "kind": "terms",
+                    "source": "web",
+                    "version": "1.0"
+                  },
+                  "message": "Consentimento registrado com sucesso."
+                },
+                "schema": {
+                  "properties": {
+                    "data": {
+                      "type": "object"
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "meta": {
+                      "type": "object"
+                    }
+                  },
+                  "required": [
+                    "message",
+                    "data"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Consentimento registrado",
+            "headers": {
+              "X-Request-ID": {
+                "description": "Identificador único da requisição gerado pela API.",
+                "example": "9fcd2e4f4d8747b4a7d8a2b1b930f52a",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "example": {
+                  "code": "VALIDATION_ERROR",
+                  "message": "kind/action/source inválido.",
+                  "status_code": 400
+                },
+                "schema": {
+                  "properties": {
+                    "code": {
+                      "type": "string"
+                    },
+                    "details": {
+                      "type": "object"
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "status_code": {
+                      "type": "integer"
+                    }
+                  },
+                  "required": [
+                    "message",
+                    "code"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Dados inválidos",
+            "headers": {
+              "X-Request-ID": {
+                "description": "Identificador único da requisição gerado pela API.",
+                "example": "9fcd2e4f4d8747b4a7d8a2b1b930f52a",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "example": {
+                  "code": "UNAUTHORIZED",
+                  "message": "Token revogado.",
+                  "status_code": 401
+                },
+                "schema": {
+                  "properties": {
+                    "code": {
+                      "type": "string"
+                    },
+                    "details": {
+                      "type": "object"
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "status_code": {
+                      "type": "integer"
+                    }
+                  },
+                  "required": [
+                    "message",
+                    "code"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Token revogado",
+            "headers": {
+              "X-Request-ID": {
+                "description": "Identificador único da requisição gerado pela API.",
+                "example": "9fcd2e4f4d8747b4a7d8a2b1b930f52a",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "summary": "Registrar consentimento LGPD",
+        "tags": [
+          "LGPD"
+        ]
+      }
+    },
+    "/me/consents/{kind}": {
+      "delete": {
+        "description": "Atalho para registrar um evento de revogação. Versão revogada é a última versão aceita do mesmo tipo, ou '1.0' se nunca houve evento anterior.",
+        "parameters": [
+          {
+            "description": "Opcional. Envie `v2` para o envelope padronizado.",
+            "example": "v2",
+            "in": "header",
+            "name": "X-API-Contract",
+            "required": false,
+            "type": "string"
+          },
+          {
+            "in": "path",
+            "name": "kind",
+            "required": true,
+            "type": "string"
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Consentimento revogado"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "example": {
+                  "code": "VALIDATION_ERROR",
+                  "message": "Kind não suportado.",
+                  "status_code": 400
+                },
+                "schema": {
+                  "properties": {
+                    "code": {
+                      "type": "string"
+                    },
+                    "details": {
+                      "type": "object"
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "status_code": {
+                      "type": "integer"
+                    }
+                  },
+                  "required": [
+                    "message",
+                    "code"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Kind inválido",
+            "headers": {
+              "X-Request-ID": {
+                "description": "Identificador único da requisição gerado pela API.",
+                "example": "9fcd2e4f4d8747b4a7d8a2b1b930f52a",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "example": {
+                  "code": "UNAUTHORIZED",
+                  "message": "Token revogado.",
+                  "status_code": 401
+                },
+                "schema": {
+                  "properties": {
+                    "code": {
+                      "type": "string"
+                    },
+                    "details": {
+                      "type": "object"
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "status_code": {
+                      "type": "integer"
+                    }
+                  },
+                  "required": [
+                    "message",
+                    "code"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Token revogado",
+            "headers": {
+              "X-Request-ID": {
+                "description": "Identificador único da requisição gerado pela API.",
+                "example": "9fcd2e4f4d8747b4a7d8a2b1b930f52a",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "summary": "Revogar consentimento LGPD",
+        "tags": [
+          "LGPD"
         ]
       }
     },
@@ -11347,6 +11824,10 @@
     {
       "description": "Registro de tokens de push (Expo, Web Push VAPID)",
       "name": "Notificações"
+    },
+    {
+      "description": "Gestão de consentimentos versionados, export e remoção de dados",
+      "name": "LGPD"
     }
   ]
 }
