@@ -9,6 +9,7 @@ Coverage areas:
     - 1st call → 200 + X-AI-Calls-Remaining: 1
     - 2nd call → 200 + X-AI-Calls-Remaining: 0
     - 3rd call → 429 + error_code AI_DAILY_LIMIT_EXCEEDED + Retry-After header
+    - provider failures and cached responses do not consume the daily allowance
 - Free user still gets 403 from entitlement gate (never reaches rate limit)
 - Goal projection endpoint NOT rate-limited (not /ai/insights/*)
 """
@@ -19,6 +20,8 @@ import uuid
 from unittest.mock import patch
 
 import pytest
+
+from app.services.llm_provider import LLMProviderError
 
 # ---------------------------------------------------------------------------
 # Helpers (same pattern as test_ai_advisory_service.py)
@@ -261,6 +264,53 @@ class TestAIDailyRateLimitHTTP:
         assert data["error"]["code"] == "AI_DAILY_LIMIT_EXCEEDED"
         assert "Retry-After" in resp.headers
         assert resp.headers.get("X-AI-Calls-Remaining") == "0"
+
+    def test_provider_failure_does_not_consume_daily_limit(self, app, client) -> None:
+        token = _register_and_login(client, "ai-rl-provider-fail")
+        _grant_premium(app, token)
+
+        with patch(
+            "app.services.ai_advisory_service.AIAdvisoryService.generate_spending_insights",
+            side_effect=[
+                LLMProviderError("provider down"),
+                {
+                    "insights": "ok",
+                    "tokens_used": 10,
+                    "cost_usd": 0.0,
+                    "month": "2026-05",
+                    "model": "stub",
+                    "cached": False,
+                },
+            ],
+        ):
+            failed = client.get("/ai/insights/spending", headers=_auth(token, v2=True))
+            recovered = client.get("/ai/insights/spending", headers=_auth(token))
+
+        assert failed.status_code == 500
+        assert recovered.status_code == 200
+        assert recovered.headers.get("X-AI-Calls-Remaining") == "1"
+
+    def test_cached_spending_insight_does_not_consume_daily_limit(
+        self, app, client
+    ) -> None:
+        token = _register_and_login(client, "ai-rl-cached")
+        _grant_premium(app, token)
+
+        with patch(
+            "app.services.ai_advisory_service.AIAdvisoryService.generate_spending_insights",
+            return_value={
+                "insights": "cached insight",
+                "tokens_used": 10,
+                "cost_usd": 0.0,
+                "month": "2026-05",
+                "model": "stub",
+                "cached": True,
+            },
+        ):
+            resp = client.get("/ai/insights/spending", headers=_auth(token))
+
+        assert resp.status_code == 200
+        assert resp.headers.get("X-AI-Calls-Remaining") == "2"
 
     def test_429_message_is_portuguese(self, app, client) -> None:
         token = _register_and_login(client, "ai-rl-ptbr")
