@@ -46,6 +46,7 @@ from typing import Any
 from uuid import UUID
 
 from flask import current_app
+from sqlalchemy import inspect as sa_inspect
 
 from app.lgpd import REGISTRY, DeletionStrategy, EntityRule
 
@@ -105,27 +106,32 @@ _SENSITIVE_COLUMNS: frozenset[tuple[str, str]] = frozenset(
 
 
 def _serialize_row(row: Any) -> dict[str, Any]:
-    """Serialise a SQLAlchemy row to a plain dict using its column metadata.
+    """Serialise a SQLAlchemy row to a plain dict using its mapper metadata.
 
     Sensitive credential / session-token columns listed in
     :data:`_SENSITIVE_COLUMNS` are filtered out — exposing them would leak
     auth secrets to no LGPD purpose.
 
-    Column attribute access uses ``col.key`` (the Python attribute name)
-    rather than ``col.name`` (the DB column name). The two diverge whenever
-    a model overrides the DB column name — e.g. ``Simulation`` defines
-    ``extra_metadata = db.Column("metadata", ...)`` so the attribute is
-    ``extra_metadata`` while the column is ``metadata``. ``getattr(row,
-    "metadata")`` would otherwise return the SQLAlchemy ``MetaData`` object
-    (reserved name on the declarative base) and explode with
-    ``TypeError: Object of type MetaData is not JSON serializable``.
+    Iterates via ``mapper.column_attrs`` (not ``__table__.columns``) so
+    Python attribute names and DB column names can diverge. Concrete trap:
+    ``Simulation`` declares ``extra_metadata = db.Column("metadata", db.JSON, …)``
+    — the Column's ``.name`` AND ``.key`` are both ``"metadata"``, but the
+    actual Python attribute is ``extra_metadata``. Using ``column_attrs``
+    surfaces the correct attribute name via ``attr.key``; the DB name lives
+    in ``attr.expression.name``. Reading the value via
+    ``getattr(row, "metadata")`` would otherwise resolve to SQLAlchemy's
+    reserved ``Base.metadata`` instance and crash Flask's JSON encoder
+    with ``TypeError: Object of type MetaData is not JSON serializable``.
     """
     table_name = row.__table__.name
+    mapper = sa_inspect(row.__class__)
     out: dict[str, Any] = {}
-    for col in row.__table__.columns:
-        if (table_name, col.name) in _SENSITIVE_COLUMNS:
+    for col_attr in mapper.column_attrs:
+        col_name = col_attr.expression.name
+        if (table_name, col_name) in _SENSITIVE_COLUMNS:
             continue
-        out[col.name] = _serialize_value(getattr(row, col.key))
+        py_attr = col_attr.key
+        out[col_name] = _serialize_value(getattr(row, py_attr))
     return out
 
 

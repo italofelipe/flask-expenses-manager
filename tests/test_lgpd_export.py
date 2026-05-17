@@ -28,6 +28,7 @@ from enum import Enum
 from uuid import UUID
 
 import pytest
+from flask import Flask
 from flask.testing import FlaskClient
 
 from app.application.services.lgpd_export_service import (
@@ -292,6 +293,52 @@ class TestSensitiveColumnsExcluded:
         assert "id" in user_row
         assert "email" in user_row
         assert "name" in user_row
+
+
+class TestRemappedColumnNames:
+    """Regression: Simulation declares ``extra_metadata = db.Column("metadata", …)``
+    so the Python attribute name and DB column name diverge. A naive
+    ``getattr(row, col.name)`` returns the SQLAlchemy reserved ``Base.metadata``
+    object and crashes the JSON encoder. The mapper-based serializer must
+    read via the Python attribute name and emit under the DB column name.
+    """
+
+    def test_simulation_with_metadata_column_serialises_cleanly(
+        self, app: Flask, client: FlaskClient
+    ) -> None:
+        from app.extensions.database import db as _db
+        from app.models.simulation import Simulation
+
+        token = _register_and_login(client)
+        # Resolve current user id via /user/me to keep this test free of any
+        # internal helper coupling.
+        me_resp = client.get("/user/me", headers={"Authorization": f"Bearer {token}"})
+        assert me_resp.status_code == 200
+        user_id_str = (me_resp.get_json().get("data") or me_resp.get_json())["user"][
+            "id"
+        ]
+
+        with app.app_context():
+            sim = Simulation(
+                user_id=UUID(user_id_str),
+                tool_id="salary_net",
+                rule_version="1.0",
+                inputs={"gross": 5000},
+                result={"net": 4200},
+                extra_metadata={"label": "Cenário conservador"},
+            )
+            _db.session.add(sim)
+            _db.session.commit()
+
+        package = _export(client, token)
+        sims = package["simulations"]
+        assert len(sims) == 1
+        row = sims[0]
+        # The DB column is `metadata`; the export must report it under that
+        # name and the value must be the dict we stored (not SQLAlchemy's
+        # MetaData object).
+        assert "metadata" in row
+        assert row["metadata"] == {"label": "Cenário conservador"}
 
 
 # ---------------------------------------------------------------------------
