@@ -84,10 +84,36 @@ def _serialize_value(value: Any) -> Any:
     return value
 
 
+# Columns that must NEVER appear in the LGPD export — even though they belong
+# to the user, exporting them creates a credentials/auth-secret leak vector
+# without any LGPD upside. Compared per (table_name, column_name) so we can
+# scope an exclusion precisely without affecting unrelated tables.
+_SENSITIVE_COLUMNS: frozenset[tuple[str, str]] = frozenset(
+    {
+        ("users", "password"),
+        ("users", "current_jti"),
+        ("users", "refresh_token_jti"),
+        ("users", "password_reset_token_hash"),
+        ("users", "password_reset_token_expires_at"),
+        ("users", "password_reset_requested_at"),
+        ("users", "email_verification_token_hash"),
+        ("users", "email_verification_token_expires_at"),
+    }
+)
+
+
 def _serialize_row(row: Any) -> dict[str, Any]:
-    """Serialise a SQLAlchemy row to a plain dict using its column metadata."""
+    """Serialise a SQLAlchemy row to a plain dict using its column metadata.
+
+    Sensitive credential / session-token columns listed in
+    :data:`_SENSITIVE_COLUMNS` are filtered out — exposing them would leak
+    auth secrets to no LGPD purpose.
+    """
+    table_name = row.__table__.name
     out: dict[str, Any] = {}
     for col in row.__table__.columns:
+        if (table_name, col.name) in _SENSITIVE_COLUMNS:
+            continue
         out[col.name] = _serialize_value(getattr(row, col.name))
     return out
 

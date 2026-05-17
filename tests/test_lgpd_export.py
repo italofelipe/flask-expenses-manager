@@ -255,6 +255,45 @@ class TestExcludedEntities:
         assert "sharing_audit_events" not in package
 
 
+class TestSensitiveColumnsExcluded:
+    """LGPD export must NEVER leak credentials / session-token columns even
+    for the requesting user — exposing the bcrypt hash or JTI has no LGPD
+    upside and creates an unnecessary attack surface.
+    """
+
+    def test_user_row_omits_password_and_token_columns(
+        self, client: FlaskClient
+    ) -> None:
+        token = _register_and_login(client)
+        package = _export(client, token)
+        users = package["users"]
+        assert len(users) == 1
+        user_row = users[0]
+        sensitive = {
+            "password",
+            "current_jti",
+            "refresh_token_jti",
+            "password_reset_token_hash",
+            "password_reset_token_expires_at",
+            "password_reset_requested_at",
+            "email_verification_token_hash",
+            "email_verification_token_expires_at",
+        }
+        leaked = sensitive & set(user_row)
+        assert not leaked, f"Sensitive columns leaked in LGPD export: {leaked}"
+
+    def test_user_row_keeps_non_sensitive_pii(self, client: FlaskClient) -> None:
+        """Non-sensitive PII (name, email, profile) MUST stay — that is the
+        whole point of LGPD portability.
+        """
+        token = _register_and_login(client)
+        package = _export(client, token)
+        user_row = package["users"][0]
+        assert "id" in user_row
+        assert "email" in user_row
+        assert "name" in user_row
+
+
 # ---------------------------------------------------------------------------
 # Serialiser primitives (unit-level)
 # ---------------------------------------------------------------------------
