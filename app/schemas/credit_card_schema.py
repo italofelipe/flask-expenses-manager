@@ -2,6 +2,9 @@ from marshmallow import Schema, fields, validate
 
 CREDIT_CARD_BRANDS = ("visa", "mastercard", "elo", "hipercard", "amex", "other")
 
+BENEFITS_MAX_ITEMS = 12
+BENEFITS_MAX_ITEM_LENGTH = 120
+
 
 class CreditCardSchema(Schema):
     """Schema para criação e atualização de cartões de crédito"""
@@ -67,6 +70,43 @@ class CreditCardSchema(Schema):
             "example": "1234",
         },
     )
+    bank = fields.Str(
+        required=False,
+        allow_none=True,
+        validate=validate.Length(max=80),
+        metadata={
+            "description": "Nome do banco emissor",
+            "example": "Nubank",
+        },
+    )
+    description = fields.Str(
+        required=False,
+        allow_none=True,
+        validate=validate.Length(max=300),
+        metadata={
+            "description": "Descrição livre do cartão",
+            "example": "Cartão principal de despesas mensais",
+        },
+    )
+    benefits = fields.List(
+        fields.Str(validate=validate.Length(max=BENEFITS_MAX_ITEM_LENGTH)),
+        required=False,
+        allow_none=True,
+        validate=validate.Length(max=BENEFITS_MAX_ITEMS),
+        metadata={
+            "description": "Lista de benefícios do cartão (máx 12 itens × 120 chars)",
+            "example": ["Cashback 1%", "Sala VIP em aeroportos"],
+        },
+    )
+    validity_date = fields.Date(
+        required=False,
+        allow_none=True,
+        format="iso",
+        metadata={
+            "description": "Validade do cartão físico (ISO YYYY-MM-DD)",
+            "example": "2028-05-31",
+        },
+    )
 
 
 class CreditCardResponseSchema(Schema):
@@ -85,6 +125,30 @@ class CreditCardResponseSchema(Schema):
     due_day = fields.Int(allow_none=True, metadata={"description": "Dia de vencimento"})
     last_four_digits = fields.Str(
         allow_none=True, metadata={"description": "Últimos 4 dígitos"}
+    )
+    bank = fields.Str(allow_none=True, metadata={"description": "Banco emissor"})
+    description = fields.Str(
+        allow_none=True, metadata={"description": "Descrição livre"}
+    )
+    benefits = fields.List(
+        fields.Str(),
+        allow_none=True,
+        metadata={"description": "Lista de benefícios"},
+    )
+    validity_date = fields.Date(
+        allow_none=True,
+        format="iso",
+        metadata={"description": "Validade do cartão físico"},
+    )
+    created_at = fields.DateTime(
+        allow_none=True,
+        format="iso",
+        metadata={"description": "Data de criação do registro"},
+    )
+    updated_at = fields.DateTime(
+        allow_none=True,
+        format="iso",
+        metadata={"description": "Data da última atualização"},
     )
 
 

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 # mypy: disable-error-code=untyped-decorator
+from datetime import date
 from typing import Any
 from uuid import UUID
 
@@ -26,6 +27,17 @@ INVALID_BRAND_MESSAGE = (
 INVALID_DAY_MESSAGE = (
     "Fields 'closing_day' and 'due_day' must be integers between 1 and 28"
 )
+INVALID_BENEFITS_MESSAGE = (
+    "Field 'benefits' must be a list of strings (max 12 items × 120 chars each)"
+)
+INVALID_VALIDITY_DATE_MESSAGE = "Field 'validity_date' must be ISO YYYY-MM-DD"
+BANK_TOO_LONG_MESSAGE = "Field 'bank' must be at most 80 characters"
+DESCRIPTION_TOO_LONG_MESSAGE = "Field 'description' must be at most 300 characters"
+
+BENEFITS_MAX_ITEMS = 12
+BENEFITS_MAX_ITEM_LENGTH = 120
+BANK_MAX_LENGTH = 80
+DESCRIPTION_MAX_LENGTH = 300
 
 
 def _serialize_card(c: CreditCard) -> dict[str, Any]:
@@ -37,6 +49,14 @@ def _serialize_card(c: CreditCard) -> dict[str, Any]:
         "closing_day": c.closing_day,
         "due_day": c.due_day,
         "last_four_digits": c.last_four_digits,
+        "bank": c.bank,
+        "description": c.description,
+        "benefits": c.benefits_list,
+        "validity_date": (
+            c.validity_date.isoformat() if c.validity_date is not None else None
+        ),
+        "created_at": c.created_at.isoformat() if c.created_at is not None else None,
+        "updated_at": c.updated_at.isoformat() if c.updated_at is not None else None,
     }
 
 
@@ -58,53 +78,111 @@ def list_credit_cards() -> tuple[dict[str, Any], int]:
     )
 
 
+def _err_400(message: str, error_code: str) -> tuple[dict[str, Any], int]:
+    return compat_error_tuple(
+        legacy_payload={"error": message},
+        status_code=400,
+        message=message,
+        error_code=error_code,
+    )
+
+
+def _validate_brand(payload: dict[str, Any]) -> tuple[dict[str, Any], int] | None:
+    brand = payload.get("brand")
+    if brand is not None and brand not in CREDIT_CARD_BRAND_VALUES:
+        return _err_400(INVALID_BRAND_MESSAGE, "INVALID_BRAND")
+    return None
+
+
+def _validate_days(payload: dict[str, Any]) -> tuple[dict[str, Any], int] | None:
+    for day_field in ("closing_day", "due_day"):
+        val = payload.get(day_field)
+        if val is None:
+            continue
+        try:
+            v = int(val)
+            if not (1 <= v <= 28):
+                raise ValueError
+        except (ValueError, TypeError):
+            return _err_400(INVALID_DAY_MESSAGE, "INVALID_DAY")
+    return None
+
+
+def _validate_last_four(payload: dict[str, Any]) -> tuple[dict[str, Any], int] | None:
+    last_four = payload.get("last_four_digits")
+    if last_four is None:
+        return None
+    if not isinstance(last_four, str) or len(last_four) != 4:
+        return _err_400(
+            "Field 'last_four_digits' must be a 4-character string",
+            "INVALID_LAST_FOUR_DIGITS",
+        )
+    return None
+
+
+def _validate_string_max(
+    value: Any, *, max_len: int, message: str, error_code: str
+) -> tuple[dict[str, Any], int] | None:
+    if value is None:
+        return None
+    if not isinstance(value, str) or len(value) > max_len:
+        return _err_400(message, error_code)
+    return None
+
+
+def _validate_benefits(payload: dict[str, Any]) -> tuple[dict[str, Any], int] | None:
+    benefits = payload.get("benefits")
+    if benefits is None:
+        return None
+    if not isinstance(benefits, list) or len(benefits) > BENEFITS_MAX_ITEMS:
+        return _err_400(INVALID_BENEFITS_MESSAGE, "INVALID_BENEFITS")
+    for item in benefits:
+        if not isinstance(item, str) or len(item) > BENEFITS_MAX_ITEM_LENGTH:
+            return _err_400(INVALID_BENEFITS_MESSAGE, "INVALID_BENEFITS")
+    return None
+
+
+def _validate_validity_date(
+    payload: dict[str, Any],
+) -> tuple[dict[str, Any], int] | None:
+    validity = payload.get("validity_date")
+    if validity is None:
+        return None
+    if not isinstance(validity, str):
+        return _err_400(INVALID_VALIDITY_DATE_MESSAGE, "INVALID_VALIDITY_DATE")
+    try:
+        date.fromisoformat(validity)
+    except ValueError:
+        return _err_400(INVALID_VALIDITY_DATE_MESSAGE, "INVALID_VALIDITY_DATE")
+    return None
+
+
 def _validate_card_payload(
     payload: dict[str, Any],
 ) -> tuple[dict[str, Any], int] | None:
-    """Validate brand, closing_day, due_day, last_four_digits.
-
-    Returns an error tuple on invalid input, or None when all values are valid.
-    """
-    brand = payload.get("brand")
-    if brand is not None and brand not in CREDIT_CARD_BRAND_VALUES:
-        from app.controllers.response_contract import compat_error_tuple as _err
-
-        return _err(
-            legacy_payload={"error": INVALID_BRAND_MESSAGE},
-            status_code=400,
-            message=INVALID_BRAND_MESSAGE,
-            error_code="INVALID_BRAND",
-        )
-    for day_field in ("closing_day", "due_day"):
-        val = payload.get(day_field)
-        if val is not None:
-            try:
-                v = int(val)
-                if not (1 <= v <= 28):
-                    raise ValueError
-            except (ValueError, TypeError):
-                from app.controllers.response_contract import compat_error_tuple as _err
-
-                return _err(
-                    legacy_payload={"error": INVALID_DAY_MESSAGE},
-                    status_code=400,
-                    message=INVALID_DAY_MESSAGE,
-                    error_code="INVALID_DAY",
-                )
-    last_four = payload.get("last_four_digits")
-    if last_four is not None and (
-        not isinstance(last_four, str) or len(last_four) != 4
+    """Run all field validators in order; return the first error or None."""
+    for validator in (
+        _validate_brand,
+        _validate_days,
+        _validate_last_four,
+        lambda p: _validate_string_max(
+            p.get("bank"),
+            max_len=BANK_MAX_LENGTH,
+            message=BANK_TOO_LONG_MESSAGE,
+            error_code="BANK_TOO_LONG",
+        ),
+        lambda p: _validate_string_max(
+            p.get("description"),
+            max_len=DESCRIPTION_MAX_LENGTH,
+            message=DESCRIPTION_TOO_LONG_MESSAGE,
+            error_code="DESCRIPTION_TOO_LONG",
+        ),
+        _validate_benefits,
+        _validate_validity_date,
     ):
-        from app.controllers.response_contract import compat_error_tuple as _err
-
-        return _err(
-            legacy_payload={
-                "error": "Field 'last_four_digits' must be a 4-character string"
-            },
-            status_code=400,
-            message="Field 'last_four_digits' must be a 4-character string",
-            error_code="INVALID_LAST_FOUR_DIGITS",
-        )
+        error = validator(payload)
+        if error is not None:
+            return error
     return None
 
 
@@ -146,6 +224,11 @@ def create_credit_card() -> tuple[dict[str, Any], int]:
     due_day_raw = payload.get("due_day")
     due_day = int(due_day_raw) if due_day_raw is not None else None
 
+    validity_raw = payload.get("validity_date")
+    validity_value = (
+        date.fromisoformat(validity_raw) if isinstance(validity_raw, str) else None
+    )
+
     card = CreditCard(
         user_id=user_id,
         name=name,
@@ -154,7 +237,13 @@ def create_credit_card() -> tuple[dict[str, Any], int]:
         closing_day=closing_day,
         due_day=due_day,
         last_four_digits=payload.get("last_four_digits") or None,
+        bank=payload.get("bank") or None,
+        description=payload.get("description") or None,
+        validity_date=validity_value,
     )
+    benefits_value = payload.get("benefits")
+    if benefits_value is not None:
+        card.benefits_list = list(benefits_value)
     db.session.add(card)
     db.session.commit()
 
@@ -168,6 +257,43 @@ def create_credit_card() -> tuple[dict[str, Any], int]:
         message="Cartão criado com sucesso",
         data={"credit_card": card_data},
     )
+
+
+def _apply_card_updates(card: CreditCard, payload: dict[str, Any]) -> None:
+    """Apply partial-update payload to an existing card.
+
+    Only fields present in `payload` are touched. Empty strings are coerced to
+    None for nullable text columns. Caller is responsible for db.session.commit.
+    """
+    from decimal import Decimal
+
+    if "brand" in payload:
+        card.brand = payload.get("brand") or None
+    if "limit_amount" in payload:
+        raw = payload["limit_amount"]
+        card.limit_amount = Decimal(str(raw)) if raw is not None else None
+    if "closing_day" in payload:
+        raw_cd = payload["closing_day"]
+        card.closing_day = int(raw_cd) if raw_cd is not None else None
+    if "due_day" in payload:
+        raw_dd = payload["due_day"]
+        card.due_day = int(raw_dd) if raw_dd is not None else None
+    if "last_four_digits" in payload:
+        card.last_four_digits = payload.get("last_four_digits") or None
+    if "bank" in payload:
+        card.bank = payload.get("bank") or None
+    if "description" in payload:
+        card.description = payload.get("description") or None
+    if "benefits" in payload:
+        benefits_value = payload.get("benefits")
+        card.benefits_list = (
+            list(benefits_value) if benefits_value is not None else None
+        )
+    if "validity_date" in payload:
+        validity_raw = payload.get("validity_date")
+        card.validity_date = (
+            date.fromisoformat(validity_raw) if isinstance(validity_raw, str) else None
+        )
 
 
 @credit_card_bp.route("/<uuid:credit_card_id>", methods=["PUT"])
@@ -206,21 +332,7 @@ def update_credit_card(credit_card_id: UUID) -> tuple[dict[str, Any], int]:
         return validation_error
 
     card.name = name
-    if "brand" in payload:
-        card.brand = payload.get("brand") or None
-    if "limit_amount" in payload:
-        from decimal import Decimal
-
-        raw = payload["limit_amount"]
-        card.limit_amount = Decimal(str(raw)) if raw is not None else None
-    if "closing_day" in payload:
-        raw_cd = payload["closing_day"]
-        card.closing_day = int(raw_cd) if raw_cd is not None else None
-    if "due_day" in payload:
-        raw_dd = payload["due_day"]
-        card.due_day = int(raw_dd) if raw_dd is not None else None
-    if "last_four_digits" in payload:
-        card.last_four_digits = payload.get("last_four_digits") or None
+    _apply_card_updates(card, payload)
     db.session.commit()
 
     card_data = _serialize_card(card)
