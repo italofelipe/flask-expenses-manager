@@ -1,5 +1,43 @@
 # Changelog
 
+## [1.39.0](https://github.com/italofelipe/auraxis-api/compare/v1.38.1...v1.39.0) (2026-05-17)
+
+
+### Features
+
+* **ai:** add financial insight context builder ([#1273](https://github.com/italofelipe/auraxis-api/issues/1273)) ([a102467](https://github.com/italofelipe/auraxis-api/commit/a102467b2888e05aa9ff177e0b78421e66027452))
+* **consent:** alembic migration — create consents table ([c58bde2](https://github.com/italofelipe/auraxis-api/commit/c58bde2e46034d6a4afd3d50ff1531304eb851e2)), closes [#1259](https://github.com/italofelipe/auraxis-api/issues/1259)
+* **consent:** marshmallow schemas + service ([b9a306e](https://github.com/italofelipe/auraxis-api/commit/b9a306e08486ac1a033ce69591d75c1f91d55d0b)), closes [#1259](https://github.com/italofelipe/auraxis-api/issues/1259)
+* **consent:** model + ConsentKind/Action/Source enums ([70cf376](https://github.com/italofelipe/auraxis-api/commit/70cf376829ff65c37d21bccd1c6d4b1c5b9058a8)), closes [#1259](https://github.com/italofelipe/auraxis-api/issues/1259)
+* **consent:** register in LGPD registry ([947f2b4](https://github.com/italofelipe/auraxis-api/commit/947f2b49d4ef4be0fcc5c9755cbce1e2ade7b9c4)), closes [#1259](https://github.com/italofelipe/auraxis-api/issues/1259)
+* **consent:** REST endpoints (GET/POST/DELETE /me/consents) ([d48af07](https://github.com/italofelipe/auraxis-api/commit/d48af0715b5ce608b75ede8669cc18859ca980fb)), closes [#1259](https://github.com/italofelipe/auraxis-api/issues/1259)
+* **lgpd:** AI minimization, consent gate e audit redaction (Closes [#1258](https://github.com/italofelipe/auraxis-api/issues/1258)) ([14ce9f8](https://github.com/italofelipe/auraxis-api/commit/14ce9f808a5dd4265ee306187194878ce6fffe20))
+* **lgpd:** ai_lgpd module — consent gate + minimisation + audit redaction ([#1258](https://github.com/italofelipe/auraxis-api/issues/1258)) ([909ffa9](https://github.com/italofelipe/auraxis-api/commit/909ffa96e0ea8e238f95ca957c8e5a6482cc266d))
+* **lgpd:** consentimentos versionados — model + endpoints + registry (Closes [#1259](https://github.com/italofelipe/auraxis-api/issues/1259)) ([ccec2ff](https://github.com/italofelipe/auraxis-api/commit/ccec2ff21c732fd378b18dafac3086da011034e3))
+* **lgpd:** deleção integral auditável via REGISTRY (Closes [#1257](https://github.com/italofelipe/auraxis-api/issues/1257)) ([315da83](https://github.com/italofelipe/auraxis-api/commit/315da83718259d4fe3c0c6b4b3b88bbfe22aa7f9))
+* **lgpd:** deletion service — registry-driven strategy dispatcher ([57a297f](https://github.com/italofelipe/auraxis-api/commit/57a297fbbaed58d631954455318ca92f2f610725)), closes [#1257](https://github.com/italofelipe/auraxis-api/issues/1257)
+* **lgpd:** export service using REGISTRY (build_user_export) ([f306146](https://github.com/italofelipe/auraxis-api/commit/f306146ad095d667aa98e1db9f13c44e280fd322)), closes [#1256](https://github.com/italofelipe/auraxis-api/issues/1256)
+* **lgpd:** exportação e portabilidade de dados — GET /user/me/export (Closes [#1256](https://github.com/italofelipe/auraxis-api/issues/1256)) ([fe97ae5](https://github.com/italofelipe/auraxis-api/commit/fe97ae5196a8ca3741d29ee577714ef79f5151dd))
+* **lgpd:** GET /user/me/export endpoint ([16e3da2](https://github.com/italofelipe/auraxis-api/commit/16e3da26f9fc9d90f68a5d4bcfd73d6592c815c0)), closes [#1256](https://github.com/italofelipe/auraxis-api/issues/1256)
+* **lgpd:** map AIConsentRequiredError → 403 AI_CONSENT_REQUIRED in AI controllers ([#1258](https://github.com/italofelipe/auraxis-api/issues/1258)) ([6fc6270](https://github.com/italofelipe/auraxis-api/commit/6fc62707bd779ea6e1f308616a1b673af34b9fc1))
+* **lgpd:** registry module — entities, rules, deletion strategies ([c7d6bd6](https://github.com/italofelipe/auraxis-api/commit/c7d6bd6d33ace84b72bc5d3c0f43e6cc048011e7)), closes [#1255](https://github.com/italofelipe/auraxis-api/issues/1255)
+* **lgpd:** registry técnico de dados pessoais (Closes [#1255](https://github.com/italofelipe/auraxis-api/issues/1255)) ([228b915](https://github.com/italofelipe/auraxis-api/commit/228b915e878463b172d003c9e502cafcfa830a35))
+* **lgpd:** wire AI consent gate + prompt minimisation into advisory service ([#1258](https://github.com/italofelipe/auraxis-api/issues/1258)) ([0aa5749](https://github.com/italofelipe/auraxis-api/commit/0aa574911a4f53587e14427364183137f3ff6877))
+
+
+### Bug Fixes
+
+* **ai:** count insight quota only after successful generation ([#1265](https://github.com/italofelipe/auraxis-api/issues/1265)) ([8c61d67](https://github.com/italofelipe/auraxis-api/commit/8c61d673ab6ee79079e63caf45e5dffd59ca14c3))
+* **ai:** enforce structured spending insights ([#1268](https://github.com/italofelipe/auraxis-api/issues/1268)) ([3d8a196](https://github.com/italofelipe/auraxis-api/commit/3d8a196e632f524a44a6cb8e89b80cc5faae472e))
+* **ci:** allowlist synthetic JWT fixture from gitleaks ([96d25c4](https://github.com/italofelipe/auraxis-api/commit/96d25c4428343afbba46a2d3f112aea6a8b55e96)), closes [#1258](https://github.com/italofelipe/auraxis-api/issues/1258)
+* **ci:** gitleaks .gitleaksignore for synthetic JWT in commit history ([a234a03](https://github.com/italofelipe/auraxis-api/commit/a234a03ee7650cca36eebcf501dbfba8b173ae98)), closes [#1258](https://github.com/italofelipe/auraxis-api/issues/1258)
+* **consent:** persist enum.value (lowercase) not enum.name (uppercase) ([f2e2a78](https://github.com/italofelipe/auraxis-api/commit/f2e2a7892976d34ed4d169682c7a520326615f5a)), closes [#1259](https://github.com/italofelipe/auraxis-api/issues/1259)
+* **lgpd:** drop spurious branch in _minimize_description (Sonar S3516) ([993d502](https://github.com/italofelipe/auraxis-api/commit/993d502538b7babeb31f85045fabb27bd3a685bd)), closes [#1258](https://github.com/italofelipe/auraxis-api/issues/1258)
+* **lgpd:** exclude credential/token columns from export (security) ([fb56f9c](https://github.com/italofelipe/auraxis-api/commit/fb56f9cea11eebdb1d80898e7a0eae8e58485677)), closes [#1256](https://github.com/italofelipe/auraxis-api/issues/1256)
+* **lgpd:** iterate mapper.column_attrs — Column.key is not the Python attr ([1ed83e7](https://github.com/italofelipe/auraxis-api/commit/1ed83e7fb8554239a29e5b1254745ad949d2cd58)), closes [#1256](https://github.com/italofelipe/auraxis-api/issues/1256)
+* **lgpd:** per-entity isolation in export — never 500 the whole pack ([c5e8b6b](https://github.com/italofelipe/auraxis-api/commit/c5e8b6b31feaa1097b2eb27ca2b5f64de26b0e12)), closes [#1256](https://github.com/italofelipe/auraxis-api/issues/1256)
+* **lgpd:** use col.key for attr access — handle remapped column names ([96db932](https://github.com/italofelipe/auraxis-api/commit/96db93204099fab3e7221ca9bdca83638b09832b)), closes [#1256](https://github.com/italofelipe/auraxis-api/issues/1256)
+
 ## [1.38.1](https://github.com/italofelipe/auraxis-api/compare/v1.38.0...v1.38.1) (2026-05-16)
 
 
