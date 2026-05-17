@@ -251,6 +251,10 @@ PRIVILEGED_OPERATIONS: set[str] = {
     # the privileged profile so the full smoke run leaves them out.
     "DELETE /auth/sessions",
     "DELETE /auth/sessions/{session_id}",
+    # LGPD account deletion irreversibly anonymises the suite user and
+    # invalidates the bearer token — same reasoning as the session-revoke
+    # endpoints above. (#1257)
+    "DELETE /user/me",
 }
 
 # ---------------------------------------------------------------------------
@@ -384,12 +388,32 @@ ENRICHMENT: dict[str, dict[str, Any]] = {
         ),
     },
     # ── User ──────────────────────────────────────────────────────────
+    # LGPD account deletion (#1257). Requires a password body and revokes
+    # the bearer token mid-suite — kept in PRIVILEGED_OPERATIONS so the
+    # full smoke run leaves it out. Tolerates 401/403 because the
+    # auto-generated stub body has no password and email-confirmation
+    # gates may also reject it before reaching the LGPD service.
     "DELETE /user/me": {
+        "body_override": json.dumps(
+            {"password": "{{testPassword}}"},
+            indent=2,
+        ),
         "test_lines": [
-            "// Returns 403 when email is not confirmed (LGPD protection)",
-            "pm.test('Delete account — expected 403 without email confirmation', function () {",
-            "  pm.expect(pm.response.code).to.be.oneOf([200, 403]);",
+            "pm.test('LGPD delete — expected 200, 401 or 403', function () {",
+            "  pm.expect(pm.response.code).to.be.oneOf([200, 401, 403]);",
             "});",
+            "if (pm.response.code === 200) {",
+            "  pm.test('LGPD delete — report has summary keys', function () {",
+            "    const body = pm.response.json();",
+            "    const data = body.data || body;",
+            "    const report = data.report || {};",
+            "    pm.expect(report).to.have.property('summary');",
+            "    pm.expect(report.summary).to.have.property('deleted');",
+            "    pm.expect(report.summary).to.have.property('anonymized');",
+            "    pm.expect(report.summary).to.have.property('retained');",
+            "    pm.expect(report).to.have.property('retentions');",
+            "  });",
+            "}",
         ],
     },
     "PATCH /user/notification-preferences": {

@@ -1044,7 +1044,7 @@
             },
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"password\": \"MinhaSenha@123\"\n}"
+              "raw": "{\n  \"password\": \"{{testPassword}}\"\n}"
             }
           },
           "event": [
@@ -1052,10 +1052,21 @@
               "listen": "test",
               "script": {
                 "exec": [
-                  "// Returns 403 when email is not confirmed (LGPD protection)",
-                  "pm.test('Delete account — expected 403 without email confirmation', function () {",
-                  "  pm.expect(pm.response.code).to.be.oneOf([200, 403]);",
-                  "});"
+                  "pm.test('LGPD delete — expected 200, 401 or 403', function () {",
+                  "  pm.expect(pm.response.code).to.be.oneOf([200, 401, 403]);",
+                  "});",
+                  "if (pm.response.code === 200) {",
+                  "  pm.test('LGPD delete — report has summary keys', function () {",
+                  "    const body = pm.response.json();",
+                  "    const data = body.data || body;",
+                  "    const report = data.report || {};",
+                  "    pm.expect(report).to.have.property('summary');",
+                  "    pm.expect(report.summary).to.have.property('deleted');",
+                  "    pm.expect(report.summary).to.have.property('anonymized');",
+                  "    pm.expect(report.summary).to.have.property('retained');",
+                  "    pm.expect(report).to.have.property('retentions');",
+                  "  });",
+                  "}"
                 ],
                 "type": "text/javascript"
               }
@@ -4520,7 +4531,7 @@
           "}",
           "",
           "var smokeRequests = [\"GET /healthz\", \"POST \\u2014 Registrar usu\\u00e1rio\", \"POST \\u2014 Autenticar usu\\u00e1rio\", \"GET \\u2014 Obter contexto do usu\\u00e1rio autenticado\", \"GET \\u2014 Obter bootstrap da home do usu\\u00e1rio\", \"POST \\u2014 Criar transa\\u00e7\\u00e3o\", \"GET \\u2014 Listar transa\\u00e7\\u00f5es\", \"GET \\u2014 Obter resumo mensal de transa\\u00e7\\u00f5es\", \"GET \\u2014 Obter overview mensal do dashboard\", \"POST /budgets\", \"GET /budgets\", \"POST /goals\", \"GET /goals\", \"POST /goals/simulate\", \"POST /wallet\", \"GET /wallet\", \"GET /wallet/valuation\", \"POST /simulations/installment-vs-cash/calculate\", \"GET /entitlements\"];",
-          "var privilegedOnlyRequests = [\"DELETE /auth/sessions\", \"DELETE /auth/sessions/{session_id}\", \"DELETE /entitlements/admin/{entitlement_id}\", \"POST /entitlements/admin\"];",
+          "var privilegedOnlyRequests = [\"DELETE /auth/sessions\", \"DELETE /auth/sessions/{session_id}\", \"DELETE \\u2014 Excluir conta do usu\\u00e1rio (LGPD)\", \"DELETE /entitlements/admin/{entitlement_id}\", \"POST /entitlements/admin\"];",
           "var activeProfile = String(pm.environment.get('suiteProfile') || pm.collectionVariables.get('suiteProfile') || 'full').toLowerCase();",
           "if (!['smoke', 'full', 'privileged'].includes(activeProfile)) {",
           "  throw new Error('Unsupported suiteProfile: ' + activeProfile + '. Use smoke, full or privileged.');",

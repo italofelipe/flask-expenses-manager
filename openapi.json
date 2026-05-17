@@ -8860,7 +8860,7 @@
     },
     "/user/me": {
       "delete": {
-        "description": "Anonimiza permanentemente todos os dados pessoais do usuário autenticado (soft-delete LGPD). Requer confirmação de senha.\n\nApós a exclusão:\n- Todos os campos de PII são anonimizados\n- O JWT é revogado (sessão encerrada)\n- O usuário não consegue mais fazer login\n\nEsta ação é irreversível.",
+        "description": "Apaga ou anonimiza permanentemente os dados pessoais do usuário autenticado, executando a estratégia de deleção registrada no registry LGPD para cada entidade. Requer confirmação de senha.\n\nApós a exclusão:\n- Entidades com `DELETE` são removidas do banco (transactions, goals, accounts, etc.)\n- Entidades com `ANONYMIZE` mantêm a linha com PII anonimizado (User, audit_events, subscriptions, etc.)\n- Entidades com `RETAIN` são preservadas por obrigação fiscal (fiscal_documents, etc.)\n- O JWT é revogado (sessão encerrada)\n- Refresh tokens e push subscriptions são removidos\n- O usuário não consegue mais fazer login\n\nA resposta inclui o relatório de auditoria com a contagem por entidade e a metadata de retenções legais. Esta ação é irreversível.",
         "parameters": [
           {
             "in": "body",
@@ -8890,7 +8890,34 @@
             "content": {
               "application/json": {
                 "example": {
-                  "data": {},
+                  "data": {
+                    "report": {
+                      "deleted_at": "2026-05-17T06:00:00",
+                      "retentions": [
+                        {
+                          "entity": "fiscal_documents",
+                          "explanation": "Fiscal documents (NF, receipts) — Brazilian tax retention",
+                          "reason": "fiscal",
+                          "retention_days": 1825
+                        }
+                      ],
+                      "summary": {
+                        "anonymized": {
+                          "audit_events": 12,
+                          "users": 1
+                        },
+                        "deleted": {
+                          "goals": 3,
+                          "transactions": 47
+                        },
+                        "retained": {
+                          "fiscal_documents": 5
+                        }
+                      },
+                      "user_id": "uuid"
+                    },
+                    "success": true
+                  },
                   "message": "Account deleted."
                 },
                 "schema": {
