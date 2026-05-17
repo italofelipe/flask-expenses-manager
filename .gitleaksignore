@@ -1,0 +1,6 @@
+# Synthetic JWT fixture used by tests/test_lgpd_ai_minimization.py:122 (#1258).
+# The token decodes to {"alg":"HS256"} with payload {"sub":"1"} — no signature,
+# no real secret. Allowlist regex was added in .gitleaks.toml but gitleaks scans
+# git history; the commit be1ca36 still contains the literal token before the
+# allowlist landed.
+be1ca36fc329d7a0d65decfcb26a48bd3dc63166:tests/test_lgpd_ai_minimization.py:generic-api-key:122
