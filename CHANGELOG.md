@@ -1,5 +1,18 @@
 # Changelog
 
+## [1.40.0](https://github.com/italofelipe/auraxis-api/compare/v1.39.0...v1.40.0) (2026-05-17)
+
+
+### Features
+
+* **ai:** add period-aware financial insight generation ([#1278](https://github.com/italofelipe/auraxis-api/issues/1278)) ([7044abd](https://github.com/italofelipe/auraxis-api/commit/7044abd191d1af67f046c74a3644b860174103ea))
+* **ai:** align insight history and batches ([#1280](https://github.com/italofelipe/auraxis-api/issues/1280)) ([24bc38b](https://github.com/italofelipe/auraxis-api/commit/24bc38b7822778f0bb50e50ea14b3d328483e98f))
+
+
+### Bug Fixes
+
+* **ai:** support RDS compose in insights job ([#1281](https://github.com/italofelipe/auraxis-api/issues/1281)) ([7e115cf](https://github.com/italofelipe/auraxis-api/commit/7e115cf0fa8f33d03e387867aedd9acc03319f7c))
+
 ## [1.39.0](https://github.com/italofelipe/auraxis-api/compare/v1.38.1...v1.39.0) (2026-05-17)
 
 
