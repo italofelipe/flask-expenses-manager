@@ -18,6 +18,7 @@ Coverage areas:
 from __future__ import annotations
 
 import uuid
+from datetime import date
 from decimal import Decimal
 from unittest.mock import MagicMock, patch
 
@@ -79,6 +80,28 @@ def _get_current_user_id(app, token: str) -> uuid.UUID:
 
         decoded = decode_token(token)
         return uuid.UUID(decoded["sub"])
+
+
+def _financial_llm_response(
+    *,
+    summary: str = "Resumo financeiro.",
+    item_type: str = "saude_financeira",
+    evidence: str = "current_period.paid.balance",
+) -> LLMResponse:
+    return LLMResponse(
+        content=(
+            f'{{"summary":"{summary}",'
+            f'"items":[{{"type":"{item_type}",'
+            '"title":"Diagnóstico financeiro",'
+            '"message":"Os dados do período foram analisados.",'
+            f'"evidence":["{evidence}"]}}]}}'
+        ),
+        prompt_tokens=100,
+        completion_tokens=40,
+        total_tokens=140,
+        model="gpt-4o-mini",
+        latency_ms=120,
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -265,6 +288,166 @@ class TestAIAdvisoryServiceSpendingInsights:
             with pytest.raises(LLMProviderError):
                 service.generate_spending_insights()
 
+
+class TestAIAdvisoryServiceFinancialInsights:
+    def test_generate_daily_financial_insights_returns_evidence_payload(
+        self,
+        app,
+    ) -> None:
+        with app.app_context():
+            from app.extensions.database import db
+            from app.models.ai_insight import AIInsight, InsightType
+            from app.services.ai_advisory_service import AIAdvisoryService
+
+            user_id = uuid.uuid4()
+            provider = MagicMock()
+            provider.generate_with_usage.return_value = LLMResponse(
+                content=(
+                    '{"summary":"Resumo do dia.",'
+                    '"items":[{"type":"saude_financeira",'
+                    '"title":"Saldo positivo",'
+                    '"message":"Você fechou o dia com saldo positivo.",'
+                    '"evidence":["current_period.paid.balance"]}]}'
+                ),
+                prompt_tokens=100,
+                completion_tokens=40,
+                total_tokens=140,
+                model="gpt-4o-mini",
+                latency_ms=120,
+            )
+
+            service = AIAdvisoryService(user_id=user_id, llm_provider=provider)
+            result = service.generate_financial_insights(
+                period_type="daily",
+                anchor_date=date(2026, 5, 17),
+            )
+
+            assert result["period_type"] == "daily"
+            assert result["period_label"] == "2026-05-17"
+            assert result["period_start"] == "2026-05-17"
+            assert result["period_end"] == "2026-05-17"
+            assert result["summary"] == "Resumo do dia."
+            assert result["items"] == [
+                {
+                    "type": "saude_financeira",
+                    "title": "Saldo positivo",
+                    "message": "Você fechou o dia com saldo positivo.",
+                    "evidence": ["current_period.paid.balance"],
+                }
+            ]
+            assert result["context_version"] == "financial_insight_snapshot.v1"
+            assert result["cached"] is False
+            assert result["tokens_used"] == 140
+
+            call = provider.generate_with_usage.call_args
+            prompt = call.args[0]
+            assert "financial_insight_snapshot.v1" in prompt
+            assert "Não invente transações" in prompt
+            assert (
+                call.kwargs["response_schema"]["name"] == "financial_insight_response"
+            )
+
+            saved = db.session.query(AIInsight).filter_by(user_id=user_id).one()
+            assert saved.insight_type == InsightType.daily
+            assert saved.period_label == "2026-05-17"
+            assert "current_period.paid.balance" in saved.content
+
+    def test_financial_insights_return_cached_period_without_provider_call(
+        self,
+        app,
+    ) -> None:
+        with app.app_context():
+            from app.services.ai_advisory_service import AIAdvisoryService
+
+            user_id = uuid.uuid4()
+            provider = MagicMock()
+            provider.generate_with_usage.return_value = _financial_llm_response(
+                summary="Resumo cache."
+            )
+
+            service = AIAdvisoryService(user_id=user_id, llm_provider=provider)
+            first = service.generate_financial_insights(
+                period_type="daily",
+                anchor_date=date(2026, 5, 17),
+            )
+            second = service.generate_financial_insights(
+                period_type="daily",
+                anchor_date=date(2026, 5, 17),
+            )
+
+            assert first["cached"] is False
+            assert second["cached"] is True
+            assert second["summary"] == "Resumo cache."
+            provider.generate_with_usage.assert_called_once()
+
+    def test_financial_insights_reject_invalid_payload_without_saving(
+        self,
+        app,
+    ) -> None:
+        with app.app_context():
+            from app.extensions.database import db
+            from app.models.ai_insight import AIInsight
+            from app.services.ai_advisory_service import AIAdvisoryService
+
+            user_id = uuid.uuid4()
+            provider = MagicMock()
+            provider.generate_with_usage.return_value = LLMResponse(
+                content='{"summary":"Resumo","items":[{"type":"saude_financeira"}]}',
+                prompt_tokens=100,
+                completion_tokens=40,
+                total_tokens=140,
+                model="gpt-4o-mini",
+                latency_ms=120,
+            )
+
+            service = AIAdvisoryService(user_id=user_id, llm_provider=provider)
+            with pytest.raises(LLMProviderError, match="Invalid financial insight"):
+                service.generate_financial_insights(
+                    period_type="daily",
+                    anchor_date=date(2026, 5, 17),
+                )
+
+            saved = db.session.query(AIInsight).filter_by(user_id=user_id).first()
+            assert saved is None
+
+    @pytest.mark.parametrize(
+        ("period_type", "period_label", "period_start", "period_end"),
+        [
+            ("weekly", "2026-W20", "2026-05-11", "2026-05-17"),
+            ("monthly", "2026-05", "2026-05-01", "2026-05-31"),
+        ],
+    )
+    def test_generate_financial_insights_supports_weekly_and_monthly_periods(
+        self,
+        app,
+        period_type: str,
+        period_label: str,
+        period_start: str,
+        period_end: str,
+    ) -> None:
+        with app.app_context():
+            from app.models.ai_insight import AIInsight, InsightType
+            from app.services.ai_advisory_service import AIAdvisoryService
+
+            user_id = uuid.uuid4()
+            provider = MagicMock()
+            provider.generate_with_usage.return_value = _financial_llm_response()
+
+            service = AIAdvisoryService(user_id=user_id, llm_provider=provider)
+            result = service.generate_financial_insights(
+                period_type=period_type,
+                anchor_date=date(2026, 5, 17),
+            )
+
+            assert result["period_type"] == period_type
+            assert result["period_label"] == period_label
+            assert result["period_start"] == period_start
+            assert result["period_end"] == period_end
+
+            saved = AIInsight.query.filter_by(user_id=user_id).one()
+            assert saved.insight_type == InsightType(period_type)
+            assert saved.period_label == period_label
+
     def test_audit_log_created_on_success(self, app) -> None:
         with app.app_context():
             user_id = uuid.uuid4()
@@ -440,6 +623,88 @@ class TestAISpendingInsightsEndpoint:
         ):
             resp = client.get("/ai/insights/spending", headers=_auth(token))
             assert resp.status_code == 500
+
+
+class TestAIInsightGenerateEndpoint:
+    def test_post_invalid_period_type_returns_400(self, app, client) -> None:
+        token = _register_and_login(client, prefix="ai-generate-invalid")
+        user_id = _get_current_user_id(app, token)
+        _grant_entitlement(app, user_id, "advanced_simulations")
+
+        with patch(
+            "app.services.ai_advisory_service.AIAdvisoryService.generate_financial_insights"
+        ) as mocked_generate:
+            resp = client.post(
+                "/ai/insights/generate",
+                json={"period_type": "yearly"},
+                headers=_auth(token),
+            )
+
+        assert resp.status_code == 400
+        mocked_generate.assert_not_called()
+
+    def test_post_invalid_anchor_date_returns_400(self, app, client) -> None:
+        token = _register_and_login(client, prefix="ai-generate-bad-date")
+        user_id = _get_current_user_id(app, token)
+        _grant_entitlement(app, user_id, "advanced_simulations")
+
+        with patch(
+            "app.services.ai_advisory_service.AIAdvisoryService.generate_financial_insights"
+        ) as mocked_generate:
+            resp = client.post(
+                "/ai/insights/generate",
+                json={"period_type": "daily", "anchor_date": "17/05/2026"},
+                headers=_auth(token),
+            )
+
+        assert resp.status_code == 400
+        mocked_generate.assert_not_called()
+
+    def test_post_daily_generation_returns_period_payload(self, app, client) -> None:
+        token = _register_and_login(client, prefix="ai-generate-daily")
+        user_id = _get_current_user_id(app, token)
+        _grant_entitlement(app, user_id, "advanced_simulations")
+
+        generated = {
+            "period_type": "daily",
+            "period_label": "2026-05-17",
+            "period_start": "2026-05-17",
+            "period_end": "2026-05-17",
+            "summary": "Resumo do dia.",
+            "items": [
+                {
+                    "type": "saude_financeira",
+                    "title": "Dia equilibrado",
+                    "message": "Receitas e despesas foram analisadas.",
+                    "evidence": ["current_period.paid.balance"],
+                }
+            ],
+            "context_version": "financial_insight_snapshot.v1",
+            "cached": False,
+            "model": "stub",
+            "tokens_used": 123,
+            "cost_usd": 0.00001,
+        }
+
+        with patch(
+            "app.services.ai_advisory_service.AIAdvisoryService.generate_financial_insights",
+            return_value=generated,
+        ) as mocked_generate:
+            resp = client.post(
+                "/ai/insights/generate",
+                json={"period_type": "daily", "anchor_date": "2026-05-17"},
+                headers=_auth(token),
+            )
+
+        assert resp.status_code == 200
+        body = resp.get_json()
+        data = body.get("data") or body
+        assert data == generated
+        mocked_generate.assert_called_once()
+        assert mocked_generate.call_args.kwargs == {
+            "period_type": "daily",
+            "anchor_date": date(2026, 5, 17),
+        }
 
 
 class TestAIGoalProjectionEndpoint:

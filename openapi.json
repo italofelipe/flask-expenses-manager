@@ -2,7 +2,6 @@
   "components": {
     "schemas": {
       "InstallmentVsCashCalculation": {
-        "additionalProperties": false,
         "properties": {
           "cash_price": {
             "minimum": 0.01,
@@ -76,7 +75,6 @@
         "type": "object"
       },
       "InstallmentVsCashGoalBridge": {
-        "additionalProperties": false,
         "properties": {
           "category": {
             "default": "planned_purchase",
@@ -127,7 +125,6 @@
         "type": "object"
       },
       "InstallmentVsCashPlannedExpenseBridge": {
-        "additionalProperties": false,
         "properties": {
           "account_id": {
             "default": null,
@@ -214,7 +211,6 @@
         "type": "object"
       },
       "InstallmentVsCashSave": {
-        "additionalProperties": false,
         "properties": {
           "cash_price": {
             "minimum": 0.01,
@@ -288,7 +284,6 @@
         "type": "object"
       },
       "TransactionCreate": {
-        "additionalProperties": false,
         "properties": {
           "account_id": {
             "description": "ID da conta bancária associada",
@@ -469,7 +464,6 @@
         "type": "object"
       },
       "TransactionCreate_7d3b606eab": {
-        "additionalProperties": false,
         "properties": {
           "account_id": {
             "description": "ID da conta bancária associada",
@@ -643,8 +637,32 @@
         },
         "type": "object"
       },
+      "app_schemas_ai_insight_schema_AIInsightGenerateRequestSchema": {
+        "properties": {
+          "anchor_date": {
+            "description": "Data âncora do período no formato YYYY-MM-DD.",
+            "example": "2026-05-17",
+            "format": "date",
+            "nullable": true,
+            "type": "string"
+          },
+          "period_type": {
+            "description": "Granularidade do insight financeiro.",
+            "enum": [
+              "daily",
+              "weekly",
+              "monthly"
+            ],
+            "example": "daily",
+            "type": "string"
+          }
+        },
+        "required": [
+          "period_type"
+        ],
+        "type": "object"
+      },
       "app_schemas_auth_schema_AuthSchema": {
-        "additionalProperties": false,
         "properties": {
           "captcha_token": {
             "default": null,
@@ -672,7 +690,6 @@
         "type": "object"
       },
       "app_schemas_auth_schema_ConfirmEmailSchema": {
-        "additionalProperties": false,
         "properties": {
           "token": {
             "description": "Token de confirmacao recebido por email",
@@ -688,7 +705,6 @@
         "type": "object"
       },
       "app_schemas_auth_schema_ForgotPasswordSchema": {
-        "additionalProperties": false,
         "properties": {
           "email": {
             "description": "Email da conta que deseja recuperar acesso",
@@ -703,7 +719,6 @@
         "type": "object"
       },
       "app_schemas_auth_schema_ResetPasswordSchema": {
-        "additionalProperties": false,
         "properties": {
           "new_password": {
             "description": "Nova senha (mínimo 10 caracteres, com maiúscula, número e símbolo)",
@@ -727,7 +742,6 @@
         "type": "object"
       },
       "app_schemas_consent_schemas_ConsentRecordSchema": {
-        "additionalProperties": false,
         "properties": {
           "action": {
             "enum": [
@@ -770,7 +784,6 @@
         "type": "object"
       },
       "app_schemas_push_subscription_schema_SubscribeSchema": {
-        "additionalProperties": false,
         "properties": {
           "device_label": {
             "default": null,
@@ -805,7 +818,6 @@
         "type": "object"
       },
       "app_schemas_push_subscription_schema_UnsubscribeSchema": {
-        "additionalProperties": false,
         "properties": {
           "endpoint": {
             "type": "string"
@@ -817,7 +829,6 @@
         "type": "object"
       },
       "app_schemas_user_schemas_DeleteAccountSchema": {
-        "additionalProperties": false,
         "properties": {
           "password": {
             "description": "Senha atual do usuário para confirmar a exclusão da conta",
@@ -832,7 +843,6 @@
         "type": "object"
       },
       "app_schemas_user_schemas_QuestionnaireAnswerSchema": {
-        "additionalProperties": false,
         "properties": {
           "answers": {
             "description": "Lista de 5 respostas — pontos da opção escolhida em cada pergunta (1–3).",
@@ -852,7 +862,6 @@
         "type": "object"
       },
       "app_schemas_user_schemas_SalaryIncreaseSimulationRequestSchema": {
-        "additionalProperties": false,
         "properties": {
           "base_date": {
             "description": "Data base do salário atual",
@@ -888,7 +897,6 @@
         "type": "object"
       },
       "app_schemas_user_schemas_UserProfileSchema": {
-        "additionalProperties": false,
         "properties": {
           "birth_date": {
             "description": "Data de nascimento",
@@ -1001,7 +1009,6 @@
         "type": "object"
       },
       "app_schemas_user_schemas_UserRegistrationSchema": {
-        "additionalProperties": false,
         "properties": {
           "captcha_token": {
             "default": null,
@@ -1075,6 +1082,1029 @@
   },
   "openapi": "3.0.2",
   "paths": {
+    "/ai/goals/{goal_id}/projection": {
+      "post": {
+        "description": "Gera uma narrativa motivacional e prática para uma meta financeira específica, combinando projeção matemática com contexto do usuário. Requer entitlement 'advanced_simulations' (plano Premium).",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "goal_id",
+            "required": true,
+            "type": "string"
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "example": {
+                  "data": {
+                    "cost_usd": 6.7e-05,
+                    "model": "gpt-4o-mini",
+                    "narrative": "Com base no seu plano de aportes...",
+                    "projection": {
+                      "months_to_completion": 24
+                    },
+                    "tokens_used": 450
+                  },
+                  "message": "Narrativa de projeção gerada com sucesso"
+                },
+                "schema": {
+                  "properties": {
+                    "data": {
+                      "type": "object"
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "meta": {
+                      "type": "object"
+                    }
+                  },
+                  "required": [
+                    "message",
+                    "data"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Narrativa gerada com sucesso",
+            "headers": {
+              "X-Request-ID": {
+                "description": "Identificador único da requisição gerado pela API.",
+                "example": "9fcd2e4f4d8747b4a7d8a2b1b930f52a",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "example": {
+                  "code": "VALIDATION_ERROR",
+                  "message": "monthly_contribution deve ser um número positivo",
+                  "status_code": 400
+                },
+                "schema": {
+                  "properties": {
+                    "code": {
+                      "type": "string"
+                    },
+                    "details": {
+                      "type": "object"
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "status_code": {
+                      "type": "integer"
+                    }
+                  },
+                  "required": [
+                    "message",
+                    "code"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Parâmetros inválidos",
+            "headers": {
+              "X-Request-ID": {
+                "description": "Identificador único da requisição gerado pela API.",
+                "example": "9fcd2e4f4d8747b4a7d8a2b1b930f52a",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "example": {
+                  "code": "UNAUTHORIZED",
+                  "message": "Token inválido",
+                  "status_code": 401
+                },
+                "schema": {
+                  "properties": {
+                    "code": {
+                      "type": "string"
+                    },
+                    "details": {
+                      "type": "object"
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "status_code": {
+                      "type": "integer"
+                    }
+                  },
+                  "required": [
+                    "message",
+                    "code"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Não autenticado",
+            "headers": {
+              "X-Request-ID": {
+                "description": "Identificador único da requisição gerado pela API.",
+                "example": "9fcd2e4f4d8747b4a7d8a2b1b930f52a",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "example": {
+                  "code": "ENTITLEMENT_REQUIRED",
+                  "message": "Recurso exclusivo para assinantes Premium.",
+                  "status_code": 403
+                },
+                "schema": {
+                  "properties": {
+                    "code": {
+                      "type": "string"
+                    },
+                    "details": {
+                      "type": "object"
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "status_code": {
+                      "type": "integer"
+                    }
+                  },
+                  "required": [
+                    "message",
+                    "code"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Entitlement insuficiente",
+            "headers": {
+              "X-Request-ID": {
+                "description": "Identificador único da requisição gerado pela API.",
+                "example": "9fcd2e4f4d8747b4a7d8a2b1b930f52a",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "example": {
+                  "code": "NOT_FOUND",
+                  "message": "Meta não encontrada",
+                  "status_code": 404
+                },
+                "schema": {
+                  "properties": {
+                    "code": {
+                      "type": "string"
+                    },
+                    "details": {
+                      "type": "object"
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "status_code": {
+                      "type": "integer"
+                    }
+                  },
+                  "required": [
+                    "message",
+                    "code"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Meta não encontrada",
+            "headers": {
+              "X-Request-ID": {
+                "description": "Identificador único da requisição gerado pela API.",
+                "example": "9fcd2e4f4d8747b4a7d8a2b1b930f52a",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "example": {
+                  "code": "INTERNAL_ERROR",
+                  "message": "Erro ao gerar narrativa de projeção",
+                  "status_code": 500
+                },
+                "schema": {
+                  "properties": {
+                    "code": {
+                      "type": "string"
+                    },
+                    "details": {
+                      "type": "object"
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "status_code": {
+                      "type": "integer"
+                    }
+                  },
+                  "required": [
+                    "message",
+                    "code"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Falha do provider LLM",
+            "headers": {
+              "X-Request-ID": {
+                "description": "Identificador único da requisição gerado pela API.",
+                "example": "9fcd2e4f4d8747b4a7d8a2b1b930f52a",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "summary": "Narrativa de projeção de meta com IA (Premium)",
+        "tags": [
+          "AI Advisory"
+        ]
+      }
+    },
+    "/ai/insights/generate": {
+      "post": {
+        "description": "Gera insights financeiros com contexto daily, weekly ou monthly, incluindo evidências estruturadas extraídas do snapshot financeiro.",
+        "parameters": [],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "description": "Período que deve ser consolidado antes da chamada à IA.",
+              "example": {
+                "anchor_date": "2026-05-17",
+                "period_type": "daily"
+              },
+              "schema": {
+                "$ref": "#/components/schemas/app_schemas_ai_insight_schema_AIInsightGenerateRequestSchema"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "example": {
+                  "data": {
+                    "cached": false,
+                    "context_version": "financial_insight_snapshot.v1",
+                    "cost_usd": 6.3e-05,
+                    "items": [
+                      {
+                        "evidence": [
+                          "current_period.paid.balance"
+                        ],
+                        "message": "Você terminou o período com saldo positivo.",
+                        "title": "Saldo positivo",
+                        "type": "saude_financeira"
+                      }
+                    ],
+                    "model": "gpt-4o-mini",
+                    "period_end": "2026-05-17",
+                    "period_label": "2026-05-17",
+                    "period_start": "2026-05-17",
+                    "period_type": "daily",
+                    "summary": "Resumo do período.",
+                    "tokens_used": 420
+                  },
+                  "message": "Insight financeiro gerado com sucesso"
+                },
+                "schema": {
+                  "properties": {
+                    "data": {
+                      "type": "object"
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "meta": {
+                      "type": "object"
+                    }
+                  },
+                  "required": [
+                    "message",
+                    "data"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Insight gerado com sucesso",
+            "headers": {
+              "X-Request-ID": {
+                "description": "Identificador único da requisição gerado pela API.",
+                "example": "9fcd2e4f4d8747b4a7d8a2b1b930f52a",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "example": {
+                  "code": "VALIDATION_ERROR",
+                  "message": "period_type deve ser daily, weekly ou monthly",
+                  "status_code": 400
+                },
+                "schema": {
+                  "properties": {
+                    "code": {
+                      "type": "string"
+                    },
+                    "details": {
+                      "type": "object"
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "status_code": {
+                      "type": "integer"
+                    }
+                  },
+                  "required": [
+                    "message",
+                    "code"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Parâmetros inválidos",
+            "headers": {
+              "X-Request-ID": {
+                "description": "Identificador único da requisição gerado pela API.",
+                "example": "9fcd2e4f4d8747b4a7d8a2b1b930f52a",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "example": {
+                  "code": "ENTITLEMENT_REQUIRED",
+                  "message": "Recurso exclusivo para assinantes Premium.",
+                  "status_code": 403
+                },
+                "schema": {
+                  "properties": {
+                    "code": {
+                      "type": "string"
+                    },
+                    "details": {
+                      "type": "object"
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "status_code": {
+                      "type": "integer"
+                    }
+                  },
+                  "required": [
+                    "message",
+                    "code"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Entitlement insuficiente",
+            "headers": {
+              "X-Request-ID": {
+                "description": "Identificador único da requisição gerado pela API.",
+                "example": "9fcd2e4f4d8747b4a7d8a2b1b930f52a",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "example": {
+                  "code": "INTERNAL_ERROR",
+                  "message": "Erro ao gerar insight financeiro",
+                  "status_code": 500
+                },
+                "schema": {
+                  "properties": {
+                    "code": {
+                      "type": "string"
+                    },
+                    "details": {
+                      "type": "object"
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "status_code": {
+                      "type": "integer"
+                    }
+                  },
+                  "required": [
+                    "message",
+                    "code"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Erro interno ou falha do provider LLM",
+            "headers": {
+              "X-Request-ID": {
+                "description": "Identificador único da requisição gerado pela API.",
+                "example": "9fcd2e4f4d8747b4a7d8a2b1b930f52a",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "summary": "Gerar insight financeiro period-aware com IA (Premium)",
+        "tags": [
+          "AI Advisory"
+        ]
+      }
+    },
+    "/ai/insights/history": {
+      "get": {
+        "description": "Retorna a lista paginada de insights gerados por IA para o usuário autenticado, ordenada do mais recente para o mais antigo. Acessível sem entitlement premium.",
+        "parameters": [
+          {
+            "description": "Número da página (base 1). Padrão: 1.",
+            "example": 1,
+            "in": "query",
+            "name": "page",
+            "required": false,
+            "type": "integer"
+          },
+          {
+            "description": "Itens por página (máx. 50). Padrão: 20.",
+            "example": 20,
+            "in": "query",
+            "name": "per_page",
+            "required": false,
+            "type": "integer"
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "example": {
+                  "data": {
+                    "items": [
+                      {
+                        "content": "3 insights...",
+                        "cost_usd": 4.8e-05,
+                        "created_at": "2026-05-11T19:00:00",
+                        "id": "uuid",
+                        "insight_type": "daily",
+                        "model": "gpt-4o-mini",
+                        "period_end": "2026-05-11",
+                        "period_label": "2026-05-11",
+                        "period_start": "2026-05-11",
+                        "tokens_used": 320
+                      }
+                    ],
+                    "page": 1,
+                    "per_page": 20,
+                    "total": 1
+                  },
+                  "message": "Histórico de insights carregado"
+                },
+                "schema": {
+                  "properties": {
+                    "data": {
+                      "type": "object"
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "meta": {
+                      "type": "object"
+                    }
+                  },
+                  "required": [
+                    "message",
+                    "data"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Lista de insights",
+            "headers": {
+              "X-Request-ID": {
+                "description": "Identificador único da requisição gerado pela API.",
+                "example": "9fcd2e4f4d8747b4a7d8a2b1b930f52a",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "example": {
+                  "code": "UNAUTHORIZED",
+                  "message": "Token inválido",
+                  "status_code": 401
+                },
+                "schema": {
+                  "properties": {
+                    "code": {
+                      "type": "string"
+                    },
+                    "details": {
+                      "type": "object"
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "status_code": {
+                      "type": "integer"
+                    }
+                  },
+                  "required": [
+                    "message",
+                    "code"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Não autenticado",
+            "headers": {
+              "X-Request-ID": {
+                "description": "Identificador único da requisição gerado pela API.",
+                "example": "9fcd2e4f4d8747b4a7d8a2b1b930f52a",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "summary": "Histórico de insights de IA",
+        "tags": [
+          "AI Advisory"
+        ]
+      }
+    },
+    "/ai/insights/spending": {
+      "get": {
+        "description": "Analisa os gastos do mês informado e retorna insights gerados por LLM em PT-BR. Requer entitlement 'advanced_simulations' (plano Premium).",
+        "parameters": [
+          {
+            "description": "Mês no formato YYYY-MM. Padrão: mês atual.",
+            "example": "2026-05",
+            "in": "query",
+            "name": "month",
+            "required": false,
+            "type": "string"
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "example": {
+                  "data": {
+                    "cached": false,
+                    "cost_usd": 4.8e-05,
+                    "insights": "[{\"type\":\"saude_financeira\",\"title\":\"Resumo\",\"message\":\"Mensagem acionável.\"}]",
+                    "items": [
+                      {
+                        "message": "Mensagem acionável.",
+                        "title": "Resumo",
+                        "type": "saude_financeira"
+                      }
+                    ],
+                    "model": "gpt-4o-mini",
+                    "month": "2026-05",
+                    "tokens_used": 320
+                  },
+                  "message": "Insights de gastos gerados com sucesso"
+                },
+                "schema": {
+                  "properties": {
+                    "data": {
+                      "type": "object"
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "meta": {
+                      "type": "object"
+                    }
+                  },
+                  "required": [
+                    "message",
+                    "data"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Insights gerados com sucesso",
+            "headers": {
+              "X-Request-ID": {
+                "description": "Identificador único da requisição gerado pela API.",
+                "example": "9fcd2e4f4d8747b4a7d8a2b1b930f52a",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "example": {
+                  "code": "UNAUTHORIZED",
+                  "message": "Token inválido",
+                  "status_code": 401
+                },
+                "schema": {
+                  "properties": {
+                    "code": {
+                      "type": "string"
+                    },
+                    "details": {
+                      "type": "object"
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "status_code": {
+                      "type": "integer"
+                    }
+                  },
+                  "required": [
+                    "message",
+                    "code"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Não autenticado",
+            "headers": {
+              "X-Request-ID": {
+                "description": "Identificador único da requisição gerado pela API.",
+                "example": "9fcd2e4f4d8747b4a7d8a2b1b930f52a",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "example": {
+                  "code": "ENTITLEMENT_REQUIRED",
+                  "message": "Recurso exclusivo para assinantes Premium.",
+                  "status_code": 403
+                },
+                "schema": {
+                  "properties": {
+                    "code": {
+                      "type": "string"
+                    },
+                    "details": {
+                      "type": "object"
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "status_code": {
+                      "type": "integer"
+                    }
+                  },
+                  "required": [
+                    "message",
+                    "code"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Entitlement insuficiente",
+            "headers": {
+              "X-Request-ID": {
+                "description": "Identificador único da requisição gerado pela API.",
+                "example": "9fcd2e4f4d8747b4a7d8a2b1b930f52a",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "example": {
+                  "code": "INTERNAL_ERROR",
+                  "message": "Erro ao gerar insights de gastos",
+                  "status_code": 500
+                },
+                "schema": {
+                  "properties": {
+                    "code": {
+                      "type": "string"
+                    },
+                    "details": {
+                      "type": "object"
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "status_code": {
+                      "type": "integer"
+                    }
+                  },
+                  "required": [
+                    "message",
+                    "code"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Erro interno ou falha do provider LLM",
+            "headers": {
+              "X-Request-ID": {
+                "description": "Identificador único da requisição gerado pela API.",
+                "example": "9fcd2e4f4d8747b4a7d8a2b1b930f52a",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "summary": "Insights de gastos com IA (Premium)",
+        "tags": [
+          "AI Advisory"
+        ]
+      }
+    },
+    "/ai/insights/weekly-summary": {
+      "get": {
+        "description": "Gera um briefing narrativo do resumo financeiro da semana atual. Requer entitlement 'advanced_simulations' (plano Premium).",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "example": {
+                  "data": {
+                    "cost_usd": 4.2e-05,
+                    "model": "gpt-4o-mini",
+                    "narrative": "Esta semana você gastou R$ 1.200...",
+                    "summary": {
+                      "current_week": {},
+                      "previous_week": {}
+                    },
+                    "tokens_used": 280
+                  },
+                  "message": "Briefing semanal gerado com sucesso"
+                },
+                "schema": {
+                  "properties": {
+                    "data": {
+                      "type": "object"
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "meta": {
+                      "type": "object"
+                    }
+                  },
+                  "required": [
+                    "message",
+                    "data"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Briefing gerado com sucesso",
+            "headers": {
+              "X-Request-ID": {
+                "description": "Identificador único da requisição gerado pela API.",
+                "example": "9fcd2e4f4d8747b4a7d8a2b1b930f52a",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "example": {
+                  "code": "UNAUTHORIZED",
+                  "message": "Token inválido",
+                  "status_code": 401
+                },
+                "schema": {
+                  "properties": {
+                    "code": {
+                      "type": "string"
+                    },
+                    "details": {
+                      "type": "object"
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "status_code": {
+                      "type": "integer"
+                    }
+                  },
+                  "required": [
+                    "message",
+                    "code"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Não autenticado",
+            "headers": {
+              "X-Request-ID": {
+                "description": "Identificador único da requisição gerado pela API.",
+                "example": "9fcd2e4f4d8747b4a7d8a2b1b930f52a",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "example": {
+                  "code": "ENTITLEMENT_REQUIRED",
+                  "message": "Recurso exclusivo para assinantes Premium.",
+                  "status_code": 403
+                },
+                "schema": {
+                  "properties": {
+                    "code": {
+                      "type": "string"
+                    },
+                    "details": {
+                      "type": "object"
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "status_code": {
+                      "type": "integer"
+                    }
+                  },
+                  "required": [
+                    "message",
+                    "code"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Entitlement insuficiente",
+            "headers": {
+              "X-Request-ID": {
+                "description": "Identificador único da requisição gerado pela API.",
+                "example": "9fcd2e4f4d8747b4a7d8a2b1b930f52a",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "example": {
+                  "code": "INTERNAL_ERROR",
+                  "message": "Erro ao gerar briefing semanal",
+                  "status_code": 500
+                },
+                "schema": {
+                  "properties": {
+                    "code": {
+                      "type": "string"
+                    },
+                    "details": {
+                      "type": "object"
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "status_code": {
+                      "type": "integer"
+                    }
+                  },
+                  "required": [
+                    "message",
+                    "code"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Falha do provider LLM",
+            "headers": {
+              "X-Request-ID": {
+                "description": "Identificador único da requisição gerado pela API.",
+                "example": "9fcd2e4f4d8747b4a7d8a2b1b930f52a",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "summary": "Briefing semanal com IA (Premium)",
+        "tags": [
+          "AI Advisory"
+        ]
+      }
+    },
     "/auth/email/confirm": {
       "post": {
         "description": "Confirma a conta do usuario a partir do token enviado por email.",
@@ -11985,6 +13015,10 @@
     {
       "description": "Gestão de consentimentos versionados, export e remoção de dados",
       "name": "LGPD"
+    },
+    {
+      "description": "Insights financeiros e narrativas geradas por IA",
+      "name": "AI Advisory"
     }
   ]
 }

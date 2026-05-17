@@ -7,16 +7,19 @@ Ela cobre as superficies REST criticas por dominio e um smoke representativo de 
 - `api-tests/postman/auraxis.postman_collection.json`
 
 ## Estrutura oficial
-- `00 - Auth and User Bootstrap`
-- `01 - Transactions`
-- `02 - Goals`
-- `03 - Wallet`
-- `04 - Simulations`
-- `05 - Alerts`
-- `06 - Subscriptions and Entitlements`
-- `07 - Shared Entries`
-- `08 - Fiscal`
-- `09 - GraphQL`
+- `00 - Health`
+- `01 - Auth`
+- `02 - User`
+- `03 - Transactions`
+- `04 - Budgets`
+- `05 - Goals`
+- `06 - Wallet`
+- `07 - Simulations`
+- `08 - Entitlements`
+- `09 - Notifications`
+- `10 - LGPD`
+- `11 - AI Advisory`
+- `99 - Cleanup`
 
 ## Ambientes versionados
 - `environments/local.postman_environment.json`

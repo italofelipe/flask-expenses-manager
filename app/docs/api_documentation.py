@@ -61,6 +61,10 @@ TAGS = [
             "Gestão de consentimentos versionados, export e remoção de dados"
         ),
     },
+    {
+        "name": "AI Advisory",
+        "description": "Insights financeiros e narrativas geradas por IA",
+    },
 ]
 
 EXAMPLES = {
