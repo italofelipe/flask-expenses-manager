@@ -110,13 +110,22 @@ def _serialize_row(row: Any) -> dict[str, Any]:
     Sensitive credential / session-token columns listed in
     :data:`_SENSITIVE_COLUMNS` are filtered out — exposing them would leak
     auth secrets to no LGPD purpose.
+
+    Column attribute access uses ``col.key`` (the Python attribute name)
+    rather than ``col.name`` (the DB column name). The two diverge whenever
+    a model overrides the DB column name — e.g. ``Simulation`` defines
+    ``extra_metadata = db.Column("metadata", ...)`` so the attribute is
+    ``extra_metadata`` while the column is ``metadata``. ``getattr(row,
+    "metadata")`` would otherwise return the SQLAlchemy ``MetaData`` object
+    (reserved name on the declarative base) and explode with
+    ``TypeError: Object of type MetaData is not JSON serializable``.
     """
     table_name = row.__table__.name
     out: dict[str, Any] = {}
     for col in row.__table__.columns:
         if (table_name, col.name) in _SENSITIVE_COLUMNS:
             continue
-        out[col.name] = _serialize_value(getattr(row, col.name))
+        out[col.name] = _serialize_value(getattr(row, col.key))
     return out
 
 
