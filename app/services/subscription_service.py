@@ -6,8 +6,12 @@ keeping controllers thin and provider-agnostic.
 
 from __future__ import annotations
 
+import os
+from datetime import datetime
 from typing import cast
 from uuid import UUID
+
+from flask import current_app, has_app_context
 
 from app.config.billing_plans import parse_billing_cycle, resolve_checkout_plan_offer
 from app.config.plan_features import PLAN_FEATURES
@@ -16,8 +20,120 @@ from app.models.subscription import BillingCycle, Subscription, SubscriptionStat
 from app.models.user import User
 from app.services.billing_adapter import BillingProvider, BillingSubscriptionSnapshot
 from app.services.entitlement_service import sync_entitlements_from_subscription
+from app.utils.datetime_utils import utc_now_naive
 
 _FREE_PLAN_CODE = "free"
+_PREMIUM_OVERRIDE_USER_IDS_CONFIG_KEY = "AURAXIS_PREMIUM_OVERRIDE_USER_IDS"
+_PREMIUM_PLAN_CODE = "premium"
+
+
+def _premium_override_user_ids_config() -> str:
+    if has_app_context():
+        configured = current_app.config.get(_PREMIUM_OVERRIDE_USER_IDS_CONFIG_KEY)
+        if configured is not None:
+            return str(configured)
+    return os.getenv(_PREMIUM_OVERRIDE_USER_IDS_CONFIG_KEY, "")
+
+
+def _configured_premium_override_user_ids() -> frozenset[UUID]:
+    configured_user_ids: set[UUID] = set()
+    raw_config = _premium_override_user_ids_config()
+    for token in raw_config.replace(";", ",").split(","):
+        candidate = token.strip()
+        if not candidate:
+            continue
+        try:
+            configured_user_ids.add(UUID(candidate))
+        except ValueError:
+            continue
+    return frozenset(configured_user_ids)
+
+
+def is_premium_override_user_id(user_id: UUID) -> bool:
+    return user_id in _configured_premium_override_user_ids()
+
+
+def _premium_override_has_active_entitlements(user_id: UUID) -> bool:
+    from app.models.entitlement import Entitlement
+
+    premium_features = set(PLAN_FEATURES[_PREMIUM_PLAN_CODE])
+    now = utc_now_naive()
+    active_keys = {
+        row.feature_key
+        for row in Entitlement.query.filter(
+            Entitlement.user_id == user_id,
+            Entitlement.feature_key.in_(premium_features),
+            (Entitlement.expires_at.is_(None)) | (Entitlement.expires_at > now),
+        ).all()
+    }
+    return premium_features.issubset(active_keys)
+
+
+def ensure_premium_override_subscription(
+    user_id: UUID,
+    *,
+    subscription: Subscription | None = None,
+) -> Subscription | None:
+    """Promote configured internal accounts to premium for product validation.
+
+    The override is intentionally scoped to configured user IDs and is
+    idempotent: regular users keep their existing subscription state, while the
+    configured account gets a permanent premium subscription and matching feature
+    entitlements even when an older row still says ``free``.
+    """
+    user = cast(User | None, db.session.get(User, user_id))
+    if user is None or not is_premium_override_user_id(user_id):
+        return None
+
+    if subscription is None:
+        subscription = cast(
+            Subscription | None,
+            Subscription.query.filter_by(user_id=user_id).first(),
+        )
+
+    changed = False
+    if subscription is None:
+        subscription = Subscription(user_id=user_id)
+        db.session.add(subscription)
+        changed = True
+
+    subscription.plan_code, did_change = _set_if_changed(
+        subscription.plan_code,
+        _PREMIUM_PLAN_CODE,
+    )
+    changed = changed or did_change
+    subscription.status, did_change = _set_if_changed(
+        subscription.status,
+        SubscriptionStatus.ACTIVE,
+    )
+    changed = changed or did_change
+    subscription.billing_cycle, did_change = _set_if_changed(
+        subscription.billing_cycle,
+        BillingCycle.MONTHLY,
+    )
+    changed = changed or did_change
+    subscription.trial_ends_at, did_change = _set_nullable_datetime_if_changed(
+        subscription.trial_ends_at,
+        None,
+    )
+    changed = changed or did_change
+    subscription.current_period_end, did_change = _set_nullable_datetime_if_changed(
+        subscription.current_period_end,
+        None,
+    )
+    changed = changed or did_change
+    subscription.canceled_at, did_change = _set_nullable_datetime_if_changed(
+        subscription.canceled_at,
+        None,
+    )
+    changed = changed or did_change
+
+    if changed or not _premium_override_has_active_entitlements(user_id):
+        sync_entitlements_from_subscription(subscription)
+        _bump_entitlements_version(user_id)
+        db.session.commit()
+
+    return subscription
 
 
 def _normalize_plan_snapshot(
@@ -56,7 +172,13 @@ def get_or_create_subscription(user_id: UUID) -> Subscription:
         )
         db.session.add(subscription)
         db.session.commit()
-    return subscription
+    return (
+        ensure_premium_override_subscription(
+            user_id,
+            subscription=subscription,
+        )
+        or subscription
+    )
 
 
 def _bump_entitlements_version(user_id: UUID) -> None:
@@ -75,6 +197,15 @@ def _sync_access_if_needed(subscription: Subscription, *, changed: bool) -> None
 
 def _set_if_changed[T](current: T, next_value: T | None) -> tuple[T, bool]:
     if next_value is None or current == next_value:
+        return current, False
+    return next_value, True
+
+
+def _set_nullable_datetime_if_changed(
+    current: datetime | None,
+    next_value: datetime | None,
+) -> tuple[datetime | None, bool]:
+    if current == next_value:
         return current, False
     return next_value, True
 
@@ -155,10 +286,23 @@ def sync_subscription_from_provider(
     provider-side subscription to sync).
     """
     if not subscription.provider_subscription_id:
-        return subscription
+        return (
+            ensure_premium_override_subscription(
+                subscription.user_id,
+                subscription=subscription,
+            )
+            or subscription
+        )
 
     data = provider.get_subscription(subscription.provider_subscription_id)
-    return apply_subscription_snapshot(subscription, data)
+    subscription = apply_subscription_snapshot(subscription, data)
+    return (
+        ensure_premium_override_subscription(
+            subscription.user_id,
+            subscription=subscription,
+        )
+        or subscription
+    )
 
 
 def cancel_subscription(
