@@ -191,6 +191,68 @@ class TestAIAdvisoryServiceSpendingInsights:
             result = service.generate_spending_insights(month="2026-01")
             assert result["month"] == "2026-01"
 
+    def test_generate_spending_insights_normalizes_fenced_json_and_returns_items(
+        self, app
+    ) -> None:
+        with app.app_context():
+            user_id = uuid.uuid4()
+            provider = MagicMock()
+            provider.generate_with_usage.return_value = LLMResponse(
+                content=(
+                    '```json\n[{"type":"saude_financeira","title":"Ok",'
+                    '"message":"Tudo certo."}]\n```'
+                ),
+                prompt_tokens=10,
+                completion_tokens=20,
+                total_tokens=30,
+                model="gpt-4o-mini",
+                latency_ms=100,
+            )
+
+            from app.services.ai_advisory_service import AIAdvisoryService
+
+            service = AIAdvisoryService(user_id=user_id, llm_provider=provider)
+            result = service.generate_spending_insights(month="2026-05")
+
+            assert result["items"] == [
+                {
+                    "type": "saude_financeira",
+                    "title": "Ok",
+                    "message": "Tudo certo.",
+                }
+            ]
+            assert result["insights"] == (
+                '[{"type":"saude_financeira","title":"Ok","message":"Tudo certo."}]'
+            )
+            assert "response_schema" in provider.generate_with_usage.call_args.kwargs
+
+    def test_generate_spending_insights_rejects_malformed_provider_output(
+        self, app
+    ) -> None:
+        with app.app_context():
+            from app.extensions.database import db
+            from app.models.ai_insight import AIInsight
+            from app.services.ai_advisory_service import AIAdvisoryService
+
+            user_id = uuid.uuid4()
+            provider = MagicMock()
+            provider.generate_with_usage.return_value = LLMResponse(
+                content="not-json",
+                prompt_tokens=10,
+                completion_tokens=20,
+                total_tokens=30,
+                model="gpt-4o-mini",
+                latency_ms=100,
+            )
+
+            service = AIAdvisoryService(user_id=user_id, llm_provider=provider)
+
+            with pytest.raises(LLMProviderError, match="Invalid spending insight"):
+                service.generate_spending_insights(month="2026-05")
+
+            saved = db.session.query(AIInsight).filter_by(user_id=user_id).first()
+            assert saved is None
+
     def test_llm_provider_error_propagates(self, app) -> None:
         with app.app_context():
             user_id = uuid.uuid4()

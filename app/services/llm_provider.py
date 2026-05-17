@@ -16,7 +16,7 @@ from __future__ import annotations
 import os
 import time
 from dataclasses import dataclass
-from typing import Protocol, runtime_checkable
+from typing import Any, Protocol, runtime_checkable
 
 
 class LLMProviderError(Exception):
@@ -58,7 +58,12 @@ class LLMProvider(Protocol):
         """Generate a response for *prompt*. Raises LLMProviderError on failure."""
         ...
 
-    def generate_with_usage(self, prompt: str) -> LLMResponse:
+    def generate_with_usage(
+        self,
+        prompt: str,
+        *,
+        response_schema: dict[str, Any] | None = None,
+    ) -> LLMResponse:
         """Generate a response and return structured usage data."""
         ...
 
@@ -77,9 +82,20 @@ class StubLLMProvider:
     def generate(self, prompt: str) -> str:  # noqa: ARG002
         return self._STUB_CONTENT
 
-    def generate_with_usage(self, prompt: str) -> LLMResponse:  # noqa: ARG002
+    def generate_with_usage(  # noqa: ARG002
+        self,
+        prompt: str,
+        *,
+        response_schema: dict[str, Any] | None = None,
+    ) -> LLMResponse:
+        content = self._STUB_CONTENT
+        if response_schema is not None:
+            content = (
+                '{"items":[{"type":"saude_financeira","title":"Resumo financeiro",'
+                '"message":"Seus dados financeiros foram analisados com sucesso."}]}'
+            )
         return LLMResponse(
-            content=self._STUB_CONTENT,
+            content=content,
             prompt_tokens=150,
             completion_tokens=80,
             total_tokens=230,
@@ -100,12 +116,29 @@ class OpenAILLMProvider:
     def generate(self, prompt: str) -> str:
         return self.generate_with_usage(prompt).content
 
-    def generate_with_usage(self, prompt: str) -> LLMResponse:
+    def generate_with_usage(
+        self,
+        prompt: str,
+        *,
+        response_schema: dict[str, Any] | None = None,
+    ) -> LLMResponse:
         if not self._api_key:
             raise LLMProviderError("OPENAI_API_KEY is not configured.")
         import requests  # lazy import to keep startup fast
 
         start = time.monotonic()
+        payload: dict[str, Any] = {
+            "model": self._model,
+            "messages": [{"role": "user", "content": prompt}],
+            "max_tokens": 512,
+            "temperature": 0.4,
+        }
+        if response_schema is not None:
+            payload["response_format"] = {
+                "type": "json_schema",
+                "json_schema": response_schema,
+            }
+
         try:
             resp = requests.post(
                 self._BASE_URL,
@@ -113,12 +146,7 @@ class OpenAILLMProvider:
                     "Authorization": f"Bearer {self._api_key}",
                     "Content-Type": "application/json",
                 },
-                json={
-                    "model": self._model,
-                    "messages": [{"role": "user", "content": prompt}],
-                    "max_tokens": 512,
-                    "temperature": 0.4,
-                },
+                json=payload,
                 timeout=20,
             )
             resp.raise_for_status()
@@ -150,7 +178,13 @@ class ClaudeLLMProvider:
     def generate(self, prompt: str) -> str:
         return self.generate_with_usage(prompt).content
 
-    def generate_with_usage(self, prompt: str) -> LLMResponse:
+    def generate_with_usage(
+        self,
+        prompt: str,
+        *,
+        response_schema: dict[str, Any] | None = None,
+    ) -> LLMResponse:
+        _ = response_schema
         if not self._api_key:
             raise LLMProviderError("ANTHROPIC_API_KEY is not configured.")
         import requests

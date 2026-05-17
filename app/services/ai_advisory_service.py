@@ -39,6 +39,51 @@ from app.services.weekly_summary import compute_weekly_summary
 
 log = logging.getLogger(__name__)
 
+_SPENDING_INSIGHT_TYPES = (
+    "gasto_elevado",
+    "oportunidade_economia",
+    "saude_financeira",
+    "alerta_orcamento",
+    "padrao_gasto",
+    "alerta_meta",
+    "progresso_meta",
+    "orcamento_ultrapassado",
+    "planejamento_meta",
+    "saude_orcamento_mensal",
+    "conquista_meta",
+    "savings_rate_gap",
+)
+
+_SPENDING_INSIGHTS_RESPONSE_SCHEMA: dict[str, Any] = {
+    "name": "spending_insight_items",
+    "strict": True,
+    "schema": {
+        "type": "object",
+        "properties": {
+            "items": {
+                "type": "array",
+                "items": {
+                    "type": "object",
+                    "properties": {
+                        "type": {
+                            "type": "string",
+                            "enum": list(_SPENDING_INSIGHT_TYPES),
+                        },
+                        "title": {"type": "string"},
+                        "message": {"type": "string"},
+                    },
+                    "required": ["type", "title", "message"],
+                    "additionalProperties": False,
+                },
+            }
+        },
+        "required": ["items"],
+        "additionalProperties": False,
+    },
+}
+
+InsightItem = dict[str, str]
+
 
 # ---------------------------------------------------------------------------
 # AIInsight persistence helpers
@@ -52,7 +97,7 @@ def _get_cached_insight(
     period_label: str,
 ) -> AIInsight | None:
     """Return an existing AIInsight for this user/type/period, or None."""
-    return (
+    insight: AIInsight | None = (
         db.session.query(AIInsight)
         .filter_by(
             user_id=user_id,
@@ -61,16 +106,18 @@ def _get_cached_insight(
         )
         .first()
     )
+    return insight
 
 
 def _get_latest_insight(*, user_id: UUID) -> AIInsight | None:
     """Return the most recently created AIInsight for this user, or None."""
-    return (
+    insight: AIInsight | None = (
         db.session.query(AIInsight)
         .filter_by(user_id=user_id)
         .order_by(AIInsight.created_at.desc())
         .first()
     )
+    return insight
 
 
 def _save_insight(
@@ -116,6 +163,65 @@ def _safe_float(value: object) -> float:
         return float(value or 0)  # type: ignore[arg-type]
     except (TypeError, ValueError):
         return 0.0
+
+
+def _strip_json_code_fence(content: str) -> str:
+    text = content.strip()
+    if not text.startswith("```"):
+        return text
+
+    first_newline = text.find("\n")
+    if first_newline == -1:
+        return text
+
+    text = text[first_newline + 1 :]
+    if text.rstrip().endswith("```"):
+        text = text.rstrip()[:-3]
+    return text.strip()
+
+
+def _coerce_spending_insight_items(content: str) -> list[InsightItem]:
+    raw = _strip_json_code_fence(content)
+    try:
+        parsed = json.loads(raw)
+    except json.JSONDecodeError as exc:
+        raise LLMProviderError("Invalid spending insight JSON.") from exc
+
+    candidate_items = parsed.get("items") if isinstance(parsed, dict) else parsed
+    if not isinstance(candidate_items, list) or not candidate_items:
+        raise LLMProviderError("Invalid spending insight items.")
+
+    items: list[InsightItem] = []
+    for candidate in candidate_items:
+        if not isinstance(candidate, dict):
+            raise LLMProviderError("Invalid spending insight item.")
+
+        item_type = candidate.get("type")
+        title = candidate.get("title")
+        message = candidate.get("message")
+        if (
+            not isinstance(item_type, str)
+            or not item_type.strip()
+            or not isinstance(title, str)
+            or not title.strip()
+            or not isinstance(message, str)
+            or not message.strip()
+        ):
+            raise LLMProviderError("Invalid spending insight item fields.")
+
+        items.append(
+            {
+                "type": item_type.strip(),
+                "title": title.strip(),
+                "message": message.strip(),
+            }
+        )
+
+    return items
+
+
+def _serialize_spending_insight_items(items: list[InsightItem]) -> str:
+    return json.dumps(items, ensure_ascii=False, separators=(",", ":"))
 
 
 def _log_llm_call(
@@ -189,8 +295,8 @@ class AIAdvisoryService:
             month: "YYYY-MM" string. Defaults to the current calendar month.
 
         Returns:
-            {"insights": str, "tokens_used": int, "cost_usd": float,
-             "month": "YYYY-MM", "model": str, "cached": bool}
+            {"insights": str, "items": list[dict], "tokens_used": int,
+             "cost_usd": float, "month": "YYYY-MM", "model": str, "cached": bool}
         """
         today = date.today()
         if month:
@@ -214,8 +320,19 @@ class AIAdvisoryService:
             period_label=period_label,
         )
         if cached is not None:
+            cached_items: list[InsightItem] = []
+            try:
+                cached_items = _coerce_spending_insight_items(cached.content)
+            except LLMProviderError:
+                log.warning(
+                    "ai_advisory.spending_insights.cached_parse_failed "
+                    "user=%s insight=%s",
+                    self._user_id,
+                    cached.id,
+                )
             return {
                 "insights": cached.content,
+                "items": cached_items,
                 "tokens_used": cached.tokens_used,
                 "cost_usd": float(cached.cost_usd),
                 "month": f"{year}-{mon:02d}",
@@ -277,7 +394,10 @@ class AIAdvisoryService:
         )
 
         try:
-            llm_resp = self._provider.generate_with_usage(prompt)
+            llm_resp = self._provider.generate_with_usage(
+                prompt,
+                response_schema=_SPENDING_INSIGHTS_RESPONSE_SCHEMA,
+            )
         except LLMProviderError as exc:
             log.warning(
                 "ai_advisory.spending_insights.llm_error user=%s error=%s",
@@ -285,6 +405,9 @@ class AIAdvisoryService:
                 exc,
             )
             raise
+
+        insight_items = _coerce_spending_insight_items(llm_resp.content)
+        serialized_insights = _serialize_spending_insight_items(insight_items)
 
         _log_llm_call(
             user_id=self._user_id,
@@ -295,7 +418,7 @@ class AIAdvisoryService:
 
         _save_insight(
             user_id=self._user_id,
-            content=llm_resp.content,
+            content=serialized_insights,
             insight_type=insight_type,
             period_label=period_label,
             period_start=start,
@@ -307,7 +430,8 @@ class AIAdvisoryService:
         )
 
         return {
-            "insights": llm_resp.content,
+            "insights": serialized_insights,
+            "items": insight_items,
             "tokens_used": llm_resp.total_tokens,
             "cost_usd": llm_resp.estimated_cost_usd,
             "month": f"{year}-{mon:02d}",
@@ -375,6 +499,25 @@ class AIAdvisoryService:
             .all()
         )
 
+        pending_expense_rows = (
+            db.session.query(
+                Transaction.description.label("description"),
+                func.sum(Transaction.amount).label("total"),
+            )
+            .filter(
+                Transaction.user_id == self._user_id,
+                Transaction.deleted.is_(False),
+                Transaction.type == TransactionType.EXPENSE,
+                Transaction.status == TransactionStatus.PENDING,
+                Transaction.due_date >= start,
+                Transaction.due_date <= end,
+            )
+            .group_by(Transaction.description)
+            .order_by(func.sum(Transaction.amount).desc())
+            .limit(5)
+            .all()
+        )
+
         top_expenses = [
             {
                 "description": r.description or "Sem descrição",
@@ -382,9 +525,20 @@ class AIAdvisoryService:
             }
             for r in category_rows
         ]
+        pending_expenses = [
+            {
+                "description": r.description or "Sem descrição",
+                "total": _safe_float(r.total),
+            }
+            for r in pending_expense_rows
+        ]
 
         total_expense = _safe_float(row.total_expense)
         total_income = _safe_float(row.total_income)
+        pending_expense_total = round(
+            sum(float(item["total"]) for item in pending_expenses),
+            2,
+        )
         balance = round(total_income - total_expense, 2)
         savings_rate = (
             round((total_income - total_expense) / total_income * 100, 1)
@@ -397,10 +551,12 @@ class AIAdvisoryService:
             "period_end": end.isoformat(),
             "total_expense": round(total_expense, 2),
             "total_income": round(total_income, 2),
+            "pending_expense_total": pending_expense_total,
             "balance": balance,
             "savings_rate_pct": savings_rate,
             "transaction_count": int(row.tx_count or 0),
             "top_expenses": top_expenses,
+            "pending_expenses": pending_expenses,
         }
 
     # ------------------------------------------------------------------
@@ -1011,9 +1167,14 @@ def _build_spending_prompt(
         )
 
     goals_block = ""
-    if goals:
+    if goals is not None and len(goals) > 0:
         goals_json = json.dumps(goals, ensure_ascii=False, default=str)
         goals_block = f"\nMetas financeiras ativas do usuário:\n{goals_json}\n"
+    elif goals is not None:
+        goals_block = (
+            "\nMetas financeiras ativas do usuário: Nenhuma meta financeira ativa "
+            "cadastrada. Não invente metas e não trate orçamento como meta.\n"
+        )
 
     budget_block = ""
     if budget:
@@ -1083,13 +1244,17 @@ def _build_spending_prompt(
 
     return (
         f"Você é um consultor financeiro pessoal. Analise os dados de gastos de {month_label} "  # noqa: E501
-        "abaixo e gere 3 insights práticos e personalizados em português brasileiro. "
+        "abaixo e gere 3 insights detalhados, práticos e personalizados em "
+        "português brasileiro. "
         f"Para cada insight, identifique o tipo ({cross_domain_types}), "
-        "um título curto e uma recomendação específica e acionável.\n"
+        "um título curto e uma mensagem com: evidência numérica dos dados, "
+        "interpretação financeira e uma próxima ação específica.\n"
         f"{previous_block}"
         f"\nDados financeiros do período:\n{context}\n"
         f"{goals_block}"
         f"{budget_block}\n"
+        "Despesas com status pending são compromissos futuros; não trate como gasto "
+        "já realizado.\n"
         "Ao identificar cruzamentos entre gastos e metas (ex: crescimento de gastos "
         "comprometendo prazo de uma meta), priorize insights dos tipos alerta_meta, "
         "progresso_meta ou planejamento_meta.\n\n"

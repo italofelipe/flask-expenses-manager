@@ -26,6 +26,7 @@ from app.extensions.database import db
 from app.models.budget import Budget
 from app.models.goal import Goal
 from app.models.goal_contribution import GoalContribution
+from app.models.transaction import Transaction, TransactionStatus, TransactionType
 from app.services.ai_advisory_service import (
     _build_goals_snapshot,
     _build_overall_budget_snapshot,
@@ -124,6 +125,30 @@ def _make_contribution(
             created_at=datetime.utcnow() - timedelta(days=days_ago),
         )
         db.session.add(contrib)
+        db.session.commit()
+
+
+def _make_transaction(
+    app,
+    user_id: uuid.UUID,
+    *,
+    title: str,
+    amount: float,
+    transaction_type: TransactionType,
+    status: TransactionStatus,
+    due_date: date,
+) -> None:
+    with app.app_context():
+        tx = Transaction(
+            user_id=user_id,
+            title=title,
+            description=title,
+            amount=Decimal(str(amount)),
+            type=transaction_type,
+            status=status,
+            due_date=due_date,
+        )
+        db.session.add(tx)
         db.session.commit()
 
 
@@ -305,11 +330,12 @@ class TestBuildSpendingPrompt:
         assert "Viagem Itália" in prompt
         assert "Metas financeiras ativas" in prompt
 
-    def test_omits_goals_section_when_empty(self):
+    def test_states_no_active_goals_when_empty(self):
         prompt = _build_spending_prompt(
             self._snapshot(), "2026-05", goals=[], budget=None
         )
-        assert "Metas financeiras ativas" not in prompt
+        assert "Nenhuma meta financeira ativa cadastrada" in prompt
+        assert "não trate orçamento como meta" in prompt
 
     def test_includes_budget_section_when_provided(self):
         budget = {
@@ -347,6 +373,52 @@ class TestBuildSpendingPrompt:
 
 
 class TestGenerateSpendingInsightsEnrichment:
+    def test_spending_snapshot_separates_paid_and_pending_expenses(self, app, client):
+        _, user_id = _register_and_login(client)
+        month_start = date(2026, 5, 1)
+        _make_transaction(
+            app,
+            user_id,
+            title="Salário",
+            amount=4000.0,
+            transaction_type=TransactionType.INCOME,
+            status=TransactionStatus.PAID,
+            due_date=month_start,
+        )
+        _make_transaction(
+            app,
+            user_id,
+            title="Mercado pago",
+            amount=700.0,
+            transaction_type=TransactionType.EXPENSE,
+            status=TransactionStatus.PAID,
+            due_date=month_start,
+        )
+        _make_transaction(
+            app,
+            user_id,
+            title="Cartão em aberto",
+            amount=2580.0,
+            transaction_type=TransactionType.EXPENSE,
+            status=TransactionStatus.PENDING,
+            due_date=date(2026, 5, 11),
+        )
+
+        with app.app_context():
+            from app.services.ai_advisory_service import AIAdvisoryService
+
+            service = AIAdvisoryService(user_id=user_id, llm_provider=MagicMock())
+            snapshot = service._build_spending_snapshot(
+                start=month_start, end=date(2026, 5, 31)
+            )
+
+        assert snapshot["total_income"] == pytest.approx(4000.0)
+        assert snapshot["total_expense"] == pytest.approx(700.0)
+        assert snapshot["pending_expense_total"] == pytest.approx(2580.0)
+        assert snapshot["pending_expenses"] == [
+            {"description": "Cartão em aberto", "total": 2580.0}
+        ]
+
     def test_prompt_contains_goal_data(self, app, client):
         _, user_id = _register_and_login(client)
         _make_goal(
@@ -373,7 +445,7 @@ class TestGenerateSpendingInsightsEnrichment:
             from app.services.ai_advisory_service import AIAdvisoryService
 
             mock_provider = MagicMock()
-            mock_provider.generate_with_usage.side_effect = lambda p: (
+            mock_provider.generate_with_usage.side_effect = lambda p, **_: (
                 captured_prompts.append(p) or stub_response
             )
 

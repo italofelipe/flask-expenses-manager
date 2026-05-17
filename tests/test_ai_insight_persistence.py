@@ -11,6 +11,7 @@ Coverage:
 
 from __future__ import annotations
 
+import json
 import uuid
 from datetime import date, timedelta
 from unittest.mock import MagicMock, patch
@@ -74,7 +75,12 @@ def _revoke_premium(app, token: str) -> None:
         deactivate_premium(user_id)
 
 
-def _stub_response(content: str = "Insight gerado com sucesso.") -> LLMResponse:
+def _stub_response(
+    content: str = (
+        '[{"type":"saude_financeira","title":"Insight",'
+        '"message":"Insight gerado com sucesso."}]'
+    ),
+) -> LLMResponse:
     return LLMResponse(
         content=content,
         prompt_tokens=100,
@@ -109,9 +115,42 @@ class TestAdvisoryServicePersistence:
                 .first()
             )
             assert saved is not None
-            assert saved.content == "Insight gerado com sucesso."
+            assert json.loads(saved.content) == [
+                {
+                    "type": "saude_financeira",
+                    "title": "Insight",
+                    "message": "Insight gerado com sucesso.",
+                }
+            ]
             assert saved.model == "gpt-4o-mini"
             assert saved.tokens_used == 300
+
+    def test_generate_spending_insights_saves_canonical_json_content(self, app) -> None:
+        with app.app_context():
+            from app.extensions.database import db
+            from app.services.ai_advisory_service import AIAdvisoryService
+
+            user_id = uuid.uuid4()
+            provider = MagicMock()
+            provider.generate_with_usage.return_value = _stub_response(
+                '```json\n[{"type":"alerta_meta","title":"Meta",'
+                '"message":"Revise seu plano."}]\n```'
+            )
+
+            service = AIAdvisoryService(user_id=user_id, llm_provider=provider)
+            result = service.generate_spending_insights(month="2026-05")
+
+            saved = (
+                db.session.query(AIInsight)
+                .filter_by(user_id=user_id, insight_type=InsightType.daily)
+                .first()
+            )
+
+            assert saved is not None
+            assert saved.content == result["insights"]
+            assert saved.content.startswith("[")
+            assert "```" not in saved.content
+            assert json.loads(saved.content) == result["items"]
 
     def test_idempotency_returns_cached_insight_without_calling_llm(self, app) -> None:
         with app.app_context():
@@ -119,7 +158,10 @@ class TestAdvisoryServicePersistence:
 
             user_id = uuid.uuid4()
             provider = MagicMock()
-            provider.generate_with_usage.return_value = _stub_response("First insight.")
+            provider.generate_with_usage.return_value = _stub_response(
+                '[{"type":"saude_financeira","title":"Primeiro",'
+                '"message":"First insight."}]'
+            )
 
             service = AIAdvisoryService(user_id=user_id, llm_provider=provider)
             result1 = service.generate_spending_insights()
@@ -171,7 +213,10 @@ class TestAdvisoryServicePersistence:
 
             user_id = uuid.uuid4()
             provider = MagicMock()
-            provider.generate_with_usage.return_value = _stub_response("Recap do mês.")
+            provider.generate_with_usage.return_value = _stub_response(
+                '[{"type":"saude_financeira","title":"Recap",'
+                '"message":"Recap do mês."}]'
+            )
 
             # Patch date.today() to be the last day of a month
             last_day = date(2026, 5, 31)
