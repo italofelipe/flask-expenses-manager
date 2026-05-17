@@ -4,6 +4,10 @@ Enforces a maximum of AI_DAILY_LIMIT calls per user per calendar day (BRT timezo
 The counter is backed by Redis when available; falls back to an in-process
 dictionary for test environments where Redis is not configured.
 
+Only successful, non-cached insight generations consume the daily allowance.
+Provider/configuration errors and cached responses do not count because no new
+LLM result was produced for the user.
+
 Usage (in MethodResource views):
     @jwt_required()
     @ai_daily_limit()
@@ -98,24 +102,36 @@ class _InMemoryAICounter:
             return cls._counts[key]
 
     @classmethod
+    def get(cls, key: str) -> int:
+        with cls._lock:
+            return cls._counts.get(key, 0)
+
+    @classmethod
     def reset(cls) -> None:
         with cls._lock:
             cls._counts.clear()
 
 
-def check_ai_daily_limit(
-    user_id: UUID,
-    *,
-    max_calls: int = AI_DAILY_LIMIT,
-) -> tuple[int, int]:
-    """Increment and return the daily AI call counter for *user_id*.
+def _counter_key(user_id: UUID) -> str:
+    return f"auraxis:ai-daily:{user_id}:{_brt_date_str()}"
 
-    Returns:
-        (current_count, retry_after_seconds)
 
-    A caller that receives current_count > max_calls MUST reject the request.
-    """
-    key = f"auraxis:ai-daily:{user_id}:{_brt_date_str()}"
+def get_ai_daily_usage(user_id: UUID) -> tuple[int, int]:
+    """Return current daily successful insight count without incrementing it."""
+    key = _counter_key(user_id)
+    ttl = _seconds_until_midnight_brt()
+
+    client = _get_redis()
+    if client is not None:
+        raw_count = client.get(key)
+        return int(raw_count or 0), ttl
+
+    return _InMemoryAICounter.get(key), ttl
+
+
+def record_ai_daily_success(user_id: UUID) -> tuple[int, int]:
+    """Increment the daily counter after a successful, non-cached AI insight."""
+    key = _counter_key(user_id)
     ttl = _seconds_until_midnight_brt()
 
     client = _get_redis()
@@ -126,6 +142,37 @@ def check_ai_daily_limit(
         return count, ttl
 
     return _InMemoryAICounter.incr(key, ttl), ttl
+
+
+def check_ai_daily_limit(
+    user_id: UUID,
+    *,
+    max_calls: int = AI_DAILY_LIMIT,
+) -> tuple[int, int]:
+    """Increment and return the legacy daily AI call counter for *user_id*.
+
+    Returns:
+        (current_count, retry_after_seconds)
+
+    A caller that receives current_count > max_calls MUST reject the request.
+    """
+    _ = max_calls
+    return record_ai_daily_success(user_id)
+
+
+def _is_countable_ai_success(response: Response) -> bool:
+    """Return True when this response represents a new AI generation."""
+    if not 200 <= response.status_code < 300:
+        return False
+
+    payload = response.get_json(silent=True)
+    if isinstance(payload, dict):
+        data = payload.get("data")
+        result_payload = data if isinstance(data, dict) else payload
+        if result_payload.get("cached") is True:
+            return False
+
+    return True
 
 
 def ai_daily_limit(
@@ -154,10 +201,9 @@ def ai_daily_limit(
             if not has_entitlement(user_id, "advanced_simulations"):
                 return cast(Response, fn(*args, **kwargs))
 
-            count, retry_after = check_ai_daily_limit(user_id, max_calls=max_calls)
-            remaining = max(0, max_calls - count)
+            count, retry_after = get_ai_daily_usage(user_id)
 
-            if count > max_calls:
+            if count >= max_calls:
                 resp = compat_error_response(
                     legacy_payload={"error": AI_DAILY_LIMIT_MESSAGE},
                     status_code=429,
@@ -169,6 +215,10 @@ def ai_daily_limit(
                 return resp
 
             response = cast(Response, fn(*args, **kwargs))
+            if _is_countable_ai_success(response):
+                count, retry_after = record_ai_daily_success(user_id)
+
+            remaining = max(0, max_calls - count)
             response.headers["X-AI-Calls-Remaining"] = str(remaining)
             return response
 
@@ -183,6 +233,8 @@ __all__ = [
     "AI_DAILY_LIMIT_MESSAGE",
     "ai_daily_limit",
     "check_ai_daily_limit",
+    "get_ai_daily_usage",
+    "record_ai_daily_success",
     "_InMemoryAICounter",
     "_brt_date_str",
     "_seconds_until_midnight_brt",
