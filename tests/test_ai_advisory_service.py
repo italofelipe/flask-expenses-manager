@@ -297,6 +297,7 @@ class TestAIAdvisoryServiceFinancialInsights:
         with app.app_context():
             from app.extensions.database import db
             from app.models.ai_insight import AIInsight, InsightType
+            from app.models.llm_audit_log import LLMAuditLog
             from app.services.ai_advisory_service import AIAdvisoryService
 
             user_id = uuid.uuid4()
@@ -351,6 +352,15 @@ class TestAIAdvisoryServiceFinancialInsights:
             assert saved.insight_type == InsightType.daily
             assert saved.period_label == "2026-05-17"
             assert "current_period.paid.balance" in saved.content
+            assert "context_hash" in saved.content
+
+            audit = (
+                db.session.query(LLMAuditLog)
+                .filter_by(user_id=user_id, endpoint="financial_insights_daily")
+                .one()
+            )
+            assert audit.model == "gpt-4o-mini"
+            assert audit.total_tokens == 140
 
     def test_financial_insights_return_cached_period_without_provider_call(
         self,

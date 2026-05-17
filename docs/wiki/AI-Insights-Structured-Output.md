@@ -61,6 +61,30 @@ The spending insight endpoint must return both legacy and structured fields:
 `insights` remains for backward compatibility, but must be a valid JSON string
 without Markdown fences. `items` is the preferred field for new clients.
 
+## Period-Aware History Contract
+
+`POST /ai/insights/generate` persists period-aware insights as canonical JSON
+with `summary`, `items[]` and `metadata`. `GET /ai/insights/history` must expose
+those fields directly so Web/App clients do not parse `content` themselves:
+
+```json
+{
+  "id": "uuid",
+  "content": "{\"summary\":\"Resumo\",\"items\":[],\"metadata\":{...}}",
+  "insight_type": "weekly",
+  "period_type": "weekly",
+  "period_label": "2026-W20",
+  "summary": "Resumo",
+  "items": [],
+  "context_schema_version": "financial_insight_snapshot.v1",
+  "context_hash": "sha256-do-snapshot-sanitizado"
+}
+```
+
+Legacy rows that contain a JSON array remain readable: history returns the
+array as `items` and leaves `summary`, `context_schema_version` and
+`context_hash` as `null`.
+
 ## OpenAI Output Rule
 
 For OpenAI Chat Completions, use Structured Outputs with

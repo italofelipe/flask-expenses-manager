@@ -10,6 +10,7 @@ All endpoints require a valid JWT and the "advanced_simulations" entitlement.
 
 from __future__ import annotations
 
+import json
 import logging
 import uuid
 from datetime import date
@@ -210,6 +211,7 @@ class AIInsightGenerateResource(MethodResource):
                         }
                     ],
                     "context_version": "financial_insight_snapshot.v1",
+                    "context_hash": "sha256",
                     "cached": False,
                     "model": "gpt-4o-mini",
                     "tokens_used": 420,
@@ -621,6 +623,52 @@ def _notify_analysis_ready(*, user_id: UUID, narrative: str) -> None:
         log.warning("ai.weekly_summary.notify_failed user_id=%s error=%s", user_id, exc)
 
 
+def _strip_history_json_code_fence(content: str) -> str:
+    text = content.strip()
+    if not text.startswith("```"):
+        return text
+    first_newline = text.find("\n")
+    if first_newline == -1:
+        return text
+    text = text[first_newline + 1 :]
+    if text.rstrip().endswith("```"):
+        text = text.rstrip()[:-3]
+    return text.strip()
+
+
+def _parse_history_content(
+    content: str,
+) -> tuple[str | None, list[dict[str, Any]], str | None, str | None]:
+    try:
+        parsed = json.loads(_strip_history_json_code_fence(content))
+    except json.JSONDecodeError:
+        return None, [], None, None
+
+    if isinstance(parsed, list):
+        return None, [item for item in parsed if isinstance(item, dict)], None, None
+
+    if not isinstance(parsed, dict):
+        return None, [], None, None
+
+    summary = parsed.get("summary") if isinstance(parsed.get("summary"), str) else None
+    raw_items = parsed.get("items")
+    items = (
+        [item for item in raw_items if isinstance(item, dict)]
+        if isinstance(raw_items, list)
+        else []
+    )
+    raw_metadata = parsed.get("metadata")
+    metadata = raw_metadata if isinstance(raw_metadata, dict) else {}
+    context_schema_version = metadata.get("context_schema_version")
+    context_hash = metadata.get("context_hash")
+    return (
+        summary,
+        items,
+        context_schema_version if isinstance(context_schema_version, str) else None,
+        context_hash if isinstance(context_hash, str) else None,
+    )
+
+
 class AIInsightHistoryResource(MethodResource):
     """GET /ai/insights/history — paginated AI insight history."""
 
@@ -657,11 +705,16 @@ class AIInsightHistoryResource(MethodResource):
                     "items": [
                         {
                             "id": "uuid",
-                            "content": "3 insights...",
+                            "content": '{"summary":"Resumo","items":[]}',
+                            "summary": "Resumo",
+                            "items": [],
+                            "period_type": "daily",
                             "insight_type": "daily",
                             "period_label": "2026-05-11",
                             "period_start": "2026-05-11",
                             "period_end": "2026-05-11",
+                            "context_schema_version": ("financial_insight_snapshot.v1"),
+                            "context_hash": "sha256",
                             "model": "gpt-4o-mini",
                             "tokens_used": 320,
                             "cost_usd": 0.000048,
@@ -708,21 +761,32 @@ class AIInsightHistoryResource(MethodResource):
             .all()
         )
 
-        items = [
-            {
-                "id": str(r.id),
-                "content": r.content,
-                "insight_type": r.insight_type.value,
-                "period_label": r.period_label,
-                "period_start": r.period_start.isoformat() if r.period_start else None,
-                "period_end": r.period_end.isoformat() if r.period_end else None,
-                "model": r.model,
-                "tokens_used": r.tokens_used,
-                "cost_usd": float(r.cost_usd),
-                "created_at": r.created_at.isoformat() if r.created_at else None,
-            }
-            for r in rows
-        ]
+        items = []
+        for r in rows:
+            summary, insight_items, context_schema_version, context_hash = (
+                _parse_history_content(r.content)
+            )
+            items.append(
+                {
+                    "id": str(r.id),
+                    "content": r.content,
+                    "insight_type": r.insight_type.value,
+                    "period_type": r.insight_type.value,
+                    "period_label": r.period_label,
+                    "period_start": r.period_start.isoformat()
+                    if r.period_start
+                    else None,
+                    "period_end": r.period_end.isoformat() if r.period_end else None,
+                    "summary": summary,
+                    "items": insight_items,
+                    "context_schema_version": context_schema_version,
+                    "context_hash": context_hash,
+                    "model": r.model,
+                    "tokens_used": r.tokens_used,
+                    "cost_usd": float(r.cost_usd),
+                    "created_at": r.created_at.isoformat() if r.created_at else None,
+                }
+            )
 
         payload = {"items": items, "page": page, "per_page": per_page, "total": total}
         return compat_success_response(
