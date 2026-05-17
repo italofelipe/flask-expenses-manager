@@ -46,6 +46,15 @@ class ConsentSource(str, enum.Enum):
     SYSTEM = "system"
 
 
+def _enum_values(enum_cls: type[enum.Enum]) -> list[str]:
+    """SQLAlchemy ``values_callable``: persist ``Enum.value`` (lowercase) and not
+    ``Enum.name`` (uppercase). Without this the CHECK constraints from the
+    ``cons1`` migration reject every INSERT/UPDATE — symptom in CI was 500
+    IntegrityError on POST /me/consents.
+    """
+    return [str(member.value) for member in enum_cls]
+
+
 class Consent(db.Model):
     """Append-only audit log of consent acceptance/revocation events."""
 
@@ -67,16 +76,31 @@ class Consent(db.Model):
     # avoids the SQLAlchemy "CREATE TYPE before migration" trap. See the
     # migration conventions in CLAUDE.md.
     kind = db.Column(
-        db.Enum(ConsentKind, name="consent_kind", native_enum=False),
+        db.Enum(
+            ConsentKind,
+            name="consent_kind",
+            native_enum=False,
+            values_callable=_enum_values,
+        ),
         nullable=False,
     )
     version = db.Column(db.String(32), nullable=False)
     action = db.Column(
-        db.Enum(ConsentAction, name="consent_action", native_enum=False),
+        db.Enum(
+            ConsentAction,
+            name="consent_action",
+            native_enum=False,
+            values_callable=_enum_values,
+        ),
         nullable=False,
     )
     source = db.Column(
-        db.Enum(ConsentSource, name="consent_source", native_enum=False),
+        db.Enum(
+            ConsentSource,
+            name="consent_source",
+            native_enum=False,
+            values_callable=_enum_values,
+        ),
         nullable=False,
     )
     created_at = db.Column(
