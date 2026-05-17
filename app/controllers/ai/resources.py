@@ -31,6 +31,7 @@ from app.docs.openapi_helpers import (
 )
 from app.middleware.ai_rate_limit import ai_daily_limit
 from app.services.ai_advisory_service import AIAdvisoryService
+from app.services.ai_lgpd import AIConsentRequiredError
 from app.services.analysis_ready_notification_service import (
     dispatch_analysis_ready_notification,
 )
@@ -54,6 +55,76 @@ def _check_entitlement(user_id: UUID) -> Response | None:
             error_code="ENTITLEMENT_REQUIRED",
         )
     return None
+
+
+def _ai_consent_required_response(exc: AIConsentRequiredError) -> Response:
+    """Standard 403 mapping for ``AIConsentRequiredError`` (#1258 — LGPD)."""
+    return compat_error_response(
+        legacy_payload={"error": exc.message},
+        status_code=403,
+        message=exc.message,
+        error_code=AIConsentRequiredError.error_code,
+    )
+
+
+def _parse_goal_projection_body(
+    goal_id_raw: str,
+    body: dict[str, Any],
+) -> tuple[Response, None, None] | tuple[None, UUID, Decimal, str]:
+    """Validate the goal projection request payload.
+
+    Returns either ``(error_response, None, None)`` when something is invalid
+    or ``(None, parsed_goal_id, monthly_contribution, user_context)`` on
+    success. Extracted from :meth:`AIGoalProjectionResource.post` so the
+    controller method stays under the cognitive-complexity threshold.
+    """
+    try:
+        parsed_goal_id: UUID = uuid.UUID(goal_id_raw)
+    except (ValueError, AttributeError):
+        return (
+            compat_error_response(
+                legacy_payload={"error": "goal_id inválido"},
+                status_code=400,
+                message="goal_id inválido",
+                error_code="VALIDATION_ERROR",
+            ),
+            None,
+            None,
+        )
+
+    user_context = str(body.get("user_context", ""))
+    raw_contribution = body.get("monthly_contribution")
+    if raw_contribution is None:
+        return (
+            compat_error_response(
+                legacy_payload={"error": "monthly_contribution é obrigatório"},
+                status_code=400,
+                message="monthly_contribution é obrigatório",
+                error_code="VALIDATION_ERROR",
+            ),
+            None,
+            None,
+        )
+
+    try:
+        monthly_contribution = Decimal(str(raw_contribution))
+        if monthly_contribution < 0:
+            raise ValueError("negative")
+    except (InvalidOperation, ValueError):
+        return (
+            compat_error_response(
+                legacy_payload={
+                    "error": "monthly_contribution deve ser um número positivo"
+                },
+                status_code=400,
+                message="monthly_contribution deve ser um número positivo",
+                error_code="VALIDATION_ERROR",
+            ),
+            None,
+            None,
+        )
+
+    return None, parsed_goal_id, monthly_contribution, user_context
 
 
 class AISpendingInsightsResource(MethodResource):
@@ -137,6 +208,8 @@ class AISpendingInsightsResource(MethodResource):
         service = AIAdvisoryService(user_id=user_id)
         try:
             result = service.generate_spending_insights(month=month)
+        except AIConsentRequiredError as exc:
+            return _ai_consent_required_response(exc)
         except LLMProviderError as exc:
             return compat_error_response(
                 legacy_payload={"error": str(exc)},
@@ -228,42 +301,10 @@ class AIGoalProjectionResource(MethodResource):
         if entitlement_error is not None:
             return entitlement_error
 
-        # Parse and validate goal_id
-        try:
-            parsed_goal_id: UUID = uuid.UUID(goal_id)
-        except (ValueError, AttributeError):
-            return compat_error_response(
-                legacy_payload={"error": "goal_id inválido"},
-                status_code=400,
-                message="goal_id inválido",
-                error_code="VALIDATION_ERROR",
-            )
-
-        body: dict[str, Any] = request.get_json() or {}
-        user_context = str(body.get("user_context", ""))
-        raw_contribution = body.get("monthly_contribution")
-
-        if raw_contribution is None:
-            return compat_error_response(
-                legacy_payload={"error": "monthly_contribution é obrigatório"},
-                status_code=400,
-                message="monthly_contribution é obrigatório",
-                error_code="VALIDATION_ERROR",
-            )
-
-        try:
-            monthly_contribution = Decimal(str(raw_contribution))
-            if monthly_contribution < 0:
-                raise ValueError("negative")
-        except (InvalidOperation, ValueError):
-            return compat_error_response(
-                legacy_payload={
-                    "error": "monthly_contribution deve ser um número positivo"
-                },
-                status_code=400,
-                message="monthly_contribution deve ser um número positivo",
-                error_code="VALIDATION_ERROR",
-            )
+        parsed = _parse_goal_projection_body(goal_id, request.get_json() or {})
+        if parsed[0] is not None:
+            return parsed[0]
+        _, parsed_goal_id, monthly_contribution, user_context = parsed
 
         service = AIAdvisoryService(user_id=user_id)
         try:
@@ -272,6 +313,8 @@ class AIGoalProjectionResource(MethodResource):
                 user_context=user_context,
                 monthly_contribution=monthly_contribution,
             )
+        except AIConsentRequiredError as exc:
+            return _ai_consent_required_response(exc)
         except ValueError as exc:
             return compat_error_response(
                 legacy_payload={"error": str(exc)},
@@ -361,6 +404,8 @@ class AIWeeklySummaryResource(MethodResource):
         service = AIAdvisoryService(user_id=user_id)
         try:
             result = service.generate_weekly_summary_narrative()
+        except AIConsentRequiredError as exc:
+            return _ai_consent_required_response(exc)
         except LLMProviderError as exc:
             return compat_error_response(
                 legacy_payload={"error": str(exc)},

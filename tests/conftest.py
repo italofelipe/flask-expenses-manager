@@ -97,6 +97,31 @@ def cleanup_sqlalchemy_sessions() -> Generator[None, None, None]:
     close_all_sessions()
 
 
+@pytest.fixture(autouse=True)
+def _autogrant_ai_consent_globally(request) -> Generator[None, None, None]:
+    """Bypass the LGPD AI consent gate (#1258) for the legacy test suite.
+
+    The gate (``app.services.ai_lgpd.ensure_ai_consent_granted``) requires
+    every AI generation to be backed by a versioned consent record. Existing
+    AI tests do not provision such consents — they would all start failing
+    with HTTP 403 the moment the gate landed.
+
+    Tests that *need* to exercise the real gate can opt out by marking the
+    test with ``@pytest.mark.no_ai_consent_patch``.
+    """
+    if request.node.get_closest_marker("no_ai_consent_patch"):
+        yield
+        return
+
+    from unittest.mock import patch
+
+    with patch(
+        "app.services.ai_advisory_service.ensure_ai_consent_granted",
+        return_value="v1.0",
+    ):
+        yield
+
+
 @pytest.fixture
 def query_counter(app: Any) -> Generator[dict[str, int], None, None]:
     """SQLAlchemy query counter fixture.

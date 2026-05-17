@@ -33,6 +33,13 @@ from app.models.goal import Goal
 from app.models.goal_contribution import GoalContribution
 from app.models.llm_audit_log import LLMAuditLog
 from app.models.transaction import Transaction, TransactionStatus, TransactionType
+from app.services.ai_lgpd import (
+    ensure_ai_consent_granted,
+    minimize_prompt_data,
+    minimize_text,
+    redact_prompt_for_audit,
+    redact_response_for_audit,
+)
 from app.services.goal_projection_service import GoalProjectionService
 from app.services.llm_provider import LLMProvider, LLMProviderError, get_llm_provider
 from app.services.weekly_summary import compute_weekly_summary
@@ -230,16 +237,29 @@ def _log_llm_call(
     endpoint: str,
     prompt: str,
     llm_response: Any,
+    consent_version: str | None = None,
 ) -> None:
-    """Persist an LLMAuditLog row for every LLM call. Swallows exceptions so
-    that audit failures never break the advisory flow."""
+    """Persist an :class:`LLMAuditLog` row with redacted prompt/response.
+
+    The ``prompt`` and ``response_text`` columns store hash markers (and a
+    bounded, minimised preview for the response) — never the raw text. This
+    keeps the audit trail forensically linkable without retaining PII (LGPD
+    minimisation, issue #1258).
+
+    Token counts, latency, cost, model and endpoint stay unredacted because
+    they are non-PII operational signals required for cost tracking and
+    rate-limit review.
+
+    Failures here never break the advisory flow — the audit log is
+    fire-and-forget by design.
+    """
     try:
         log_row = LLMAuditLog(
             user_id=user_id,
             endpoint=endpoint,
             model=llm_response.model,
-            prompt=prompt,
-            response_text=llm_response.content,
+            prompt=redact_prompt_for_audit(prompt, consent_version=consent_version),
+            response_text=redact_response_for_audit(llm_response.content),
             prompt_tokens=llm_response.prompt_tokens,
             completion_tokens=llm_response.completion_tokens,
             total_tokens=llm_response.total_tokens,
@@ -297,7 +317,12 @@ class AIAdvisoryService:
         Returns:
             {"insights": str, "items": list[dict], "tokens_used": int,
              "cost_usd": float, "month": "YYYY-MM", "model": str, "cached": bool}
+
+        Raises:
+            AIConsentRequiredError: When the user has not granted (or has
+                revoked) the ``AI`` LGPD consent (#1258).
         """
+        consent_version = ensure_ai_consent_granted(self._user_id)
         today = date.today()
         if month:
             year, mon = int(month[:4]), int(month[5:7])
@@ -313,7 +338,9 @@ class AIAdvisoryService:
             f"{year}-{mon:02d}-recap" if is_recap else today.strftime("%Y-%m-%d")
         )
 
-        # Idempotency: return cached insight if already generated today
+        # Idempotency: return cached insight if already generated today.
+        # The consent gate above already ensured the user has an active
+        # ``AI`` consent — replays are safe to serve from cache.
         cached = _get_cached_insight(
             user_id=self._user_id,
             insight_type=insight_type,
@@ -382,7 +409,7 @@ class AIAdvisoryService:
             )
 
         prompt = _build_spending_prompt(
-            snapshot,
+            minimize_prompt_data(snapshot),
             month_label=f"{year}-{mon:02d}",
             previous_insight=previous_content,
             is_recap=is_recap,
@@ -414,8 +441,13 @@ class AIAdvisoryService:
             endpoint="spending_insights",
             prompt=prompt,
             llm_response=llm_resp,
+            consent_version=consent_version,
         )
 
+        # AIInsight does not yet carry a dedicated ``consent_version_id``
+        # column (follow-up issue tracked in the PR description). The same
+        # value is preserved on the ``LLMAuditLog`` row above so the LGPD
+        # audit chain stays complete — see ``docs/lgpd/AI_MINIMIZATION.md``.
         _save_insight(
             user_id=self._user_id,
             content=serialized_insights,
@@ -583,7 +615,10 @@ class AIAdvisoryService:
         Raises:
             ValueError: When goal is not found or doesn't belong to the user.
             LLMProviderError: On provider failure.
+            AIConsentRequiredError: When the user has not granted the ``AI``
+                LGPD consent (#1258).
         """
+        consent_version = ensure_ai_consent_granted(self._user_id)
         goal: Goal | None = Goal.query.filter_by(
             id=goal_id, user_id=self._user_id
         ).first()
@@ -603,9 +638,9 @@ class AIAdvisoryService:
         projection_data = projection_service.serialize(projection)
 
         prompt = _build_goal_projection_prompt(
-            goal_title=str(goal.title),
+            goal_title=minimize_text(str(goal.title)) or "meta",
             projection=projection_data,
-            user_context=user_context,
+            user_context=minimize_text(user_context),
             monthly_contribution=monthly_contribution,
         )
 
@@ -625,6 +660,7 @@ class AIAdvisoryService:
             endpoint="goal_projection",
             prompt=prompt,
             llm_response=llm_resp,
+            consent_version=consent_version,
         )
 
         return {
@@ -648,7 +684,10 @@ class AIAdvisoryService:
 
         Raises:
             LLMProviderError: On provider failure.
+            AIConsentRequiredError: When the user has not granted the ``AI``
+                LGPD consent (#1258).
         """
+        consent_version = ensure_ai_consent_granted(self._user_id)
         today = date.today()
         week_start = today - relativedelta(days=today.weekday())
         week_end = week_start + relativedelta(days=6)
@@ -685,6 +724,7 @@ class AIAdvisoryService:
             endpoint="weekly_summary",
             prompt=prompt,
             llm_response=llm_resp,
+            consent_version=consent_version,
         )
 
         return {
