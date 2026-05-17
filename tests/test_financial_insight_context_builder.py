@@ -6,6 +6,7 @@ import json
 import uuid
 from datetime import date
 from decimal import Decimal
+from inspect import getsource
 from typing import Any
 
 from app.extensions.database import db
@@ -18,6 +19,7 @@ from app.models.transaction import (
     TransactionType,
 )
 from app.models.user import User
+from app.services import financial_insight_context_builder
 from app.services.financial_insight_context_builder import (
     FinancialInsightContextBuilder,
 )
@@ -303,6 +305,19 @@ class TestFinancialInsightContextBuilderDaily:
         assert "external_id" not in serialized
         assert "bank_name" not in serialized
         assert snapshot["transactions"]["sample"][0]["title"] == "Consulta CPF [cpf]"
+
+    def test_email_redaction_does_not_use_backtracking_regex(self) -> None:
+        source = getsource(financial_insight_context_builder)
+
+        assert "_EMAIL_RE" not in source
+        assert r"(?:\.[\w-]+)+" not in source
+
+        assert (
+            financial_insight_context_builder._sanitize_text(
+                "Enviar para <ana@example.com>, cópia pix:financeiro+pix@example.com"
+            )
+            == "Enviar para <[email]>, cópia pix:[email]"
+        )
 
 
 class TestFinancialInsightContextBuilderWeekly:

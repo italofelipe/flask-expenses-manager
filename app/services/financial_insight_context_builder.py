@@ -27,7 +27,10 @@ _CURRENCY = "BRL"
 _TIMEZONE = "America/Sao_Paulo"
 _MONEY_QUANT = Decimal("0.01")
 _PERCENT_QUANT = Decimal("0.01")
-_EMAIL_RE = re.compile(r"[\w.+-]+@[\w-]+(?:\.[\w-]+)+")
+_EMAIL_MASK = "[email]"
+_MAX_EMAIL_TOKEN_LENGTH = 320
+_EMAIL_LOCAL_SYMBOLS = "._%+-"
+_EMAIL_DOMAIN_SYMBOLS = "-_"
 _CPF_RE = re.compile(r"\b\d{3}\.\d{3}\.\d{3}-\d{2}\b")
 _LONG_NUMBER_RE = re.compile(r"\b\d{8,}\b")
 
@@ -56,6 +59,94 @@ def _safe_pct(numerator: Decimal, denominator: Decimal) -> str:
     return _percent_str(numerator / denominator * Decimal("100"))
 
 
+def _is_email_candidate_char(char: str) -> bool:
+    return char.isalnum() or char == "@" or char in _EMAIL_LOCAL_SYMBOLS
+
+
+def _is_email_local_char(char: str) -> bool:
+    return char.isalnum() or char in _EMAIL_LOCAL_SYMBOLS
+
+
+def _is_email_domain_char(char: str) -> bool:
+    return char.isalnum() or char in _EMAIL_DOMAIN_SYMBOLS
+
+
+def _strip_email_boundary_dots(token: str) -> tuple[str, str, str]:
+    prefix = ""
+    suffix = ""
+    candidate = token
+
+    while candidate.startswith("."):
+        prefix += "."
+        candidate = candidate[1:]
+    while candidate.endswith("."):
+        suffix = "." + suffix
+        candidate = candidate[:-1]
+
+    return prefix, candidate, suffix
+
+
+def _looks_like_email(candidate: str) -> bool:
+    if candidate.count("@") != 1:
+        return False
+
+    local_part, domain = candidate.split("@", 1)
+    if (
+        not local_part
+        or not domain
+        or len(local_part) > 64
+        or len(domain) > 253
+        or "." not in domain
+        or local_part.startswith(".")
+        or local_part.endswith(".")
+    ):
+        return False
+
+    if not all(_is_email_local_char(char) for char in local_part):
+        return False
+
+    labels = domain.split(".")
+    return all(
+        label
+        and len(label) <= 63
+        and not label.startswith("-")
+        and not label.endswith("-")
+        and all(_is_email_domain_char(char) for char in label)
+        for label in labels
+    )
+
+
+def _redact_email_token(token: str) -> str:
+    prefix, candidate, suffix = _strip_email_boundary_dots(token)
+    if "@" not in candidate:
+        return token
+    if len(candidate) > _MAX_EMAIL_TOKEN_LENGTH or candidate.count("@") > 1:
+        return f"{prefix}{_EMAIL_MASK}{suffix}"
+    if _looks_like_email(candidate):
+        return f"{prefix}{_EMAIL_MASK}{suffix}"
+    return token
+
+
+def _redact_email_tokens(text: str) -> str:
+    redacted: list[str] = []
+    token_chars: list[str] = []
+
+    for char in text:
+        if _is_email_candidate_char(char):
+            token_chars.append(char)
+            continue
+
+        if token_chars:
+            redacted.append(_redact_email_token("".join(token_chars)))
+            token_chars = []
+        redacted.append(char)
+
+    if token_chars:
+        redacted.append(_redact_email_token("".join(token_chars)))
+
+    return "".join(redacted)
+
+
 def _sanitize_text(value: object, *, max_length: int = 120) -> str | None:
     if value is None:
         return None
@@ -64,7 +155,7 @@ def _sanitize_text(value: object, *, max_length: int = 120) -> str | None:
     if not text:
         return None
 
-    text = _EMAIL_RE.sub("[email]", text)
+    text = _redact_email_tokens(text)
     text = _CPF_RE.sub("[cpf]", text)
     text = _LONG_NUMBER_RE.sub("[number]", text)
     text = " ".join(text.split())
