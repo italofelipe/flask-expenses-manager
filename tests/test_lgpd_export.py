@@ -290,6 +290,16 @@ class TestSerialiserPrimitives:
     def test_serialize_bytes_returns_hex(self) -> None:
         assert _serialize_value(b"\x00\x01\x02") == "000102"
 
+    def test_serialize_date_returns_iso(self) -> None:
+        from datetime import date
+
+        assert _serialize_value(date(2026, 5, 17)) == "2026-05-17"
+
+    def test_iso_helper_handles_none(self) -> None:
+        from app.application.services.lgpd_export_service import _iso
+
+        assert _iso(None) is None
+
     def test_serialize_row_uses_column_metadata(self, client: FlaskClient) -> None:
         """End-to-end check that _serialize_row converts a real model row."""
         token = _register_and_login(client, "lgpd-exp-row")
