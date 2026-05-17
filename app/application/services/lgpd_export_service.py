@@ -45,6 +45,8 @@ from enum import Enum
 from typing import Any
 from uuid import UUID
 
+from flask import current_app
+
 from app.lgpd import REGISTRY, DeletionStrategy, EntityRule
 
 _REGISTRY_VERSION = "1.0"
@@ -159,20 +161,51 @@ def _build_metadata(user_id: UUID) -> dict[str, Any]:
     }
 
 
+def _export_one_entity(
+    rule: EntityRule, user_id: UUID, failed: list[str]
+) -> list[dict[str, Any]]:
+    """Serialise one registry entity, recording the failure instead of
+    raising so the export never 500s on a single bad query.
+
+    SQLite-passing tests can miss Postgres-only edge cases (enum case
+    folding, JSON column quirks, etc.). Treating each entity as
+    independently fallible keeps the export robust to those drifts —
+    callers see the partial pack plus a ``warnings.failed_entities`` list.
+    """
+    try:
+        rows = _query_rows_for_entity(rule, user_id)
+        return [_serialize_row(row) for row in rows]
+    except Exception as exc:  # noqa: BLE001 — defensive boundary, see docstring
+        current_app.logger.exception(
+            "event=lgpd.export.entity_failed user_id=%s entity=%s error=%s",
+            user_id,
+            rule.table_name,
+            type(exc).__name__,
+        )
+        failed.append(rule.table_name)
+        return []
+
+
 def build_user_export(user_id: UUID) -> dict[str, Any]:
     """Generate the full LGPD export package for ``user_id``.
 
     The caller must enforce authentication before invoking this function.
     Entities flagged ``export_included=False`` in the registry are
     intentionally omitted (e.g. refresh tokens, LLM audit logs).
+
+    Each entity is queried independently; a failure on one (e.g. a
+    Postgres-only column quirk a SQLite test missed) is logged and the
+    entity reports an empty list rather than crashing the whole export.
     """
+    failed: list[str] = []
     package: dict[str, Any] = {"metadata": _build_metadata(user_id)}
     for rule in REGISTRY:
         if not rule.export_included:
             continue
-        rows = _query_rows_for_entity(rule, user_id)
-        package[rule.table_name] = [_serialize_row(r) for r in rows]
+        package[rule.table_name] = _export_one_entity(rule, user_id, failed)
     package["retentions"] = _build_retentions_section()
+    if failed:
+        package["warnings"] = {"failed_entities": failed}
     return package
 
 
