@@ -446,6 +446,23 @@ def _log_llm_call(
 # ---------------------------------------------------------------------------
 
 
+def _build_period_snapshot(
+    *,
+    insight_type: InsightType,
+    user_id: UUID,
+    anchor: date,
+) -> dict[str, Any]:
+    """Dispatch to the period-specific snapshot builder."""
+    builder = FinancialInsightContextBuilder()
+    if insight_type == InsightType.daily:
+        return builder.build_daily(user_id=user_id, anchor_date=anchor)
+    if insight_type == InsightType.weekly:
+        return builder.build_weekly(user_id=user_id, anchor_date=anchor)
+    if insight_type == InsightType.monthly:
+        return builder.build_monthly(user_id=user_id, anchor_date=anchor)
+    raise ValueError("period_type must be daily, weekly or monthly")
+
+
 class AIAdvisoryService:
     """Central service for LLM-powered financial insights.
 
@@ -477,24 +494,11 @@ class AIAdvisoryService:
         anchor = anchor_date or date.today()
         consent_version = ensure_ai_consent_granted(self._user_id)
 
-        snapshot_builder = FinancialInsightContextBuilder()
-        if insight_type == InsightType.daily:
-            snapshot = snapshot_builder.build_daily(
-                user_id=self._user_id,
-                anchor_date=anchor,
-            )
-        elif insight_type == InsightType.weekly:
-            snapshot = snapshot_builder.build_weekly(
-                user_id=self._user_id,
-                anchor_date=anchor,
-            )
-        elif insight_type == InsightType.monthly:
-            snapshot = snapshot_builder.build_monthly(
-                user_id=self._user_id,
-                anchor_date=anchor,
-            )
-        else:
-            raise ValueError("period_type must be daily, weekly or monthly")
+        snapshot = _build_period_snapshot(
+            insight_type=insight_type,
+            user_id=self._user_id,
+            anchor=anchor,
+        )
 
         period = snapshot["period"]
         period_label = str(period["label"])

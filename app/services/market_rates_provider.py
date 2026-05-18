@@ -27,7 +27,6 @@ import os
 from datetime import date, datetime
 from decimal import Decimal, InvalidOperation
 from typing import Protocol, runtime_checkable
-from urllib.error import HTTPError, URLError
 from urllib.parse import urlencode
 from urllib.request import Request, urlopen
 
@@ -41,6 +40,7 @@ _SGS_IPCA_MONTHLY = 433
 _BCB_BASE = "https://api.bcb.gov.br/dados/serie/bcdata.sgs.{series}/dados"
 _HTTP_TIMEOUT_SECONDS = 5.0
 _CACHE_TTL_SECONDS = 24 * 60 * 60
+_BR_DATE_FMT = "%d/%m/%Y"
 
 
 @runtime_checkable
@@ -82,17 +82,18 @@ class StubMarketRatesProvider:
         self._cdi = cdi
         self._ipca = ipca
 
-    def cdi_monthly(self, *, year: int, month: int) -> Decimal | None:  # noqa: ARG002
+    def cdi_monthly(self, *, year: int, month: int) -> Decimal | None:
+        # Stub ignores period intentionally; values are configured globally.
+        del year, month
         if self._cdi is not None:
             return self._cdi
-        raw = os.getenv("AI_MARKET_RATE_CDI_MONTHLY")
-        return _decimal_or_none(raw)
+        return _decimal_or_none(os.getenv("AI_MARKET_RATE_CDI_MONTHLY"))
 
-    def ipca_monthly(self, *, year: int, month: int) -> Decimal | None:  # noqa: ARG002
+    def ipca_monthly(self, *, year: int, month: int) -> Decimal | None:
+        del year, month
         if self._ipca is not None:
             return self._ipca
-        raw = os.getenv("AI_MARKET_RATE_IPCA_MONTHLY")
-        return _decimal_or_none(raw)
+        return _decimal_or_none(os.getenv("AI_MARKET_RATE_IPCA_MONTHLY"))
 
 
 def _decimal_or_none(raw: str | None) -> Decimal | None:
@@ -120,8 +121,8 @@ def _fetch_sgs_series_value(
     last_day = _last_day_of_month(year, month)
     params = {
         "formato": "json",
-        "dataInicial": target.strftime("%d/%m/%Y"),
-        "dataFinal": last_day.strftime("%d/%m/%Y"),
+        "dataInicial": target.strftime(_BR_DATE_FMT),
+        "dataFinal": last_day.strftime(_BR_DATE_FMT),
     }
     url = _BCB_BASE.format(series=series_id) + "?" + urlencode(params)
     request = Request(  # noqa: S310 — fixed-host BCB public API
@@ -132,7 +133,7 @@ def _fetch_sgs_series_value(
     try:
         with urlopen(request, timeout=_HTTP_TIMEOUT_SECONDS) as response:  # noqa: S310
             payload = json.loads(response.read().decode("utf-8"))
-    except (HTTPError, URLError, TimeoutError, ValueError, OSError) as exc:
+    except (OSError, ValueError) as exc:
         log.warning(
             "ai_advisory.market_rates.fetch_failed series=%s ym=%04d-%02d error=%s",
             series_id,
@@ -164,7 +165,7 @@ def _parse_sgs_payload(
         if not (isinstance(date_str, str) and isinstance(value_str, str)):
             continue
         try:
-            parsed = datetime.strptime(date_str, "%d/%m/%Y").date()
+            parsed = datetime.strptime(date_str, _BR_DATE_FMT).date()
         except ValueError:
             continue
         if parsed.year == target_year and parsed.month == target_month:
