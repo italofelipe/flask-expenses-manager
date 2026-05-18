@@ -7,6 +7,7 @@ from app.graphql.mutations.account import (
     DeleteAccountMutation,
     UpdateAccountMutation,
 )
+from app.graphql.mutations.ai_insight import GenerateAiInsightMutation
 from app.graphql.mutations.auth import (
     ConfirmEmailMutation,
     ForgotPasswordMutation,
@@ -178,6 +179,8 @@ class Mutation(graphene.ObjectType):
     create_fiscal_document = CreateFiscalDocumentMutation.Field(
         deprecation_reason="ADR-0002: use POST /fiscal/fiscal-documents"
     )
+    # AI Advisory — canonical GraphQL parity for POST /ai/insights/generate
+    generate_ai_insight = GenerateAiInsightMutation.Field()
 
 
 __all__ = ["Mutation"]

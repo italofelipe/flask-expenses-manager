@@ -836,6 +836,19 @@ GRAPHQL_OPERATION_CATALOG: tuple[GraphQLOperationDoc, ...] = (
         ),
         source_module=QUERY_AI_INSIGHT_MODULE,
     ),
+    # AI Advisory — generate (MVP-3 / #1287 #1288)
+    GraphQLOperationDoc(
+        name="generateAiInsight",
+        operation_type="mutation",
+        domain="ai_advisory",
+        access="auth_required",
+        summary=(
+            "Gera um insight financeiro period-aware (daily/weekly/monthly) com "
+            "itens marcados por dimension (general | transactions | credit_cards |"
+            " goals | budgets). Paridade com POST /ai/insights/generate."
+        ),
+        source_module="app.graphql.mutations.ai_insight",
+    ),
 )
 
 

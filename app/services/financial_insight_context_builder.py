@@ -15,12 +15,28 @@ from typing import Any, cast
 from uuid import UUID
 
 from app.models.budget import Budget
+from app.models.credit_card import CreditCard
 from app.models.goal import Goal
 from app.models.transaction import (
     Transaction,
     TransactionStatus,
     TransactionType,
 )
+from app.services.credit_card_bill_service import compute_utilization
+
+INSIGHT_DIMENSIONS: tuple[str, ...] = (
+    "general",
+    "transactions",
+    "credit_cards",
+    "goals",
+    "budgets",
+)
+"""Closed enum of dimension labels assigned to each AI insight item.
+
+Decided on 2026-05-17 (MVP-3 wiki): each insight item must declare which
+surface it belongs to so contextual pages can filter, while the global
+`/insights` hub renders all dimensions grouped.
+"""
 
 _SNAPSHOT_VERSION = "financial_insight_snapshot.v1"
 _CURRENCY = "BRL"
@@ -171,6 +187,14 @@ def _enum_value(value: object) -> str | None:
     return str(enum_value if enum_value is not None else value)
 
 
+def _same_day_previous_year(anchor_date: date) -> date | None:
+    """Return the same calendar day a year before, or None when invalid (Feb 29)."""
+    try:
+        return anchor_date.replace(year=anchor_date.year - 1)
+    except ValueError:
+        return None
+
+
 def _same_day_previous_month(anchor_date: date) -> date | None:
     previous_year = anchor_date.year
     previous_month = anchor_date.month - 1
@@ -210,22 +234,22 @@ class FinancialInsightContextBuilder:
     """Build sanitized financial snapshots for daily, weekly and monthly insights."""
 
     def build_daily(self, *, user_id: UUID, anchor_date: date) -> dict[str, Any]:
-        """Return a daily snapshot with yesterday, prior-month and MTD comparison."""
+        """Return a daily snapshot with extended temporal comparisons."""
         current = self._period_snapshot(
             user_id=user_id,
             start=anchor_date,
             end=anchor_date,
             label=anchor_date.isoformat(),
             period_type="daily",
+            include_credit_cards=True,
         )
         yesterday = anchor_date - timedelta(days=1)
+        previous_week = anchor_date - timedelta(days=7)
         same_day_previous_month = _same_day_previous_month(anchor_date)
+        same_day_previous_year = _same_day_previous_year(anchor_date)
         month_start = date(anchor_date.year, anchor_date.month, 1)
 
         missing_comparisons: list[str] = []
-        if same_day_previous_month is None:
-            missing_comparisons.append("same_day_previous_month")
-
         comparisons: dict[str, Any] = {
             "yesterday": self._comparison_snapshot(
                 user_id=user_id,
@@ -233,6 +257,13 @@ class FinancialInsightContextBuilder:
                 start=yesterday,
                 end=yesterday,
                 label=yesterday.isoformat(),
+            ),
+            "previous_week": self._comparison_snapshot(
+                user_id=user_id,
+                current=current,
+                start=previous_week,
+                end=previous_week,
+                label=previous_week.isoformat(),
             ),
             "month_to_date": self._compact_period_snapshot(
                 self._period_snapshot(
@@ -252,6 +283,19 @@ class FinancialInsightContextBuilder:
                 end=same_day_previous_month,
                 label=same_day_previous_month.isoformat(),
             )
+        else:
+            missing_comparisons.append("same_day_previous_month")
+
+        if same_day_previous_year is not None:
+            comparisons["same_day_previous_year"] = self._comparison_snapshot(
+                user_id=user_id,
+                current=current,
+                start=same_day_previous_year,
+                end=same_day_previous_year,
+                label=same_day_previous_year.isoformat(),
+            )
+        else:
+            missing_comparisons.append("same_day_previous_year")
 
         current["comparisons"] = comparisons
         current["data_quality"]["missing_comparison_periods"] = missing_comparisons
@@ -267,6 +311,7 @@ class FinancialInsightContextBuilder:
             label=f"{anchor_date.isocalendar().year}-W{anchor_date.isocalendar().week:02d}",
             period_type="weekly",
             include_daily_series=True,
+            include_credit_cards=True,
         )
         previous_start = start - timedelta(days=7)
         previous_end = start - timedelta(days=1)
@@ -296,6 +341,7 @@ class FinancialInsightContextBuilder:
             include_daily_series=True,
             include_budgets=True,
             include_goals=True,
+            include_credit_cards=True,
         )
 
     def _comparison_snapshot(
@@ -342,6 +388,7 @@ class FinancialInsightContextBuilder:
         include_daily_series: bool = False,
         include_budgets: bool = False,
         include_goals: bool = False,
+        include_credit_cards: bool = False,
     ) -> dict[str, Any]:
         transactions = self._fetch_transactions(user_id=user_id, start=start, end=end)
         non_cancelled = [
@@ -371,12 +418,59 @@ class FinancialInsightContextBuilder:
             if include_budgets
             else [],
             "goals": self._goals_payload(user_id=user_id) if include_goals else [],
+            "credit_cards": self._credit_cards_payload(user_id=user_id, anchor=end)
+            if include_credit_cards
+            else [],
             "data_quality": {
                 "has_transactions": bool(non_cancelled),
                 "missing_comparison_periods": [],
             },
         }
         return snapshot
+
+    def _credit_cards_payload(
+        self,
+        *,
+        user_id: UUID,
+        anchor: date,
+    ) -> list[dict[str, Any]]:
+        """Sanitized list of cards with current-cycle utilization snapshot.
+
+        Returns one entry per card belonging to the user. Cards without
+        closing_day/due_day are skipped (utilization undefined). PII is
+        never emitted — raw user_id / last_four_digits / external IDs stay
+        out of the snapshot.
+        """
+        cards = (
+            CreditCard.query.filter_by(user_id=user_id).order_by(CreditCard.name).all()
+        )
+        payload: list[dict[str, Any]] = []
+        for card in cards:
+            if card.closing_day is None or card.due_day is None:
+                continue
+            util = compute_utilization(card, today=anchor)
+            payload.append(
+                {
+                    "name": _sanitize_text(card.name, max_length=60) or "Cartão",
+                    "brand": _sanitize_text(card.brand, max_length=20) or None,
+                    "bank": _sanitize_text(card.bank, max_length=60) or None,
+                    "limit_amount": _money_str(util.limit_amount or 0)
+                    if util.limit_amount is not None
+                    else None,
+                    "committed_amount": _money_str(util.committed_amount),
+                    "available_amount": _money_str(util.available_amount or 0)
+                    if util.available_amount is not None
+                    else None,
+                    "utilization_pct": util.utilization_pct,
+                    "cycle": {
+                        "start_date": util.cycle.start_date.isoformat(),
+                        "end_date": util.cycle.end_date.isoformat(),
+                        "due_date": util.cycle.due_date.isoformat(),
+                        "status": util.cycle.status,
+                    },
+                }
+            )
+        return payload
 
     def _fetch_transactions(
         self,

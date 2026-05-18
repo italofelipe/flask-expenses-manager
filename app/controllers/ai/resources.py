@@ -205,6 +205,7 @@ class AIInsightGenerateResource(MethodResource):
                     "items": [
                         {
                             "type": "saude_financeira",
+                            "dimension": "general",
                             "title": "Saldo positivo",
                             "message": "Você terminou o período com saldo positivo.",
                             "evidence": ["current_period.paid.balance"],

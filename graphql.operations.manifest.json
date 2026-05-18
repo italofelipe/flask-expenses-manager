@@ -701,5 +701,13 @@
     "operation_type": "query",
     "source_module": "app.graphql.queries.ai_insight",
     "summary": "Retorna o histórico paginado de insights gerados por IA para o usuário autenticado, ordenado do mais recente ao mais antigo."
+  },
+  {
+    "access": "auth_required",
+    "domain": "ai_advisory",
+    "name": "generateAiInsight",
+    "operation_type": "mutation",
+    "source_module": "app.graphql.mutations.ai_insight",
+    "summary": "Gera um insight financeiro period-aware (daily/weekly/monthly) com itens marcados por dimension (general | transactions | credit_cards | goals | budgets). Paridade com POST /ai/insights/generate."
   }
 ]
