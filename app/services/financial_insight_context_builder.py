@@ -12,7 +12,7 @@ import logging
 import os
 import re
 from calendar import monthrange
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta, timezone
 from decimal import Decimal, InvalidOperation
 from typing import Any, cast
 from uuid import UUID
@@ -211,6 +211,16 @@ def _enum_value(value: object) -> str | None:
     return str(enum_value if enum_value is not None else value)
 
 
+def _naive_utc(value: datetime) -> datetime:
+    if value.tzinfo is None:
+        return value
+    return value.astimezone(timezone.utc).replace(tzinfo=None)
+
+
+def _datetime_after(value: datetime | None, since: datetime) -> bool:
+    return value is not None and _naive_utc(value) > since
+
+
 def _same_day_previous_year(anchor_date: date) -> date | None:
     """Return the same calendar day a year before, or None when invalid (Feb 29)."""
     try:
@@ -257,7 +267,13 @@ def _date_period(start: date, end: date, label: str) -> dict[str, str]:
 class FinancialInsightContextBuilder:
     """Build sanitized financial snapshots for daily, weekly and monthly insights."""
 
-    def build_daily(self, *, user_id: UUID, anchor_date: date) -> dict[str, Any]:
+    def build_daily(
+        self,
+        *,
+        user_id: UUID,
+        anchor_date: date,
+        previous_generated_at: datetime | None = None,
+    ) -> dict[str, Any]:
         """Return a daily snapshot with extended temporal comparisons."""
         current = self._period_snapshot(
             user_id=user_id,
@@ -266,6 +282,7 @@ class FinancialInsightContextBuilder:
             label=anchor_date.isoformat(),
             period_type="daily",
             include_credit_cards=True,
+            previous_generated_at=previous_generated_at,
         )
         yesterday = anchor_date - timedelta(days=1)
         previous_week = anchor_date - timedelta(days=7)
@@ -325,7 +342,13 @@ class FinancialInsightContextBuilder:
         current["data_quality"]["missing_comparison_periods"] = missing_comparisons
         return current
 
-    def build_weekly(self, *, user_id: UUID, anchor_date: date) -> dict[str, Any]:
+    def build_weekly(
+        self,
+        *,
+        user_id: UUID,
+        anchor_date: date,
+        previous_generated_at: datetime | None = None,
+    ) -> dict[str, Any]:
         """Return a weekly snapshot for the ISO week containing ``anchor_date``."""
         start, end = _week_bounds(anchor_date)
         current = self._period_snapshot(
@@ -337,6 +360,7 @@ class FinancialInsightContextBuilder:
             include_daily_series=True,
             include_credit_cards=True,
             include_wallet=True,
+            previous_generated_at=previous_generated_at,
         )
         previous_start = start - timedelta(days=7)
         previous_end = start - timedelta(days=1)
@@ -354,7 +378,13 @@ class FinancialInsightContextBuilder:
         }
         return current
 
-    def build_monthly(self, *, user_id: UUID, anchor_date: date) -> dict[str, Any]:
+    def build_monthly(
+        self,
+        *,
+        user_id: UUID,
+        anchor_date: date,
+        previous_generated_at: datetime | None = None,
+    ) -> dict[str, Any]:
         """Return a monthly snapshot for the calendar month containing anchor."""
         start, end = _month_bounds(anchor_date)
         return self._period_snapshot(
@@ -368,6 +398,7 @@ class FinancialInsightContextBuilder:
             include_goals=True,
             include_credit_cards=True,
             include_wallet=True,
+            previous_generated_at=previous_generated_at,
         )
 
     def _comparison_snapshot(
@@ -417,6 +448,7 @@ class FinancialInsightContextBuilder:
         include_credit_cards: bool = False,
         include_wallet: bool = False,
         market_rates: MarketRatesProvider | None = None,
+        previous_generated_at: datetime | None = None,
     ) -> dict[str, Any]:
         transactions = self._fetch_transactions(user_id=user_id, start=start, end=end)
         non_cancelled = [
@@ -441,7 +473,10 @@ class FinancialInsightContextBuilder:
             "categories": {
                 "top_expense_categories": self._top_expense_categories(paid)
             },
-            "transactions": self._transactions_payload(non_cancelled),
+            "transactions": self._transactions_payload(
+                non_cancelled,
+                previous_generated_at=previous_generated_at,
+            ),
             "budgets": self._budgets_payload(user_id=user_id, start=start, end=end)
             if include_budgets
             else [],
@@ -814,6 +849,7 @@ class FinancialInsightContextBuilder:
         transactions: list[Transaction],
         *,
         sample_limit: int = 20,
+        previous_generated_at: datetime | None = None,
     ) -> dict[str, Any]:
         sorted_transactions = sorted(
             transactions,
@@ -824,6 +860,64 @@ class FinancialInsightContextBuilder:
             "sample": [
                 self._serialize_transaction(tx)
                 for tx in sorted_transactions[:sample_limit]
+            ],
+            "changes_since_last_generation": self._transaction_changes_payload(
+                transactions,
+                previous_generated_at=previous_generated_at,
+            ),
+        }
+
+    def _transaction_changes_payload(
+        self,
+        transactions: list[Transaction],
+        *,
+        previous_generated_at: datetime | None,
+    ) -> dict[str, Any]:
+        if previous_generated_at is None:
+            return {
+                "since": None,
+                "has_changes": False,
+                "created": self._transaction_event_payload([]),
+                "updated": self._transaction_event_payload([]),
+                "paid": self._transaction_event_payload([]),
+            }
+
+        since = _naive_utc(previous_generated_at)
+        created = [tx for tx in transactions if _datetime_after(tx.created_at, since)]
+        updated = [
+            tx
+            for tx in transactions
+            if _datetime_after(tx.updated_at, since)
+            and not _datetime_after(tx.created_at, since)
+        ]
+        paid = [tx for tx in transactions if _datetime_after(tx.paid_at, since)]
+        return {
+            "since": since.isoformat(),
+            "has_changes": bool(created or updated or paid),
+            "created": self._transaction_event_payload(created),
+            "updated": self._transaction_event_payload(updated),
+            "paid": self._transaction_event_payload(paid),
+        }
+
+    def _transaction_event_payload(
+        self,
+        transactions: list[Transaction],
+        *,
+        item_limit: int = 10,
+    ) -> dict[str, Any]:
+        sorted_transactions = sorted(
+            transactions,
+            key=lambda tx: (tx.due_date, _money(tx.amount), str(tx.title or "")),
+        )
+        return {
+            "count": len(transactions),
+            "income_total": _money_str(self._sum(transactions, TransactionType.INCOME)),
+            "expense_total": _money_str(
+                self._sum(transactions, TransactionType.EXPENSE)
+            ),
+            "items": [
+                self._serialize_transaction(tx)
+                for tx in sorted_transactions[:item_limit]
             ],
         }
 

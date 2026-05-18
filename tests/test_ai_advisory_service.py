@@ -18,7 +18,7 @@ Coverage areas:
 from __future__ import annotations
 
 import uuid
-from datetime import date
+from datetime import date, datetime
 from decimal import Decimal
 from unittest.mock import MagicMock, patch
 
@@ -362,6 +362,51 @@ class TestAIAdvisoryServiceFinancialInsights:
             )
             assert audit.model == "gpt-4o-mini"
             assert audit.total_tokens == 140
+
+    def test_financial_insights_prompt_uses_structured_deltas_not_previous_text(
+        self,
+        app,
+    ) -> None:
+        with app.app_context():
+            from app.extensions.database import db
+            from app.models.ai_insight import AIInsight, InsightType
+            from app.services.ai_advisory_service import AIAdvisoryService
+
+            user_id = uuid.uuid4()
+            previous = AIInsight(
+                user_id=user_id,
+                content=(
+                    "Insight antigo contaminado: meta do carro estourou por "
+                    "R$ 999.999,00."
+                ),
+                insight_type=InsightType.daily,
+                period_label="2026-05-16",
+                period_start=date(2026, 5, 16),
+                period_end=date(2026, 5, 16),
+                model="gpt-4o-mini",
+                tokens_used=100,
+                cost_usd=0.000015,
+                created_at=datetime(2026, 5, 16, 12, 0, 0),
+            )
+            db.session.add(previous)
+            db.session.commit()
+
+            provider = MagicMock()
+            provider.generate_with_usage.return_value = _financial_llm_response(
+                summary="Resumo sem contaminação."
+            )
+
+            service = AIAdvisoryService(user_id=user_id, llm_provider=provider)
+            service.generate_financial_insights(
+                period_type="daily",
+                anchor_date=date(2026, 5, 17),
+            )
+
+            prompt = provider.generate_with_usage.call_args.args[0]
+            assert "changes_since_last_generation" in prompt
+            assert '"dimension"' in prompt
+            assert "Insight antigo contaminado" not in prompt
+            assert "R$ 999.999,00" not in prompt
 
     def test_financial_insights_return_cached_period_without_provider_call(
         self,

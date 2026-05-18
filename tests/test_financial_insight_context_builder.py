@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import json
 import uuid
-from datetime import date
+from datetime import date, datetime
 from decimal import Decimal
 from inspect import getsource
 from typing import Any
@@ -49,6 +49,9 @@ def _make_transaction(
     observation: str | None = None,
     external_id: str | None = None,
     bank_name: str | None = None,
+    created_at: datetime | None = None,
+    updated_at: datetime | None = None,
+    paid_at: datetime | None = None,
 ) -> Transaction:
     tx = Transaction(
         user_id=user_id,
@@ -62,7 +65,12 @@ def _make_transaction(
         status=status,
         due_date=due_date,
         category=category,
+        paid_at=paid_at,
     )
+    if created_at is not None:
+        tx.created_at = created_at
+    if updated_at is not None:
+        tx.updated_at = updated_at
     db.session.add(tx)
     db.session.commit()
     db.session.refresh(tx)
@@ -416,6 +424,78 @@ class TestFinancialInsightContextBuilderWeekly:
 
 
 class TestFinancialInsightContextBuilderMonthly:
+    def test_monthly_snapshot_tracks_competence_totals_and_generation_deltas(
+        self, app
+    ) -> None:
+        with app.app_context():
+            user_id = _make_user()
+            anchor = date(2026, 5, 17)
+            previous_generated_at = datetime(2026, 5, 10, 12, 0, 0)
+
+            _make_transaction(
+                user_id,
+                title="Receita maio",
+                amount="27934.00",
+                tx_type=TransactionType.INCOME,
+                status=TransactionStatus.PAID,
+                due_date=date(2026, 5, 5),
+                created_at=datetime(2026, 5, 1, 9, 0, 0),
+                updated_at=datetime(2026, 5, 1, 9, 0, 0),
+                paid_at=datetime(2026, 5, 5, 9, 0, 0),
+            )
+            _make_transaction(
+                user_id,
+                title="Despesa paga nova",
+                amount="21125.00",
+                tx_type=TransactionType.EXPENSE,
+                status=TransactionStatus.PAID,
+                due_date=date(2026, 5, 11),
+                created_at=datetime(2026, 5, 11, 8, 0, 0),
+                updated_at=datetime(2026, 5, 11, 8, 0, 0),
+                paid_at=datetime(2026, 5, 11, 8, 30, 0),
+            )
+            _make_transaction(
+                user_id,
+                title="Pendência alterada",
+                amount="2730.00",
+                tx_type=TransactionType.EXPENSE,
+                status=TransactionStatus.PENDING,
+                due_date=date(2026, 5, 20),
+                created_at=datetime(2026, 5, 2, 10, 0, 0),
+                updated_at=datetime(2026, 5, 12, 10, 0, 0),
+            )
+
+            snapshot = FinancialInsightContextBuilder().build_monthly(
+                user_id=user_id,
+                anchor_date=anchor,
+                previous_generated_at=previous_generated_at,
+            )
+
+        assert snapshot["current_period"]["paid"] == {
+            "income_total": "27934.00",
+            "expense_total": "21125.00",
+            "balance": "6809.00",
+            "transaction_count": 2,
+        }
+        assert (
+            snapshot["current_period"]["commitments"]["pending_expense_total"]
+            == "2730.00"
+        )
+
+        deltas = snapshot["transactions"]["changes_since_last_generation"]
+        assert deltas["since"] == "2026-05-10T12:00:00"
+        assert deltas["has_changes"] is True
+        assert deltas["created"]["count"] == 1
+        assert deltas["created"]["expense_total"] == "21125.00"
+        assert deltas["updated"]["count"] == 1
+        assert deltas["updated"]["expense_total"] == "2730.00"
+        assert deltas["paid"]["count"] == 1
+        assert deltas["paid"]["expense_total"] == "21125.00"
+        assert deltas["created"]["items"][0]["title"] == "Despesa paga nova"
+        for section in ("created", "updated", "paid"):
+            for item in deltas[section]["items"]:
+                assert "id" not in item
+
     def test_monthly_snapshot_includes_day_extremes_budgets_and_goals(
         self, app
     ) -> None:
