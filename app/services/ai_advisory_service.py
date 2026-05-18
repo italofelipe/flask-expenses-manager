@@ -48,6 +48,7 @@ from app.services.financial_insight_context_builder import (
     truncate_snapshot,
 )
 from app.services.goal_projection_service import GoalProjectionService
+from app.services.insight_evidence_validator import filter_valid_items
 from app.services.llm_provider import LLMProvider, LLMProviderError, get_llm_provider
 from app.services.weekly_summary import compute_weekly_summary
 
@@ -358,6 +359,14 @@ def _coerce_financial_insight_response(
         raise LLMProviderError("Invalid financial insight items.")
 
     items = [_coerce_financial_insight_item(item) for item in candidate_items]
+    # Issue #1300: drop items whose evidence paths disagree with the declared
+    # dimension (or point to unknown snapshot prefixes). Surviving items keep
+    # their order. When every item is rejected, surface as a provider error.
+    items = filter_valid_items(items)
+    if not items:
+        raise LLMProviderError(
+            "All financial insight items rejected by evidence validation."
+        )
     metadata = _coerce_financial_insight_metadata(parsed)
 
     return summary.strip(), items, metadata
