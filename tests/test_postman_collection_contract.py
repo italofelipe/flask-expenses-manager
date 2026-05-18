@@ -113,6 +113,8 @@ OPENAPI_GAPS: set[tuple[str, str]] = {
     ("GET", "/credit-cards/{param}"),
     ("PATCH", "/credit-cards/{param}"),
     ("DELETE", "/credit-cards/{param}"),
+    ("GET", "/credit-cards/{param}/bill"),
+    ("GET", "/credit-cards/{param}/utilization"),
     # GraphQL
     ("GET", "/graphql"),
     ("POST", "/graphql"),
