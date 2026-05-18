@@ -108,6 +108,7 @@ def test_known_critical_models_present() -> None:
         "users",
         "transactions",
         "llm_audit_logs",
+        "ai_insight_runs",
         "ai_insights",
         "refresh_tokens",
         "push_subscriptions",
