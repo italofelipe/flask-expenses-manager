@@ -11,6 +11,8 @@ from sqlalchemy.dialects.postgresql import UUID
 from app.extensions.database import db
 from app.utils.datetime_utils import utc_now_naive
 
+_USERS_FK = "users.id"
+
 
 def _enum_values(enum_cls: type[enum.Enum]) -> list[str]:
     return [str(item.value) for item in enum_cls]
@@ -46,7 +48,7 @@ class SharedEntry(db.Model):
     )
     owner_id = db.Column(
         UUID(as_uuid=True),
-        db.ForeignKey("users.id"),
+        db.ForeignKey(_USERS_FK),
         nullable=False,
         index=True,
     )
@@ -100,10 +102,10 @@ class Invitation(db.Model):
         index=True,
     )
     from_user_id = db.Column(
-        UUID(as_uuid=True), db.ForeignKey("users.id"), nullable=False, index=True
+        UUID(as_uuid=True), db.ForeignKey(_USERS_FK), nullable=False, index=True
     )
     to_user_email = db.Column(db.String(254), nullable=False)
-    to_user_id = db.Column(UUID(as_uuid=True), db.ForeignKey("users.id"), nullable=True)
+    to_user_id = db.Column(UUID(as_uuid=True), db.ForeignKey(_USERS_FK), nullable=True)
     split_value = db.Column(db.Numeric(5, 2), nullable=True)
     share_amount = db.Column(db.Numeric(12, 2), nullable=True)
     message = db.Column(db.String(300), nullable=True)

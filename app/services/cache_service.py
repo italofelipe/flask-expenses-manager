@@ -55,19 +55,25 @@ ENTITLEMENT_CACHE_TTL = 300  # 5 minutes — invalidated on grant/revoke/sync
 
 
 class _NoOpCacheService:
-    """Always returns cache-miss; used when Redis is unavailable."""
+    """Always returns cache-miss; used when Redis is unavailable.
+
+    Every method signature matches ``RedisCacheService`` so the Protocol
+    contract is satisfied; the arguments are intentionally discarded via
+    ``del`` to silence linters without changing keyword names.
+    """
 
     def get(self, key: str) -> Any | None:
+        del key
         return None
 
     def set(self, key: str, value: Any, *, ttl: int) -> None:
-        return None
+        del key, value, ttl
 
     def invalidate(self, key: str) -> None:
-        return None
+        del key
 
     def invalidate_pattern(self, pattern: str) -> None:
-        return None
+        del pattern
 
     @property
     def available(self) -> bool:

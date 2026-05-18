@@ -206,6 +206,28 @@ def revoke_entitlement(user_id: str | UUID, feature_key: str) -> None:
 # ---------------------------------------------------------------------------
 
 
+_DEGRADED_STATUSES = {
+    SubscriptionStatus.CANCELED,
+    SubscriptionStatus.EXPIRED,
+    SubscriptionStatus.PAST_DUE,
+}
+
+
+def _resolve_effective_plan(plan_slug: str, status: SubscriptionStatus | None) -> str:
+    if status in _DEGRADED_STATUSES:
+        return "free"
+    return plan_slug if plan_slug in PLAN_FEATURES else "free"
+
+
+def _resolve_entitlement_source(
+    effective_plan: str,
+    status: SubscriptionStatus | None,
+) -> EntitlementSource:
+    if effective_plan == "trial" or status == SubscriptionStatus.TRIALING:
+        return EntitlementSource.TRIAL
+    return EntitlementSource.SUBSCRIPTION
+
+
 def sync_entitlements_from_subscription(
     subscription: Subscription,
 ) -> list[Entitlement]:
@@ -225,27 +247,9 @@ def sync_entitlements_from_subscription(
     plan_slug = subscription.plan_code or "free"
     status = subscription.status
 
-    _DEGRADED_STATUSES = {
-        SubscriptionStatus.CANCELED,
-        SubscriptionStatus.EXPIRED,
-        SubscriptionStatus.PAST_DUE,
-    }
-
-    # Determine effective plan based on status
-    if status in _DEGRADED_STATUSES:
-        effective_plan = "free"
-    else:
-        effective_plan = plan_slug if plan_slug in PLAN_FEATURES else "free"
-
+    effective_plan = _resolve_effective_plan(plan_slug, status)
     desired_features: set[str] = set(PLAN_FEATURES[effective_plan])
-
-    # Determine source enum for granted entitlements
-    if effective_plan == "trial" or status == SubscriptionStatus.TRIALING:
-        source = EntitlementSource.TRIAL
-    elif effective_plan in ("premium",):
-        source = EntitlementSource.SUBSCRIPTION
-    else:
-        source = EntitlementSource.SUBSCRIPTION
+    source = _resolve_entitlement_source(effective_plan, status)
 
     # Fetch current entitlements that were granted by subscription/trial sources
     # (manual entitlements are intentionally left untouched)

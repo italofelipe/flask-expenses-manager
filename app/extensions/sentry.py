@@ -39,7 +39,7 @@ def _before_send(event: Event, hint: Hint) -> Event | None:
     """Drop client errors (4xx) and apply error sampling to reduce quota use."""
     exc_info = hint.get("exc_info")
     if exc_info:
-        exc_type, exc_value, _ = exc_info
+        _, exc_value, _ = exc_info
         # Drop werkzeug/Flask HTTP exceptions with status < 500 (client errors)
         status_code = getattr(exc_value, "code", None)
         if status_code is not None and status_code < 500:

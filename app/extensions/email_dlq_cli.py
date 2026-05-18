@@ -17,6 +17,8 @@ from flask.cli import AppGroup
 
 email_dlq_cli = AppGroup("email-dlq", help="Email Dead-Letter Queue management.")
 
+_DLQ_UNAVAILABLE_MESSAGE = "DLQ unavailable (Redis not configured)."
+
 
 @email_dlq_cli.command("list")
 def dlq_list() -> None:
@@ -25,7 +27,7 @@ def dlq_list() -> None:
 
     dlq = get_email_dlq()
     if not dlq.available:
-        click.echo("DLQ unavailable (Redis not configured).", err=True)
+        click.echo(_DLQ_UNAVAILABLE_MESSAGE, err=True)
         return
 
     entries = dlq.list_pending()
@@ -51,7 +53,7 @@ def dlq_retry(limit: int) -> None:
 
     dlq = get_email_dlq()
     if not dlq.available:
-        click.echo("DLQ unavailable (Redis not configured).", err=True)
+        click.echo(_DLQ_UNAVAILABLE_MESSAGE, err=True)
         return
 
     size_before = dlq.size()
@@ -73,7 +75,7 @@ def dlq_size() -> None:
 
     dlq = get_email_dlq()
     if not dlq.available:
-        click.echo("DLQ unavailable (Redis not configured).", err=True)
+        click.echo(_DLQ_UNAVAILABLE_MESSAGE, err=True)
         return
 
     click.echo(f"email_dlq_size={dlq.size()}")

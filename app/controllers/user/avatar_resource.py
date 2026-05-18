@@ -127,7 +127,7 @@ class AvatarResource(MethodResource):
                 ext=ext,
             )
         except AvatarStorageError as exc:
-            current_app.logger.error(
+            current_app.logger.exception(
                 "event=avatar.upload_failed user_id=%s request_id=%s error=%s",
                 user.id,
                 current_request_id(),

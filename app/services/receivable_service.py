@@ -8,7 +8,7 @@ must NEVER be presented as an official fiscal calculation without the disclaimer
 from __future__ import annotations
 
 import uuid as _uuid
-from datetime import date
+from datetime import date, datetime
 from decimal import Decimal
 from typing import Any, cast
 
@@ -19,7 +19,6 @@ from app.models.fiscal import (
     ReceivableEntry,
     ReconciliationStatus,
 )
-from app.utils.datetime_utils import utc_now_naive
 
 
 def _to_uuid(value: str | _uuid.UUID) -> _uuid.UUID:
@@ -106,7 +105,7 @@ def mark_received(
         received_amount if received_amount is not None else entry.expected_net_amount
     )
     entry.received_amount = actual
-    entry.received_at = utc_now_naive()
+    entry.received_at = datetime.combine(received_date, datetime.min.time())
     entry.reconciliation_status = ReconciliationStatus.RECONCILED
     if entry.expected_net_amount is not None and actual is not None:
         outstanding = entry.expected_net_amount - actual

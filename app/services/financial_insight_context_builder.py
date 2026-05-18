@@ -25,7 +25,17 @@ from app.models.transaction import (
     TransactionStatus,
     TransactionType,
 )
+from app.models.user import User
+from app.models.wallet import Wallet
 from app.services.credit_card_bill_service import compute_utilization
+from app.services.investor_profile_targets import (
+    AllocationDiagnosis,
+    evaluate_allocation,
+)
+from app.services.market_rates_provider import (
+    MarketRatesProvider,
+    get_default_market_rates_provider,
+)
 
 INSIGHT_DIMENSIONS: tuple[str, ...] = (
     "general",
@@ -326,6 +336,7 @@ class FinancialInsightContextBuilder:
             period_type="weekly",
             include_daily_series=True,
             include_credit_cards=True,
+            include_wallet=True,
         )
         previous_start = start - timedelta(days=7)
         previous_end = start - timedelta(days=1)
@@ -356,6 +367,7 @@ class FinancialInsightContextBuilder:
             include_budgets=True,
             include_goals=True,
             include_credit_cards=True,
+            include_wallet=True,
         )
 
     def _comparison_snapshot(
@@ -403,6 +415,8 @@ class FinancialInsightContextBuilder:
         include_budgets: bool = False,
         include_goals: bool = False,
         include_credit_cards: bool = False,
+        include_wallet: bool = False,
+        market_rates: MarketRatesProvider | None = None,
     ) -> dict[str, Any]:
         transactions = self._fetch_transactions(user_id=user_id, start=start, end=end)
         non_cancelled = [
@@ -440,6 +454,17 @@ class FinancialInsightContextBuilder:
                 "missing_comparison_periods": [],
             },
         }
+        if include_wallet:
+            wallet_payload, missing_rates = self._wallet_payload(
+                user_id=user_id,
+                anchor=end,
+                market_rates=market_rates or get_default_market_rates_provider(),
+            )
+            snapshot["wallet"] = wallet_payload
+            if missing_rates:
+                snapshot["data_quality"]["missing_external_rates"] = missing_rates
+        else:
+            snapshot["wallet"] = {"items": [], "total_value": "0.00"}
         return snapshot
 
     def _credit_cards_payload(
@@ -485,6 +510,103 @@ class FinancialInsightContextBuilder:
                 }
             )
         return payload
+
+    def _wallet_payload(
+        self,
+        *,
+        user_id: UUID,
+        anchor: date,
+        market_rates: MarketRatesProvider,
+    ) -> tuple[dict[str, Any], list[str]]:
+        """Return (wallet_section, missing_external_rates).
+
+        Sanitized list of holdings + asset-class distribution + investor
+        profile diagnosis + benchmark CDI/IPCA for the anchor's month.
+        """
+        wallets = Wallet.query.filter_by(user_id=user_id).order_by(Wallet.name).all()
+        user = User.query.filter_by(id=user_id).first()
+        items = [self._serialize_wallet_item(w) for w in wallets]
+        diagnosis = evaluate_allocation(
+            investor_profile=getattr(user, "investor_profile", None) if user else None,
+            wallets=wallets,
+        )
+        benchmark, missing = self._fetch_wallet_benchmark(
+            market_rates=market_rates,
+            year=anchor.year,
+            month=anchor.month,
+        )
+        return (
+            {
+                "items": items,
+                "total_value": _money_str(diagnosis.distribution.total_value),
+                "distribution": {
+                    "fixed_income_pct": _percent_str(
+                        diagnosis.distribution.fixed_income_pct
+                    ),
+                    "market_pct": _percent_str(diagnosis.distribution.market_pct),
+                    "custom_pct": _percent_str(diagnosis.distribution.custom_pct),
+                },
+                "profile_alignment": self._serialize_diagnosis(diagnosis),
+                "benchmark": benchmark,
+            },
+            missing,
+        )
+
+    def _serialize_wallet_item(self, wallet: Wallet) -> dict[str, Any]:
+        return {
+            "name": _sanitize_text(wallet.name, max_length=80) or "Investimento",
+            "asset_class": (wallet.asset_class or "custom").lower(),
+            "current_value": _money_str(wallet.value or 0),
+            "annual_rate": _percent_str(wallet.annual_rate or 0)
+            if wallet.annual_rate is not None
+            else None,
+            "ticker": _sanitize_text(wallet.ticker, max_length=16)
+            if wallet.ticker
+            else None,
+            "should_be_on_wallet": bool(wallet.should_be_on_wallet),
+        }
+
+    def _serialize_diagnosis(self, diagnosis: AllocationDiagnosis) -> dict[str, Any]:
+        return {
+            "profile": diagnosis.profile,
+            "target_fixed_income_pct": _percent_str(
+                diagnosis.target.target_fixed_income_pct
+            )
+            if diagnosis.target
+            else None,
+            "target_market_pct": _percent_str(diagnosis.target.target_market_pct)
+            if diagnosis.target
+            else None,
+            "alert_level": diagnosis.alert_level,
+            "drift_pp": _percent_str(diagnosis.drift_pp)
+            if diagnosis.drift_pp is not None
+            else None,
+            "notes": list(diagnosis.notes),
+        }
+
+    def _fetch_wallet_benchmark(
+        self,
+        *,
+        market_rates: MarketRatesProvider,
+        year: int,
+        month: int,
+    ) -> tuple[dict[str, Any], list[str]]:
+        cdi = market_rates.cdi_monthly(year=year, month=month)
+        ipca = market_rates.ipca_monthly(year=year, month=month)
+        missing: list[str] = []
+        if cdi is None:
+            missing.append("cdi_monthly")
+        if ipca is None:
+            missing.append("ipca_monthly")
+        return (
+            {
+                "cdi_monthly_pct": _percent_str(cdi) if cdi is not None else None,
+                "ipca_monthly_pct": _percent_str(ipca) if ipca is not None else None,
+                "reference_year": year,
+                "reference_month": month,
+            },
+            missing,
+        )
 
     def _fetch_transactions(
         self,
@@ -869,6 +991,26 @@ def _trim_top_categories(snapshot: dict[str, Any]) -> bool:
     return False
 
 
+def _trim_wallet_items(snapshot: dict[str, Any]) -> bool:
+    """Keep top 10 holdings by current_value; preserves distribution/benchmark."""
+    wallet = snapshot.get("wallet")
+    if not isinstance(wallet, dict):
+        return False
+    items = wallet.get("items")
+    if not (isinstance(items, list) and len(items) > 10):
+        return False
+
+    def _sort_key(entry: dict[str, Any]) -> float:
+        try:
+            return float(entry.get("current_value", 0) or 0)
+        except (TypeError, ValueError):
+            return 0.0
+
+    kept = sorted(items, key=_sort_key, reverse=True)[:10]
+    snapshot["wallet"] = {**wallet, "items": kept}
+    return True
+
+
 def truncate_snapshot(
     snapshot: dict[str, Any],
     *,
@@ -905,6 +1047,7 @@ def truncate_snapshot(
         ("daily_series", _trim_daily_series),
         ("credit_cards.idle", _trim_idle_credit_cards),
         ("categories.top_expense_categories", _trim_top_categories),
+        ("wallet.items", _trim_wallet_items),
     )
     for label, step in steps:
         if step(truncated):

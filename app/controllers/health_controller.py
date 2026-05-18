@@ -64,7 +64,7 @@ def _check_redis() -> DependencyStatus:
         )
         client.ping()
         return "ok"
-    except (ImportError, Exception):
+    except Exception:
         return "error"
 
 

@@ -79,15 +79,17 @@ class StubLLMProvider:
         "3. Há uma oportunidade de economia de até 15% caso reduza gastos variáveis nos próximos 60 dias."  # noqa: E501
     )
 
-    def generate(self, prompt: str) -> str:  # noqa: ARG002
+    def generate(self, prompt: str) -> str:
+        del prompt
         return self._STUB_CONTENT
 
-    def generate_with_usage(  # noqa: ARG002
+    def generate_with_usage(
         self,
         prompt: str,
         *,
         response_schema: dict[str, Any] | None = None,
     ) -> LLMResponse:
+        del prompt
         content = self._STUB_CONTENT
         if (
             response_schema
