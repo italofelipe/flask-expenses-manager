@@ -7,6 +7,9 @@ instances so prompts and audit logs do not receive user PII or raw IDs.
 
 from __future__ import annotations
 
+import json
+import logging
+import os
 import re
 from calendar import monthrange
 from datetime import date, timedelta
@@ -41,6 +44,17 @@ surface it belongs to so contextual pages can filter, while the global
 _SNAPSHOT_VERSION = "financial_insight_snapshot.v1"
 _CURRENCY = "BRL"
 _TIMEZONE = "America/Sao_Paulo"
+
+# Hard cap on serialized snapshot size sent to the LLM (Sprint 5 obs-1).
+# When exceeded, `truncate_snapshot()` reduces large lists deterministically
+# while preserving the structural backbone (schema_version, current_period,
+# comparisons). Override via AI_SNAPSHOT_MAX_BYTES env for cost experiments.
+DEFAULT_MAX_SNAPSHOT_BYTES = 12 * 1024
+MAX_SNAPSHOT_BYTES = int(
+    os.getenv("AI_SNAPSHOT_MAX_BYTES", str(DEFAULT_MAX_SNAPSHOT_BYTES))
+)
+
+_log = logging.getLogger(__name__)
 _MONEY_QUANT = Decimal("0.01")
 _PERCENT_QUANT = Decimal("0.01")
 _EMAIL_MASK = "[email]"
@@ -795,4 +809,124 @@ class FinancialInsightContextBuilder:
         )
 
 
-__all__ = ["FinancialInsightContextBuilder"]
+def _measure_snapshot_bytes(snapshot: dict[str, Any]) -> int:
+    """Return UTF-8 byte size of the JSON-serialized snapshot."""
+    return len(json.dumps(snapshot, ensure_ascii=False, sort_keys=True).encode("utf-8"))
+
+
+def _trim_transactions(snapshot: dict[str, Any]) -> bool:
+    txs = snapshot.get("transactions")
+    if not isinstance(txs, dict):
+        return False
+    items = txs.get("items")
+    if not (isinstance(items, list) and len(items) > 15):
+        return False
+    expenses = [i for i in items if i.get("type") == "expense"]
+    incomes = [i for i in items if i.get("type") == "income"]
+    kept = (
+        sorted(expenses, key=lambda i: float(i.get("amount", 0) or 0), reverse=True)[
+            :10
+        ]
+        + sorted(incomes, key=lambda i: float(i.get("amount", 0) or 0), reverse=True)[
+            :5
+        ]
+    )
+    snapshot["transactions"] = {**txs, "items": kept}
+    return True
+
+
+def _trim_daily_series(snapshot: dict[str, Any]) -> bool:
+    series = snapshot.get("daily_series")
+    if isinstance(series, list) and len(series) > 7:
+        snapshot["daily_series"] = series[-7:]
+        return True
+    return False
+
+
+def _trim_idle_credit_cards(snapshot: dict[str, Any]) -> bool:
+    cards = snapshot.get("credit_cards")
+    if not (isinstance(cards, list) and cards):
+        return False
+    active = [
+        c
+        for c in cards
+        if isinstance(c, dict) and c.get("utilization_pct") not in (None, 0, 0.0)
+    ]
+    if len(active) < len(cards):
+        snapshot["credit_cards"] = active
+        return True
+    return False
+
+
+def _trim_top_categories(snapshot: dict[str, Any]) -> bool:
+    categories = snapshot.get("categories")
+    if not isinstance(categories, dict):
+        return False
+    top = categories.get("top_expense_categories")
+    if isinstance(top, list) and len(top) > 5:
+        snapshot["categories"] = {**categories, "top_expense_categories": top[:5]}
+        return True
+    return False
+
+
+def truncate_snapshot(
+    snapshot: dict[str, Any],
+    *,
+    max_bytes: int = MAX_SNAPSHOT_BYTES,
+) -> tuple[dict[str, Any], dict[str, Any]]:
+    """Return ``(possibly_truncated, info)`` keeping the snapshot under max_bytes.
+
+    Truncation order (least → most destructive):
+
+    1. transactions: keep top 10 by expense amount, then top 5 income.
+    2. daily_series: keep most recent 7 entries.
+    3. credit_cards: drop entries with zero/None utilization_pct.
+    4. categories.top_expense_categories: keep top 5.
+
+    Always preserved: ``schema_version``, ``period_type``, ``period``,
+    ``current_period``, ``comparisons``, ``data_quality``. Caller receives
+    a dict describing what changed for observability.
+    """
+    original_bytes = _measure_snapshot_bytes(snapshot)
+    info: dict[str, Any] = {
+        "snapshot_bytes_original": original_bytes,
+        "snapshot_bytes_final": original_bytes,
+        "truncated": False,
+        "dropped_sections": [],
+        "max_bytes": max_bytes,
+    }
+    if original_bytes <= max_bytes:
+        return snapshot, info
+
+    truncated = dict(snapshot)
+    dropped: list[str] = info["dropped_sections"]
+    steps = (
+        ("transactions.items", _trim_transactions),
+        ("daily_series", _trim_daily_series),
+        ("credit_cards.idle", _trim_idle_credit_cards),
+        ("categories.top_expense_categories", _trim_top_categories),
+    )
+    for label, step in steps:
+        if step(truncated):
+            dropped.append(label)
+        if _measure_snapshot_bytes(truncated) <= max_bytes:
+            break
+
+    final_bytes = _measure_snapshot_bytes(truncated)
+    info["snapshot_bytes_final"] = final_bytes
+    info["truncated"] = True
+    _log.warning(
+        "ai_advisory.snapshot.truncated original=%d final=%d dropped=%s",
+        original_bytes,
+        final_bytes,
+        dropped,
+    )
+    return truncated, info
+
+
+__all__ = [
+    "FinancialInsightContextBuilder",
+    "INSIGHT_DIMENSIONS",
+    "MAX_SNAPSHOT_BYTES",
+    "truncate_snapshot",
+]
