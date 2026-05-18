@@ -277,11 +277,19 @@ class TestBuildWeeklyBudgetSnapshot:
 class TestBuildWeeklyGoalsSnapshot:
     def test_returns_contributions_this_week(self, app, client):
         _, user_id = _register_and_login(client)
+        # Use days_ago bounded by weekday so the contribution always falls in the
+        # current ISO week (Monday→Sunday). On Monday, weekday()==0 → days_ago=0
+        # (today). On Tuesday→Sunday, days_ago=1 (yesterday, still this week).
+        today = date.today()
+        days_ago = min(1, today.weekday())
         _make_goal_with_contribution(
-            app, user_id, title="Viagem", contribution_amount=300.0, days_ago=1
+            app,
+            user_id,
+            title="Viagem",
+            contribution_amount=300.0,
+            days_ago=days_ago,
         )
 
-        today = date.today()
         week_start = today - timedelta(days=today.weekday())
 
         with app.app_context():

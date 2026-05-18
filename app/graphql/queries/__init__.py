@@ -5,6 +5,7 @@ import graphene
 from .account import AccountQueryMixin
 from .ai_insight import AIInsightQueryMixin
 from .budget import BudgetQueryMixin
+from .credit_card import CreditCardQueryMixin
 from .dashboard import DashboardQueryMixin
 from .fiscal import FiscalQueryMixin
 from .goal import GoalQueryMixin
@@ -32,6 +33,7 @@ class Query(
     TagQueryMixin,
     AccountQueryMixin,
     AIInsightQueryMixin,
+    CreditCardQueryMixin,
     FiscalQueryMixin,
     graphene.ObjectType,
 ):
@@ -53,5 +55,6 @@ __all__ = [
     "TagQueryMixin",
     "AccountQueryMixin",
     "AIInsightQueryMixin",
+    "CreditCardQueryMixin",
     "FiscalQueryMixin",
 ]

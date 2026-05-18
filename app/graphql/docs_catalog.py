@@ -10,6 +10,7 @@ GraphQLDomain = Literal[
     "ai_advisory",
     "auth",
     "billing",
+    "credit_card",
     "dashboard",
     "fiscal",
     "goals",
@@ -47,6 +48,7 @@ MUTATION_SUBSCRIPTION_MODULE = "app.graphql.mutations.subscription"
 MUTATION_NOTIFICATION_MODULE = "app.graphql.mutations.notification"
 QUERY_TAG_MODULE = "app.graphql.queries.tag"
 QUERY_ACCOUNT_MODULE = "app.graphql.queries.account"
+QUERY_CREDIT_CARD_MODULE = "app.graphql.queries.credit_card"
 MUTATION_TAG_MODULE = "app.graphql.mutations.tag"
 MUTATION_ACCOUNT_MODULE = "app.graphql.mutations.account"
 MUTATION_BANK_STATEMENT_MODULE = "app.graphql.mutations.bank_statement"
@@ -689,6 +691,37 @@ GRAPHQL_OPERATION_CATALOG: tuple[GraphQLOperationDoc, ...] = (
         access="auth_required",
         summary="Remove uma conta bancária do usuário.",
         source_module=MUTATION_ACCOUNT_MODULE,
+    ),
+    # Credit Cards (MVP-3 / #1284-#1286)
+    GraphQLOperationDoc(
+        name="creditCards",
+        operation_type="query",
+        domain="credit_card",
+        access="auth_required",
+        summary="Lista todos os cartões de crédito do usuário autenticado.",
+        source_module=QUERY_CREDIT_CARD_MODULE,
+    ),
+    GraphQLOperationDoc(
+        name="creditCardBill",
+        operation_type="query",
+        domain="credit_card",
+        access="auth_required",
+        summary=(
+            "Retorna a fatura (ciclo + transações + totais) de um cartão para "
+            "o mês solicitado (YYYY-MM)."
+        ),
+        source_module=QUERY_CREDIT_CARD_MODULE,
+    ),
+    GraphQLOperationDoc(
+        name="creditCardUtilization",
+        operation_type="query",
+        domain="credit_card",
+        access="auth_required",
+        summary=(
+            "Retorna o snapshot de utilização do ciclo aberto: committed, "
+            "available, limit e utilization_pct."
+        ),
+        source_module=QUERY_CREDIT_CARD_MODULE,
     ),
     # Bank Statement Import (#1148)
     GraphQLOperationDoc(
