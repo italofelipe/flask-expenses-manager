@@ -19,7 +19,7 @@ import hashlib
 import json
 import logging
 from calendar import monthrange
-from datetime import date
+from datetime import date, datetime
 from decimal import Decimal
 from typing import Any
 from uuid import UUID
@@ -460,15 +460,28 @@ def _build_period_snapshot(
     insight_type: InsightType,
     user_id: UUID,
     anchor: date,
+    previous_generated_at: datetime | None = None,
 ) -> dict[str, Any]:
     """Dispatch to the period-specific snapshot builder."""
     builder = FinancialInsightContextBuilder()
     if insight_type == InsightType.daily:
-        return builder.build_daily(user_id=user_id, anchor_date=anchor)
+        return builder.build_daily(
+            user_id=user_id,
+            anchor_date=anchor,
+            previous_generated_at=previous_generated_at,
+        )
     if insight_type == InsightType.weekly:
-        return builder.build_weekly(user_id=user_id, anchor_date=anchor)
+        return builder.build_weekly(
+            user_id=user_id,
+            anchor_date=anchor,
+            previous_generated_at=previous_generated_at,
+        )
     if insight_type == InsightType.monthly:
-        return builder.build_monthly(user_id=user_id, anchor_date=anchor)
+        return builder.build_monthly(
+            user_id=user_id,
+            anchor_date=anchor,
+            previous_generated_at=previous_generated_at,
+        )
     raise ValueError("period_type must be daily, weekly or monthly")
 
 
@@ -503,10 +516,12 @@ class AIAdvisoryService:
         anchor = anchor_date or date.today()
         consent_version = ensure_ai_consent_granted(self._user_id)
 
+        previous = _get_latest_insight(user_id=self._user_id)
         snapshot = _build_period_snapshot(
             insight_type=insight_type,
             user_id=self._user_id,
             anchor=anchor,
+            previous_generated_at=previous.created_at if previous else None,
         )
 
         period = snapshot["period"]
@@ -552,7 +567,6 @@ class AIAdvisoryService:
                     "cached": True,
                 }
 
-        previous = _get_latest_insight(user_id=self._user_id)
         prompt_snapshot = minimize_prompt_data(snapshot)
         # Apply 12 KiB cap before hashing/prompting so context_hash matches
         # whatever we actually send to the LLM.
@@ -561,7 +575,6 @@ class AIAdvisoryService:
         prompt = _build_financial_insight_prompt(
             prompt_snapshot,
             period_type=normalized_period_type,
-            previous_insight=previous.content if previous else None,
         )
 
         try:
@@ -1547,16 +1560,8 @@ def _build_financial_insight_prompt(
     snapshot: dict[str, Any],
     *,
     period_type: str,
-    previous_insight: str | None = None,
 ) -> str:
     context = json.dumps(snapshot, ensure_ascii=False, default=str)
-    previous_block = ""
-    if previous_insight:
-        previous_block = (
-            "\nInsight anterior persistido para continuidade narrativa:\n"
-            f"{previous_insight}\n"
-        )
-
     period_instruction = {
         "daily": (
             "Para insight diário: compare hoje com ontem, com o mesmo dia do mês "
@@ -1594,12 +1599,15 @@ def _build_financial_insight_prompt(
         "quando disponíveis, e sinalize desvios do perfil de investidor via "
         "'wallet.profile_alignment'. Quando o usuário não tiver perfil declarado, "
         "descreva a distribuição sem afirmações de adequação.\n"
-        f"{previous_block}"
+        "Para mudanças desde a última geração, use somente "
+        "transactions.changes_since_last_generation. Não use texto de insights "
+        "anteriores como fonte factual.\n"
         f"\nSnapshot financeiro ({snapshot.get('schema_version')}):\n{context}\n\n"
         f"Tipos permitidos: {insight_types}.\n"
         "Retorne somente JSON no formato:\n"
         '{"summary":"...","items":[{"type":"saude_financeira",'
-        '"title":"...","message":"...","evidence":["current_period.paid.balance"]}]}'
+        '"dimension":"general","title":"...","message":"...",'
+        '"evidence":["current_period.paid.balance"]}]}'
     )
 
 
