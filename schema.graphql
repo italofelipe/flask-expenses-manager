@@ -10,6 +10,9 @@ type Query {
     """
     type: String
   ): FiscalDocumentListType
+  creditCards: CreditCardListType
+  creditCardBill(cardId: UUID!, month: String!): CreditCardBillType
+  creditCardUtilization(cardId: UUID!): CreditCardUtilizationType
   aiInsightHistory(page: Int = 1, perPage: Int = 20): AIInsightHistoryResultType
   accounts: AccountListType
   account(accountId: UUID!): AccountType
@@ -106,6 +109,65 @@ type FiscalDocumentType {
   createdAt: String!
 }
 
+type CreditCardListType {
+  creditCards: [CreditCardType]
+  total: Int
+}
+
+type CreditCardType {
+  id: String!
+  name: String!
+  brand: String
+  limitAmount: DecimalScalar
+  closingDay: Int
+  dueDay: Int
+  lastFourDigits: String
+  bank: String
+  description: String
+  benefits: [String]
+  validityDate: String
+  createdAt: String
+  updatedAt: String
+}
+
+type CreditCardBillType {
+  cycle: BillCycleType!
+  transactions: [BillTransactionType]
+  totalAmount: DecimalScalar!
+  paidAmount: DecimalScalar!
+  pendingAmount: DecimalScalar!
+}
+
+type BillCycleType {
+  startDate: String!
+  endDate: String!
+  dueDate: String!
+  status: String!
+}
+
+type BillTransactionType {
+  id: String!
+  title: String!
+  amount: DecimalScalar!
+  dueDate: String
+  status: String
+  type: String
+}
+
+"""
+Leverages the internal Python implementation of UUID (uuid.UUID) to provide native UUID objects
+in fields, resolvers and input.
+"""
+scalar UUID
+
+type CreditCardUtilizationType {
+  cycle: BillCycleType!
+  committedAmount: DecimalScalar!
+  availableAmount: DecimalScalar
+  limitAmount: DecimalScalar
+  utilizationPct: Float
+}
+
 type AIInsightHistoryResultType {
   items: [AIInsightType!]!
   page: Int!
@@ -138,12 +200,6 @@ type AccountType {
   institution: String
   initialBalance: DecimalScalar
 }
-
-"""
-Leverages the internal Python implementation of UUID (uuid.UUID) to provide native UUID objects
-in fields, resolvers and input.
-"""
-scalar UUID
 
 type TagListType {
   tags: [TagType!]!
