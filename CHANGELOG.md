@@ -1,5 +1,16 @@
 # Changelog
 
+## [1.42.0](https://github.com/italofelipe/auraxis-api/compare/v1.41.0...v1.42.0) (2026-05-18)
+
+
+### Features
+
+* **ai-insights:** enforce dimension↔evidence consistency per item ([#1300](https://github.com/italofelipe/auraxis-api/issues/1300)) ([#1302](https://github.com/italofelipe/auraxis-api/issues/1302)) ([40e12f5](https://github.com/italofelipe/auraxis-api/commit/40e12f55a78d25812ca263208b7cd95cbc5980dc))
+* **ai-insights:** MVP-3 — dimension, credit_cards section, extended comparisons + GraphQL parity ([#1287](https://github.com/italofelipe/auraxis-api/issues/1287) [#1288](https://github.com/italofelipe/auraxis-api/issues/1288)) ([#1296](https://github.com/italofelipe/auraxis-api/issues/1296)) ([6b8d178](https://github.com/italofelipe/auraxis-api/commit/6b8d178a28931924a9e56e63daa415632be87afe))
+* **ai-insights:** observability + snapshot guardrails + metadata (Sprint 5 [#1289](https://github.com/italofelipe/auraxis-api/issues/1289)) ([#1297](https://github.com/italofelipe/auraxis-api/issues/1297)) ([438970c](https://github.com/italofelipe/auraxis-api/commit/438970ccd3caecca007e1da8d111608040a4b35d))
+* **ai-insights:** wallet section + CDI/IPCA benchmark + investor profile diagnosis ([#1243](https://github.com/italofelipe/auraxis-api/issues/1243)) ([#1298](https://github.com/italofelipe/auraxis-api/issues/1298)) ([48a0d66](https://github.com/italofelipe/auraxis-api/commit/48a0d66bef7b872876286f3f0dd8ade5f1c27b9c))
+* **credit-card:** Hub de Cartões enriquecido + bill cycle + utilization (Sprint 1 MVP-3) ([#1294](https://github.com/italofelipe/auraxis-api/issues/1294)) ([02eaaf7](https://github.com/italofelipe/auraxis-api/commit/02eaaf74f34abb5bb0f80163325411c75bcfc529))
+
 ## [1.41.0](https://github.com/italofelipe/auraxis-api/compare/v1.40.1...v1.41.0) (2026-05-17)
 
 
