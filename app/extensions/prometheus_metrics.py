@@ -44,8 +44,39 @@ _AUDIT_EVENTS_PURGED_TOTAL: Any = None
 _CACHE_HITS_TOTAL: Any = None
 _CACHE_MISSES_TOTAL: Any = None
 _CACHE_INVALIDATIONS_TOTAL: Any = None
+_AI_INSIGHT_GENERATED_TOTAL: Any = None
+_AI_INSIGHT_TOKENS: Any = None
+_AI_INSIGHT_SNAPSHOT_BYTES: Any = None
 
 _DURATION_BUCKETS = (0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1.0, 2.5)
+_AI_TOKENS_BUCKETS = (100, 250, 500, 1000, 2500, 5000, 10000, 25000)
+_AI_SNAPSHOT_BYTES_BUCKETS = (1024, 2048, 4096, 8192, 12288, 16384, 32768)
+
+
+def _init_ai_insight_metrics() -> None:
+    """Lazily initialise the MVP-3 AI insight observability instruments."""
+    global _AI_INSIGHT_GENERATED_TOTAL, _AI_INSIGHT_TOKENS, _AI_INSIGHT_SNAPSHOT_BYTES
+
+    if _AI_INSIGHT_GENERATED_TOTAL is None:
+        _AI_INSIGHT_GENERATED_TOTAL = Counter(
+            "auraxis_ai_insight_generated_total",
+            "AI insights generated, by period_type and dimension",
+            ["period_type", "dimension"],
+        )
+    if _AI_INSIGHT_TOKENS is None:
+        _AI_INSIGHT_TOKENS = Histogram(
+            "auraxis_ai_insight_tokens",
+            "Tokens consumed per AI insight generation",
+            ["period_type"],
+            buckets=_AI_TOKENS_BUCKETS,
+        )
+    if _AI_INSIGHT_SNAPSHOT_BYTES is None:
+        _AI_INSIGHT_SNAPSHOT_BYTES = Histogram(
+            "auraxis_ai_insight_snapshot_bytes",
+            "Snapshot size in bytes sent to the LLM (post truncation)",
+            ["period_type", "truncated"],
+            buckets=_AI_SNAPSHOT_BYTES_BUCKETS,
+        )
 
 
 def _ensure_metrics_initialized() -> None:
@@ -111,6 +142,8 @@ def _ensure_metrics_initialized() -> None:
             ["namespace"],
         )
 
+    _init_ai_insight_metrics()
+
 
 def record_http_request(
     *,
@@ -172,6 +205,35 @@ def record_auth_login(*, status: str) -> None:
         _AUTH_LOGINS_TOTAL.labels(status=status).inc()
 
 
+def record_ai_insight_generated(
+    *,
+    period_type: str,
+    dimensions: list[str],
+    tokens_used: int,
+    snapshot_bytes: int,
+    truncated: bool,
+) -> None:
+    """Record an AI insight generation across counter + histograms (MVP-3).
+
+    Emits one ``auraxis_ai_insight_generated_total`` increment per distinct
+    dimension found in the LLM response (so a single generation contributes
+    to multiple dimensions when the LLM produces multi-surface items).
+    Tokens and snapshot byte size are observed once per call.
+    """
+    _ensure_metrics_initialized()
+    pt = period_type or "unknown"
+    if _AI_INSIGHT_GENERATED_TOTAL is not None:
+        for dim in dimensions or ["general"]:
+            _AI_INSIGHT_GENERATED_TOTAL.labels(period_type=pt, dimension=dim).inc()
+    if _AI_INSIGHT_TOKENS is not None and tokens_used >= 0:
+        _AI_INSIGHT_TOKENS.labels(period_type=pt).observe(tokens_used)
+    if _AI_INSIGHT_SNAPSHOT_BYTES is not None and snapshot_bytes >= 0:
+        _AI_INSIGHT_SNAPSHOT_BYTES.labels(
+            period_type=pt,
+            truncated="true" if truncated else "false",
+        ).observe(snapshot_bytes)
+
+
 def generate_latest_metrics() -> tuple[bytes, str]:
     """Return ``(body_bytes, content_type)`` for the Prometheus scrape endpoint.
 
@@ -221,6 +283,7 @@ def register_prometheus_middleware(app: "Flask") -> None:
 
 __all__ = [
     "generate_latest_metrics",
+    "record_ai_insight_generated",
     "record_audit_purge",
     "record_auth_login",
     "record_cache_hit",

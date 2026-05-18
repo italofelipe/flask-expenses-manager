@@ -73,6 +73,32 @@ class AIInsight(db.Model):
         nullable=True,
     )
     created_at = db.Column(db.DateTime, default=utc_now_naive, nullable=False)
+    # Snapshot/audit metadata for observability — populated since MVP-3
+    # (Sprint 5 obs-1). Legacy rows have NULL. Stored as JSON in Text for
+    # SQLite parity with PG; access via `metadata_dict` property.
+    metadata_json = db.Column(db.Text, nullable=True)
+
+    @property
+    def metadata_dict(self) -> dict[str, object]:
+        """Decode `metadata_json` to a dict, or {} when missing/invalid."""
+        import json as _json
+
+        if not self.metadata_json:
+            return {}
+        try:
+            decoded = _json.loads(self.metadata_json)
+        except (ValueError, TypeError):
+            return {}
+        return decoded if isinstance(decoded, dict) else {}
+
+    @metadata_dict.setter
+    def metadata_dict(self, value: dict[str, object] | None) -> None:
+        import json as _json
+
+        if value is None:
+            self.metadata_json = None
+        else:
+            self.metadata_json = _json.dumps(value, ensure_ascii=False, sort_keys=True)
 
     __table_args__ = (
         db.Index("ix_ai_insights_user_id", "user_id"),

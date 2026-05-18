@@ -28,6 +28,7 @@ from dateutil.relativedelta import relativedelta
 from sqlalchemy import case, func
 
 from app.extensions.database import db
+from app.extensions.prometheus_metrics import record_ai_insight_generated
 from app.models.ai_insight import AIInsight, InsightType
 from app.models.budget import Budget
 from app.models.goal import Goal
@@ -44,6 +45,7 @@ from app.services.ai_lgpd import (
 from app.services.financial_insight_context_builder import (
     INSIGHT_DIMENSIONS,
     FinancialInsightContextBuilder,
+    truncate_snapshot,
 )
 from app.services.goal_projection_service import GoalProjectionService
 from app.services.llm_provider import LLMProvider, LLMProviderError, get_llm_provider
@@ -188,6 +190,7 @@ def _save_insight(
     tokens_used: int,
     cost_usd: float,
     previous_insight_id: UUID | None,
+    metadata: dict[str, Any] | None = None,
 ) -> AIInsight:
     """Persist a new AIInsight record and return it."""
     from decimal import Decimal as _Decimal
@@ -204,6 +207,8 @@ def _save_insight(
         cost_usd=_Decimal(str(cost_usd)),
         previous_insight_id=previous_insight_id,
     )
+    if metadata:
+        insight.metadata_dict = metadata
     db.session.add(insight)
     db.session.commit()
     return insight
@@ -536,6 +541,9 @@ class AIAdvisoryService:
 
         previous = _get_latest_insight(user_id=self._user_id)
         prompt_snapshot = minimize_prompt_data(snapshot)
+        # Apply 12 KiB cap before hashing/prompting so context_hash matches
+        # whatever we actually send to the LLM.
+        prompt_snapshot, truncation_info = truncate_snapshot(prompt_snapshot)
         context_hash = _financial_context_hash(prompt_snapshot)
         prompt = _build_financial_insight_prompt(
             prompt_snapshot,
@@ -577,6 +585,24 @@ class AIAdvisoryService:
             consent_version=consent_version,
         )
 
+        dimensions_present = sorted(
+            {str(it.get("dimension", "general")) for it in items}
+        )
+        comparisons_available = sorted((snapshot.get("comparisons") or {}).keys())
+        persist_metadata: dict[str, Any] = {
+            "snapshot_version": context_version,
+            "context_hash": context_hash,
+            "comparisons_available": comparisons_available,
+            "dimensions_present": dimensions_present,
+            "snapshot_bytes_original": truncation_info["snapshot_bytes_original"],
+            "snapshot_bytes_final": truncation_info["snapshot_bytes_final"],
+            "truncated": bool(truncation_info["truncated"]),
+        }
+        if truncation_info["dropped_sections"]:
+            persist_metadata["dropped_sections"] = list(
+                truncation_info["dropped_sections"]
+            )
+
         _save_insight(
             user_id=self._user_id,
             content=serialized_content,
@@ -588,7 +614,23 @@ class AIAdvisoryService:
             tokens_used=llm_resp.total_tokens,
             cost_usd=llm_resp.estimated_cost_usd,
             previous_insight_id=previous.id if previous else None,
+            metadata=persist_metadata,
         )
+
+        try:
+            record_ai_insight_generated(
+                period_type=normalized_period_type,
+                dimensions=dimensions_present,
+                tokens_used=int(llm_resp.total_tokens or 0),
+                snapshot_bytes=int(truncation_info["snapshot_bytes_final"]),
+                truncated=bool(truncation_info["truncated"]),
+            )
+        except Exception:  # pragma: no cover — metrics are fire-and-forget
+            log.warning(
+                "ai_advisory.metrics.record_failed user=%s period=%s",
+                self._user_id,
+                normalized_period_type,
+            )
 
         return {
             "period_type": normalized_period_type,
