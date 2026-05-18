@@ -1,5 +1,17 @@
 # Changelog
 
+## [1.41.0](https://github.com/italofelipe/auraxis-api/compare/v1.40.1...v1.41.0) (2026-05-17)
+
+
+### Features
+
+* **credit-card:** bill cycle service with compute_bill_cycle + utili… ([#1290](https://github.com/italofelipe/auraxis-api/issues/1290)) ([19dd2a0](https://github.com/italofelipe/auraxis-api/commit/19dd2a02f3d18f9c33ed1a73d12377422bde96fb)), closes [#1284](https://github.com/italofelipe/auraxis-api/issues/1284)
+
+
+### Bug Fixes
+
+* **security:** retry com backoff no download do osv-scanner (502 transiente) ([#1292](https://github.com/italofelipe/auraxis-api/issues/1292)) ([e4b8391](https://github.com/italofelipe/auraxis-api/commit/e4b8391c49d355fd7ef9bc5225c1bbd03fe71939)), closes [#1291](https://github.com/italofelipe/auraxis-api/issues/1291)
+
 ## [1.40.1](https://github.com/italofelipe/auraxis-api/compare/v1.40.0...v1.40.1) (2026-05-17)
 
 

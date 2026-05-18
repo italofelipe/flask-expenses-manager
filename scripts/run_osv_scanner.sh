@@ -44,6 +44,11 @@ resolve_platform() {
 
 ensure_osv_scanner() {
   local platform cache_dir binary_path asset_url
+  local -i attempt=0
+  local -i max_attempts=5
+  local -i sleep_seconds=5
+  local curl_exit=0
+
   platform="$(resolve_platform)"
   cache_dir="${ROOT_DIR}/.cache/tools/osv-scanner/${OSV_SCANNER_VERSION}"
   binary_path="${cache_dir}/osv-scanner"
@@ -55,8 +60,41 @@ ensure_osv_scanner() {
 
   mkdir -p "${cache_dir}"
   asset_url="https://github.com/google/osv-scanner/releases/download/v${OSV_SCANNER_VERSION}/osv-scanner_${platform}"
-  curl -fsSL "${asset_url}" -o "${binary_path}"
+
+  # Retry with exponential-ish backoff: 5s, 10s, 20s, 40s, 80s.
+  # Handles transient upstream 5xx (CDN/GitHub releases) and DNS hiccups.
+  while (( attempt < max_attempts )); do
+    attempt=$((attempt + 1))
+    curl_exit=0
+    curl --fail --silent --show-error --location \
+         --retry 3 --retry-delay 2 --retry-connrefused \
+         --max-time 60 \
+         "${asset_url}" -o "${binary_path}" \
+         || curl_exit=$?
+    if [[ "${curl_exit}" -eq 0 && -s "${binary_path}" ]]; then
+      break
+    fi
+    rm -f "${binary_path}"
+    if (( attempt >= max_attempts )); then
+      echo "[osv-scanner] failed to download after ${max_attempts} attempts (curl exit=${curl_exit}, url=${asset_url})" >&2
+      return 1
+    fi
+    echo "[osv-scanner] download attempt ${attempt}/${max_attempts} failed (curl exit=${curl_exit}); retrying in ${sleep_seconds}s" >&2
+    sleep "${sleep_seconds}"
+    sleep_seconds=$((sleep_seconds * 2))
+  done
+
+  if [[ ! -s "${binary_path}" ]]; then
+    echo "[osv-scanner] download produced empty file at ${binary_path}" >&2
+    rm -f "${binary_path}"
+    return 1
+  fi
+
   chmod +x "${binary_path}"
+  if [[ ! -x "${binary_path}" ]]; then
+    echo "[osv-scanner] binary not executable after chmod: ${binary_path}" >&2
+    return 1
+  fi
   printf '%s\n' "${binary_path}"
 }
 
