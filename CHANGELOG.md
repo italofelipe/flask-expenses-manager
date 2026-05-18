@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.43.0](https://github.com/italofelipe/auraxis-api/compare/v1.42.0...v1.43.0) (2026-05-18)
+
+
+### Features
+
+* **ai-insights:** track generation deltas ([#1303](https://github.com/italofelipe/auraxis-api/issues/1303)) ([2e15dc9](https://github.com/italofelipe/auraxis-api/commit/2e15dc9bb9eca6b372d79625aa3e71c4a3d9d04d))
+
 ## [1.42.0](https://github.com/italofelipe/auraxis-api/compare/v1.41.0...v1.42.0) (2026-05-18)
 
 
