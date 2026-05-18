@@ -177,8 +177,9 @@ def _normalize_profile(raw: str | None) -> ProfileKey | None:
     if not raw:
         return None
     normalized = raw.strip().lower()
-    if normalized in PROFILE_TARGETS:
-        return normalized  # type: ignore[return-value]
+    for key in PROFILE_TARGETS:
+        if normalized == key:
+            return key
     return None
 
 
