@@ -600,6 +600,30 @@
   },
   {
     "access": "auth_required",
+    "domain": "credit_card",
+    "name": "creditCards",
+    "operation_type": "query",
+    "source_module": "app.graphql.queries.credit_card",
+    "summary": "Lista todos os cartões de crédito do usuário autenticado."
+  },
+  {
+    "access": "auth_required",
+    "domain": "credit_card",
+    "name": "creditCardBill",
+    "operation_type": "query",
+    "source_module": "app.graphql.queries.credit_card",
+    "summary": "Retorna a fatura (ciclo + transações + totais) de um cartão para o mês solicitado (YYYY-MM)."
+  },
+  {
+    "access": "auth_required",
+    "domain": "credit_card",
+    "name": "creditCardUtilization",
+    "operation_type": "query",
+    "source_module": "app.graphql.queries.credit_card",
+    "summary": "Retorna o snapshot de utilização do ciclo aberto: committed, available, limit e utilization_pct."
+  },
+  {
+    "access": "auth_required",
     "domain": "transactions",
     "name": "previewBankStatement",
     "operation_type": "mutation",
