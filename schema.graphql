@@ -881,6 +881,15 @@ type Mutation {
     """service_invoice | product_invoice | receipt | debit_note | credit_note"""
     type: String!
   ): FiscalDocumentPayload @deprecated(reason: "ADR-0002: use POST /fiscal/fiscal-documents")
+
+  """
+  GraphQL parity for POST /ai/insights/generate.
+  
+  Reuses AIAdvisoryService — quota (2x/day Premium), entitlement gate and
+  LGPD consent are enforced inside the service. GraphQL surface exposes the
+  same payload shape so the frontend hub can render either path identically.
+  """
+  generateAiInsight(anchorDate: String, periodType: String!): GenerateAiInsightPayload
 }
 
 type AuthPayloadType {
@@ -1254,4 +1263,28 @@ type FiscalDocumentPayload {
   """Field-level validation errors (empty on success)."""
   errors: [ValidationError!]!
   data: FiscalDocumentType
+}
+
+type GenerateAiInsightPayload {
+  ok: Boolean!
+  periodType: String
+  periodLabel: String
+  periodStart: String
+  periodEnd: String
+  summary: String
+  items: [AIInsightItemType]
+  contextVersion: String
+  cached: Boolean
+  model: String
+  tokensUsed: Int
+  costUsd: Float
+}
+
+"""A single LLM-produced insight item, tagged by dimension."""
+type AIInsightItemType {
+  type: String!
+  dimension: String!
+  title: String!
+  message: String!
+  evidence: [String]
 }

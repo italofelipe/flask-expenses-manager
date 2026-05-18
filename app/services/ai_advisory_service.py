@@ -42,6 +42,7 @@ from app.services.ai_lgpd import (
     redact_response_for_audit,
 )
 from app.services.financial_insight_context_builder import (
+    INSIGHT_DIMENSIONS,
     FinancialInsightContextBuilder,
 )
 from app.services.goal_projection_service import GoalProjectionService
@@ -109,6 +110,10 @@ _FINANCIAL_INSIGHT_RESPONSE_SCHEMA: dict[str, Any] = {
                             "type": "string",
                             "enum": list(_SPENDING_INSIGHT_TYPES),
                         },
+                        "dimension": {
+                            "type": "string",
+                            "enum": list(INSIGHT_DIMENSIONS),
+                        },
                         "title": {"type": "string"},
                         "message": {"type": "string"},
                         "evidence": {
@@ -116,7 +121,13 @@ _FINANCIAL_INSIGHT_RESPONSE_SCHEMA: dict[str, Any] = {
                             "items": {"type": "string"},
                         },
                     },
-                    "required": ["type", "title", "message", "evidence"],
+                    "required": [
+                        "type",
+                        "dimension",
+                        "title",
+                        "message",
+                        "evidence",
+                    ],
                     "additionalProperties": False,
                 },
             },
@@ -286,8 +297,20 @@ def _coerce_financial_insight_item(candidate: object) -> FinancialInsightItem:
     ):
         raise LLMProviderError("Invalid financial insight item fields.")
 
+    # Dimension is required for new MVP-3 items; legacy AIInsight rows (pre
+    # 2026-05-18) may not have it — those get coerced to 'general'. Invalid
+    # explicit values are rejected so the schema stays a closed enum.
+    dimension_raw = candidate.get("dimension")
+    if dimension_raw is None:
+        dimension = "general"
+    elif isinstance(dimension_raw, str) and dimension_raw.strip() in INSIGHT_DIMENSIONS:
+        dimension = dimension_raw.strip()
+    else:
+        raise LLMProviderError("Invalid financial insight item dimension.")
+
     return {
         "type": item_type.strip(),
+        "dimension": dimension,
         "title": title.strip(),
         "message": message.strip(),
         "evidence": [item.strip() for item in evidence],

@@ -331,6 +331,7 @@ class TestAIAdvisoryServiceFinancialInsights:
             assert result["items"] == [
                 {
                     "type": "saude_financeira",
+                    "dimension": "general",
                     "title": "Saldo positivo",
                     "message": "Você fechou o dia com saldo positivo.",
                     "evidence": ["current_period.paid.balance"],
