@@ -178,13 +178,12 @@ def get_shared_entry(shared_entry_id: UUID, requesting_user_id: UUID) -> SharedE
     entry: SharedEntry | None = db.session.get(SharedEntry, shared_entry_id)
     if entry is None:
         raise SharedEntryNotFoundError()
-    if entry.owner_id == requesting_user_id:
-        return entry
-    invitation = Invitation.query.filter_by(
-        shared_entry_id=shared_entry_id,
-        to_user_id=requesting_user_id,
-        status=InvitationStatus.ACCEPTED,
-    ).first()
-    if invitation is None:
-        raise SharedEntryForbiddenError()
+    if entry.owner_id != requesting_user_id:
+        invitation = Invitation.query.filter_by(
+            shared_entry_id=shared_entry_id,
+            to_user_id=requesting_user_id,
+            status=InvitationStatus.ACCEPTED,
+        ).first()
+        if invitation is None:
+            raise SharedEntryForbiddenError()
     return entry

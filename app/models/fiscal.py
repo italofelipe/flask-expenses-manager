@@ -22,6 +22,8 @@ from sqlalchemy.dialects.postgresql import UUID
 from app.extensions.database import db
 from app.utils.datetime_utils import utc_now_naive
 
+_USERS_FK = "users.id"
+
 
 def _enum_values(enum_cls: type[enum.Enum]) -> list[str]:
     return [str(item.value) for item in enum_cls]
@@ -73,7 +75,7 @@ class FiscalImport(db.Model):
         UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, nullable=False
     )
     user_id = db.Column(
-        UUID(as_uuid=True), db.ForeignKey("users.id"), nullable=False, index=True
+        UUID(as_uuid=True), db.ForeignKey(_USERS_FK), nullable=False, index=True
     )
     status = db.Column(
         db.Enum(FiscalImportStatus, values_callable=_enum_values),
@@ -106,7 +108,7 @@ class FiscalDocument(db.Model):
     id = db.Column(
         UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, nullable=False
     )
-    user_id = db.Column(UUID(as_uuid=True), db.ForeignKey("users.id"), nullable=False)
+    user_id = db.Column(UUID(as_uuid=True), db.ForeignKey(_USERS_FK), nullable=False)
     import_id = db.Column(
         UUID(as_uuid=True), db.ForeignKey("fiscal_imports.id"), nullable=True
     )
@@ -172,11 +174,12 @@ class ReceivableEntry(db.Model):
         nullable=False,
         index=True,
     )
-    user_id = db.Column(UUID(as_uuid=True), db.ForeignKey("users.id"), nullable=False)
+    user_id = db.Column(UUID(as_uuid=True), db.ForeignKey(_USERS_FK), nullable=False)
     # advisory-only — see module docstring
     expected_net_amount = db.Column(db.Numeric(14, 2), nullable=True)
     received_amount = db.Column(db.Numeric(14, 2), nullable=True)
-    # outstanding_amount = expected_net_amount - received_amount (calculated in app)
+    # Stored as (expected_net_amount - received_amount), computed at the
+    # service layer when the entry is settled.
     outstanding_amount = db.Column(db.Numeric(14, 2), nullable=True)
     reconciliation_status = db.Column(
         db.Enum(ReconciliationStatus, values_callable=_enum_values),
@@ -217,7 +220,7 @@ class FiscalAdjustment(db.Model):
         nullable=False,
         index=True,
     )
-    user_id = db.Column(UUID(as_uuid=True), db.ForeignKey("users.id"), nullable=False)
+    user_id = db.Column(UUID(as_uuid=True), db.ForeignKey(_USERS_FK), nullable=False)
     type = db.Column(
         db.Enum(FiscalAdjustmentType, values_callable=_enum_values), nullable=False
     )

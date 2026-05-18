@@ -43,6 +43,8 @@ from app.utils.typed_decorators import typed_jwt_required as jwt_required
 
 from .blueprint import fiscal_bp
 
+_FIELD_CONTENT_REQUIRED_MESSAGE = "Field 'content' is required"
+
 
 def _parse_date_param(value: str) -> date:
     for fmt in ("%Y-%m-%d", "%d/%m/%Y"):
@@ -70,9 +72,9 @@ def csv_upload() -> tuple[dict[str, Any], int]:
 
     if not content:
         return compat_error_tuple(
-            legacy_payload={"error": "Field 'content' is required"},
+            legacy_payload={"error": _FIELD_CONTENT_REQUIRED_MESSAGE},
             status_code=400,
-            message="Field 'content' is required",
+            message=_FIELD_CONTENT_REQUIRED_MESSAGE,
             error_code="MISSING_CONTENT",
         )
 
@@ -116,9 +118,9 @@ def csv_confirm() -> tuple[dict[str, Any], int]:
 
     if not content:
         return compat_error_tuple(
-            legacy_payload={"error": "Field 'content' is required"},
+            legacy_payload={"error": _FIELD_CONTENT_REQUIRED_MESSAGE},
             status_code=400,
-            message="Field 'content' is required",
+            message=_FIELD_CONTENT_REQUIRED_MESSAGE,
             error_code="MISSING_CONTENT",
         )
 
@@ -199,7 +201,7 @@ def create_receivable_entry() -> tuple[dict[str, Any], int]:
     try:
         amount = Decimal(str(payload["amount"]))
         expected_date = _parse_date_param(payload["expected_date"])
-    except (ValueError, Exception) as exc:
+    except Exception as exc:
         return compat_error_tuple(
             legacy_payload={"error": str(exc)},
             status_code=400,

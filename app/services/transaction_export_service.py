@@ -21,7 +21,7 @@ import io
 from dataclasses import dataclass
 from datetime import date
 from decimal import Decimal
-from typing import TYPE_CHECKING, Generator, Iterator
+from typing import TYPE_CHECKING, Any, Generator, Iterator
 
 from app.models.transaction import Transaction, TransactionStatus, TransactionType
 
@@ -66,32 +66,15 @@ def _iter_transactions_batched(
     last_id: _UUID | None = None
 
     while True:
-        query = Transaction.query.filter_by(user_id=user_id, deleted=False)
-
-        if start_date is not None:
-            query = query.filter(Transaction.due_date >= start_date)
-        if end_date is not None:
-            query = query.filter(Transaction.due_date <= end_date)
-        if tx_type is not None:
-            query = query.filter(Transaction.type == tx_type)
-        if status is not None:
-            query = query.filter(Transaction.status == status)
-
-        if last_due is not None and last_id is not None:
-            # Keyset pagination: skip rows we already yielded.
-            # Rows are ordered by (due_date ASC, id ASC) so this condition
-            # correctly advances the cursor without duplicates or gaps.
-            from sqlalchemy import and_, or_
-
-            query = query.filter(
-                or_(
-                    Transaction.due_date > last_due,
-                    and_(
-                        Transaction.due_date == last_due,
-                        Transaction.id > last_id,
-                    ),
-                )
-            )
+        query = _build_export_query(
+            user_id=user_id,
+            start_date=start_date,
+            end_date=end_date,
+            tx_type=tx_type,
+            status=status,
+            last_due=last_due,
+            last_id=last_id,
+        )
 
         batch: list[Transaction] = (
             query.order_by(Transaction.due_date.asc(), Transaction.id.asc())
@@ -111,6 +94,41 @@ def _iter_transactions_batched(
         if len(batch) < batch_size:
             # Last partial batch — no more rows
             break
+
+
+def _build_export_query(
+    *,
+    user_id: "UUID",
+    start_date: date | None,
+    end_date: date | None,
+    tx_type: TransactionType | None,
+    status: TransactionStatus | None,
+    last_due: date | None,
+    last_id: Any,
+) -> Any:
+    """Build the filtered query for one batch in keyset pagination."""
+    query = Transaction.query.filter_by(user_id=user_id, deleted=False)
+    if start_date is not None:
+        query = query.filter(Transaction.due_date >= start_date)
+    if end_date is not None:
+        query = query.filter(Transaction.due_date <= end_date)
+    if tx_type is not None:
+        query = query.filter(Transaction.type == tx_type)
+    if status is not None:
+        query = query.filter(Transaction.status == status)
+    if last_due is not None and last_id is not None:
+        from sqlalchemy import and_, or_
+
+        query = query.filter(
+            or_(
+                Transaction.due_date > last_due,
+                and_(
+                    Transaction.due_date == last_due,
+                    Transaction.id > last_id,
+                ),
+            )
+        )
+    return query
 
 
 # ---------------------------------------------------------------------------

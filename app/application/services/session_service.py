@@ -217,15 +217,18 @@ def rotate_session_by_jti(
     return new_session
 
 
-def check_refresh_jti_revoked(*, user_id: UUID, jti: str) -> bool:
-    """Return True if *jti* is revoked.  Used by JWT revocation callback.
+def check_refresh_jti_revoked(*, user_id: UUID, jti: str) -> bool | None:
+    """Return True if *jti* is revoked, False if active, None to fall back.
 
-    Also triggers family-wide revocation on reuse (token theft detection).
-    Falls back to ``user.refresh_token_jti`` for sessions without rows.
+    Used by the JWT revocation callback. ``None`` signals the caller to
+    fall back to ``user.refresh_token_jti``. ``user_id`` is accepted to
+    preserve the public signature even though the lookup is by ``jti``;
+    discarded explicitly so unused-argument linters stay silent.
     """
+    del user_id
     existing: RefreshToken | None = RefreshToken.query.filter_by(jti=jti).first()
     if existing is None:
-        return None  # type: ignore[return-value]  # Signal: fall back to user field.
+        return None  # Fall back to user field.
     if existing.revoked_at is not None:
         _revoke_family(existing.family_id)
         db.session.commit()

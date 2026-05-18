@@ -23,6 +23,8 @@ from app.services.feature_flag_service import get_feature_flag_service
 
 admin_feature_flags_bp = Blueprint("admin_feature_flags", __name__)
 
+_FEATURE_FLAG_NOT_FOUND_MESSAGE = "Feature flag not found"
+
 _FLAG_NAME_RE = re.compile(r"^[a-zA-Z0-9._-]{1,128}$")
 
 
@@ -66,7 +68,7 @@ def get_feature_flag(name: str) -> Response:
     if not _FLAG_NAME_RE.match(name):
         response = jsonify(
             {
-                "message": "Feature flag not found",
+                "message": _FEATURE_FLAG_NOT_FOUND_MESSAGE,
                 "success": False,
                 "error": {"code": "NOT_FOUND", "details": {}},
             }
@@ -78,7 +80,7 @@ def get_feature_flag(name: str) -> Response:
     if config is None:
         response = jsonify(
             {
-                "message": "Feature flag not found",
+                "message": _FEATURE_FLAG_NOT_FOUND_MESSAGE,
                 "success": False,
                 "error": {"code": "NOT_FOUND", "details": {"name": name}},
             }
@@ -180,7 +182,7 @@ def delete_feature_flag(name: str) -> Response:
     if not _FLAG_NAME_RE.match(name):
         response = jsonify(
             {
-                "message": "Feature flag not found",
+                "message": _FEATURE_FLAG_NOT_FOUND_MESSAGE,
                 "success": False,
                 "error": {"code": "NOT_FOUND", "details": {}},
             }

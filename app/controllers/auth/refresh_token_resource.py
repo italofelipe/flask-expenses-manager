@@ -28,6 +28,8 @@ from .contracts import compat_error, compat_success
 from .cookie_only_policy import COOKIE_ONLY_HEADER, should_omit_refresh_token_in_body
 from .dependencies import get_auth_dependencies
 
+_TOKEN_INVALID_OR_USED_MESSAGE = "Token invalid or already used"
+
 
 class RefreshTokenResource(MethodResource):
     @doc(
@@ -57,7 +59,7 @@ class RefreshTokenResource(MethodResource):
             ),
             401: json_error_response(
                 description="Refresh token inválido, expirado ou já utilizado",
-                message="Token invalid or already used",
+                message=_TOKEN_INVALID_OR_USED_MESSAGE,
                 error_code="TOKEN_INVALID",
                 status_code=401,
             ),
@@ -87,9 +89,9 @@ class RefreshTokenResource(MethodResource):
         # Replay attack guard: the incoming JTI must match the stored refresh JTI.
         if not incoming_jti or user.refresh_token_jti != incoming_jti:
             return compat_error(
-                legacy_payload={"message": "Token invalid or already used"},
+                legacy_payload={"message": _TOKEN_INVALID_OR_USED_MESSAGE},
                 status_code=401,
-                message="Token invalid or already used",
+                message=_TOKEN_INVALID_OR_USED_MESSAGE,
                 error_code="TOKEN_REUSED",
             )
 
@@ -112,9 +114,9 @@ class RefreshTokenResource(MethodResource):
                 )
             except TokenReuseError:
                 return compat_error(
-                    legacy_payload={"message": "Token invalid or already used"},
+                    legacy_payload={"message": _TOKEN_INVALID_OR_USED_MESSAGE},
                     status_code=401,
-                    message="Token invalid or already used",
+                    message=_TOKEN_INVALID_OR_USED_MESSAGE,
                     error_code="TOKEN_REUSED",
                 )
             except SessionNotFoundError:

@@ -31,16 +31,22 @@ DEFAULT_TTL_SECONDS = 300
 
 
 class _NoOpJwtRevocationCache:
-    """Always reports a cache-miss; used when Redis is unavailable."""
+    """Always reports a cache-miss; used when Redis is unavailable.
+
+    Args are accepted to satisfy the Protocol used by callers but explicitly
+    discarded via ``del`` so unused-argument linters stay silent without
+    changing the public method signatures.
+    """
 
     def get_current_jti(self, user_id: str) -> str | None:
+        del user_id
         return None
 
     def set_current_jti(self, user_id: str, jti: str | None) -> None:
-        return None
+        del user_id, jti
 
     def invalidate(self, user_id: str) -> None:
-        return None
+        del user_id
 
 
 class RedisJwtRevocationCache:

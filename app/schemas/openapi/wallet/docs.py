@@ -10,6 +10,12 @@ WALLET_UPDATE_SUCCESSOR_ENDPOINT = "/wallet/{investment_id}"
 WALLET_UPDATE_SUCCESSOR_METHOD = "PATCH"
 WALLET_UPDATE_SUCCESS_MESSAGE = "Investimento atualizado com sucesso"
 
+# Shared literals deduplicated for Sonar S1192.
+_DESC_INVALID_TOKEN = "Token inválido"
+_DESC_CONTRACT_HEADER = "Opcional. Envie 'v2' para o contrato padronizado."
+_DESC_INVESTMENT_ID = "ID do investimento"
+_DESC_INVESTMENT_NOT_FOUND = "Investimento não encontrado"
+
 WALLET_ADD_DOC: dict[str, Any] = {
     "description": (
         "Adiciona um novo item à carteira do usuário.\n\n"
@@ -33,7 +39,7 @@ WALLET_ADD_DOC: dict[str, Any] = {
     "responses": {
         201: {"description": "Ativo cadastrado com sucesso"},
         400: {"description": "Erro de validação ou ticker inválido"},
-        401: {"description": "Token inválido"},
+        401: {"description": _DESC_INVALID_TOKEN},
         500: {"description": "Erro interno"},
     },
 }
@@ -45,14 +51,14 @@ WALLET_LIST_DOC: dict[str, Any] = {
     "params": {
         "X-API-Contract": {
             "in": "header",
-            "description": "Opcional. Envie 'v2' para o contrato padronizado.",
+            "description": _DESC_CONTRACT_HEADER,
             "type": "string",
             "required": False,
         }
     },
     "responses": {
         200: {"description": "Lista paginada de investimentos"},
-        401: {"description": "Token inválido"},
+        401: {"description": _DESC_INVALID_TOKEN},
     },
 }
 
@@ -64,19 +70,19 @@ WALLET_GET_DOC: dict[str, Any] = {
     "tags": ["Wallet"],
     "security": [{"BearerAuth": []}],
     "params": {
-        "investment_id": {"description": "ID do investimento"},
+        "investment_id": {"description": _DESC_INVESTMENT_ID},
         "X-API-Contract": {
             "in": "header",
-            "description": "Opcional. Envie 'v2' para o contrato padronizado.",
+            "description": _DESC_CONTRACT_HEADER,
             "type": "string",
             "required": False,
         },
     },
     "responses": {
         200: {"description": "Investimento retornado com sucesso"},
-        401: {"description": "Token inválido"},
+        401: {"description": _DESC_INVALID_TOKEN},
         403: {"description": "Sem permissão"},
-        404: {"description": "Investimento não encontrado"},
+        404: {"description": _DESC_INVESTMENT_NOT_FOUND},
     },
 }
 
@@ -88,23 +94,23 @@ WALLET_HISTORY_DOC: dict[str, Any] = {
     "tags": ["Wallet"],
     "security": [{"BearerAuth": []}],
     "params": {
-        "investment_id": {"description": "ID do investimento"},
+        "investment_id": {"description": _DESC_INVESTMENT_ID},
         "page": {"description": "Página desejada (default: 1)"},
         "per_page": {
             "description": "Itens por página (default: 5, mínimo 1, máximo 100)"
         },
         "X-API-Contract": {
             "in": "header",
-            "description": "Opcional. Envie 'v2' para o contrato padronizado.",
+            "description": _DESC_CONTRACT_HEADER,
             "type": "string",
             "required": False,
         },
     },
     "responses": {
         200: {"description": "Histórico paginado"},
-        401: {"description": "Token inválido"},
+        401: {"description": _DESC_INVALID_TOKEN},
         403: {"description": "Sem permissão"},
-        404: {"description": "Investimento não encontrado"},
+        404: {"description": _DESC_INVESTMENT_NOT_FOUND},
     },
 }
 
@@ -116,10 +122,10 @@ WALLET_PATCH_DOC: dict[str, Any] = {
     "tags": ["Wallet"],
     "security": [{"BearerAuth": []}],
     "params": {
-        "investment_id": {"description": "ID do investimento"},
+        "investment_id": {"description": _DESC_INVESTMENT_ID},
         "X-API-Contract": {
             "in": "header",
-            "description": "Opcional. Envie 'v2' para o contrato padronizado.",
+            "description": _DESC_CONTRACT_HEADER,
             "type": "string",
             "required": False,
         },
@@ -127,8 +133,8 @@ WALLET_PATCH_DOC: dict[str, Any] = {
     "responses": {
         200: {"description": WALLET_UPDATE_SUCCESS_MESSAGE},
         400: {"description": "Dados inválidos"},
-        401: {"description": "Token inválido"},
-        404: {"description": "Investimento não encontrado"},
+        401: {"description": _DESC_INVALID_TOKEN},
+        404: {"description": _DESC_INVESTMENT_NOT_FOUND},
     },
 }
 
@@ -140,10 +146,10 @@ WALLET_PUT_DOC: dict[str, Any] = {
     "tags": ["Wallet"],
     "security": [{"BearerAuth": []}],
     "params": {
-        "investment_id": {"description": "ID do investimento"},
+        "investment_id": {"description": _DESC_INVESTMENT_ID},
         "X-API-Contract": {
             "in": "header",
-            "description": "Opcional. Envie 'v2' para o contrato padronizado.",
+            "description": _DESC_CONTRACT_HEADER,
             "type": "string",
             "required": False,
         },
@@ -157,8 +163,8 @@ WALLET_PUT_DOC: dict[str, Any] = {
             ),
         },
         400: {"description": "Dados inválidos"},
-        401: {"description": "Token inválido"},
-        404: {"description": "Investimento não encontrado"},
+        401: {"description": _DESC_INVALID_TOKEN},
+        404: {"description": _DESC_INVESTMENT_NOT_FOUND},
     },
 }
 
@@ -167,18 +173,18 @@ WALLET_DELETE_DOC: dict[str, Any] = {
     "tags": ["Wallet"],
     "security": [{"BearerAuth": []}],
     "params": {
-        "investment_id": {"description": "ID do investimento"},
+        "investment_id": {"description": _DESC_INVESTMENT_ID},
         "X-API-Contract": {
             "in": "header",
-            "description": "Opcional. Envie 'v2' para o contrato padronizado.",
+            "description": _DESC_CONTRACT_HEADER,
             "type": "string",
             "required": False,
         },
     },
     "responses": {
         200: {"description": "Investimento deletado com sucesso"},
-        401: {"description": "Token inválido"},
+        401: {"description": _DESC_INVALID_TOKEN},
         403: {"description": "Sem permissão para deletar"},
-        404: {"description": "Investimento não encontrado"},
+        404: {"description": _DESC_INVESTMENT_NOT_FOUND},
     },
 }

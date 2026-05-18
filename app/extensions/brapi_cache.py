@@ -21,16 +21,23 @@ _KEY_PREFIX = "brapi:cache"
 
 
 class _NoOpBrapiCache:
-    """Always reports a cache-miss; used when Redis is unavailable or TTL=0."""
+    """Always reports a cache-miss; used when Redis is unavailable or TTL=0.
+
+    Method signatures match ``RedisBrapiCache`` so callers see a uniform
+    interface. Arguments are intentionally discarded via ``del`` to keep
+    keyword names stable for callers without tripping unused-argument linters.
+    """
 
     def get(self, key: str) -> Any | None:
+        del key
         return None
 
     def set(self, key: str, value: Any, ttl_seconds: int) -> None:
-        pass
+        del key, value, ttl_seconds
 
     def reset(self) -> None:
-        pass
+        # No in-memory state to clear when the cache is a no-op.
+        return
 
 
 class RedisBrapiCache:

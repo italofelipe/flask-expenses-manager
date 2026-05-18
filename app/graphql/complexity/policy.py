@@ -62,7 +62,7 @@ def _read_field_weights_env() -> dict[str, int]:
         parsed = json.loads(raw)
         if isinstance(parsed, dict):
             return {str(k): max(1, int(v)) for k, v in parsed.items()}
-    except (json.JSONDecodeError, ValueError, TypeError):
+    except (ValueError, TypeError):
         pass
     return dict(_DEFAULT_FIELD_WEIGHTS)
 

@@ -141,7 +141,7 @@ def serialize_shared_entry_with_me(
     that address).
     """
     perspective: Invitation | None = None
-    for inv in list(entry.invitations):
+    for inv in entry.invitations:  # type: ignore[attr-defined]
         if (
             inv.to_user_id == requesting_user_id
             and inv.status == InvitationStatus.ACCEPTED

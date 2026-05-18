@@ -143,12 +143,11 @@ class BudgetService:
                 Transaction.due_date >= monday,
                 Transaction.due_date <= sunday,
             )
-        elif budget.period == "custom":
-            if budget.start_date and budget.end_date:
-                query = query.filter(
-                    Transaction.due_date >= budget.start_date,
-                    Transaction.due_date <= budget.end_date,
-                )
+        elif budget.period == "custom" and budget.start_date and budget.end_date:
+            query = query.filter(
+                Transaction.due_date >= budget.start_date,
+                Transaction.due_date <= budget.end_date,
+            )
 
         result = query.scalar()
         return Decimal(str(result)) if result is not None else Decimal("0")

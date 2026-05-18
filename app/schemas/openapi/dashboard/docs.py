@@ -10,6 +10,12 @@ from app.docs.openapi_helpers import (
     json_success_response,
 )
 
+# Shared error descriptions deduplicated for Sonar S1192.
+_DESC_INVALID_PARAM = "Parâmetro inválido"
+_DESC_INVALID_TOKEN = "Token inválido"
+_DESC_REVOKED_TOKEN = "Token revogado"
+_DESC_INTERNAL_ERROR = "Erro interno"
+
 DASHBOARD_OVERVIEW_DOC: dict[str, Any] = {
     "summary": "Obter overview mensal do dashboard",
     "description": (
@@ -68,19 +74,19 @@ DASHBOARD_OVERVIEW_DOC: dict[str, Any] = {
             },
         ),
         400: json_error_response(
-            description="Parâmetro inválido",
+            description=_DESC_INVALID_PARAM,
             message="Parâmetro 'month' inválido. Use o formato YYYY-MM.",
             error_code="VALIDATION_ERROR",
             status_code=400,
         ),
         401: json_error_response(
-            description="Token inválido",
-            message="Token revogado",
+            description=_DESC_INVALID_TOKEN,
+            message=_DESC_REVOKED_TOKEN,
             error_code="UNAUTHORIZED",
             status_code=401,
         ),
         500: json_error_response(
-            description="Erro interno",
+            description=_DESC_INTERNAL_ERROR,
             message="Erro ao calcular overview do dashboard",
             error_code="INTERNAL_ERROR",
             status_code=500,
@@ -123,19 +129,19 @@ DASHBOARD_TRENDS_DOC: dict[str, Any] = {
             },
         ),
         401: json_error_response(
-            description="Token inválido",
-            message="Token revogado",
+            description=_DESC_INVALID_TOKEN,
+            message=_DESC_REVOKED_TOKEN,
             error_code="UNAUTHORIZED",
             status_code=401,
         ),
         422: json_error_response(
-            description="Parâmetro inválido",
+            description=_DESC_INVALID_PARAM,
             message="O parâmetro 'months' deve ser um inteiro entre 1 e 24.",
             error_code="VALIDATION_ERROR",
             status_code=422,
         ),
         500: json_error_response(
-            description="Erro interno",
+            description=_DESC_INTERNAL_ERROR,
             message="Erro ao calcular tendências do dashboard",
             error_code="INTERNAL_ERROR",
             status_code=500,
@@ -220,13 +226,13 @@ DASHBOARD_WEEKLY_SUMMARY_DOC: dict[str, Any] = {
             },
         ),
         401: json_error_response(
-            description="Token inválido",
-            message="Token revogado",
+            description=_DESC_INVALID_TOKEN,
+            message=_DESC_REVOKED_TOKEN,
             error_code="UNAUTHORIZED",
             status_code=401,
         ),
         422: json_error_response(
-            description="Parâmetro inválido",
+            description=_DESC_INVALID_PARAM,
             message=(
                 "Período inválido. Use 1m, 3m, 6m ou forneça start_date e end_date."
             ),
@@ -234,7 +240,7 @@ DASHBOARD_WEEKLY_SUMMARY_DOC: dict[str, Any] = {
             status_code=422,
         ),
         500: json_error_response(
-            description="Erro interno",
+            description=_DESC_INTERNAL_ERROR,
             message="Erro ao calcular resumo semanal",
             error_code="INTERNAL_ERROR",
             status_code=500,
@@ -267,13 +273,13 @@ DASHBOARD_SURVIVAL_DOC: dict[str, Any] = {
             },
         ),
         401: json_error_response(
-            description="Token inválido",
-            message="Token revogado",
+            description=_DESC_INVALID_TOKEN,
+            message=_DESC_REVOKED_TOKEN,
             error_code="UNAUTHORIZED",
             status_code=401,
         ),
         500: json_error_response(
-            description="Erro interno",
+            description=_DESC_INTERNAL_ERROR,
             message="Erro ao calcular índice de sobrevivência",
             error_code="INTERNAL_ERROR",
             status_code=500,

@@ -83,6 +83,7 @@ class _NoOpEmailDLQ:
         )
 
     def retry_pending(self, *, limit: int = 50) -> int:
+        del limit
         return 0
 
     def list_pending(self) -> list[dict[str, Any]]:

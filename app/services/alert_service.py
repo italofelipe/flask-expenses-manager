@@ -188,8 +188,14 @@ def upsert_preference(
 ) -> AlertPreference:
     """Create or update an AlertPreference for (user_id, category).
 
+    ``channels`` is accepted for forward-compatibility (multi-channel routing
+    is on the roadmap) but currently ignored — the model has no column for it
+    yet. Discarded explicitly to keep linters quiet without losing the public
+    signature.
+
     Returns the persisted AlertPreference.
     """
+    del channels
     pref: AlertPreference | None = _get_preference(user_id, category)
     if pref is None:
         pref = AlertPreference(

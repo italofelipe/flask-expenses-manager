@@ -190,7 +190,7 @@ def _export_one_entity(
     try:
         rows = _query_rows_for_entity(rule, user_id)
         return [_serialize_row(row) for row in rows]
-    except Exception as exc:  # noqa: BLE001 — defensive boundary, see docstring
+    except Exception as exc:  # noqa: BLE001  # defensive boundary, see docstring
         current_app.logger.exception(
             "event=lgpd.export.entity_failed user_id=%s entity=%s error=%s",
             user_id,

@@ -33,7 +33,7 @@ def parse_ofx(content: str, bank_name: str) -> list[ParsedEntry]:
         raise ValueError(f"Unsupported OFX bank: {bank_name!r}")
 
     stripped = content.lstrip()
-    if stripped.startswith("<?xml") or stripped.startswith("<OFX>"):
+    if stripped.startswith(("<?xml", "<OFX>")):
         return _parse_ofx_xml(content, normalized_bank)
     return _parse_ofx_sgml(content, normalized_bank)
 

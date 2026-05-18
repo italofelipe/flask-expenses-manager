@@ -56,8 +56,7 @@ PREMIUM_MONTHLY_PLAN = BillingPlanOffer(
     tier="premium",
     display_name="Premium Mensal",
     description="Analises com IA, alertas e briefing semanal.",
-    # ADR #669: R$29,90/mês — founder-confirmed 2026-05-10
-    # Canonical: ADR #669 (auraxis-platform)
+    # Canonical price R$29,90/mes confirmed by ADR-669 (founder, 2026-05-10).
     price_cents=2990,
     billing_cycle=BillingCycle.MONTHLY,
     trial_days=7,
@@ -71,8 +70,7 @@ PREMIUM_ANNUAL_PLAN = BillingPlanOffer(
     tier="premium",
     display_name="Premium Anual",
     description="Mesmo pacote premium com desconto anual.",
-    # ADR #669: R$287,04/ano (equiv. R$23,92/mês, 20% off)
-    # Canonical: ADR #669 (auraxis-platform)
+    # Canonical price R$287,04/ano (eq. R$23,92/mes, 20% off) per ADR-669.
     price_cents=28704,
     billing_cycle=BillingCycle.ANNUAL,
     trial_days=7,

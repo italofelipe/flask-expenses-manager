@@ -27,7 +27,6 @@ from app.models.ai_insight import AIInsight, InsightType
 from app.models.entitlement import Entitlement
 from app.models.user import User
 from app.services.ai_advisory_service import AIAdvisoryService
-from app.services.llm_provider import LLMProviderError
 
 ai_insights_cli = AppGroup("ai", help="Scheduled AI insights batch commands.")
 
@@ -147,7 +146,7 @@ def _run_batch(
             else:
                 total_cost += float(result.get("cost_usd", 0))
                 processed += 1
-        except (LLMProviderError, Exception) as exc:  # noqa: BLE001
+        except Exception as exc:  # noqa: BLE001
             click.echo(
                 f"{label} ERROR user={user_id} error={exc}",
                 err=True,

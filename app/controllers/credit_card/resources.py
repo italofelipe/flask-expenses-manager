@@ -259,41 +259,51 @@ def create_credit_card() -> tuple[dict[str, Any], int]:
     )
 
 
+def _coerce_text(raw: Any) -> Any:
+    return raw or None
+
+
+def _coerce_decimal(raw: Any) -> Any:
+    from decimal import Decimal
+
+    return Decimal(str(raw)) if raw is not None else None
+
+
+def _coerce_int(raw: Any) -> Any:
+    return int(raw) if raw is not None else None
+
+
+def _coerce_benefits(raw: Any) -> Any:
+    return list(raw) if raw is not None else None
+
+
+def _coerce_validity_date(raw: Any) -> Any:
+    return date.fromisoformat(raw) if isinstance(raw, str) else None
+
+
+# Maps payload keys to (attribute name, coercion fn). Keeps update logic
+# table-driven so cognitive complexity stays under the Sonar/Ruff cap.
+_CARD_UPDATE_FIELDS: tuple[tuple[str, str, Any], ...] = (
+    ("brand", "brand", _coerce_text),
+    ("limit_amount", "limit_amount", _coerce_decimal),
+    ("closing_day", "closing_day", _coerce_int),
+    ("due_day", "due_day", _coerce_int),
+    ("last_four_digits", "last_four_digits", _coerce_text),
+    ("bank", "bank", _coerce_text),
+    ("description", "description", _coerce_text),
+    ("benefits", "benefits_list", _coerce_benefits),
+    ("validity_date", "validity_date", _coerce_validity_date),
+)
+
+
 def _apply_card_updates(card: CreditCard, payload: dict[str, Any]) -> None:
     """Apply partial-update payload to an existing card.
 
-    Only fields present in `payload` are touched. Empty strings are coerced to
-    None for nullable text columns. Caller is responsible for db.session.commit.
+    Only fields present in `payload` are touched. Caller commits the session.
     """
-    from decimal import Decimal
-
-    if "brand" in payload:
-        card.brand = payload.get("brand") or None
-    if "limit_amount" in payload:
-        raw = payload["limit_amount"]
-        card.limit_amount = Decimal(str(raw)) if raw is not None else None
-    if "closing_day" in payload:
-        raw_cd = payload["closing_day"]
-        card.closing_day = int(raw_cd) if raw_cd is not None else None
-    if "due_day" in payload:
-        raw_dd = payload["due_day"]
-        card.due_day = int(raw_dd) if raw_dd is not None else None
-    if "last_four_digits" in payload:
-        card.last_four_digits = payload.get("last_four_digits") or None
-    if "bank" in payload:
-        card.bank = payload.get("bank") or None
-    if "description" in payload:
-        card.description = payload.get("description") or None
-    if "benefits" in payload:
-        benefits_value = payload.get("benefits")
-        card.benefits_list = (
-            list(benefits_value) if benefits_value is not None else None
-        )
-    if "validity_date" in payload:
-        validity_raw = payload.get("validity_date")
-        card.validity_date = (
-            date.fromisoformat(validity_raw) if isinstance(validity_raw, str) else None
-        )
+    for payload_key, attr_name, coerce in _CARD_UPDATE_FIELDS:
+        if payload_key in payload:
+            setattr(card, attr_name, coerce(payload.get(payload_key)))
 
 
 @credit_card_bp.route("/<uuid:credit_card_id>", methods=["PUT"])
