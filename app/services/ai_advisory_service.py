@@ -18,14 +18,15 @@ from __future__ import annotations
 import hashlib
 import json
 import logging
+import os
 from calendar import monthrange
-from datetime import date, datetime
-from decimal import Decimal
+from datetime import date, datetime, time
+from decimal import Decimal, InvalidOperation
 from typing import Any
 from uuid import UUID
 
 from dateutil.relativedelta import relativedelta
-from sqlalchemy import case, func
+from sqlalchemy import case, func, or_
 
 from app.extensions.database import db
 from app.extensions.prometheus_metrics import record_ai_insight_generated
@@ -52,6 +53,7 @@ from app.services.goal_projection_service import GoalProjectionService
 from app.services.insight_evidence_validator import filter_valid_items
 from app.services.llm_provider import LLMProvider, LLMProviderError, get_llm_provider
 from app.services.weekly_summary import compute_weekly_summary
+from app.utils.datetime_utils import utc_now_naive
 
 log = logging.getLogger(__name__)
 
@@ -144,6 +146,31 @@ _FINANCIAL_INSIGHT_RESPONSE_SCHEMA: dict[str, Any] = {
 InsightItem = dict[str, str]
 FinancialInsightItem = dict[str, Any]
 
+_AI_INSIGHTS_DAILY_BUDGET_ENV = "AI_INSIGHTS_DAILY_BUDGET_USD"
+_AI_INSIGHTS_MONTHLY_BUDGET_ENV = "AI_INSIGHTS_MONTHLY_BUDGET_USD"
+_AI_INSIGHT_COST_ENDPOINTS = (
+    "financial_insights_daily",
+    "financial_insights_weekly",
+    "financial_insights_monthly",
+)
+
+
+class AIInsightCostBudgetExceededError(LLMProviderError):
+    """Raised when AI Insight generation is blocked by cost governance."""
+
+    def __init__(
+        self,
+        message: str,
+        *,
+        scope: str,
+        limit_usd: Decimal,
+        spent_usd: Decimal,
+    ) -> None:
+        super().__init__(message)
+        self.scope = scope
+        self.limit_usd = limit_usd
+        self.spent_usd = spent_usd
+
 
 # ---------------------------------------------------------------------------
 # AIInsight persistence helpers
@@ -169,6 +196,31 @@ def _get_cached_insight(
     return insight
 
 
+def _get_cached_insight_for_snapshot(
+    *,
+    user_id: UUID,
+    insight_type: InsightType,
+    period_label: str,
+    snapshot_hash: str,
+) -> AIInsight | None:
+    """Return a cached insight only when the persisted context hash matches."""
+    candidates: list[AIInsight] = (
+        db.session.query(AIInsight)
+        .filter_by(
+            user_id=user_id,
+            insight_type=insight_type,
+            period_label=period_label,
+        )
+        .order_by(AIInsight.created_at.desc())
+        .all()
+    )
+    for candidate in candidates:
+        metadata = candidate.metadata_dict
+        if str(metadata.get("context_hash") or "") == snapshot_hash:
+            return candidate
+    return None
+
+
 def _get_latest_insight(*, user_id: UUID) -> AIInsight | None:
     """Return the most recently created AIInsight for this user, or None."""
     insight: AIInsight | None = (
@@ -178,6 +230,43 @@ def _get_latest_insight(*, user_id: UUID) -> AIInsight | None:
         .first()
     )
     return insight
+
+
+def _get_latest_insight_for_period_context(
+    *,
+    user_id: UUID,
+    insight_type: InsightType,
+    period_label: str,
+) -> AIInsight | None:
+    """Return latest prior insight excluding the period currently being generated."""
+    insight: AIInsight | None = (
+        db.session.query(AIInsight)
+        .filter(AIInsight.user_id == user_id)
+        .filter(
+            or_(
+                AIInsight.insight_type != insight_type,
+                AIInsight.period_label != period_label,
+            )
+        )
+        .order_by(AIInsight.created_at.desc())
+        .first()
+    )
+    return insight
+
+
+def _period_label_for_anchor(
+    *,
+    insight_type: InsightType,
+    anchor: date,
+) -> str:
+    if insight_type == InsightType.daily:
+        return anchor.isoformat()
+    if insight_type == InsightType.weekly:
+        iso = anchor.isocalendar()
+        return f"{iso.year}-W{iso.week:02d}"
+    if insight_type == InsightType.monthly:
+        return f"{anchor:%Y-%m}"
+    return anchor.isoformat()
 
 
 def _save_insight(
@@ -557,6 +646,175 @@ def _log_llm_call(
         db.session.rollback()
 
 
+def _read_ai_insight_budget_limit(env_name: str) -> Decimal | None:
+    raw = os.getenv(env_name)
+    if raw is None or not raw.strip():
+        return None
+    try:
+        limit = Decimal(raw.strip())
+    except InvalidOperation:
+        log.warning("ai_advisory.cost_budget.invalid_env name=%s", env_name)
+        return None
+    if limit <= 0:
+        return None
+    return limit
+
+
+def _ai_insight_spend_usd(*, start_at: datetime, end_at: datetime) -> Decimal:
+    total = (
+        db.session.query(func.coalesce(func.sum(LLMAuditLog.estimated_cost_usd), 0))
+        .filter(LLMAuditLog.endpoint.in_(_AI_INSIGHT_COST_ENDPOINTS))
+        .filter(LLMAuditLog.created_at >= start_at)
+        .filter(LLMAuditLog.created_at < end_at)
+        .scalar()
+    )
+    return Decimal(str(total or "0"))
+
+
+def _budget_exceeded_message(
+    *,
+    scope_label: str,
+    limit_usd: Decimal,
+    spent_usd: Decimal,
+) -> str:
+    return (
+        f"Orçamento {scope_label} de AI Insights atingido "
+        f"(limite_usd={limit_usd}, gasto_usd={spent_usd})."
+    )
+
+
+def _raise_if_budget_exceeded(
+    *,
+    scope: str,
+    scope_label: str,
+    limit_usd: Decimal | None,
+    spent_usd: Decimal,
+) -> None:
+    if limit_usd is None or spent_usd < limit_usd:
+        return
+    message = _budget_exceeded_message(
+        scope_label=scope_label,
+        limit_usd=limit_usd,
+        spent_usd=spent_usd,
+    )
+    raise AIInsightCostBudgetExceededError(
+        message,
+        scope=scope,
+        limit_usd=limit_usd,
+        spent_usd=spent_usd,
+    )
+
+
+def _enforce_ai_insight_cost_budget(*, now: datetime | None = None) -> None:
+    """Block GPT generation when configured AI Insight cost budgets are spent."""
+    current = now or utc_now_naive()
+    day_start = datetime.combine(current.date(), time.min)
+    day_end = day_start + relativedelta(days=1)
+    month_start = datetime(current.year, current.month, 1)
+    month_end = month_start + relativedelta(months=1)
+
+    daily_limit = _read_ai_insight_budget_limit(_AI_INSIGHTS_DAILY_BUDGET_ENV)
+    if daily_limit is not None:
+        daily_spend = _ai_insight_spend_usd(start_at=day_start, end_at=day_end)
+        _raise_if_budget_exceeded(
+            scope="daily",
+            scope_label="diário",
+            limit_usd=daily_limit,
+            spent_usd=daily_spend,
+        )
+
+    monthly_limit = _read_ai_insight_budget_limit(_AI_INSIGHTS_MONTHLY_BUDGET_ENV)
+    if monthly_limit is not None:
+        monthly_spend = _ai_insight_spend_usd(start_at=month_start, end_at=month_end)
+        _raise_if_budget_exceeded(
+            scope="monthly",
+            scope_label="mensal",
+            limit_usd=monthly_limit,
+            spent_usd=monthly_spend,
+        )
+
+
+def _mark_preview_run_cached(
+    *,
+    preview_run: AIInsightRun,
+    cached: AIInsight,
+) -> None:
+    preview_run.status = AIInsightRunStatus.cached
+    preview_run.ai_insight_id = cached.id
+    preview_run.model = cached.model
+    preview_run.tokens_in = 0
+    preview_run.tokens_out = 0
+    preview_run.tokens_total = 0
+    preview_run.cost_usd = Decimal("0")
+    db.session.commit()
+
+
+def _mark_preview_run_blocked(
+    *,
+    preview_run: AIInsightRun,
+    reason: str,
+) -> None:
+    preview_run.status = AIInsightRunStatus.blocked
+    preview_run.rejection_reasons_json = [reason]
+    db.session.commit()
+
+
+def _cached_financial_insight_payload_for_snapshot(
+    *,
+    user_id: UUID,
+    insight_type: InsightType,
+    period_label: str,
+    snapshot_hash: str,
+    normalized_period_type: str,
+    context_version: str,
+    preview_run: AIInsightRun | None,
+) -> dict[str, Any] | None:
+    cached = _get_cached_insight_for_snapshot(
+        user_id=user_id,
+        insight_type=insight_type,
+        period_label=period_label,
+        snapshot_hash=snapshot_hash,
+    )
+    if cached is None:
+        return None
+
+    cached_payload = _cached_financial_insight_payload(
+        cached=cached,
+        user_id=user_id,
+        normalized_period_type=normalized_period_type,
+        context_version=context_version,
+    )
+    if cached_payload is None:
+        return None
+
+    if preview_run is not None:
+        _mark_preview_run_cached(preview_run=preview_run, cached=cached)
+    return cached_payload
+
+
+def _enforce_financial_insight_generation_budget(
+    *,
+    user_id: UUID,
+    normalized_period_type: str,
+    preview_run: AIInsightRun | None,
+) -> None:
+    try:
+        _enforce_ai_insight_cost_budget()
+    except AIInsightCostBudgetExceededError as exc:
+        if preview_run is not None:
+            _mark_preview_run_blocked(preview_run=preview_run, reason=str(exc))
+        log.warning(
+            "ai_advisory.financial_insights.cost_blocked "
+            "user=%s period_type=%s scope=%s spent_usd=%s limit_usd=%s",
+            user_id,
+            normalized_period_type,
+            exc.scope,
+            exc.spent_usd,
+            exc.limit_usd,
+        )
+        raise
+
+
 # ---------------------------------------------------------------------------
 # Service
 # ---------------------------------------------------------------------------
@@ -624,7 +882,6 @@ class AIAdvisoryService:
         anchor = anchor_date or date.today()
         consent_version = ensure_ai_consent_granted(self._user_id)
 
-        previous = _get_latest_insight(user_id=self._user_id)
         preview_run: AIInsightRun | None = None
         if preview_run_id is not None:
             (
@@ -642,7 +899,21 @@ class AIAdvisoryService:
                 preview_run_id=preview_run_id,
             )
             snapshot = prompt_snapshot
+            previous = _get_latest_insight_for_period_context(
+                user_id=self._user_id,
+                insight_type=insight_type,
+                period_label=period_label,
+            )
         else:
+            period_label_hint = _period_label_for_anchor(
+                insight_type=insight_type,
+                anchor=anchor,
+            )
+            previous = _get_latest_insight_for_period_context(
+                user_id=self._user_id,
+                insight_type=insight_type,
+                period_label=period_label_hint,
+            )
             snapshot = _build_period_snapshot(
                 insight_type=insight_type,
                 user_id=self._user_id,
@@ -656,26 +927,29 @@ class AIAdvisoryService:
             period_end = date.fromisoformat(str(period["end"]))
             context_version = str(snapshot["schema_version"])
 
-            cached = _get_cached_insight(
-                user_id=self._user_id,
-                insight_type=insight_type,
-                period_label=period_label,
-            )
-            if cached is not None:
-                cached_payload = _cached_financial_insight_payload(
-                    cached=cached,
-                    user_id=self._user_id,
-                    normalized_period_type=normalized_period_type,
-                    context_version=context_version,
-                )
-                if cached_payload is not None:
-                    return cached_payload
-
             prompt_snapshot = minimize_prompt_data(snapshot)
             # Apply 12 KiB cap before hashing/prompting so context_hash matches
             # whatever we actually send to the LLM.
             prompt_snapshot, truncation_info = truncate_snapshot(prompt_snapshot)
             context_hash = _financial_context_hash(prompt_snapshot)
+
+        cached_payload = _cached_financial_insight_payload_for_snapshot(
+            user_id=self._user_id,
+            insight_type=insight_type,
+            period_label=period_label,
+            snapshot_hash=context_hash,
+            normalized_period_type=normalized_period_type,
+            context_version=context_version,
+            preview_run=preview_run,
+        )
+        if cached_payload is not None:
+            return cached_payload
+
+        _enforce_financial_insight_generation_budget(
+            user_id=self._user_id,
+            normalized_period_type=normalized_period_type,
+            preview_run=preview_run,
+        )
 
         prompt = _build_financial_insight_prompt(
             prompt_snapshot,
