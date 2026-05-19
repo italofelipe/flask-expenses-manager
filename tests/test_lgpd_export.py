@@ -22,7 +22,7 @@ from __future__ import annotations
 
 import re
 import uuid
-from datetime import UTC, datetime
+from datetime import UTC, date, datetime
 from decimal import Decimal
 from enum import Enum
 from uuid import UUID
@@ -36,6 +36,8 @@ from app.application.services.lgpd_export_service import (
     _serialize_value,
     build_user_export,
 )
+from app.models.ai_insight import InsightType
+from app.models.ai_insight_run import AIInsightRun, AIInsightRunStatus
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -169,6 +171,38 @@ class TestEntityCoverage:
         assert isinstance(consents, list)
         kinds = {row["kind"] for row in consents}
         assert {"terms", "privacy"} <= kinds
+
+    def test_export_includes_ai_insight_runs(self, app: Flask, client: FlaskClient):
+        from app.extensions.database import db as _db
+
+        token = _register_and_login(client)
+        user_id = _resolve_user_id(client, token)
+
+        with app.app_context():
+            _db.session.add(
+                AIInsightRun(
+                    user_id=user_id,
+                    status=AIInsightRunStatus.previewed,
+                    period_type=InsightType.monthly,
+                    period_label="2026-05",
+                    period_start=date(2026, 5, 1),
+                    period_end=date(2026, 5, 31),
+                    snapshot_schema_version="financial_insight_snapshot.v2",
+                    snapshot_hash="sha256:export-me",
+                    prompt_template_version="financial-insight.v2.2026-05-18",
+                    snapshot_json={"dimensions": {"transactions": {}}},
+                    evidence_manifest_json={"evidence": {}},
+                )
+            )
+            _db.session.commit()
+
+        package = _export(client, token)
+
+        runs = package["ai_insight_runs"]
+        assert isinstance(runs, list)
+        assert len(runs) == 1
+        assert runs[0]["snapshot_hash"] == "sha256:export-me"
+        assert runs[0]["snapshot_json"] == {"dimensions": {"transactions": {}}}
 
 
 # ---------------------------------------------------------------------------

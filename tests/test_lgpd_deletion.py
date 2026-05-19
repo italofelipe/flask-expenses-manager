@@ -35,6 +35,8 @@ from uuid import UUID
 
 from flask.testing import FlaskClient
 
+from app.models.ai_insight import InsightType
+from app.models.ai_insight_run import AIInsightRun, AIInsightRunStatus
 from app.utils.datetime_utils import utc_now_naive
 
 # ---------------------------------------------------------------------------
@@ -199,6 +201,42 @@ class TestDeleteStrategy:
 
         deleted = _extract_report(resp)["summary"]["deleted"]
         assert deleted.get("goals", 0) == 1
+
+    def test_ai_insight_runs_are_hard_deleted(
+        self, client: FlaskClient, app: Any
+    ) -> None:
+        from app.extensions.database import db
+
+        token, _ = _register_and_login(client)
+        uid = _user_id(client, token)
+
+        with app.app_context():
+            db.session.add(
+                AIInsightRun(
+                    user_id=uid,
+                    status=AIInsightRunStatus.generated,
+                    period_type=InsightType.daily,
+                    period_label="2026-05-18",
+                    period_start=date(2026, 5, 18),
+                    period_end=date(2026, 5, 18),
+                    snapshot_schema_version="financial_insight_snapshot.v2",
+                    snapshot_hash="sha256:delete-me",
+                    prompt_template_version="financial-insight.v2.2026-05-18",
+                    snapshot_json={"dimensions": {"transactions": {}}},
+                    evidence_manifest_json={"evidence": {}},
+                )
+            )
+            db.session.commit()
+            assert AIInsightRun.query.filter_by(user_id=uid).count() == 1
+
+        resp = _delete_me(client, token)
+        assert resp.status_code == 200
+
+        with app.app_context():
+            assert AIInsightRun.query.filter_by(user_id=uid).count() == 0
+
+        deleted = _extract_report(resp)["summary"]["deleted"]
+        assert deleted.get("ai_insight_runs", 0) == 1
 
     def test_refresh_tokens_and_push_subscriptions_are_revoked(
         self, client: FlaskClient, app: Any
