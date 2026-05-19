@@ -20,6 +20,17 @@ class AIInsightGenerateRequestSchema(Schema):
             "example": "2026-05-17",
         },
     )
+    preview_run_id = fields.UUID(
+        required=False,
+        allow_none=True,
+        metadata={
+            "description": (
+                "Run de preview admin a ser reutilizado para manter o mesmo "
+                "snapshot_hash na geração."
+            ),
+            "example": "550e8400-e29b-41d4-a716-446655440000",
+        },
+    )
 
 
 __all__ = ["AIInsightGenerateRequestSchema"]

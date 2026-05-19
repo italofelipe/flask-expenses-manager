@@ -30,6 +30,7 @@ from sqlalchemy import case, func
 from app.extensions.database import db
 from app.extensions.prometheus_metrics import record_ai_insight_generated
 from app.models.ai_insight import AIInsight, InsightType
+from app.models.ai_insight_run import AIInsightRun, AIInsightRunStatus
 from app.models.budget import Budget
 from app.models.goal import Goal
 from app.models.goal_contribution import GoalContribution
@@ -403,6 +404,112 @@ def _financial_context_hash(snapshot: dict[str, Any]) -> str:
     return hashlib.sha256(serialized.encode("utf-8")).hexdigest()
 
 
+def _snapshot_byte_size(snapshot: dict[str, Any]) -> int:
+    return len(
+        json.dumps(snapshot, ensure_ascii=False, sort_keys=True, default=str).encode(
+            "utf-8"
+        )
+    )
+
+
+def _truncation_info_from_preview_run(
+    run: AIInsightRun,
+    snapshot: dict[str, Any],
+) -> dict[str, Any]:
+    info = (
+        run.truncation_flags_json if isinstance(run.truncation_flags_json, dict) else {}
+    )
+    snapshot_bytes = _snapshot_byte_size(snapshot)
+    return {
+        "snapshot_bytes_original": int(
+            info.get("snapshot_bytes_original", snapshot_bytes)
+        ),
+        "snapshot_bytes_final": int(info.get("snapshot_bytes_final", snapshot_bytes)),
+        "truncated": bool(info.get("truncated", False)),
+        "dropped_sections": list(info.get("dropped_sections") or []),
+        "max_bytes": int(info.get("max_bytes", snapshot_bytes)),
+    }
+
+
+def _load_preview_financial_context(
+    *,
+    user_id: UUID,
+    insight_type: InsightType,
+    preview_run_id: UUID,
+) -> tuple[
+    AIInsightRun,
+    dict[str, Any],
+    str,
+    date,
+    date,
+    str,
+    str,
+    dict[str, Any],
+]:
+    preview_run = db.session.get(AIInsightRun, preview_run_id)
+    if (
+        preview_run is None
+        or preview_run.user_id != user_id
+        or preview_run.period_type != insight_type
+    ):
+        raise LLMProviderError("preview_run_id inválido")
+    if preview_run.status != AIInsightRunStatus.previewed:
+        raise LLMProviderError("preview_run_id não está em preview")
+    if not isinstance(preview_run.snapshot_json, dict):
+        raise LLMProviderError("preview_run_id não possui snapshot auditável")
+
+    prompt_snapshot = dict(preview_run.snapshot_json)
+    return (
+        preview_run,
+        prompt_snapshot,
+        preview_run.period_label,
+        preview_run.period_start,
+        preview_run.period_end,
+        preview_run.snapshot_schema_version,
+        preview_run.snapshot_hash,
+        _truncation_info_from_preview_run(preview_run, prompt_snapshot),
+    )
+
+
+def _cached_financial_insight_payload(
+    *,
+    cached: AIInsight,
+    user_id: UUID,
+    normalized_period_type: str,
+    context_version: str,
+) -> dict[str, Any] | None:
+    try:
+        (
+            cached_summary,
+            cached_items,
+            cached_metadata,
+        ) = _coerce_financial_insight_response(cached.content)
+    except LLMProviderError:
+        log.warning(
+            "ai_advisory.financial_insights.cached_parse_failed user=%s insight=%s",
+            user_id,
+            cached.id,
+        )
+        return None
+
+    return {
+        "period_type": normalized_period_type,
+        "period_label": cached.period_label,
+        "period_start": cached.period_start.isoformat(),
+        "period_end": cached.period_end.isoformat(),
+        "summary": cached_summary,
+        "items": cached_items,
+        "context_version": cached_metadata.get(
+            "context_schema_version", context_version
+        ),
+        "context_hash": cached_metadata.get("context_hash"),
+        "tokens_used": cached.tokens_used,
+        "cost_usd": float(cached.cost_usd),
+        "model": cached.model,
+        "cached": True,
+    }
+
+
 def _log_llm_call(
     *,
     user_id: UUID,
@@ -509,6 +616,7 @@ class AIAdvisoryService:
         *,
         period_type: str,
         anchor_date: date | None = None,
+        preview_run_id: UUID | None = None,
     ) -> dict[str, Any]:
         """Generate period-aware financial insights with structured evidence."""
         normalized_period_type = period_type.strip().lower()
@@ -517,61 +625,58 @@ class AIAdvisoryService:
         consent_version = ensure_ai_consent_granted(self._user_id)
 
         previous = _get_latest_insight(user_id=self._user_id)
-        snapshot = _build_period_snapshot(
-            insight_type=insight_type,
-            user_id=self._user_id,
-            anchor=anchor,
-            previous_generated_at=previous.created_at if previous else None,
-        )
+        preview_run: AIInsightRun | None = None
+        if preview_run_id is not None:
+            (
+                preview_run,
+                prompt_snapshot,
+                period_label,
+                period_start,
+                period_end,
+                context_version,
+                context_hash,
+                truncation_info,
+            ) = _load_preview_financial_context(
+                user_id=self._user_id,
+                insight_type=insight_type,
+                preview_run_id=preview_run_id,
+            )
+            snapshot = prompt_snapshot
+        else:
+            snapshot = _build_period_snapshot(
+                insight_type=insight_type,
+                user_id=self._user_id,
+                anchor=anchor,
+                previous_generated_at=previous.created_at if previous else None,
+            )
 
-        period = snapshot["period"]
-        period_label = str(period["label"])
-        period_start = date.fromisoformat(str(period["start"]))
-        period_end = date.fromisoformat(str(period["end"]))
-        context_version = str(snapshot["schema_version"])
+            period = snapshot["period"]
+            period_label = str(period["label"])
+            period_start = date.fromisoformat(str(period["start"]))
+            period_end = date.fromisoformat(str(period["end"]))
+            context_version = str(snapshot["schema_version"])
 
-        cached = _get_cached_insight(
-            user_id=self._user_id,
-            insight_type=insight_type,
-            period_label=period_label,
-        )
-        if cached is not None:
-            try:
-                (
-                    cached_summary,
-                    cached_items,
-                    cached_metadata,
-                ) = _coerce_financial_insight_response(cached.content)
-            except LLMProviderError:
-                log.warning(
-                    "ai_advisory.financial_insights.cached_parse_failed "
-                    "user=%s insight=%s",
-                    self._user_id,
-                    cached.id,
+            cached = _get_cached_insight(
+                user_id=self._user_id,
+                insight_type=insight_type,
+                period_label=period_label,
+            )
+            if cached is not None:
+                cached_payload = _cached_financial_insight_payload(
+                    cached=cached,
+                    user_id=self._user_id,
+                    normalized_period_type=normalized_period_type,
+                    context_version=context_version,
                 )
-            else:
-                return {
-                    "period_type": normalized_period_type,
-                    "period_label": cached.period_label,
-                    "period_start": cached.period_start.isoformat(),
-                    "period_end": cached.period_end.isoformat(),
-                    "summary": cached_summary,
-                    "items": cached_items,
-                    "context_version": cached_metadata.get(
-                        "context_schema_version", context_version
-                    ),
-                    "context_hash": cached_metadata.get("context_hash"),
-                    "tokens_used": cached.tokens_used,
-                    "cost_usd": float(cached.cost_usd),
-                    "model": cached.model,
-                    "cached": True,
-                }
+                if cached_payload is not None:
+                    return cached_payload
 
-        prompt_snapshot = minimize_prompt_data(snapshot)
-        # Apply 12 KiB cap before hashing/prompting so context_hash matches
-        # whatever we actually send to the LLM.
-        prompt_snapshot, truncation_info = truncate_snapshot(prompt_snapshot)
-        context_hash = _financial_context_hash(prompt_snapshot)
+            prompt_snapshot = minimize_prompt_data(snapshot)
+            # Apply 12 KiB cap before hashing/prompting so context_hash matches
+            # whatever we actually send to the LLM.
+            prompt_snapshot, truncation_info = truncate_snapshot(prompt_snapshot)
+            context_hash = _financial_context_hash(prompt_snapshot)
+
         prompt = _build_financial_insight_prompt(
             prompt_snapshot,
             period_type=normalized_period_type,
@@ -629,7 +734,7 @@ class AIAdvisoryService:
                 truncation_info["dropped_sections"]
             )
 
-        _save_insight(
+        saved_insight = _save_insight(
             user_id=self._user_id,
             content=serialized_content,
             insight_type=insight_type,
@@ -642,6 +747,16 @@ class AIAdvisoryService:
             previous_insight_id=previous.id if previous else None,
             metadata=persist_metadata,
         )
+
+        if preview_run is not None:
+            preview_run.status = AIInsightRunStatus.generated
+            preview_run.ai_insight_id = saved_insight.id
+            preview_run.model = llm_resp.model
+            preview_run.tokens_in = int(llm_resp.prompt_tokens or 0)
+            preview_run.tokens_out = int(llm_resp.completion_tokens or 0)
+            preview_run.tokens_total = int(llm_resp.total_tokens or 0)
+            preview_run.cost_usd = Decimal(str(llm_resp.estimated_cost_usd))
+            db.session.commit()
 
         try:
             record_ai_insight_generated(

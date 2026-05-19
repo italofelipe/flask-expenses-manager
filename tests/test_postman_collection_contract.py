@@ -153,6 +153,8 @@ OPENAPI_GAPS: set[tuple[str, str]] = {
     ("DELETE", "/admin/feature-flags/{param}"),
     # Admin audit trail (#1052)
     ("GET", "/admin/audit-trail/{param}/{param}"),
+    # Admin AI Insight audit preview (#1311)
+    ("POST", "/admin/ai-insights/preview"),
     # Bank statements
     ("POST", "/bank-statements/preview"),
     ("POST", "/bank-statements/confirm"),

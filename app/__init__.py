@@ -17,6 +17,7 @@ from app.cli.features import features as features_cli_group
 from app.cli.openapi_export import openapi_export_command
 from app.cli.worker_cli import worker_cli_group
 from app.controllers.account import account_bp
+from app.controllers.admin.ai_insights import admin_ai_insights_bp
 from app.controllers.admin.audit_trail import admin_audit_trail_bp
 from app.controllers.admin.feature_flags import admin_feature_flags_bp
 from app.controllers.advisory import advisory_bp
@@ -334,6 +335,7 @@ def create_app(*, enable_http_runtime: bool = True) -> Flask:
     app.register_blueprint(ai_bp)
     app.register_blueprint(consents_bp)
     app.register_blueprint(admin_feature_flags_bp, url_prefix="/admin")
+    app.register_blueprint(admin_ai_insights_bp, url_prefix="/admin")
     app.register_blueprint(admin_audit_trail_bp)
 
     # Registra os endpoints documentados no Swagger com base no mapa real de rotas.

@@ -137,7 +137,7 @@ def _parse_goal_projection_body(
 
 def _parse_ai_insight_generate_body(
     body: dict[str, Any],
-) -> tuple[Response, None, None] | tuple[None, str, date | None]:
+) -> tuple[Response, None, None, None] | tuple[None, str, date | None, UUID | None]:
     period_type = str(body.get("period_type", "")).strip().lower()
     if period_type not in _AI_INSIGHT_PERIOD_TYPES:
         return (
@@ -151,29 +151,49 @@ def _parse_ai_insight_generate_body(
             ),
             None,
             None,
+            None,
         )
 
     raw_anchor_date = body.get("anchor_date")
-    if raw_anchor_date in (None, ""):
-        return None, period_type, None
+    anchor_date: date | None = None
+    if raw_anchor_date not in (None, ""):
+        try:
+            anchor_date = date.fromisoformat(str(raw_anchor_date))
+        except ValueError:
+            return (
+                compat_error_response(
+                    legacy_payload={
+                        "error": "anchor_date deve estar no formato YYYY-MM-DD"
+                    },
+                    status_code=400,
+                    message="anchor_date deve estar no formato YYYY-MM-DD",
+                    error_code="VALIDATION_ERROR",
+                ),
+                None,
+                None,
+                None,
+            )
+
+    raw_preview_run_id = body.get("preview_run_id")
+    if raw_preview_run_id in (None, ""):
+        return None, period_type, anchor_date, None
 
     try:
-        anchor_date = date.fromisoformat(str(raw_anchor_date))
-    except ValueError:
+        preview_run_id = uuid.UUID(str(raw_preview_run_id))
+    except (TypeError, ValueError):
         return (
             compat_error_response(
-                legacy_payload={
-                    "error": "anchor_date deve estar no formato YYYY-MM-DD"
-                },
+                legacy_payload={"error": "preview_run_id deve ser um UUID válido"},
                 status_code=400,
-                message="anchor_date deve estar no formato YYYY-MM-DD",
+                message="preview_run_id deve ser um UUID válido",
                 error_code="VALIDATION_ERROR",
             ),
             None,
             None,
+            None,
         )
 
-    return None, period_type, anchor_date
+    return None, period_type, anchor_date, preview_run_id
 
 
 class AIInsightGenerateResource(MethodResource):
@@ -190,7 +210,11 @@ class AIInsightGenerateResource(MethodResource):
         requestBody=json_request_body(
             schema=AIInsightGenerateRequestSchema,
             description="Período que deve ser consolidado antes da chamada à IA.",
-            example={"period_type": "daily", "anchor_date": "2026-05-17"},
+            example={
+                "period_type": "daily",
+                "anchor_date": "2026-05-17",
+                "preview_run_id": "550e8400-e29b-41d4-a716-446655440000",
+            },
         ),
         responses={
             200: json_success_response(
@@ -253,7 +277,9 @@ class AIInsightGenerateResource(MethodResource):
             return entitlement_error
 
         body = request.get_json(silent=True) or {}
-        parse_error, period_type, anchor_date = _parse_ai_insight_generate_body(body)
+        parse_error, period_type, anchor_date, preview_run_id = (
+            _parse_ai_insight_generate_body(body)
+        )
         if parse_error is not None:
             return parse_error
         assert period_type is not None
@@ -263,6 +289,7 @@ class AIInsightGenerateResource(MethodResource):
             result = service.generate_financial_insights(
                 period_type=period_type,
                 anchor_date=anchor_date,
+                preview_run_id=preview_run_id,
             )
         except AIConsentRequiredError as exc:
             return _ai_consent_required_response(exc)
