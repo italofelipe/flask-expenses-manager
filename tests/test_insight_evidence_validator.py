@@ -43,6 +43,7 @@ class TestKnownPrefixes:
             "comparisons.yesterday.delta",
             "daily_series",
             "data_quality.missing_external_rates",
+            "financial_health.risk_flags[0].code",
         ],
     )
     def test_accepts_known_prefix(self, path) -> None:

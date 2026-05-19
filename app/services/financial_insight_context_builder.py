@@ -20,6 +20,7 @@ from uuid import UUID
 from app.models.budget import Budget
 from app.models.credit_card import CreditCard
 from app.models.goal import Goal
+from app.models.goal_contribution import GoalContribution
 from app.models.transaction import (
     Transaction,
     TransactionStatus,
@@ -54,6 +55,7 @@ surface it belongs to so contextual pages can filter, while the global
 _SNAPSHOT_VERSION = "financial_insight_snapshot.v1"
 _CURRENCY = "BRL"
 _TIMEZONE = "America/Sao_Paulo"
+_GOAL_PACE_WINDOW_DAYS = 90
 
 # Hard cap on serialized snapshot size sent to the LLM (Sprint 5 obs-1).
 # When exceeded, `truncate_snapshot()` reduces large lists deterministically
@@ -73,6 +75,7 @@ _EMAIL_LOCAL_SYMBOLS = "._%+-"
 _EMAIL_DOMAIN_SYMBOLS = "-_"
 _CPF_RE = re.compile(r"\b\d{3}\.\d{3}\.\d{3}-\d{2}\b")
 _LONG_NUMBER_RE = re.compile(r"\b\d{8,}\b")
+_RiskPenalty = tuple[int, dict[str, Any]]
 
 
 def _money(value: object) -> Decimal:
@@ -264,6 +267,196 @@ def _date_period(start: date, end: date, label: str) -> dict[str, str]:
     }
 
 
+def _risk_flag(
+    *,
+    code: str,
+    severity: str,
+    dimension: str,
+    evidence: list[str],
+) -> dict[str, Any]:
+    return {
+        "code": code,
+        "severity": severity,
+        "dimension": dimension,
+        "evidence": evidence,
+    }
+
+
+def _financial_health_grade(score: int) -> str:
+    if score >= 80:
+        return "healthy"
+    if score >= 60:
+        return "attention"
+    return "critical"
+
+
+def _goal_pace_assessment(
+    *,
+    remaining: Decimal,
+    required_monthly_pace: Decimal | None,
+    observed_monthly_pace: Decimal,
+    has_target_date: bool,
+    has_contribution_history: bool,
+) -> tuple[str, str]:
+    if remaining <= 0:
+        return "completed", "goal_total"
+    if not has_target_date:
+        return "insufficient_data", "missing_target_date"
+    if not has_contribution_history:
+        return "insufficient_data", "no_contribution_history"
+    if required_monthly_pace is None:
+        return "insufficient_data", "missing_required_pace"
+    if observed_monthly_pace >= required_monthly_pace:
+        return "on_track", "goal_total_and_90d_contributions"
+    return "behind", "goal_total_and_90d_contributions"
+
+
+def _transaction_risk_penalties(
+    *,
+    balance: Decimal,
+    income: Decimal,
+    pending: Decimal,
+    overdue: Decimal,
+) -> list[_RiskPenalty]:
+    penalties: list[_RiskPenalty] = []
+    if balance < 0:
+        penalties.append(
+            (
+                30,
+                _risk_flag(
+                    code="negative_paid_balance",
+                    severity="high",
+                    dimension="general",
+                    evidence=["current_period.paid.balance"],
+                ),
+            )
+        )
+    if overdue > 0:
+        penalties.append(
+            (
+                25,
+                _risk_flag(
+                    code="overdue_expenses",
+                    severity="high",
+                    dimension="transactions",
+                    evidence=["current_period.commitments.overdue_expense_total"],
+                ),
+            )
+        )
+    if pending > 0:
+        penalty, code, severity = (
+            (20, "future_commitment_pressure", "medium")
+            if income == 0 or pending > max(balance, Decimal("0.00"))
+            else (5, "future_commitments_open", "low")
+        )
+        penalties.append(
+            (
+                penalty,
+                _risk_flag(
+                    code=code,
+                    severity=severity,
+                    dimension="transactions",
+                    evidence=[
+                        "current_period.commitments.pending_expense_total",
+                        "current_period.paid.balance",
+                    ],
+                ),
+            )
+        )
+    return penalties
+
+
+def _budget_risk_penalties(budgets: object) -> list[_RiskPenalty]:
+    if not isinstance(budgets, list):
+        return []
+    penalties: list[_RiskPenalty] = []
+    for index, budget in enumerate(budgets):
+        if not isinstance(budget, dict):
+            continue
+        utilization = _money(budget.get("utilization_pct"))
+        if bool(budget.get("exceeded")):
+            penalties.append(
+                (
+                    15,
+                    _risk_flag(
+                        code="budget_exceeded",
+                        severity="medium",
+                        dimension="budgets",
+                        evidence=[f"budgets.{index}.exceeded"],
+                    ),
+                )
+            )
+        elif utilization >= 90:
+            penalties.append(
+                (
+                    8,
+                    _risk_flag(
+                        code="budget_near_limit",
+                        severity="low",
+                        dimension="budgets",
+                        evidence=[f"budgets.{index}.utilization_pct"],
+                    ),
+                )
+            )
+    return penalties
+
+
+def _credit_card_risk_penalties(cards: object) -> list[_RiskPenalty]:
+    if not isinstance(cards, list):
+        return []
+    penalties: list[_RiskPenalty] = []
+    for index, card in enumerate(cards):
+        if not isinstance(card, dict):
+            continue
+        utilization = _money(card.get("utilization_pct"))
+        if utilization >= 95:
+            penalty, code, severity = (
+                25,
+                "credit_card_utilization_critical",
+                "high",
+            )
+        elif utilization >= 80:
+            penalty, code, severity = 15, "high_credit_card_utilization", "medium"
+        else:
+            continue
+        penalties.append(
+            (
+                penalty,
+                _risk_flag(
+                    code=code,
+                    severity=severity,
+                    dimension="credit_cards",
+                    evidence=[f"credit_cards.{index}.utilization_pct"],
+                ),
+            )
+        )
+    return penalties
+
+
+def _goal_risk_penalties(goals: object) -> list[_RiskPenalty]:
+    if not isinstance(goals, list):
+        return []
+    penalties: list[_RiskPenalty] = []
+    for index, goal in enumerate(goals):
+        if not isinstance(goal, dict) or goal.get("pace_assessment") != "behind":
+            continue
+        penalties.append(
+            (
+                10,
+                _risk_flag(
+                    code="goal_pace_gap",
+                    severity="medium",
+                    dimension="goals",
+                    evidence=[
+                        f"goals.{index}.required_monthly_pace",
+                        f"goals.{index}.observed_monthly_pace_90d",
+                    ],
+                ),
+            )
+        )
+    return penalties
+
+
 class FinancialInsightContextBuilder:
     """Build sanitized financial snapshots for daily, weekly and monthly insights."""
 
@@ -358,6 +551,7 @@ class FinancialInsightContextBuilder:
             label=f"{anchor_date.isocalendar().year}-W{anchor_date.isocalendar().week:02d}",
             period_type="weekly",
             include_daily_series=True,
+            include_goals=True,
             include_credit_cards=True,
             include_wallet=True,
             previous_generated_at=previous_generated_at,
@@ -457,6 +651,13 @@ class FinancialInsightContextBuilder:
         paid = [tx for tx in non_cancelled if tx.status == TransactionStatus.PAID]
 
         current_period = self._current_period_summary(transactions)
+        goals_payload: list[dict[str, Any]] = []
+        goal_data_quality: dict[str, Any] = {}
+        if include_goals:
+            goals_payload, goal_data_quality = self._goals_payload(
+                user_id=user_id,
+                anchor=end,
+            )
         snapshot: dict[str, Any] = {
             "schema_version": _SNAPSHOT_VERSION,
             "period_type": period_type,
@@ -480,7 +681,7 @@ class FinancialInsightContextBuilder:
             "budgets": self._budgets_payload(user_id=user_id, start=start, end=end)
             if include_budgets
             else [],
-            "goals": self._goals_payload(user_id=user_id) if include_goals else [],
+            "goals": goals_payload,
             "credit_cards": self._credit_cards_payload(user_id=user_id, anchor=end)
             if include_credit_cards
             else [],
@@ -489,6 +690,7 @@ class FinancialInsightContextBuilder:
                 "missing_comparison_periods": [],
             },
         }
+        snapshot["data_quality"].update(goal_data_quality)
         if include_wallet:
             wallet_payload, missing_rates = self._wallet_payload(
                 user_id=user_id,
@@ -500,6 +702,10 @@ class FinancialInsightContextBuilder:
                 snapshot["data_quality"]["missing_external_rates"] = missing_rates
         else:
             snapshot["wallet"] = {"items": [], "total_value": "0.00"}
+        snapshot["financial_health"] = self._financial_health_payload(snapshot)
+        snapshot["data_quality"]["insufficient_financial_health_data"] = (
+            snapshot["financial_health"]["grade"] == "insufficient_data"
+        )
         return snapshot
 
     def _credit_cards_payload(
@@ -986,7 +1192,12 @@ class FinancialInsightContextBuilder:
             )
         return result
 
-    def _goals_payload(self, *, user_id: UUID) -> list[dict[str, Any]]:
+    def _goals_payload(
+        self,
+        *,
+        user_id: UUID,
+        anchor: date,
+    ) -> tuple[list[dict[str, Any]], dict[str, Any]]:
         rows = (
             Goal.query.filter(
                 Goal.user_id == user_id,
@@ -996,11 +1207,68 @@ class FinancialInsightContextBuilder:
             .all()
         )
         goals = cast(list[Goal], rows)
+        if not goals:
+            return [], {
+                "has_active_goals": False,
+                "insufficient_goal_pace_data": False,
+                "goal_pace_window_days": _GOAL_PACE_WINDOW_DAYS,
+            }
+
+        cutoff = datetime(
+            anchor.year, anchor.month, anchor.day, 23, 59, 59
+        ) - timedelta(days=_GOAL_PACE_WINDOW_DAYS)
+        contributions = cast(
+            list[GoalContribution],
+            GoalContribution.query.filter(
+                GoalContribution.user_id == user_id,
+                GoalContribution.created_at >= cutoff,
+            )
+            .order_by(GoalContribution.created_at.asc())
+            .all(),
+        )
+        recent_by_goal: dict[str, Decimal] = {}
+        for contribution in contributions:
+            goal_key = str(contribution.goal_id)
+            recent_by_goal[goal_key] = recent_by_goal.get(
+                goal_key, Decimal("0.00")
+            ) + _money(contribution.amount)
 
         result: list[dict[str, Any]] = []
+        goals_without_deadline = 0
+        goals_without_observed_pace = 0
         for goal in goals:
             current = _money(goal.current_amount)
             target = _money(goal.target_amount)
+            remaining = max(target - current, Decimal("0.00"))
+            days_remaining: int | None = None
+            required_monthly_pace: Decimal | None = None
+            if goal.target_date is None:
+                goals_without_deadline += 1
+            else:
+                days_remaining = max((goal.target_date - anchor).days, 0)
+                months_remaining = max((days_remaining + 29) // 30, 1)
+                required_monthly_pace = (
+                    remaining / Decimal(months_remaining)
+                    if remaining > 0
+                    else Decimal("0.00")
+                )
+
+            recent_90d = max(
+                recent_by_goal.get(str(goal.id), Decimal("0.00")),
+                Decimal("0.00"),
+            )
+            observed_monthly_pace = recent_90d / (
+                Decimal(_GOAL_PACE_WINDOW_DAYS) / Decimal(30)
+            )
+            if recent_90d == 0 and remaining > 0:
+                goals_without_observed_pace += 1
+            pace_assessment, pace_basis = _goal_pace_assessment(
+                remaining=remaining,
+                required_monthly_pace=required_monthly_pace,
+                observed_monthly_pace=observed_monthly_pace,
+                has_target_date=goal.target_date is not None,
+                has_contribution_history=recent_90d > 0,
+            )
             result.append(
                 {
                     "title": _sanitize_text(goal.title) or "Meta",
@@ -1010,9 +1278,76 @@ class FinancialInsightContextBuilder:
                     "target_date": goal.target_date.isoformat()
                     if goal.target_date
                     else None,
+                    "remaining_amount": _money_str(remaining),
+                    "days_remaining": days_remaining,
+                    "required_monthly_pace": _money_str(required_monthly_pace)
+                    if required_monthly_pace is not None
+                    else None,
+                    "observed_monthly_pace_90d": _money_str(observed_monthly_pace),
+                    "pace_assessment": pace_assessment,
+                    "pace_basis": pace_basis,
                 }
             )
-        return result
+        return result, {
+            "has_active_goals": True,
+            "insufficient_goal_pace_data": any(
+                goal.get("pace_assessment") == "insufficient_data" for goal in result
+            ),
+            "goals_without_deadline_count": goals_without_deadline,
+            "goals_without_observed_pace_count": goals_without_observed_pace,
+            "goal_pace_window_days": _GOAL_PACE_WINDOW_DAYS,
+        }
+
+    def _financial_health_payload(self, snapshot: dict[str, Any]) -> dict[str, Any]:
+        data_quality = snapshot.get("data_quality") or {}
+        has_transactions = bool(
+            isinstance(data_quality, dict) and data_quality.get("has_transactions")
+        )
+        if not has_transactions:
+            return {
+                "score": 50,
+                "grade": "insufficient_data",
+                "risk_flags": [
+                    _risk_flag(
+                        code="insufficient_transaction_data",
+                        severity="info",
+                        dimension="general",
+                        evidence=["data_quality.has_transactions"],
+                    )
+                ],
+            }
+
+        paid = snapshot["current_period"]["paid"]
+        commitments = snapshot["current_period"]["commitments"]
+        balance = _money(paid["balance"])
+        income = _money(paid["income_total"])
+        pending = _money(commitments["pending_expense_total"])
+        overdue = _money(commitments["overdue_expense_total"])
+        penalties = [
+            *_transaction_risk_penalties(
+                balance=balance,
+                income=income,
+                pending=pending,
+                overdue=overdue,
+            ),
+            *_budget_risk_penalties(snapshot.get("budgets")),
+            *_credit_card_risk_penalties(snapshot.get("credit_cards")),
+            *_goal_risk_penalties(snapshot.get("goals")),
+        ]
+        risk_flags = [flag for _penalty, flag in penalties]
+        score = 100 - sum(penalty for penalty, _flag in penalties)
+        score = max(0, min(100, score))
+        return {
+            "score": score,
+            "grade": _financial_health_grade(score),
+            "risk_flags": risk_flags,
+            "inputs": {
+                "paid_balance": _money_str(balance),
+                "paid_income_total": _money_str(income),
+                "pending_expense_total": _money_str(pending),
+                "overdue_expense_total": _money_str(overdue),
+            },
+        }
 
     def _sum(
         self,

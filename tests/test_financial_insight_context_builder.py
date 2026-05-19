@@ -11,7 +11,9 @@ from typing import Any
 
 from app.extensions.database import db
 from app.models.budget import Budget
+from app.models.credit_card import CreditCard
 from app.models.goal import Goal
+from app.models.goal_contribution import GoalContribution
 from app.models.transaction import (
     Transaction,
     TransactionCategory,
@@ -52,6 +54,7 @@ def _make_transaction(
     created_at: datetime | None = None,
     updated_at: datetime | None = None,
     paid_at: datetime | None = None,
+    credit_card_id: uuid.UUID | None = None,
 ) -> Transaction:
     tx = Transaction(
         user_id=user_id,
@@ -66,6 +69,7 @@ def _make_transaction(
         due_date=due_date,
         category=category,
         paid_at=paid_at,
+        credit_card_id=credit_card_id,
     )
     if created_at is not None:
         tx.created_at = created_at
@@ -97,6 +101,26 @@ def _make_budget(
     return budget
 
 
+def _make_credit_card(
+    user_id: uuid.UUID,
+    *,
+    name: str = "Cartão principal",
+    limit_amount: str = "1000.00",
+    closing_day: int = 20,
+    due_day: int = 28,
+) -> CreditCard:
+    card = CreditCard(
+        user_id=user_id,
+        name=name,
+        limit_amount=Decimal(limit_amount),
+        closing_day=closing_day,
+        due_day=due_day,
+    )
+    db.session.add(card)
+    db.session.commit()
+    return card
+
+
 def _make_goal(
     user_id: uuid.UUID,
     *,
@@ -116,6 +140,24 @@ def _make_goal(
     db.session.add(goal)
     db.session.commit()
     return goal
+
+
+def _make_goal_contribution(
+    user_id: uuid.UUID,
+    goal_id: uuid.UUID,
+    *,
+    amount: str,
+    created_at: datetime,
+) -> GoalContribution:
+    contribution = GoalContribution(
+        user_id=user_id,
+        goal_id=goal_id,
+        amount=Decimal(amount),
+        created_at=created_at,
+    )
+    db.session.add(contribution)
+    db.session.commit()
+    return contribution
 
 
 def _as_json(value: dict[str, Any]) -> str:
@@ -592,12 +634,155 @@ class TestFinancialInsightContextBuilderMonthly:
                 "exceeded": True,
             }
         ]
-        assert snapshot["goals"] == [
-            {
-                "title": "Comprar carro",
-                "current_amount": "1200.00",
-                "target_amount": "5000.00",
-                "progress_pct": "24.00",
-                "target_date": "2026-12-31",
-            }
-        ]
+        assert len(snapshot["goals"]) == 1
+        goal = snapshot["goals"][0]
+        assert goal["title"] == "Comprar carro"
+        assert goal["current_amount"] == "1200.00"
+        assert goal["target_amount"] == "5000.00"
+        assert goal["progress_pct"] == "24.00"
+        assert goal["target_date"] == "2026-12-31"
+        assert goal["remaining_amount"] == "3800.00"
+        assert goal["days_remaining"] == 214
+        assert goal["required_monthly_pace"] == "475.00"
+        assert goal["observed_monthly_pace_90d"] == "0.00"
+        assert goal["pace_assessment"] == "insufficient_data"
+        assert goal["pace_basis"] == "no_contribution_history"
+
+    def test_monthly_snapshot_includes_deterministic_health_and_risk_flags(
+        self, app
+    ) -> None:
+        with app.app_context():
+            user_id = _make_user()
+            anchor = date(2026, 5, 17)
+            card = _make_credit_card(user_id, limit_amount="1000.00")
+            _make_budget(
+                user_id,
+                name="Alimentação",
+                amount="1000.00",
+                category=TransactionCategory.alimentacao,
+            )
+            _make_transaction(
+                user_id,
+                title="Receita baixa",
+                amount="500.00",
+                tx_type=TransactionType.INCOME,
+                status=TransactionStatus.PAID,
+                due_date=date(2026, 5, 2),
+            )
+            _make_transaction(
+                user_id,
+                title="Mercado alto",
+                amount="1200.00",
+                tx_type=TransactionType.EXPENSE,
+                status=TransactionStatus.PAID,
+                due_date=date(2026, 5, 10),
+                category=TransactionCategory.alimentacao,
+            )
+            _make_transaction(
+                user_id,
+                title="Fatura do ciclo",
+                amount="850.00",
+                tx_type=TransactionType.EXPENSE,
+                status=TransactionStatus.PENDING,
+                due_date=date(2026, 5, 25),
+                credit_card_id=card.id,
+            )
+            _make_transaction(
+                user_id,
+                title="Boleto vencido",
+                amount="100.00",
+                tx_type=TransactionType.EXPENSE,
+                status=TransactionStatus.OVERDUE,
+                due_date=date(2026, 5, 11),
+            )
+
+            snapshot = FinancialInsightContextBuilder().build_monthly(
+                user_id=user_id,
+                anchor_date=anchor,
+            )
+
+        health = snapshot["financial_health"]
+        assert health["score"] == 0
+        assert health["grade"] == "critical"
+        codes = {flag["code"] for flag in health["risk_flags"]}
+        assert {
+            "negative_paid_balance",
+            "overdue_expenses",
+            "future_commitment_pressure",
+            "budget_exceeded",
+            "high_credit_card_utilization",
+        }.issubset(codes)
+        assert snapshot["data_quality"]["insufficient_financial_health_data"] is False
+
+    def test_weekly_goal_pace_uses_deadline_and_contribution_history(self, app) -> None:
+        with app.app_context():
+            user_id = _make_user()
+            anchor = date(2026, 5, 17)
+            goal = _make_goal(
+                user_id,
+                title="Reserva",
+                current_amount="1200.00",
+                target_amount="5000.00",
+                target_date=date(2026, 12, 31),
+            )
+            _make_goal_contribution(
+                user_id,
+                goal.id,
+                amount="300.00",
+                created_at=datetime(2026, 5, 10, 10, 0, 0),
+            )
+            _make_goal_contribution(
+                user_id,
+                goal.id,
+                amount="150.00",
+                created_at=datetime(2026, 4, 20, 10, 0, 0),
+            )
+            _make_goal_contribution(
+                user_id,
+                goal.id,
+                amount="999.00",
+                created_at=datetime(2026, 1, 1, 10, 0, 0),
+            )
+
+            snapshot = FinancialInsightContextBuilder().build_weekly(
+                user_id=user_id,
+                anchor_date=anchor,
+            )
+
+        assert len(snapshot["goals"]) == 1
+        goal_payload = snapshot["goals"][0]
+        assert goal_payload["remaining_amount"] == "3800.00"
+        assert goal_payload["days_remaining"] == 228
+        assert goal_payload["required_monthly_pace"] == "475.00"
+        assert goal_payload["observed_monthly_pace_90d"] == "150.00"
+        assert goal_payload["pace_assessment"] == "behind"
+        assert goal_payload["pace_basis"] == "goal_total_and_90d_contributions"
+        assert snapshot["data_quality"]["insufficient_goal_pace_data"] is False
+
+    def test_weekly_snapshot_marks_insufficient_data_without_transactions_or_goal_pace(
+        self, app
+    ) -> None:
+        with app.app_context():
+            user_id = _make_user()
+            _make_goal(
+                user_id,
+                title="Meta sem prazo",
+                current_amount="0.00",
+                target_amount="1000.00",
+                target_date=None,
+            )
+
+            snapshot = FinancialInsightContextBuilder().build_weekly(
+                user_id=user_id,
+                anchor_date=date(2026, 5, 17),
+            )
+
+        assert snapshot["financial_health"]["score"] == 50
+        assert snapshot["financial_health"]["grade"] == "insufficient_data"
+        assert snapshot["financial_health"]["risk_flags"][0]["code"] == (
+            "insufficient_transaction_data"
+        )
+        assert snapshot["data_quality"]["insufficient_financial_health_data"] is True
+        assert snapshot["data_quality"]["insufficient_goal_pace_data"] is True
+        assert snapshot["goals"][0]["pace_assessment"] == "insufficient_data"
+        assert snapshot["goals"][0]["pace_basis"] == "missing_target_date"
