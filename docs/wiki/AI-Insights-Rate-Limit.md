@@ -26,6 +26,26 @@ The daily counter is not consumed by:
 This avoids penalizing users for infrastructure, provider, or configuration
 failures where Auraxis did not produce a new AI insight.
 
+## Cost Circuit Breaker
+
+Manual financial insight generation also checks the configured USD budget
+before calling the LLM provider:
+
+- `AI_INSIGHTS_DAILY_BUDGET_USD`
+- `AI_INSIGHTS_MONTHLY_BUDGET_USD`
+
+Empty, missing, zero, or negative values disable the corresponding budget.
+When a positive limit is configured, the source of truth is
+`LLMAuditLog.estimated_cost_usd` for `financial_insights_daily`,
+`financial_insights_weekly`, and `financial_insights_monthly`. If the current
+daily or monthly spend is already at or above the configured limit, generation
+is blocked before GPT is called and the API returns HTTP `429` with error code
+`AI_INSIGHT_BUDGET_EXCEEDED`.
+
+Cached insights are returned before the budget check because they do not
+generate new LLM cost. Admin preview and dossier export are also unaffected:
+they never call the LLM provider and do not consume budget.
+
 ## Response Headers
 
 Successful and failed pass-through responses include `X-AI-Calls-Remaining`

@@ -14,7 +14,8 @@ from app.models.user import User
 from app.services.ai_advisory_service import (
     _build_period_snapshot,
     _financial_context_hash,
-    _get_latest_insight,
+    _get_latest_insight_for_period_context,
+    _period_label_for_anchor,
 )
 from app.services.ai_insight_runs import create_ai_insight_run
 from app.services.ai_lgpd import minimize_prompt_data
@@ -304,7 +305,15 @@ def build_ai_insight_preview(
 
     insight_type = _normalize_insight_type(period_type)
     anchor = anchor_date or date.today()
-    previous = _get_latest_insight(user_id=user_id)
+    period_label_hint = _period_label_for_anchor(
+        insight_type=insight_type,
+        anchor=anchor,
+    )
+    previous = _get_latest_insight_for_period_context(
+        user_id=user_id,
+        insight_type=insight_type,
+        period_label=period_label_hint,
+    )
     raw_snapshot = _build_period_snapshot(
         insight_type=insight_type,
         user_id=user_id,

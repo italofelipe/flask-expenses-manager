@@ -34,7 +34,10 @@ from app.docs.openapi_helpers import (
 )
 from app.middleware.ai_rate_limit import ai_daily_limit
 from app.schemas.ai_insight_schema import AIInsightGenerateRequestSchema
-from app.services.ai_advisory_service import AIAdvisoryService
+from app.services.ai_advisory_service import (
+    AIAdvisoryService,
+    AIInsightCostBudgetExceededError,
+)
 from app.services.ai_lgpd import AIConsentRequiredError
 from app.services.analysis_ready_notification_service import (
     dispatch_analysis_ready_notification,
@@ -293,6 +296,13 @@ class AIInsightGenerateResource(MethodResource):
             )
         except AIConsentRequiredError as exc:
             return _ai_consent_required_response(exc)
+        except AIInsightCostBudgetExceededError as exc:
+            return compat_error_response(
+                legacy_payload={"error": str(exc)},
+                status_code=429,
+                message=str(exc),
+                error_code="AI_INSIGHT_BUDGET_EXCEEDED",
+            )
         except LLMProviderError as exc:
             return compat_error_response(
                 legacy_payload={"error": str(exc)},

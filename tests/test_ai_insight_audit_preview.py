@@ -161,8 +161,30 @@ class TestAIInsightAuditPreviewAdmin:
         self,
         admin_preview_app,
         admin_preview_client,
+        monkeypatch: pytest.MonkeyPatch,
     ) -> None:
         user_id = _create_user_with_transactions(admin_preview_app)
+        monkeypatch.setenv("AI_INSIGHTS_DAILY_BUDGET_USD", "0.01")
+        monkeypatch.setenv("AI_INSIGHTS_MONTHLY_BUDGET_USD", "0.01")
+        with admin_preview_app.app_context():
+            from app.extensions.database import db
+            from app.models.llm_audit_log import LLMAuditLog
+
+            db.session.add(
+                LLMAuditLog(
+                    user_id=user_id,
+                    endpoint="financial_insights_daily",
+                    model="gpt-4o-mini",
+                    prompt="redacted",
+                    response_text="redacted",
+                    prompt_tokens=10,
+                    completion_tokens=10,
+                    total_tokens=20,
+                    estimated_cost_usd=Decimal("0.01000000"),
+                    latency_ms=50,
+                )
+            )
+            db.session.commit()
 
         with (
             patch(
@@ -205,5 +227,5 @@ class TestAIInsightAuditPreviewAdmin:
             assert run.status == AIInsightRunStatus.previewed
             assert run.snapshot_hash == payload["snapshot_hash"]
             assert run.tokens_total == 0
-            assert LLMAuditLog.query.filter_by(user_id=user_id).count() == 0
+            assert LLMAuditLog.query.filter_by(user_id=user_id).count() == 1
             assert AIInsight.query.filter_by(user_id=user_id).count() == 0

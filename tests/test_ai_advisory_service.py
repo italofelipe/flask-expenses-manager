@@ -411,6 +411,7 @@ class TestAIAdvisoryServiceFinancialInsights:
     def test_financial_insights_return_cached_period_without_provider_call(
         self,
         app,
+        monkeypatch: pytest.MonkeyPatch,
     ) -> None:
         with app.app_context():
             from app.services.ai_advisory_service import AIAdvisoryService
@@ -426,6 +427,7 @@ class TestAIAdvisoryServiceFinancialInsights:
                 period_type="daily",
                 anchor_date=date(2026, 5, 17),
             )
+            monkeypatch.setenv("AI_INSIGHTS_DAILY_BUDGET_USD", "0.000001")
             second = service.generate_financial_insights(
                 period_type="daily",
                 anchor_date=date(2026, 5, 17),
@@ -435,6 +437,169 @@ class TestAIAdvisoryServiceFinancialInsights:
             assert second["cached"] is True
             assert second["summary"] == "Resumo cache."
             provider.generate_with_usage.assert_called_once()
+
+    def test_financial_insights_regenerate_when_snapshot_hash_changes(
+        self,
+        app,
+    ) -> None:
+        with app.app_context():
+            from app.services.ai_advisory_service import AIAdvisoryService
+
+            user_id = uuid.uuid4()
+            provider = MagicMock()
+            provider.generate_with_usage.side_effect = [
+                _financial_llm_response(summary="Resumo inicial."),
+                _financial_llm_response(summary="Resumo atualizado."),
+            ]
+            first_snapshot = {
+                "schema_version": "financial_insight_snapshot.v1",
+                "period_type": "daily",
+                "period": {
+                    "label": "2026-05-17",
+                    "start": "2026-05-17",
+                    "end": "2026-05-17",
+                },
+                "current_period": {
+                    "paid": {
+                        "income_total": "1000.00",
+                        "expense_total": "250.00",
+                        "balance": "750.00",
+                        "transaction_count": 2,
+                    },
+                    "commitments": {
+                        "pending_expense_total": "0.00",
+                        "overdue_expense_total": "0.00",
+                        "transaction_count": 0,
+                    },
+                    "cancelled_transaction_count": 0,
+                },
+                "comparisons": {},
+                "transactions": {"included_count": 2, "sample": []},
+                "data_quality": {
+                    "has_transactions": True,
+                    "missing_comparison_periods": [],
+                },
+            }
+            changed_snapshot = {
+                **first_snapshot,
+                "current_period": {
+                    **first_snapshot["current_period"],
+                    "paid": {
+                        **first_snapshot["current_period"]["paid"],
+                        "balance": "700.00",
+                    },
+                },
+            }
+
+            service = AIAdvisoryService(user_id=user_id, llm_provider=provider)
+            with patch(
+                "app.services.ai_advisory_service._build_period_snapshot",
+                side_effect=[first_snapshot, changed_snapshot],
+            ):
+                first = service.generate_financial_insights(
+                    period_type="daily",
+                    anchor_date=date(2026, 5, 17),
+                )
+                second = service.generate_financial_insights(
+                    period_type="daily",
+                    anchor_date=date(2026, 5, 17),
+                )
+
+            assert first["cached"] is False
+            assert second["cached"] is False
+            assert second["summary"] == "Resumo atualizado."
+            assert first["context_hash"] != second["context_hash"]
+            assert provider.generate_with_usage.call_count == 2
+
+    def test_financial_insights_daily_budget_blocks_before_provider_call(
+        self,
+        app,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        with app.app_context():
+            from app.extensions.database import db
+            from app.models.llm_audit_log import LLMAuditLog
+            from app.services.ai_advisory_service import (
+                AIAdvisoryService,
+                AIInsightCostBudgetExceededError,
+            )
+
+            user_id = uuid.uuid4()
+            db.session.add(
+                LLMAuditLog(
+                    user_id=user_id,
+                    endpoint="financial_insights_daily",
+                    model="gpt-4o-mini",
+                    prompt="redacted",
+                    response_text="redacted",
+                    prompt_tokens=10,
+                    completion_tokens=10,
+                    total_tokens=20,
+                    estimated_cost_usd=Decimal("0.01000000"),
+                    latency_ms=50,
+                )
+            )
+            db.session.commit()
+            monkeypatch.setenv("AI_INSIGHTS_DAILY_BUDGET_USD", "0.01")
+            monkeypatch.delenv("AI_INSIGHTS_MONTHLY_BUDGET_USD", raising=False)
+            provider = MagicMock()
+
+            service = AIAdvisoryService(user_id=user_id, llm_provider=provider)
+            with pytest.raises(
+                AIInsightCostBudgetExceededError,
+                match="Orçamento diário de AI Insights atingido",
+            ):
+                service.generate_financial_insights(
+                    period_type="daily",
+                    anchor_date=date(2026, 5, 17),
+                )
+
+            provider.generate_with_usage.assert_not_called()
+
+    def test_financial_insights_monthly_budget_blocks_before_provider_call(
+        self,
+        app,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        with app.app_context():
+            from app.extensions.database import db
+            from app.models.llm_audit_log import LLMAuditLog
+            from app.services.ai_advisory_service import (
+                AIAdvisoryService,
+                AIInsightCostBudgetExceededError,
+            )
+
+            user_id = uuid.uuid4()
+            db.session.add(
+                LLMAuditLog(
+                    user_id=user_id,
+                    endpoint="financial_insights_weekly",
+                    model="gpt-4o-mini",
+                    prompt="redacted",
+                    response_text="redacted",
+                    prompt_tokens=10,
+                    completion_tokens=10,
+                    total_tokens=20,
+                    estimated_cost_usd=Decimal("0.02000000"),
+                    latency_ms=50,
+                )
+            )
+            db.session.commit()
+            monkeypatch.delenv("AI_INSIGHTS_DAILY_BUDGET_USD", raising=False)
+            monkeypatch.setenv("AI_INSIGHTS_MONTHLY_BUDGET_USD", "0.02")
+            provider = MagicMock()
+
+            service = AIAdvisoryService(user_id=user_id, llm_provider=provider)
+            with pytest.raises(
+                AIInsightCostBudgetExceededError,
+                match="Orçamento mensal de AI Insights atingido",
+            ):
+                service.generate_financial_insights(
+                    period_type="daily",
+                    anchor_date=date(2026, 5, 17),
+                )
+
+            provider.generate_with_usage.assert_not_called()
 
     def test_financial_insights_reject_invalid_payload_without_saving(
         self,
@@ -897,6 +1062,34 @@ class TestAIInsightGenerateEndpoint:
             "anchor_date": date(2026, 5, 17),
             "preview_run_id": preview_run_id,
         }
+
+    def test_post_generation_budget_exceeded_returns_429(self, app, client) -> None:
+        token = _register_and_login(client, prefix="ai-generate-budget")
+        user_id = _get_current_user_id(app, token)
+        _grant_entitlement(app, user_id, "advanced_simulations")
+
+        from app.services.ai_advisory_service import AIInsightCostBudgetExceededError
+
+        error = AIInsightCostBudgetExceededError(
+            "Orçamento diário de AI Insights atingido.",
+            scope="daily",
+            limit_usd=Decimal("0.01"),
+            spent_usd=Decimal("0.01"),
+        )
+
+        with patch(
+            "app.services.ai_advisory_service.AIAdvisoryService.generate_financial_insights",
+            side_effect=error,
+        ):
+            resp = client.post(
+                "/ai/insights/generate",
+                json={"period_type": "daily", "anchor_date": "2026-05-17"},
+                headers=_auth(token),
+            )
+
+        assert resp.status_code == 429
+        body = resp.get_json()
+        assert body["error"] == "Orçamento diário de AI Insights atingido."
 
 
 class TestAIGoalProjectionEndpoint:
