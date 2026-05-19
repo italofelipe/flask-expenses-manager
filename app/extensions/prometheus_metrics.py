@@ -40,6 +40,7 @@ except ImportError:  # pragma: no cover
 _HTTP_REQUESTS_TOTAL: Any = None
 _HTTP_REQUEST_DURATION: Any = None
 _AUTH_LOGINS_TOTAL: Any = None
+_AUTH_LOGIN_COOKIE_ONLY_HEADER_TOTAL: Any = None
 _AUDIT_EVENTS_PURGED_TOTAL: Any = None
 _CACHE_HITS_TOTAL: Any = None
 _CACHE_MISSES_TOTAL: Any = None
@@ -85,6 +86,7 @@ def _ensure_metrics_initialized() -> None:
         _HTTP_REQUESTS_TOTAL, \
         _HTTP_REQUEST_DURATION, \
         _AUTH_LOGINS_TOTAL, \
+        _AUTH_LOGIN_COOKIE_ONLY_HEADER_TOTAL, \
         _AUDIT_EVENTS_PURGED_TOTAL, \
         _CACHE_HITS_TOTAL, \
         _CACHE_MISSES_TOTAL, \
@@ -113,6 +115,24 @@ def _ensure_metrics_initialized() -> None:
             "auraxis_auth_logins_total",
             "Total login attempts (status: success | failure | mfa_required)",
             ["status"],
+        )
+
+    # SEC-AUD-07 / #623 — canary metric for the cookie-only refresh flip.
+    # Labels:
+    #   header_present: "yes" | "no" — whether the client sent
+    #     X-Refresh-Cookie-Only on the login request.
+    # When the global flag AURAXIS_REFRESH_COOKIE_ONLY is flipped to True,
+    # responses stop carrying refresh_token in the body. Before flipping we
+    # need 2 weeks of header_present="no" near zero to confirm every
+    # production client has migrated.
+    if _AUTH_LOGIN_COOKIE_ONLY_HEADER_TOTAL is None:
+        _AUTH_LOGIN_COOKIE_ONLY_HEADER_TOTAL = Counter(
+            "auraxis_auth_login_cookie_only_header_total",
+            (
+                "Successful logins by presence of X-Refresh-Cookie-Only "
+                "header (canary for SEC-AUD-07)"
+            ),
+            ["header_present"],
         )
 
     if _AUDIT_EVENTS_PURGED_TOTAL is None:
@@ -205,6 +225,24 @@ def record_auth_login(*, status: str) -> None:
         _AUTH_LOGINS_TOTAL.labels(status=status).inc()
 
 
+def record_auth_login_cookie_only_header(*, header_present: bool) -> None:
+    """Canary for SEC-AUD-07 / #623.
+
+    Increment ``auraxis_auth_login_cookie_only_header_total`` to track
+    whether successful logins are arriving with the ``X-Refresh-Cookie-Only``
+    header set. Call this **only on successful logins** so the denominator
+    reflects real client traffic, not failed attempts.
+
+    When the rate of ``header_present="no"`` is effectively zero for 2
+    weeks in production, the global ``AURAXIS_REFRESH_COOKIE_ONLY`` flag
+    can be flipped safely.
+    """
+    _ensure_metrics_initialized()
+    if _AUTH_LOGIN_COOKIE_ONLY_HEADER_TOTAL is not None:
+        label = "yes" if header_present else "no"
+        _AUTH_LOGIN_COOKIE_ONLY_HEADER_TOTAL.labels(header_present=label).inc()
+
+
 def record_ai_insight_generated(
     *,
     period_type: str,
@@ -286,6 +324,7 @@ __all__ = [
     "record_ai_insight_generated",
     "record_audit_purge",
     "record_auth_login",
+    "record_auth_login_cookie_only_header",
     "record_cache_hit",
     "record_cache_invalidation",
     "record_cache_miss",
