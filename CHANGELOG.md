@@ -1,5 +1,15 @@
 # Changelog
 
+## [1.44.0](https://github.com/italofelipe/auraxis-api/compare/v1.43.0...v1.44.0) (2026-05-19)
+
+
+### Features
+
+* **ai:** add deterministic insight health scoring ([#1318](https://github.com/italofelipe/auraxis-api/issues/1318)) ([e1e3fcd](https://github.com/italofelipe/auraxis-api/commit/e1e3fcd84a022cb79a62f892fe64c223db058e9a))
+* **ai:** expose audit preview dossier export ([#1317](https://github.com/italofelipe/auraxis-api/issues/1317)) ([cc2733a](https://github.com/italofelipe/auraxis-api/commit/cc2733aee8ce0ea075306838f1dc2577e29dde09))
+* **ai:** govern insight generation cost ([#1319](https://github.com/italofelipe/auraxis-api/issues/1319)) ([81885ac](https://github.com/italofelipe/auraxis-api/commit/81885acfa5ee28b26873cfe4019a87c577a803a7))
+* **ai:** persist ai insight runs ([#1315](https://github.com/italofelipe/auraxis-api/issues/1315)) ([ed3bfe5](https://github.com/italofelipe/auraxis-api/commit/ed3bfe58d7e00ed1709f7b2896b42cfc58ebf0fc))
+
 ## [1.43.0](https://github.com/italofelipe/auraxis-api/compare/v1.42.0...v1.43.0) (2026-05-18)
 
 
