@@ -1707,7 +1707,7 @@ def _build_financial_insight_prompt(
         "Cada item deve conter evidências que apontem para chaves conhecidas do "
         "snapshot, como current_period.paid.balance, comparisons.yesterday.delta, "
         "daily_series, extremes, categories, transactions.sample, budgets, goals, "
-        "credit_cards ou wallet.\n"
+        "credit_cards, wallet ou financial_health.\n"
         "Quando 'wallet' estiver presente e o ativo total for > 0, contextualize "
         "a rentabilidade e a alocação atual: compare com "
         "'wallet.benchmark.cdi_monthly_pct' e 'wallet.benchmark.ipca_monthly_pct' "

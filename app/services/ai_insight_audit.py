@@ -69,6 +69,18 @@ def _safe_float(value: object) -> float:
         return 0.0
 
 
+def _financial_health_risk_flags(
+    snapshot: dict[str, Any],
+) -> list[dict[str, Any]] | None:
+    financial_health = snapshot.get("financial_health")
+    if not isinstance(financial_health, dict):
+        return None
+    risk_flags = financial_health.get("risk_flags")
+    if not isinstance(risk_flags, list):
+        return None
+    return [flag for flag in risk_flags if isinstance(flag, dict)]
+
+
 def _latest_snapshot_hash(
     *,
     user_id: UUID,
@@ -108,6 +120,16 @@ def build_evidence_manifest(
     """Return deterministic evidence pointers for an auditable snapshot."""
 
     evidence_paths = (
+        (
+            "financial_health.score",
+            "Score determinístico de saúde financeira",
+            "general",
+        ),
+        (
+            "financial_health.risk_flags",
+            "Flags determinísticas de risco",
+            "general",
+        ),
         (
             "current_period.paid.income_total",
             "Receitas pagas no período",
@@ -189,6 +211,10 @@ def build_evidence_manifest(
 def build_deterministic_risks(snapshot: dict[str, Any]) -> list[dict[str, Any]]:
     """Return deterministic risk flags derived from the snapshot."""
 
+    risk_flags = _financial_health_risk_flags(snapshot)
+    if risk_flags is not None:
+        return risk_flags
+
     risks: list[dict[str, Any]] = []
     data_quality = snapshot.get("data_quality") or {}
     if isinstance(data_quality, dict) and data_quality.get("has_transactions") is False:
@@ -222,6 +248,21 @@ def build_deterministic_risks(snapshot: dict[str, Any]) -> list[dict[str, Any]]:
                 "severity": "high",
                 "dimension": "transactions",
                 "evidence": ["current_period.commitments.overdue_expense_total"],
+            }
+        )
+
+    pending = _safe_float(
+        _get_path(snapshot, "current_period.commitments.pending_expense_total")
+    )
+    if pending > 0:
+        risks.append(
+            {
+                "code": "future_commitments_open",
+                "severity": "low",
+                "dimension": "transactions",
+                "evidence": [
+                    "current_period.commitments.pending_expense_total",
+                ],
             }
         )
 

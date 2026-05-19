@@ -112,6 +112,31 @@ def _data(payload: dict) -> dict:
     return payload.get("data") or payload
 
 
+def test_deterministic_risks_use_snapshot_financial_health_flags() -> None:
+    from app.services.ai_insight_audit import build_deterministic_risks
+
+    snapshot = {
+        "financial_health": {
+            "risk_flags": [
+                {
+                    "code": "future_commitment_pressure",
+                    "severity": "medium",
+                    "dimension": "transactions",
+                    "evidence": [
+                        "current_period.commitments.pending_expense_total",
+                        "current_period.paid.balance",
+                    ],
+                }
+            ]
+        }
+    }
+
+    assert (
+        build_deterministic_risks(snapshot)
+        == snapshot["financial_health"]["risk_flags"]
+    )
+
+
 class TestAIInsightAuditPreviewAdmin:
     def test_preview_returns_403_for_non_admin(self, admin_preview_client) -> None:
         with patch(
