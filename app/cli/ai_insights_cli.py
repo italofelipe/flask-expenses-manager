@@ -14,9 +14,13 @@ Both commands follow the same pattern:
 
 from __future__ import annotations
 
+import html as html_lib
+import json
 import sys
 import uuid
 from datetime import date, datetime, timedelta, timezone
+from pathlib import Path
+from typing import Any
 
 import click
 from flask import Flask
@@ -27,6 +31,7 @@ from app.models.ai_insight import AIInsight, InsightType
 from app.models.entitlement import Entitlement
 from app.models.user import User
 from app.services.ai_advisory_service import AIAdvisoryService
+from app.services.ai_insight_audit import get_ai_insight_run_dossier
 
 ai_insights_cli = AppGroup("ai", help="Scheduled AI insights batch commands.")
 
@@ -94,6 +99,69 @@ def _already_has_insight(
         .first()
     )
     return exists is not None
+
+
+def _parse_uuid_option(value: str | None, *, option_name: str) -> uuid.UUID | None:
+    if value in (None, ""):
+        return None
+    try:
+        return uuid.UUID(str(value))
+    except ValueError as exc:
+        raise click.ClickException(f"{option_name} deve ser UUID válido") from exc
+
+
+def _render_dossier_html(payload: dict[str, Any]) -> str:
+    title = f"AI Insight Dossier {payload['run']['id']}"
+    pretty = html_lib.escape(
+        json.dumps(payload, ensure_ascii=False, indent=2, sort_keys=True)
+    )
+    return (
+        "<!doctype html>\n"
+        '<html lang="pt-BR">\n'
+        "<head>\n"
+        '  <meta charset="utf-8">\n'
+        f"  <title>{html_lib.escape(title)}</title>\n"
+        "  <style>"
+        "body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;"
+        "margin:32px;color:#111827;background:#f9fafb;}"
+        "main{max-width:1100px;margin:0 auto;}"
+        "pre{white-space:pre-wrap;background:#fff;border:1px solid #d1d5db;"
+        "border-radius:8px;padding:16px;overflow:auto;}"
+        "h1{font-size:22px;margin:0 0 16px;}"
+        "</style>\n"
+        "</head>\n"
+        "<body><main>\n"
+        f"<h1>{html_lib.escape(title)}</h1>\n"
+        f"<pre>{pretty}</pre>\n"
+        "</main></body>\n"
+        "</html>\n"
+    )
+
+
+def _write_dossier_files(
+    *,
+    payload: dict[str, Any],
+    output_dir: Path,
+    output_format: str,
+) -> list[Path]:
+    run_id = str(payload["run"]["id"])
+    output_dir.mkdir(parents=True, exist_ok=True)
+    written: list[Path] = []
+
+    if output_format in {"json", "both"}:
+        json_path = output_dir / f"ai-insight-dossier-{run_id}.json"
+        json_path.write_text(
+            json.dumps(payload, ensure_ascii=False, indent=2, sort_keys=True),
+            encoding="utf-8",
+        )
+        written.append(json_path)
+
+    if output_format in {"html", "both"}:
+        html_path = output_dir / f"ai-insight-dossier-{run_id}.html"
+        html_path.write_text(_render_dossier_html(payload), encoding="utf-8")
+        written.append(html_path)
+
+    return written
 
 
 def _run_batch(
@@ -231,6 +299,67 @@ def monthly_insights(month: str | None, dry_run: bool) -> None:
     if not dry_run:
         click.echo(f"monthly_insights month={month_label}")
     sys.exit(exit_code)
+
+
+@ai_insights_cli.command("export-dossier")
+@click.option("--run-id", default=None, help="AIInsightRun UUID to export.")
+@click.option("--user-id", default=None, help="Filter by user UUID.")
+@click.option(
+    "--period-type",
+    default=None,
+    type=click.Choice(["daily", "weekly", "monthly"]),
+    help="Filter by insight period type.",
+)
+@click.option("--period-label", default=None, help="Filter by period label.")
+@click.option("--insight-id", default=None, help="Filter by AIInsight UUID.")
+@click.option(
+    "--output-dir",
+    default=".",
+    type=click.Path(file_okay=False, path_type=Path),
+    help="Local directory where dossier files will be written.",
+)
+@click.option(
+    "--format",
+    "output_format",
+    default="json",
+    type=click.Choice(["json", "html", "both"]),
+    show_default=True,
+    help="Dossier output format.",
+)
+def export_dossier(
+    run_id: str | None,
+    user_id: str | None,
+    period_type: str | None,
+    period_label: str | None,
+    insight_id: str | None,
+    output_dir: Path,
+    output_format: str,
+) -> None:
+    """Export an auditable AI Insight dossier without calling an LLM."""
+
+    if not any((run_id, user_id, period_type, period_label, insight_id)):
+        raise click.ClickException(
+            "Informe ao menos um filtro: --run-id, --user-id, --period-type, "
+            "--period-label ou --insight-id."
+        )
+
+    payload = get_ai_insight_run_dossier(
+        run_id=_parse_uuid_option(run_id, option_name="--run-id"),
+        user_id=_parse_uuid_option(user_id, option_name="--user-id"),
+        period_type=period_type,
+        period_label=period_label,
+        insight_id=_parse_uuid_option(insight_id, option_name="--insight-id"),
+    )
+    paths = _write_dossier_files(
+        payload=payload,
+        output_dir=output_dir,
+        output_format=output_format,
+    )
+    click.echo(
+        "export_dossier: "
+        + " ".join(f"path={path}" for path in paths)
+        + f" run_id={payload['run']['id']}"
+    )
 
 
 def register_ai_insights_commands(app: Flask) -> None:

@@ -504,6 +504,98 @@ class TestAIAdvisoryServiceFinancialInsights:
             assert saved.insight_type == InsightType(period_type)
             assert saved.period_label == period_label
 
+    def test_generate_financial_insights_can_reuse_preview_run_snapshot(
+        self,
+        app,
+    ) -> None:
+        with app.app_context():
+            from app.extensions.database import db
+            from app.models.ai_insight import AIInsight, InsightType
+            from app.models.ai_insight_run import AIInsightRunStatus
+            from app.models.user import User
+            from app.services.ai_advisory_service import AIAdvisoryService
+            from app.services.ai_insight_runs import create_ai_insight_run
+
+            user_id = uuid.uuid4()
+            db.session.add(
+                User(
+                    id=user_id,
+                    name="Preview User",
+                    email=f"preview-{user_id.hex[:8]}@test.com",
+                    password="x",
+                )
+            )
+            db.session.commit()
+
+            snapshot = {
+                "schema_version": "financial_insight_snapshot.v1",
+                "period_type": "daily",
+                "period": {
+                    "label": "2026-05-17",
+                    "start": "2026-05-17",
+                    "end": "2026-05-17",
+                },
+                "current_period": {
+                    "paid": {
+                        "income_total": "1000.00",
+                        "expense_total": "250.00",
+                        "balance": "750.00",
+                        "transaction_count": 2,
+                    },
+                    "commitments": {
+                        "pending_expense_total": "0.00",
+                        "overdue_expense_total": "0.00",
+                        "transaction_count": 0,
+                    },
+                    "cancelled_transaction_count": 0,
+                },
+                "comparisons": {},
+                "transactions": {"included_count": 2, "sample": []},
+                "data_quality": {
+                    "has_transactions": True,
+                    "missing_comparison_periods": [],
+                },
+            }
+            preview_run = create_ai_insight_run(
+                user_id=user_id,
+                status=AIInsightRunStatus.previewed,
+                period_type=InsightType.daily,
+                period_label="2026-05-17",
+                period_start=date(2026, 5, 17),
+                period_end=date(2026, 5, 17),
+                snapshot_schema_version="financial_insight_snapshot.v1",
+                snapshot_hash="preview-hash-123",
+                prompt_template_version="financial-insight.v1.preview",
+                snapshot_json=snapshot,
+                evidence_manifest_json={"items": []},
+                data_quality_json=snapshot["data_quality"],
+            )
+
+            provider = MagicMock()
+            provider.generate_with_usage.return_value = _financial_llm_response(
+                summary="Resumo a partir do preview."
+            )
+
+            service = AIAdvisoryService(user_id=user_id, llm_provider=provider)
+            with patch(
+                "app.services.ai_advisory_service._build_period_snapshot",
+                side_effect=AssertionError("snapshot should come from preview run"),
+            ):
+                result = service.generate_financial_insights(
+                    period_type="daily",
+                    anchor_date=date(2026, 5, 17),
+                    preview_run_id=preview_run.id,
+                )
+
+            assert result["context_hash"] == "preview-hash-123"
+            assert result["cached"] is False
+            saved = AIInsight.query.filter_by(user_id=user_id).one()
+            db.session.refresh(preview_run)
+            assert preview_run.status == AIInsightRunStatus.generated
+            assert preview_run.ai_insight_id == saved.id
+            assert preview_run.snapshot_hash == "preview-hash-123"
+            assert preview_run.tokens_total == 140
+
     def test_audit_log_created_on_success(self, app) -> None:
         with app.app_context():
             user_id = uuid.uuid4()
@@ -760,6 +852,50 @@ class TestAIInsightGenerateEndpoint:
         assert mocked_generate.call_args.kwargs == {
             "period_type": "daily",
             "anchor_date": date(2026, 5, 17),
+            "preview_run_id": None,
+        }
+
+    def test_post_generation_accepts_preview_run_id(self, app, client) -> None:
+        token = _register_and_login(client, prefix="ai-generate-preview")
+        user_id = _get_current_user_id(app, token)
+        _grant_entitlement(app, user_id, "advanced_simulations")
+        preview_run_id = uuid.uuid4()
+
+        generated = {
+            "period_type": "daily",
+            "period_label": "2026-05-17",
+            "period_start": "2026-05-17",
+            "period_end": "2026-05-17",
+            "summary": "Resumo do preview.",
+            "items": [],
+            "context_version": "financial_insight_snapshot.v1",
+            "context_hash": "preview-hash-123",
+            "cached": False,
+            "model": "stub",
+            "tokens_used": 123,
+            "cost_usd": 0.00001,
+        }
+
+        with patch(
+            "app.services.ai_advisory_service.AIAdvisoryService.generate_financial_insights",
+            return_value=generated,
+        ) as mocked_generate:
+            resp = client.post(
+                "/ai/insights/generate",
+                json={
+                    "period_type": "daily",
+                    "anchor_date": "2026-05-17",
+                    "preview_run_id": str(preview_run_id),
+                },
+                headers=_auth(token),
+            )
+
+        assert resp.status_code == 200
+        mocked_generate.assert_called_once()
+        assert mocked_generate.call_args.kwargs == {
+            "period_type": "daily",
+            "anchor_date": date(2026, 5, 17),
+            "preview_run_id": preview_run_id,
         }
 
 
