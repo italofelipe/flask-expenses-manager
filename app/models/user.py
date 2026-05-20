@@ -1,7 +1,9 @@
 # mypy: disable-error-code="name-defined,no-redef"
 
 import uuid
+from datetime import UTC, datetime, timedelta
 
+from flask import current_app
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.ext.hybrid import hybrid_property
 
@@ -88,3 +90,53 @@ class User(db.Model):
     @monthly_income.setter
     def monthly_income(self, value):
         self.monthly_income_net = value
+
+    @hybrid_property
+    def email_verified(self) -> bool:
+        """True se o email do usuário foi confirmado."""
+        return self.email_verified_at is not None
+
+    @hybrid_property
+    def email_verification_deadline_at(self) -> datetime | None:
+        """Timestamp limite para confirmar email; None se já verificado.
+
+        Após esse prazo, o usuário entra em modo soft-block (mutations bloqueadas
+        retornam 403 EMAIL_VERIFICATION_REQUIRED). Reads continuam liberados.
+        """
+        if self.email_verified_at is not None:
+            return None
+        if self.created_at is None:
+            return None
+        grace_days = int(
+            current_app.config.get("EMAIL_VERIFICATION_GRACE_PERIOD_DAYS", 14)
+        )
+        deadline: datetime = self.created_at + timedelta(days=grace_days)
+        return deadline
+
+    @hybrid_property
+    def email_verification_required_now(self) -> bool:
+        """True se o grace period expirou e o email ainda não foi confirmado.
+
+        Usado pelo decorator @require_email_verified para retornar 403 em
+        endpoints de mutation.
+        """
+        if self.email_verified_at is not None:
+            return False
+        deadline = self.email_verification_deadline_at
+        if deadline is None:
+            return False
+        return datetime.now(UTC).replace(tzinfo=None) > deadline
+
+    @hybrid_property
+    def days_until_email_required(self) -> int | None:
+        """Dias restantes até o grace period expirar; None se já verificado.
+
+        Pode ser <= 0 (já expirou — frontend usa para mostrar gate, não countdown).
+        """
+        if self.email_verified_at is not None:
+            return None
+        deadline = self.email_verification_deadline_at
+        if deadline is None:
+            return None
+        remaining = deadline - datetime.now(UTC).replace(tzinfo=None)
+        return remaining.days

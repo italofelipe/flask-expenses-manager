@@ -10,6 +10,7 @@ from app.application.services.transaction_application_service import (
     TransactionApplicationError,
 )
 from app.auth import current_user_id
+from app.decorators import require_email_verified
 from app.schemas.transaction_schema import TransactionSchema
 from app.utils.typed_decorators import typed_doc as doc
 from app.utils.typed_decorators import typed_jwt_required as jwt_required
@@ -49,6 +50,7 @@ class TransactionCreateMixin:
 
     @doc(**TRANSACTION_CREATE_DOC)
     @jwt_required()
+    @require_email_verified
     @use_kwargs(TransactionSchema, location="json")
     def post(self, **kwargs: Any) -> Response:
         token_error = _guard_revoked_token()
