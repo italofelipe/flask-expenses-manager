@@ -170,6 +170,7 @@ jobs:
           if-no-files-found: ignore
 
       - name: REST + GraphQL smoke checks (DEV)
+        id: smoke_dev
         env:
           DEV_BASE_URL: ${{ vars.AURAXIS_DEV_BASE_URL }}
         run: |
@@ -181,13 +182,15 @@ jobs:
             --skip-cors
 
       - name: Auto-rollback DEV on deploy failure
-        if: ${{ failure() }}
+        if: ${{ failure() && (steps.deploy_dev.outcome == 'failure' || steps.smoke_dev.outcome == 'failure') }}
         continue-on-error: true
         env:
           AWS_REGION: ${{ vars.AWS_REGION }}
           DEV_INSTANCE_ID: ${{ vars.AURAXIS_DEV_INSTANCE_ID }}
           PROD_INSTANCE_ID: ${{ vars.AURAXIS_PROD_INSTANCE_ID }}
         run: |
+          # Log which deploy-critical step triggered the rollback for on-call clarity.
+          echo "::warning::Rollback triggered — deploy_dev=${{ steps.deploy_dev.outcome }}, smoke_dev=${{ steps.smoke_dev.outcome }}"
           python scripts/aws_deploy_i6.py \
             --profile "" \
             --region "${AWS_REGION}" \
@@ -329,6 +332,7 @@ jobs:
           if-no-files-found: ignore
 
       - name: REST + GraphQL smoke checks (PROD)
+        id: smoke_prod
         env:
           PROD_BASE_URL: ${{ vars.AURAXIS_PROD_BASE_URL }}
         run: |
@@ -340,6 +344,7 @@ jobs:
             --cors-origin https://app.auraxis.com.br
 
       - name: Readiness gate (PROD)
+        id: readiness_prod
         env:
           PROD_BASE_URL: ${{ vars.AURAXIS_PROD_BASE_URL }}
         run: |
@@ -353,8 +358,13 @@ jobs:
             echo "[readiness-gate] PASS ${endpoint} returned HTTP ${STATUS}"
           done
 
+      # Post-deploy observability gate — intentionally soft-fail (does NOT trigger rollback).
+      # See #1263: rollback should fire only on deploy-critical failures
+      # (deploy_prod / smoke_prod / readiness_prod), not on observability flakes.
       - name: Canary observation window (Sentry — 10 min)
-        if: success()
+        id: canary_prod
+        if: ${{ success() && env.SENTRY_TOKEN != '' && env.SENTRY_ORG != '' }}
+        continue-on-error: true
         run: |
           echo "Aguardando 10 minutos para observacao pos-deploy..."
           sleep 600
@@ -367,14 +377,29 @@ jobs:
           SENTRY_TOKEN: ${{ secrets.SENTRY_TOKEN }}
           SENTRY_ORG: ${{ secrets.SENTRY_ORG }}
 
+      - name: Annotate canary skip
+        if: ${{ success() && (env.SENTRY_TOKEN == '' || env.SENTRY_ORG == '') }}
+        env:
+          SENTRY_TOKEN: ${{ secrets.SENTRY_TOKEN }}
+          SENTRY_ORG: ${{ secrets.SENTRY_ORG }}
+        run: |
+          echo "::warning::Canary observation skipped — SENTRY_TOKEN or SENTRY_ORG secret is not configured. Deploy is considered healthy; configure both secrets to enable the canary gate."
+
+      - name: Annotate canary failure
+        if: ${{ steps.canary_prod.outcome == 'failure' }}
+        run: |
+          echo "::warning::Canary observation failed but deploy was NOT rolled back (post-deploy gate semantics per #1263). Investigate Sentry signal manually; rollback this image only if app health is actually degraded."
+
       - name: Auto-rollback PROD on deploy failure
-        if: ${{ failure() }}
+        if: ${{ failure() && (steps.deploy_prod.outcome == 'failure' || steps.smoke_prod.outcome == 'failure' || steps.readiness_prod.outcome == 'failure') }}
         continue-on-error: true
         env:
           AWS_REGION: ${{ vars.AWS_REGION }}
           DEV_INSTANCE_ID: ${{ vars.AURAXIS_DEV_INSTANCE_ID }}
           PROD_INSTANCE_ID: ${{ vars.AURAXIS_PROD_INSTANCE_ID }}
         run: |
+          # Log which deploy-critical step triggered rollback for on-call clarity (per #1263 AC).
+          echo "::error::Rollback triggered — deploy_prod=${{ steps.deploy_prod.outcome }}, smoke_prod=${{ steps.smoke_prod.outcome }}, readiness_prod=${{ steps.readiness_prod.outcome }}, canary_prod=${{ steps.canary_prod.outcome }} (canary is informational only)"
           python scripts/aws_deploy_i6.py \
             --profile "" \
             --region "${AWS_REGION}" \
