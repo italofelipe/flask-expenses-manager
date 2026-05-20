@@ -126,6 +126,12 @@ class WalletEntryPayload(TypedDict):
 def to_user_profile_payload(profile: AuthenticatedUserProfile) -> UserProfilePayload:
     payload = asdict(profile)
     payload.pop("entitlements_version", None)
+    # GraphQL UserType doesn't yet expose email_verification fields; surface them
+    # only via the REST canonical payload until the GraphQL parity PR lands.
+    payload.pop("email_verified", None)
+    payload.pop("email_verification_deadline_at", None)
+    payload.pop("email_verification_required_now", None)
+    payload.pop("days_until_email_required", None)
     return cast(UserProfilePayload, payload)
 
 
