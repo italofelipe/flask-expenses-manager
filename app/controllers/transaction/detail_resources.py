@@ -6,6 +6,7 @@ from flask import Response
 from flask_apispec.views import MethodResource
 
 from app.auth import current_user_id
+from app.decorators import require_email_verified
 from app.extensions.database import db
 from app.models.transaction import Transaction
 from app.utils.typed_decorators import typed_doc as doc
@@ -73,6 +74,7 @@ class TransactionDetailResource(MethodResource):
 class TransactionForceDeleteResource(MethodResource):
     @doc(**TRANSACTION_FORCE_DELETE_DOC)
     @jwt_required()
+    @require_email_verified
     def delete(self, transaction_id: UUID) -> Response:
         token_error = _guard_revoked_token()
         if token_error is not None:
@@ -113,6 +115,7 @@ class TransactionForceDeleteResource(MethodResource):
 class TransactionRestoreResource(MethodResource):
     @doc(**TRANSACTION_RESTORE_DOC)
     @jwt_required()
+    @require_email_verified
     def patch(self, transaction_id: UUID) -> Response:
         token_error = _guard_revoked_token()
         if token_error is not None:

@@ -106,6 +106,15 @@ class Config:
         "AURAXIS_PREMIUM_OVERRIDE_USER_IDS", ""
     )
 
+    # Email verification grace period — after N days without confirmation,
+    # mutations are soft-blocked (reads continue). See:
+    # - app/models/user.py — User.email_verification_required_now
+    # - app/decorators/require_email_verified.py — endpoint decorator
+    EMAIL_VERIFICATION_GRACE_PERIOD_DAYS = int(
+        os.getenv("EMAIL_VERIFICATION_GRACE_PERIOD_DAYS", "14")
+    )
+    EMAIL_VERIFICATION_ENFORCE = _read_bool_env("EMAIL_VERIFICATION_ENFORCE", True)
+
     DEBUG = _read_bool_env("FLASK_DEBUG", False)
 
     # Database config

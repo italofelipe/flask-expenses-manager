@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass
-from datetime import date
+from datetime import date, datetime
 from typing import SupportsFloat, cast
 from uuid import UUID
 
@@ -33,6 +33,11 @@ class AuthenticatedUserProfile:
     taxonomy_version: str | None
     entitlements_version: int
     avatar_url: str | None
+    # Email verification status (14d grace period soft-block)
+    email_verified: bool = False
+    email_verification_deadline_at: str | None = None
+    email_verification_required_now: bool = False
+    days_until_email_required: int | None = None
 
 
 @dataclass(frozen=True)
@@ -66,6 +71,10 @@ def _to_float_or_none(value: SupportsFloat | None) -> float | None:
 
 
 def _isoformat_or_none(value: date | None) -> str | None:
+    return value.isoformat() if value is not None else None
+
+
+def _datetime_isoformat_or_none(value: datetime | None) -> str | None:
     return value.isoformat() if value is not None else None
 
 
@@ -115,6 +124,12 @@ class AuthenticatedUserContextService:
             taxonomy_version=user.taxonomy_version,
             entitlements_version=int(user.entitlements_version or 0),
             avatar_url=user.avatar_url,
+            email_verified=bool(user.email_verified),
+            email_verification_deadline_at=_datetime_isoformat_or_none(
+                user.email_verification_deadline_at
+            ),
+            email_verification_required_now=bool(user.email_verification_required_now),
+            days_until_email_required=user.days_until_email_required,
         )
 
     def build_wallet_entries(

@@ -75,6 +75,14 @@ CANONICAL_USER_KEYS = {
     "financial_profile",
     "investor_profile",
     "product_context",
+    "email_verification",
+}
+
+EMAIL_VERIFICATION_FIELDS = {
+    "verified",
+    "deadline_at",
+    "required_now",
+    "days_remaining",
 }
 
 IDENTITY_FIELDS = {"id", "name", "email"}
@@ -345,6 +353,10 @@ def test_user_me_v3_contract_returns_canonical_context_only(client) -> None:
         set(body["data"]["user"]["investor_profile"].keys()) == INVESTOR_PROFILE_FIELDS
     )
     assert set(body["data"]["user"]["product_context"].keys()) == PRODUCT_CONTEXT_FIELDS
+    assert (
+        set(body["data"]["user"]["email_verification"].keys())
+        == EMAIL_VERIFICATION_FIELDS
+    )
     assert "monthly_income" not in body["data"]["user"]["financial_profile"]
     assert "transactions" not in body["data"]["user"]
     assert "wallet" not in body["data"]["user"]

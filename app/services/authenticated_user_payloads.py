@@ -72,12 +72,20 @@ class AuthenticatedUserProductContextPayload(TypedDict):
     entitlements_version: int
 
 
+class AuthenticatedUserEmailVerificationPayload(TypedDict):
+    verified: bool
+    deadline_at: str | None
+    required_now: bool
+    days_remaining: int | None
+
+
 class AuthenticatedUserCanonicalPayload(TypedDict):
     identity: AuthenticatedUserIdentityPayload
     profile: AuthenticatedUserProfileDetailsPayload
     financial_profile: AuthenticatedUserFinancialProfilePayload
     investor_profile: AuthenticatedUserInvestorProfilePayload
     product_context: AuthenticatedUserProductContextPayload
+    email_verification: AuthenticatedUserEmailVerificationPayload
 
 
 class AuthenticatedUserTransactionsPreviewPayload(TypedDict):
@@ -118,6 +126,12 @@ class WalletEntryPayload(TypedDict):
 def to_user_profile_payload(profile: AuthenticatedUserProfile) -> UserProfilePayload:
     payload = asdict(profile)
     payload.pop("entitlements_version", None)
+    # GraphQL UserType doesn't yet expose email_verification fields; surface them
+    # only via the REST canonical payload until the GraphQL parity PR lands.
+    payload.pop("email_verified", None)
+    payload.pop("email_verification_deadline_at", None)
+    payload.pop("email_verification_required_now", None)
+    payload.pop("days_until_email_required", None)
     return cast(UserProfilePayload, payload)
 
 
@@ -153,6 +167,12 @@ def to_authenticated_user_canonical_payload(
         },
         "product_context": {
             "entitlements_version": profile.entitlements_version,
+        },
+        "email_verification": {
+            "verified": profile.email_verified,
+            "deadline_at": profile.email_verification_deadline_at,
+            "required_now": profile.email_verification_required_now,
+            "days_remaining": profile.days_until_email_required,
         },
     }
 
