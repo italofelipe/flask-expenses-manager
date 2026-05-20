@@ -100,6 +100,7 @@ def test_user_bootstrap_v2_contract_returns_aggregated_payload(client, app) -> N
         "financial_profile",
         "investor_profile",
         "product_context",
+        "email_verification",
     }
     assert body["data"]["transactions_preview"]["limit"] == 2
     assert body["data"]["transactions_preview"]["returned_items"] == 2
