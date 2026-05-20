@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.44.1](https://github.com/italofelipe/auraxis-api/compare/v1.44.0...v1.44.1) (2026-05-20)
+
+
+### Bug Fixes
+
+* **deploy:** gate rollback only on deploy-critical failures (P0) ([#1322](https://github.com/italofelipe/auraxis-api/issues/1322)) ([eaf045c](https://github.com/italofelipe/auraxis-api/commit/eaf045c74710d91c3b0d75d498556205bdd5442c))
+
 ## [1.44.0](https://github.com/italofelipe/auraxis-api/compare/v1.43.0...v1.44.0) (2026-05-19)
 
 
