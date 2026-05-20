@@ -17,7 +17,10 @@ from app.docs.openapi_helpers import (
 )
 from app.extensions.database import db
 from app.extensions.integration_metrics import increment_metric
-from app.extensions.prometheus_metrics import record_auth_login
+from app.extensions.prometheus_metrics import (
+    record_auth_login,
+    record_auth_login_cookie_only_header,
+)
 from app.http.request_context import get_request_context
 from app.schemas.auth_schema import AuthSchema
 from app.services.captcha_service import get_captcha_service
@@ -279,8 +282,16 @@ class AuthResource(MethodResource):
                 "email_confirmed": identity.user.email_verified_at is not None,
             }
             record_auth_login(status="success")
+            cookie_only_header_value = request.headers.get(COOKIE_ONLY_HEADER)
+            # SEC-AUD-07 / #623 canary — track whether successful logins
+            # are arriving with the X-Refresh-Cookie-Only header so we can
+            # confirm 2 weeks of header_present="no" near zero before flipping
+            # AURAXIS_REFRESH_COOKIE_ONLY=True.
+            record_auth_login_cookie_only_header(
+                header_present=cookie_only_header_value is not None,
+            )
             omit_refresh_in_body = should_omit_refresh_token_in_body(
-                header_value=request.headers.get(COOKIE_ONLY_HEADER),
+                header_value=cookie_only_header_value,
             )
             legacy_payload: dict[str, Any] = {
                 "message": "Login successful",

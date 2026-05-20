@@ -18,6 +18,7 @@ import app.extensions.prometheus_metrics as prom_mod
 from app.extensions.prometheus_metrics import (
     generate_latest_metrics,
     record_auth_login,
+    record_auth_login_cookie_only_header,
     record_http_request,
 )
 
@@ -182,6 +183,45 @@ def test_record_auth_login_increments_failure_counter() -> None:
     after = auth_counter.labels(status="failure")._value.get()
 
     assert after == before + 1.0
+
+
+# ---------------------------------------------------------------------------
+# SEC-AUD-07 / #623 canary metric
+# ---------------------------------------------------------------------------
+
+
+def test_record_auth_login_cookie_only_header_yes_branch() -> None:
+    """header_present=True maps to the `yes` label."""
+    prom_mod._ensure_metrics_initialized()
+    counter = prom_mod._AUTH_LOGIN_COOKIE_ONLY_HEADER_TOTAL
+    assert counter is not None
+
+    before = counter.labels(header_present="yes")._value.get()
+    record_auth_login_cookie_only_header(header_present=True)
+    after = counter.labels(header_present="yes")._value.get()
+
+    assert after == before + 1.0
+
+
+def test_record_auth_login_cookie_only_header_no_branch() -> None:
+    """header_present=False maps to `no` (target for zero before flip)."""
+    prom_mod._ensure_metrics_initialized()
+    counter = prom_mod._AUTH_LOGIN_COOKIE_ONLY_HEADER_TOTAL
+    assert counter is not None
+
+    before = counter.labels(header_present="no")._value.get()
+    record_auth_login_cookie_only_header(header_present=False)
+    after = counter.labels(header_present="no")._value.get()
+
+    assert after == before + 1.0
+
+
+def test_cookie_only_header_metric_exposed_in_export() -> None:
+    """Counter name appears in /ops/metrics output once incremented."""
+    prom_mod._ensure_metrics_initialized()
+    record_auth_login_cookie_only_header(header_present=True)
+    body, _ = generate_latest_metrics()
+    assert b"auraxis_auth_login_cookie_only_header_total" in body
 
 
 # ---------------------------------------------------------------------------
