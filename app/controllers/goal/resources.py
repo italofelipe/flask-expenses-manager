@@ -10,6 +10,7 @@ from marshmallow import fields
 from app.application.services.goal_application_service import GoalApplicationError
 from app.auth import current_user_id
 from app.controllers.response_contract import compat_success_response_deprecated
+from app.decorators import require_email_verified
 from app.docs.openapi_helpers import deprecated_headers_doc
 from app.utils.typed_decorators import typed_doc as doc
 from app.utils.typed_decorators import typed_jwt_required as jwt_required
@@ -68,6 +69,7 @@ class GoalCollectionResource(MethodResource):
         },
     )
     @jwt_required()
+    @require_email_verified
     def post(self) -> Any:
         user_id = current_user_id()
         payload = request.get_json() or {}
@@ -203,6 +205,7 @@ class GoalResource(MethodResource):
         },
     )
     @jwt_required()
+    @require_email_verified
     def put(self, goal_id: UUID) -> Any:
         payload = request.get_json() or {}
         try:
@@ -226,6 +229,7 @@ class GoalResource(MethodResource):
         },
     )
     @jwt_required()
+    @require_email_verified
     def patch(self, goal_id: UUID) -> Any:
         payload = request.get_json() or {}
         try:
@@ -248,6 +252,7 @@ class GoalResource(MethodResource):
         },
     )
     @jwt_required()
+    @require_email_verified
     def delete(self, goal_id: UUID) -> Any:
         user_id = current_user_id()
         dependencies = get_goal_dependencies()

@@ -11,6 +11,7 @@ from app.application.services.installment_vs_cash_application_service import (
 )
 from app.auth import current_user_id
 from app.controllers.response_contract import compat_success_response_deprecated
+from app.decorators import require_email_verified
 from app.docs.openapi_helpers import deprecated_headers_doc
 from app.schemas.installment_vs_cash_schema import (
     InstallmentVsCashCalculationSchema,
@@ -120,6 +121,7 @@ class InstallmentVsCashCanonicalResource(MethodResource):
         },
     )
     @jwt_required()
+    @require_email_verified
     @use_kwargs(InstallmentVsCashSaveSchema, location="json")
     def post(self, **kwargs: object) -> ResponseReturnValue:
         try:
@@ -151,6 +153,7 @@ class InstallmentVsCashSaveResource(MethodResource):
         },
     )
     @jwt_required()
+    @require_email_verified
     @use_kwargs(InstallmentVsCashSaveSchema, location="json")
     def post(self, **kwargs: object) -> Response:
         try:
@@ -175,6 +178,7 @@ class SimulationGoalBridgeResource(MethodResource):
         },
     )
     @jwt_required()
+    @require_email_verified
     @require_entitlement("advanced_simulations")
     @use_kwargs(InstallmentVsCashGoalBridgeSchema, location="json")
     def post(self, simulation_id: UUID, **kwargs: object) -> ResponseReturnValue:
@@ -213,6 +217,7 @@ class SimulationPlannedExpenseBridgeResource(MethodResource):
         },
     )
     @jwt_required()
+    @require_email_verified
     @require_entitlement("advanced_simulations")
     @use_kwargs(InstallmentVsCashPlannedExpenseBridgeSchema, location="json")
     def post(self, simulation_id: UUID, **kwargs: object) -> ResponseReturnValue:

@@ -11,6 +11,7 @@ from flask import request
 
 from app.auth import current_user_id
 from app.controllers.response_contract import compat_error_tuple, compat_success_tuple
+from app.decorators import require_email_verified
 from app.extensions.database import db
 from app.models.credit_card import CreditCard
 from app.utils.typed_decorators import typed_jwt_required as jwt_required
@@ -188,6 +189,7 @@ def _validate_card_payload(
 
 @credit_card_bp.route("", methods=["POST"])
 @jwt_required()
+@require_email_verified
 def create_credit_card() -> tuple[dict[str, Any], int]:
     """Create a new credit card for the authenticated user."""
     user_id = current_user_id()
@@ -308,6 +310,7 @@ def _apply_card_updates(card: CreditCard, payload: dict[str, Any]) -> None:
 
 @credit_card_bp.route("/<uuid:credit_card_id>", methods=["PUT"])
 @jwt_required()
+@require_email_verified
 def update_credit_card(credit_card_id: UUID) -> tuple[dict[str, Any], int]:
     """Update an existing credit card belonging to the authenticated user."""
     user_id = current_user_id()
@@ -359,6 +362,7 @@ def update_credit_card(credit_card_id: UUID) -> tuple[dict[str, Any], int]:
 
 @credit_card_bp.route("/<uuid:credit_card_id>", methods=["DELETE"])
 @jwt_required()
+@require_email_verified
 def delete_credit_card(credit_card_id: UUID) -> tuple[dict[str, Any], int]:
     """Delete a credit card belonging to the authenticated user."""
     user_id = current_user_id()

@@ -7,6 +7,7 @@ from flask import request
 from flask_apispec.views import MethodResource
 
 from app.auth import current_user_id
+from app.decorators import require_email_verified
 from app.services.budget_service import BudgetService, BudgetServiceError
 from app.utils.typed_decorators import typed_doc as doc
 from app.utils.typed_decorators import typed_jwt_required as jwt_required
@@ -53,6 +54,7 @@ class BudgetCollectionResource(MethodResource):
         },
     )
     @jwt_required()
+    @require_email_verified
     def post(self) -> Any:
         service = _get_service()
         payload = request.get_json() or {}
@@ -139,6 +141,7 @@ class BudgetResource(MethodResource):
         },
     )
     @jwt_required()
+    @require_email_verified
     def patch(self, budget_id: UUID) -> Any:
         service = _get_service()
         payload = request.get_json() or {}
@@ -171,6 +174,7 @@ class BudgetResource(MethodResource):
         },
     )
     @jwt_required()
+    @require_email_verified
     def delete(self, budget_id: UUID) -> Any:
         service = _get_service()
         try:

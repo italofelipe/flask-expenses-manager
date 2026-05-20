@@ -12,6 +12,7 @@ from app.application.services.simulation_application_service import (
 )
 from app.auth import current_user_id
 from app.controllers.response_contract import compat_error_response
+from app.decorators import require_email_verified
 from app.utils.typed_decorators import typed_doc as doc
 from app.utils.typed_decorators import typed_jwt_required as jwt_required
 from app.utils.typed_decorators import typed_use_kwargs as use_kwargs
@@ -67,6 +68,7 @@ class SimulationCollectionResource(MethodResource):
         },
     )
     @jwt_required()
+    @require_email_verified
     def post(self) -> Any:
         oversized = _enforce_body_size_cap()
         if oversized is not None:
@@ -176,6 +178,7 @@ class SimulationResource(MethodResource):
         },
     )
     @jwt_required()
+    @require_email_verified
     def delete(self, simulation_id: UUID) -> Any:
         user_id = current_user_id()
         dependencies = get_simulation_dependencies()

@@ -8,6 +8,7 @@ from marshmallow import fields
 
 from app.application.services.wallet_application_service import WalletApplicationError
 from app.auth import current_user_id
+from app.decorators import require_email_verified
 from app.schemas.openapi.wallet.docs import (
     WALLET_ADD_DOC,
     WALLET_DELETE_DOC,
@@ -36,6 +37,7 @@ from .dependencies import get_wallet_dependencies
 @wallet_bp.route("", methods=["POST"])
 @doc(**WALLET_ADD_DOC)
 @jwt_required()
+@require_email_verified
 def add_wallet_entry() -> tuple[dict[str, Any], int]:
     user_id = current_user_id()
     payload = request.get_json() or {}
@@ -178,6 +180,7 @@ def _update_wallet_entry_data(
 @wallet_bp.route("/<uuid:investment_id>", methods=["PATCH"])
 @doc(**WALLET_PATCH_DOC)
 @jwt_required()
+@require_email_verified
 def patch_wallet_entry(investment_id: UUID) -> tuple[dict[str, Any], int]:
     try:
         investment_data = _update_wallet_entry_data(
@@ -201,6 +204,7 @@ def patch_wallet_entry(investment_id: UUID) -> tuple[dict[str, Any], int]:
 @wallet_bp.route("/<uuid:investment_id>", methods=["PUT"])
 @doc(**WALLET_PUT_DOC)
 @jwt_required()
+@require_email_verified
 def update_wallet_entry(investment_id: UUID) -> Response | tuple[dict[str, Any], int]:
     try:
         investment_data = _update_wallet_entry_data(
@@ -226,6 +230,7 @@ def update_wallet_entry(investment_id: UUID) -> Response | tuple[dict[str, Any],
 @wallet_bp.route("/<uuid:investment_id>", methods=["DELETE"])
 @doc(**WALLET_DELETE_DOC)
 @jwt_required()
+@require_email_verified
 def delete_wallet_entry(investment_id: UUID) -> tuple[dict[str, Any], int]:
     user_id = current_user_id()
     dependencies = get_wallet_dependencies()
