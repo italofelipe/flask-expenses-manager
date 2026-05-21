@@ -114,6 +114,10 @@ class Config:
         os.getenv("EMAIL_VERIFICATION_GRACE_PERIOD_DAYS", "14")
     )
     EMAIL_VERIFICATION_ENFORCE = _read_bool_env("EMAIL_VERIFICATION_ENFORCE", True)
+    # URL base do frontend para o link de confirmação de email. Consumido por
+    # email_confirmation_service. Quando vazio, o serviço faz fallback para
+    # a URL canônica de prod com warning de log (PR #1335).
+    EMAIL_CONFIRMATION_FRONTEND_URL = os.getenv("EMAIL_CONFIRMATION_FRONTEND_URL", "")
 
     DEBUG = _read_bool_env("FLASK_DEBUG", False)
 
