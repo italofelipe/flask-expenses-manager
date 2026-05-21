@@ -1,5 +1,18 @@
 # Changelog
 
+## [1.45.0](https://github.com/italofelipe/auraxis-api/compare/v1.44.1...v1.45.0) (2026-05-21)
+
+
+### Features
+
+* **auth:** D-7/D-1 email verification reminders via cron job ([8eb32bd](https://github.com/italofelipe/auraxis-api/commit/8eb32bd8de3d48822c61b6d72d7ebdb5a815496b))
+* **auth:** expand [@require](https://github.com/require)_email_verified to goal/wallet/budget/simulation/credit_card mutations ([69e6415](https://github.com/italofelipe/auraxis-api/commit/69e64159c53b88aeafcf84e0acbd97e5a02191ae))
+
+
+### Bug Fixes
+
+* **emails:** URL fallback canônico + templates v3 Market Pulse ([9811b3d](https://github.com/italofelipe/auraxis-api/commit/9811b3df4f1692dece1dd6a948cb32abba03c482))
+
 ## [1.44.1](https://github.com/italofelipe/auraxis-api/compare/v1.44.0...v1.44.1) (2026-05-20)
 
 
