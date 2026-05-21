@@ -568,10 +568,125 @@ def render_analysis_ready_email(
     return html, text
 
 
+def render_email_verification_reminder_email(
+    *, days_until_deadline: int
+) -> tuple[str, str]:
+    """Render the D-7 / D-1 verification reminder email.
+
+    Args:
+        days_until_deadline: 7 (mild urgency) or 1 (high urgency).
+
+    Returns:
+        (html, text) tuple ready to pass to EmailMessage.
+    """
+    resend_url = f"{_APP_URL}/resend-confirmation"
+
+    if days_until_deadline == 1:
+        email_title = "Último dia para confirmar seu email"
+        preview = (
+            "Amanhã sua conta entra em modo somente-leitura. "
+            "Confirme seu email para manter o acesso total."
+        )
+        heading = "Último dia para confirmar seu email"
+        urgency_copy = (
+            f"Sua conta foi criada há quase 14 dias. "
+            f'Se você não confirmar seu email <strong style="color: {_COLOR_BRAND};">'
+            f"até amanhã</strong>, ela entrará em modo somente-leitura — "
+            f"você ainda poderá ver seus dados, mas não criar ou editar nada."
+        )
+        cta_label = "Confirmar agora"
+    else:
+        email_title = "Faltam 7 dias para confirmar seu email"
+        preview = (
+            "Confirme seu email no Auraxis dentro de 7 dias para evitar bloqueio "
+            "de novas transações."
+        )
+        heading = f"Faltam {days_until_deadline} dias para confirmar seu email"
+        urgency_copy = (
+            f"Você criou sua conta no Auraxis recentemente, mas ainda não "
+            f'confirmou seu email. Em <strong style="color: {_COLOR_BRAND};">'
+            f"{days_until_deadline} dias</strong> sua conta entrará em modo "
+            f"somente-leitura caso o email não seja confirmado."
+        )
+        cta_label = "Confirmar email"
+
+    body_html = f"""
+      <h1 style="font-family: {_FONT_HEADING}; font-size: 26px; font-weight: 700;
+                 color: {_COLOR_TEXT_PRIMARY}; margin: 0 0 8px; line-height: 1.2;">
+        {heading}
+      </h1>
+      <p style="font-family: {_FONT_BODY}; font-size: 13px; font-weight: 600;
+                color: {_COLOR_BRAND}; margin: 0 0 24px; text-transform: uppercase;
+                letter-spacing: 1px;">
+        Auraxis &mdash; Finanças pessoais
+      </p>
+
+      <div style="border-top: 1px solid {_COLOR_BG_ELEVATED}; margin: 0 0 28px;"></div>
+
+      <p style="font-family: {_FONT_BODY}; font-size: 15px; color: {_COLOR_TEXT_SECONDARY};
+                line-height: 1.65; margin: 0 0 24px;">
+        {urgency_copy}
+      </p>
+
+      <!-- CTA -->
+      <table role="presentation" cellpadding="0" cellspacing="0" border="0" style="margin: 8px 0 32px;">
+        <tr>
+          <td align="left" style="border-radius: 8px; background-color: {_COLOR_BRAND};">
+            <a href="{resend_url}" class="btn"
+               style="background-color: {_COLOR_BRAND}; color: {_COLOR_BG_BASE};
+                      font-family: {_FONT_BODY}; font-size: 15px; font-weight: 600;
+                      text-decoration: none; display: inline-block;
+                      padding: 14px 32px; border-radius: 8px;">
+              {cta_label}
+            </a>
+          </td>
+        </tr>
+      </table>
+
+      <div style="border-top: 1px solid {_COLOR_BG_ELEVATED}; margin: 0 0 20px;"></div>
+
+      <p style="font-family: {_FONT_BODY}; font-size: 12px; color: {_COLOR_TEXT_MUTED};
+                line-height: 1.6; margin: 0;">
+        Não recebeu o email de confirmação original? Acesse
+        <a href="{resend_url}" style="color: {_COLOR_BRAND};">{resend_url}</a>
+        para reenviar.
+      </p>
+    """
+
+    html = _base_layout(
+        title=email_title,
+        preview_text=preview,
+        body_html=body_html,
+    )
+
+    if days_until_deadline == 1:
+        text = (
+            "Último dia para confirmar seu email — Auraxis\n"
+            "=============================================\n\n"
+            "Sua conta foi criada há quase 14 dias. Se você não confirmar seu "
+            "email até amanhã, ela entrará em modo somente-leitura.\n\n"
+            f"Confirme agora: {resend_url}\n\n"
+            "— Equipe Auraxis\n"
+        )
+    else:
+        text = (
+            f"Faltam {days_until_deadline} dias para confirmar seu email — Auraxis\n"
+            "========================================================\n\n"
+            f"Você criou sua conta no Auraxis recentemente. Em "
+            f"{days_until_deadline} dias sua conta entrará em modo "
+            "somente-leitura se o email não for confirmado.\n\n"
+            f"Confirme agora: {resend_url}\n\n"
+            "— Equipe Auraxis\n"
+        )
+
+    return html, text
+
+
 __all__ = [
     "render_account_deletion_email",
     "render_analysis_ready_email",
     "render_confirmation_email",
     "render_due_soon_email",
+    "render_email_verification_reminder_email",
     "render_password_reset_email",
 ]
