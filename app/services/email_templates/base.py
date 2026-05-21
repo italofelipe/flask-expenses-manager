@@ -1,8 +1,10 @@
 """Auraxis transactional email template system.
 
 All emails are rendered from a shared base layout that enforces brand
-consistency: dark background, amber/gold brand colour, Playfair Display
-headings, Raleway body — matching the web application's design tokens.
+consistency with the v3 "Market Pulse" design system: navy background,
+cyan brand colour, Inter sans-serif throughout — mirrored from the
+auraxis-web design tokens (dark variant, since emails are always rendered
+against a dark canvas).
 
 Usage::
 
@@ -17,19 +19,22 @@ from __future__ import annotations
 # Brand tokens (mirrored from auraxis-web design system)
 # ---------------------------------------------------------------------------
 
-_COLOR_BG_BASE = "#0b0909"
-_COLOR_BG_SURFACE = "#272020"
-_COLOR_BG_ELEVATED = "#413939"
-_COLOR_BRAND = "#ffab1a"
-_COLOR_BRAND_HOVER = "#ffbe4d"
-_COLOR_BRAND_DARK = "#f59600"
-_COLOR_TEXT_PRIMARY = "#faf9f9"
-_COLOR_TEXT_SECONDARY = "#d1c7c7"
-_COLOR_TEXT_MUTED = "#9b8888"
-_COLOR_BORDER = "rgba(65, 57, 57, 0.8)"
+# v3 "Market Pulse" tokens — mirrors auraxis-web design system (dark variant).
+# Emails are always rendered against a dark navy background regardless of the
+# recipient's client preference, so we lock to the dark-mode palette here.
+_COLOR_BG_BASE = "#05070d"
+_COLOR_BG_SURFACE = "#121a2a"
+_COLOR_BG_ELEVATED = "#0e1523"
+_COLOR_BRAND = "#44d4ff"
+_COLOR_BRAND_HOVER = "#7eddff"
+_COLOR_BRAND_DARK = "#087FA7"
+_COLOR_TEXT_PRIMARY = "#f1f5ff"
+_COLOR_TEXT_SECONDARY = "#c5cee0"
+_COLOR_TEXT_MUTED = "#8b95b1"
+_COLOR_BORDER = "rgba(30, 41, 59, 0.8)"
 
-_FONT_HEADING = "'Playfair Display', 'Georgia', 'Times New Roman', serif"
-_FONT_BODY = "'Raleway', 'Segoe UI', 'Helvetica Neue', Arial, sans-serif"
+_FONT_HEADING = "'Inter', 'Segoe UI', 'Helvetica Neue', Arial, sans-serif"
+_FONT_BODY = "'Inter', 'Segoe UI', 'Helvetica Neue', Arial, sans-serif"
 
 _LOGO_URL = "https://app.auraxis.com.br/logo.png"
 _APP_URL = "https://app.auraxis.com.br"
@@ -59,7 +64,7 @@ def _base_layout(*, title: str, preview_text: str, body_html: str) -> str:
   </noscript>
   <![endif]-->
   <style>
-    @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@600;700&family=Raleway:wght@400;500;600&display=swap');
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
     body, table, td, a {{ -webkit-text-size-adjust: 100%; -ms-text-size-adjust: 100%; }}
     table, td {{ mso-table-lspace: 0pt; mso-table-rspace: 0pt; }}
     img {{ -ms-interpolation-mode: bicubic; border: 0; height: auto; line-height: 100%; outline: none; text-decoration: none; }}

@@ -69,6 +69,9 @@ def _confirmation_outbox() -> list[dict[str, str]]:
     )
 
 
+_DEFAULT_CONFIRMATION_URL = "https://app.auraxis.com.br/confirm-email"
+
+
 def _confirmation_frontend_url() -> str:
     return str(runtime_config("EMAIL_CONFIRMATION_FRONTEND_URL", "")).strip()
 
@@ -78,10 +81,10 @@ def _build_confirmation_url(token: str) -> str:
     if not base_url:
         runtime_logger().warning(
             "event=auth.email_confirmation_url_missing "
-            "EMAIL_CONFIRMATION_FRONTEND_URL is not configured — "
-            "confirmation link will be 'n/a'. Set this variable in your environment."
+            "EMAIL_CONFIRMATION_FRONTEND_URL not configured — falling back to "
+            "canonical default. Set this variable in your environment."
         )
-        return "n/a"
+        base_url = _DEFAULT_CONFIRMATION_URL
     separator = "&" if "?" in base_url else "?"
     return f"{base_url}{separator}token={token}"
 
