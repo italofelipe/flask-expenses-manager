@@ -124,10 +124,15 @@ class WalletEntryPayload(TypedDict):
 
 
 def to_user_profile_payload(profile: AuthenticatedUserProfile) -> UserProfilePayload:
+    """Build the legacy v2 flat user payload.
+
+    The v2 contract is **frozen**: it does not include the new
+    email-verification fields. Clients on v2 read verification status
+    from a separate header/endpoint; v3 surfaces it inside the canonical
+    ``email_verification`` block.
+    """
     payload = asdict(profile)
     payload.pop("entitlements_version", None)
-    # GraphQL UserType doesn't yet expose email_verification fields; surface them
-    # only via the REST canonical payload until the GraphQL parity PR lands.
     payload.pop("email_verified", None)
     payload.pop("email_verification_deadline_at", None)
     payload.pop("email_verification_required_now", None)

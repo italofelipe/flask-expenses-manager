@@ -27,6 +27,11 @@ class UserType(graphene.ObjectType):
     profile_quiz_score = graphene.Int()
     taxonomy_version = graphene.String()
     avatar_url = graphene.String()
+    # #1325 / #1331: 14-day email verification grace period
+    email_verified = graphene.Boolean()
+    email_verification_deadline_at = graphene.String()
+    email_verification_required_now = graphene.Boolean()
+    days_until_email_required = graphene.Int()
 
 
 class AuthPayloadType(graphene.ObjectType):

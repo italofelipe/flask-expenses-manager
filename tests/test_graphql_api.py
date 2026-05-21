@@ -126,6 +126,34 @@ def test_graphql_me_remains_user_context_only(client) -> None:
     assert "transactions" not in UserType._meta.fields
 
 
+def test_graphql_me_exposes_email_verification_fields(client) -> None:
+    token = _register_and_login_graphql(client)
+
+    response = _graphql(
+        client,
+        """
+        query Me {
+          me {
+            emailVerified
+            emailVerificationDeadlineAt
+            emailVerificationRequiredNow
+            daysUntilEmailRequired
+          }
+        }
+        """,
+        token=token,
+    )
+    assert response.status_code == 200
+    body = response.get_json()
+    assert "errors" not in body
+    payload = body["data"]["me"]
+    # Fresh user — not yet verified, within grace period
+    assert payload["emailVerified"] is False
+    assert payload["emailVerificationDeadlineAt"] is not None
+    assert payload["emailVerificationRequiredNow"] is False
+    assert payload["daysUntilEmailRequired"] is not None
+
+
 def test_graphql_forgot_password_is_neutral(client) -> None:
     mutation = """
     mutation ForgotPassword($email: String!) {
