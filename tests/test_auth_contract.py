@@ -303,6 +303,7 @@ def test_auth_password_reset_v2_contract_revokes_existing_sessions(client) -> No
 
 
 def test_auth_email_confirm_v2_contract(client) -> None:
+    """Magic-link login (#1338): confirm returns access token + canonical user."""
     suffix = uuid.uuid4().hex[:8]
     payload = _register_payload(suffix)
     register = client.post("/auth/register", json=payload)
@@ -322,7 +323,50 @@ def test_auth_email_confirm_v2_contract(client) -> None:
     body = response.get_json()
     assert body["success"] is True
     assert body["message"] == EMAIL_CONFIRMATION_SUCCESS_MESSAGE
-    assert body["data"] == {}
+    # Magic-link login: response carries token + canonical user payload.
+    data = body["data"]
+    assert isinstance(data.get("token"), str) and len(data["token"]) > 0
+    user_payload = data["user"]
+    assert set(user_payload.keys()) >= {
+        "identity",
+        "profile",
+        "financial_profile",
+        "investor_profile",
+        "product_context",
+        "email_verification",
+    }
+    assert user_payload["identity"]["email"] == payload["email"]
+    # Backend just marked verified — the canonical block must reflect that.
+    assert user_payload["email_verification"]["verified"] is True
+    # Refresh cookie must be set so the client can refresh silently afterwards.
+    set_cookie = response.headers.get("Set-Cookie", "")
+    assert "auraxis_refresh" in set_cookie
+
+
+def test_auth_email_confirm_v2_contract_rejects_reused_token(client) -> None:
+    """Second click on the same magic-link must not mint a new session."""
+    suffix = uuid.uuid4().hex[:8]
+    payload = _register_payload(suffix)
+    client.post("/auth/register", json=payload)
+    outbox = client.application.extensions.get("email_confirmation_outbox", [])
+    token = outbox[0]["token"]
+
+    first = client.post(
+        "/auth/email/confirm",
+        headers=_v2_headers(),
+        json={"token": token},
+    )
+    assert first.status_code == 200
+
+    second = client.post(
+        "/auth/email/confirm",
+        headers=_v2_headers(),
+        json={"token": token},
+    )
+    assert second.status_code == 400
+    body = second.get_json()
+    assert body["success"] is False
+    assert body["error"]["code"] == "VALIDATION_ERROR"
 
 
 def test_auth_email_confirm_v2_contract_with_invalid_token(client) -> None:
