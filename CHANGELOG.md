@@ -1,5 +1,17 @@
 # Changelog
 
+## [1.46.0](https://github.com/italofelipe/auraxis-api/compare/v1.45.0...v1.46.0) (2026-05-21)
+
+
+### Features
+
+* **auth:** /auth/email/confirm emit JWT + refresh cookie (magic-link login) ([#1339](https://github.com/italofelipe/auraxis-api/issues/1339)) ([1c48342](https://github.com/italofelipe/auraxis-api/commit/1c4834203d5542a73886fd2331b208924f67e0e0))
+
+
+### Bug Fixes
+
+* **config:** register EMAIL_CONFIRMATION_FRONTEND_URL in Config class ([#1337](https://github.com/italofelipe/auraxis-api/issues/1337)) ([1ab4a86](https://github.com/italofelipe/auraxis-api/commit/1ab4a86541cf93ba05a2e99e9574f8f258f51170))
+
 ## [1.45.0](https://github.com/italofelipe/auraxis-api/compare/v1.44.1...v1.45.0) (2026-05-21)
 
 
