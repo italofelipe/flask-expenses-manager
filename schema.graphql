@@ -773,6 +773,10 @@ type UserType {
   profileQuizScore: Int
   taxonomyVersion: String
   avatarUrl: String
+  emailVerified: Boolean
+  emailVerificationDeadlineAt: String
+  emailVerificationRequiredNow: Boolean
+  daysUntilEmailRequired: Int
 }
 
 type Mutation {
