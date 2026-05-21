@@ -15,8 +15,8 @@ from app.services.email_templates import (
     render_password_reset_email,
 )
 
-CONFIRM_URL = "https://app.auraxis.com.br/auth/confirm-email?token=abc123"
-RESET_URL = "https://app.auraxis.com.br/auth/reset-password?token=xyz456"
+CONFIRM_URL = "https://app.auraxis.com.br/confirm-email?token=abc123"
+RESET_URL = "https://app.auraxis.com.br/reset-password?token=xyz456"
 
 
 class TestRenderConfirmationEmail:
@@ -35,20 +35,17 @@ class TestRenderConfirmationEmail:
 
     def test_html_contains_brand_colour(self) -> None:
         html, _ = render_confirmation_email(confirmation_url=CONFIRM_URL)
-        # Primary brand amber
-        assert "#ffab1a" in html
+        # Primary brand cyan (v3 Market Pulse)
+        assert "#44d4ff" in html
 
     def test_html_contains_brand_name(self) -> None:
         html, _ = render_confirmation_email(confirmation_url=CONFIRM_URL)
         assert "Auraxis" in html
 
-    def test_html_contains_heading_font(self) -> None:
+    def test_html_contains_inter_font(self) -> None:
+        # v3 Market Pulse uses Inter as a single sans-serif for headings and body.
         html, _ = render_confirmation_email(confirmation_url=CONFIRM_URL)
-        assert "Playfair Display" in html
-
-    def test_html_contains_body_font(self) -> None:
-        html, _ = render_confirmation_email(confirmation_url=CONFIRM_URL)
-        assert "Raleway" in html
+        assert "Inter" in html
 
     def test_html_contains_cta_button(self) -> None:
         html, _ = render_confirmation_email(confirmation_url=CONFIRM_URL)
@@ -99,7 +96,7 @@ class TestRenderPasswordResetEmail:
 
     def test_html_contains_brand_colour(self) -> None:
         html, _ = render_password_reset_email(reset_url=RESET_URL)
-        assert "#ffab1a" in html
+        assert "#44d4ff" in html
 
 
 class TestRenderDueSoonEmail:
@@ -120,7 +117,7 @@ class TestRenderDueSoonEmail:
         html, _ = render_due_soon_email(
             title="Aluguel", amount_formatted="1500.00", days_before_due=7
         )
-        assert "#ffab1a" in html
+        assert "#44d4ff" in html
 
     def test_html_contains_brand_name(self) -> None:
         html, _ = render_due_soon_email(
