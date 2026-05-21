@@ -6,6 +6,7 @@ import secrets
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from typing import cast
+from uuid import UUID
 
 from app.extensions.database import db
 from app.http.runtime import (
@@ -31,6 +32,10 @@ EMAIL_CONFIRMATION_INVALID_TOKEN_MESSAGE = (
 class EmailConfirmationResult:
     ok: bool
     message: str
+    # Populated when ok=True so the REST controller can mint a JWT and open
+    # a session for the user (magic-link login pattern — #1338).
+    user_id: UUID | None = None
+    user_email: str | None = None
 
 
 def _utcnow() -> datetime:
@@ -179,4 +184,9 @@ def confirm_email(*, token: str) -> EmailConfirmationResult:
         "event=auth.email_confirmation_completed user_id=%s",
         str(user.id),
     )
-    return EmailConfirmationResult(ok=True, message=EMAIL_CONFIRMATION_SUCCESS_MESSAGE)
+    return EmailConfirmationResult(
+        ok=True,
+        message=EMAIL_CONFIRMATION_SUCCESS_MESSAGE,
+        user_id=user.id,
+        user_email=str(user.email),
+    )
