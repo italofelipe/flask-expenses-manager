@@ -11,6 +11,7 @@ from app.application.services.investment_application_service import (
     InvestmentApplicationError,
 )
 from app.auth import current_user_id
+from app.decorators import require_email_verified
 from app.utils.typed_decorators import typed_doc as doc
 from app.utils.typed_decorators import typed_jwt_required as jwt_required
 from app.utils.typed_decorators import typed_use_kwargs as use_kwargs
@@ -45,6 +46,7 @@ from .dependencies import get_wallet_dependencies
     },
 )
 @jwt_required()
+@require_email_verified
 def add_investment_operation(investment_id: UUID) -> tuple[dict[str, Any], int]:
     user_id: UUID = current_user_id()
     payload: dict[str, Any] = request.get_json() or {}
@@ -163,6 +165,7 @@ def list_investment_operations(
     },
 )
 @jwt_required()
+@require_email_verified
 def update_investment_operation(
     investment_id: UUID, operation_id: UUID
 ) -> tuple[dict[str, Any], int]:
@@ -212,6 +215,7 @@ def update_investment_operation(
     },
 )
 @jwt_required()
+@require_email_verified
 def delete_investment_operation(
     investment_id: UUID, operation_id: UUID
 ) -> tuple[dict[str, Any], int]:
