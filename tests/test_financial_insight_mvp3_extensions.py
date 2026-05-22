@@ -166,13 +166,14 @@ class TestExtendedComparisons:
 
 
 class TestInsightDimensions:
-    def test_dimension_enum_has_five_canonical_values(self):
+    def test_dimension_enum_has_canonical_values(self):
         assert set(INSIGHT_DIMENSIONS) == {
             "general",
             "transactions",
             "credit_cards",
             "goals",
             "budgets",
+            "wallet",
         }
 
     def test_llm_response_schema_requires_dimension_on_items(self):

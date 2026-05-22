@@ -314,7 +314,9 @@ class TestWalletSnapshotSection:
         assert snapshot["wallet"]["benchmark"]["cdi_monthly_pct"] == "0.92"
         assert snapshot["wallet"]["benchmark"]["ipca_monthly_pct"] == "0.45"
 
-    def test_daily_snapshot_does_not_include_wallet(self, app, client) -> None:
+    def test_daily_snapshot_includes_wallet_for_global_insight(
+        self, app, client
+    ) -> None:
         _, user_id = _register(client)
         _add_wallet(
             app,
@@ -323,10 +325,17 @@ class TestWalletSnapshotSection:
             asset_class="cdb",
             value="1000.00",
         )
-        with app.app_context():
-            snapshot = FinancialInsightContextBuilder().build_daily(
-                user_id=UUID(user_id),
-                anchor_date=date(2026, 5, 17),
-            )
-        # Wallet is intentionally weekly+monthly only.
-        assert snapshot.get("wallet", {}).get("items", []) == []
+        with patch(
+            "app.services.financial_insight_context_builder."
+            "get_default_market_rates_provider"
+        ) as get_provider:
+            stub = StubMarketRatesProvider(cdi=Decimal("0.92"), ipca=Decimal("0.45"))
+            get_provider.return_value = stub
+            with app.app_context():
+                snapshot = FinancialInsightContextBuilder().build_daily(
+                    user_id=UUID(user_id),
+                    anchor_date=date(2026, 5, 17),
+                )
+        assert snapshot["wallet"]["items"][0]["name"] == "CDB"
+        assert snapshot["wallet"]["total_value"] == "1000.00"
+        assert snapshot["data_quality"]["domain_presence"]["wallet"] is True

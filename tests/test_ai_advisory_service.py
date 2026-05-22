@@ -85,17 +85,51 @@ def _get_current_user_id(app, token: str) -> uuid.UUID:
 def _financial_llm_response(
     *,
     summary: str = "Resumo financeiro.",
-    item_type: str = "saude_financeira",
-    evidence: str = "current_period.paid.balance",
 ) -> LLMResponse:
-    return LLMResponse(
-        content=(
-            f'{{"summary":"{summary}",'
-            f'"items":[{{"type":"{item_type}",'
-            '"title":"Diagnóstico financeiro",'
-            '"message":"Os dados do período foram analisados.",'
-            f'"evidence":["{evidence}"]}}]}}'
+    items = [
+        (
+            "general",
+            "current_period.paid.balance",
+            "Panorama geral",
         ),
+        (
+            "transactions",
+            "transactions.included_count",
+            "Movimentações",
+        ),
+        (
+            "credit_cards",
+            "data_quality.domain_presence.credit_cards",
+            "Cartões",
+        ),
+        (
+            "goals",
+            "data_quality.domain_presence.goals",
+            "Metas",
+        ),
+        (
+            "budgets",
+            "data_quality.domain_presence.budgets",
+            "Orçamentos",
+        ),
+        (
+            "wallet",
+            "data_quality.domain_presence.wallet",
+            "Carteira",
+        ),
+    ]
+    payload_items = ",".join(
+        (
+            '{"type":"saude_financeira",'
+            f'"dimension":"{dimension}",'
+            f'"title":"{title}",'
+            '"message":"Os dados do domínio foram analisados.",'
+            f'"evidence":["{evidence}"]}}'
+        )
+        for dimension, evidence, title in items
+    )
+    return LLMResponse(
+        content=(f'{{"summary":"{summary}","items":[{payload_items}]}}'),
         prompt_tokens=100,
         completion_tokens=40,
         total_tokens=140,
@@ -302,19 +336,8 @@ class TestAIAdvisoryServiceFinancialInsights:
 
             user_id = uuid.uuid4()
             provider = MagicMock()
-            provider.generate_with_usage.return_value = LLMResponse(
-                content=(
-                    '{"summary":"Resumo do dia.",'
-                    '"items":[{"type":"saude_financeira",'
-                    '"title":"Saldo positivo",'
-                    '"message":"Você fechou o dia com saldo positivo.",'
-                    '"evidence":["current_period.paid.balance"]}]}'
-                ),
-                prompt_tokens=100,
-                completion_tokens=40,
-                total_tokens=140,
-                model="gpt-4o-mini",
-                latency_ms=120,
+            provider.generate_with_usage.return_value = _financial_llm_response(
+                summary="Resumo do dia."
             )
 
             service = AIAdvisoryService(user_id=user_id, llm_provider=provider)
@@ -328,14 +351,13 @@ class TestAIAdvisoryServiceFinancialInsights:
             assert result["period_start"] == "2026-05-17"
             assert result["period_end"] == "2026-05-17"
             assert result["summary"] == "Resumo do dia."
-            assert result["items"] == [
-                {
-                    "type": "saude_financeira",
-                    "dimension": "general",
-                    "title": "Saldo positivo",
-                    "message": "Você fechou o dia com saldo positivo.",
-                    "evidence": ["current_period.paid.balance"],
-                }
+            assert [item["dimension"] for item in result["items"]] == [
+                "general",
+                "transactions",
+                "credit_cards",
+                "goals",
+                "budgets",
+                "wallet",
             ]
             assert result["context_version"] == "financial_insight_snapshot.v1"
             assert result["cached"] is False
@@ -362,6 +384,46 @@ class TestAIAdvisoryServiceFinancialInsights:
             )
             assert audit.model == "gpt-4o-mini"
             assert audit.total_tokens == 140
+
+    def test_financial_insights_reject_missing_required_dimensions(
+        self,
+        app,
+    ) -> None:
+        with app.app_context():
+            from app.extensions.database import db
+            from app.models.ai_insight import AIInsight
+            from app.services.ai_advisory_service import AIAdvisoryService
+
+            user_id = uuid.uuid4()
+            provider = MagicMock()
+            provider.generate_with_usage.return_value = LLMResponse(
+                content=(
+                    '{"summary":"Resumo incompleto.",'
+                    '"items":[{"type":"saude_financeira",'
+                    '"dimension":"general",'
+                    '"title":"Só geral",'
+                    '"message":"Apenas o panorama geral foi retornado.",'
+                    '"evidence":["current_period.paid.balance"]}]}'
+                ),
+                prompt_tokens=100,
+                completion_tokens=40,
+                total_tokens=140,
+                model="gpt-4o-mini",
+                latency_ms=120,
+            )
+
+            service = AIAdvisoryService(user_id=user_id, llm_provider=provider)
+            with pytest.raises(
+                LLMProviderError,
+                match="Missing financial insight dimensions",
+            ):
+                service.generate_financial_insights(
+                    period_type="daily",
+                    anchor_date=date(2026, 5, 17),
+                )
+
+            saved = db.session.query(AIInsight).filter_by(user_id=user_id).first()
+            assert saved is None
 
     def test_financial_insights_prompt_uses_structured_deltas_not_previous_text(
         self,
