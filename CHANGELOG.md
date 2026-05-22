@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.47.0](https://github.com/italofelipe/auraxis-api/compare/v1.46.1...v1.47.0) (2026-05-22)
+
+
+### Features
+
+* **ai:** add monthly report workflow ([#1351](https://github.com/italofelipe/auraxis-api/issues/1351)) ([c79bd2e](https://github.com/italofelipe/auraxis-api/commit/c79bd2e2ab985c6deef8b20bd5459b78ec60025d))
+* **ai:** expand daily insight snapshots by domain ([#1349](https://github.com/italofelipe/auraxis-api/issues/1349)) ([cc929b4](https://github.com/italofelipe/auraxis-api/commit/cc929b4c8385028f15d73dc0ab88dde9c78fabec))
+
 ## [1.46.1](https://github.com/italofelipe/auraxis-api/compare/v1.46.0...v1.46.1) (2026-05-22)
 
 
