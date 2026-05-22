@@ -1,5 +1,14 @@
 # Changelog
 
+## [1.48.0](https://github.com/italofelipe/auraxis-api/compare/v1.47.0...v1.48.0) (2026-05-22)
+
+
+### Features
+
+* **agent:** telemetry capture + artifact upload in agent-implement workflow (R2/3.3a) ([#1355](https://github.com/italofelipe/auraxis-api/issues/1355)) ([503f40b](https://github.com/italofelipe/auraxis-api/commit/503f40b081231cc4ccf592a591de32401430c80b)), closes [#1354](https://github.com/italofelipe/auraxis-api/issues/1354)
+* **agent:** telemetry capture + artifact upload in qa and watchdog workflows (R2/3.3b) ([#1356](https://github.com/italofelipe/auraxis-api/issues/1356)) ([210c656](https://github.com/italofelipe/auraxis-api/commit/210c6564c31bf9b49039181db5222db56a98eaa6))
+* **sentry:** env-aware traces_sample_rate auto-default + dev setup guidance (R2/3.1c) ([#1353](https://github.com/italofelipe/auraxis-api/issues/1353)) ([23060b2](https://github.com/italofelipe/auraxis-api/commit/23060b2a2e9f0ea1195dfa31d2c5dfe71bbd2c47)), closes [#1352](https://github.com/italofelipe/auraxis-api/issues/1352)
+
 ## [1.47.0](https://github.com/italofelipe/auraxis-api/compare/v1.46.1...v1.47.0) (2026-05-22)
 
 
