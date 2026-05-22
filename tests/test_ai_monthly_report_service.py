@@ -116,6 +116,18 @@ def _create_insight(
 
 
 def _monthly_llm_response() -> LLMResponse:
+    dimensions = [
+        ("general", "Panorama mensal", "monthly_report_context.daily_insights"),
+        (
+            "transactions",
+            "Movimentação mensal",
+            "data_quality.domain_presence.transactions",
+        ),
+        ("goals", "Metas do mês", "data_quality.domain_presence.goals"),
+        ("budgets", "Orçamentos do mês", "data_quality.domain_presence.budgets"),
+        ("credit_cards", "Cartões do mês", "data_quality.domain_presence.credit_cards"),
+        ("wallet", "Carteira do mês", "data_quality.domain_presence.wallet"),
+    ]
     return LLMResponse(
         content=json.dumps(
             {
@@ -123,13 +135,14 @@ def _monthly_llm_response() -> LLMResponse:
                 "items": [
                     {
                         "type": "saude_financeira",
-                        "dimension": "general",
-                        "title": "Panorama mensal",
+                        "dimension": dimension,
+                        "title": title,
                         "message": (
                             "O mês foi consolidado com base nos insights diários."
                         ),
-                        "evidence": ["monthly_report_context.daily_insights"],
+                        "evidence": [evidence],
                     }
+                    for dimension, title, evidence in dimensions
                 ],
             },
             ensure_ascii=False,
