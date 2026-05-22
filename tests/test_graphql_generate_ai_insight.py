@@ -20,10 +20,12 @@ def _register_and_login(client, *, prefix: str) -> str:
     return login.get_json()["token"]
 
 
-def _gql(client, query, token=None, variables=None):
+def _gql(client, query, token=None, variables=None, extra_headers=None):
     headers = {"Content-Type": "application/json", "X-API-Contract": "v2"}
     if token:
         headers["Authorization"] = f"Bearer {token}"
+    if extra_headers:
+        headers.update(extra_headers)
     return client.post(
         "/graphql",
         json={"query": query, "variables": variables or {}},
@@ -134,3 +136,53 @@ class TestGenerateAiInsightMutation:
         assert len(data["items"]) == 1
         assert data["items"][0]["dimension"] == "credit_cards"
         assert data["items"][0]["evidence"] == ["credit_cards[0].utilization_pct"]
+
+    def test_passes_timezone_header_to_generation_service(self, app, client):
+        token = _register_and_login(client, prefix="gql-gen-tz")
+        from flask_jwt_extended import decode_token
+
+        from app.services.entitlement_service import grant_entitlement
+
+        with app.app_context():
+            user_id = UUID(decode_token(token)["sub"])
+            grant_entitlement(
+                user_id=user_id,
+                feature_key="advanced_simulations",
+                source="trial",
+            )
+            from app.extensions.database import db
+
+            db.session.commit()
+
+        fake_result = {
+            "period_type": "daily",
+            "period_label": "2026-05-22",
+            "period_start": "2026-05-22",
+            "period_end": "2026-05-22",
+            "summary": "Resumo com timezone.",
+            "items": [],
+            "context_version": "financial_insight_snapshot.v1",
+            "cached": False,
+            "model": "gpt-4o-mini",
+            "tokens_used": 50,
+            "cost_usd": 0.0001,
+        }
+        with patch("app.graphql.mutations.ai_insight.AIAdvisoryService") as MockSvc:
+            instance = MockSvc.return_value
+            instance.generate_financial_insights.return_value = fake_result
+            response = _gql(
+                client,
+                _GENERATE_MUTATION,
+                token,
+                variables={"periodType": "daily", "anchorDate": None},
+                extra_headers={"X-Auraxis-Timezone": "Pacific/Kiritimati"},
+            )
+
+        body = response.get_json()
+        assert "errors" not in body or not body["errors"], body
+        instance.generate_financial_insights.assert_called_once_with(
+            period_type="daily",
+            anchor_date=None,
+            timezone_name="Pacific/Kiritimati",
+            timezone_fallback=False,
+        )

@@ -466,6 +466,8 @@ class FinancialInsightContextBuilder:
         user_id: UUID,
         anchor_date: date,
         previous_generated_at: datetime | None = None,
+        timezone_name: str = _TIMEZONE,
+        timezone_fallback: bool = False,
     ) -> dict[str, Any]:
         """Return a daily snapshot with extended temporal comparisons."""
         current = self._period_snapshot(
@@ -476,6 +478,8 @@ class FinancialInsightContextBuilder:
             period_type="daily",
             include_credit_cards=True,
             previous_generated_at=previous_generated_at,
+            timezone_name=timezone_name,
+            timezone_fallback=timezone_fallback,
         )
         yesterday = anchor_date - timedelta(days=1)
         previous_week = anchor_date - timedelta(days=7)
@@ -541,6 +545,8 @@ class FinancialInsightContextBuilder:
         user_id: UUID,
         anchor_date: date,
         previous_generated_at: datetime | None = None,
+        timezone_name: str = _TIMEZONE,
+        timezone_fallback: bool = False,
     ) -> dict[str, Any]:
         """Return a weekly snapshot for the ISO week containing ``anchor_date``."""
         start, end = _week_bounds(anchor_date)
@@ -555,6 +561,8 @@ class FinancialInsightContextBuilder:
             include_credit_cards=True,
             include_wallet=True,
             previous_generated_at=previous_generated_at,
+            timezone_name=timezone_name,
+            timezone_fallback=timezone_fallback,
         )
         previous_start = start - timedelta(days=7)
         previous_end = start - timedelta(days=1)
@@ -578,6 +586,8 @@ class FinancialInsightContextBuilder:
         user_id: UUID,
         anchor_date: date,
         previous_generated_at: datetime | None = None,
+        timezone_name: str = _TIMEZONE,
+        timezone_fallback: bool = False,
     ) -> dict[str, Any]:
         """Return a monthly snapshot for the calendar month containing anchor."""
         start, end = _month_bounds(anchor_date)
@@ -593,6 +603,8 @@ class FinancialInsightContextBuilder:
             include_credit_cards=True,
             include_wallet=True,
             previous_generated_at=previous_generated_at,
+            timezone_name=timezone_name,
+            timezone_fallback=timezone_fallback,
         )
 
     def _comparison_snapshot(
@@ -643,6 +655,8 @@ class FinancialInsightContextBuilder:
         include_wallet: bool = False,
         market_rates: MarketRatesProvider | None = None,
         previous_generated_at: datetime | None = None,
+        timezone_name: str = _TIMEZONE,
+        timezone_fallback: bool = False,
     ) -> dict[str, Any]:
         transactions = self._fetch_transactions(user_id=user_id, start=start, end=end)
         non_cancelled = [
@@ -662,7 +676,7 @@ class FinancialInsightContextBuilder:
             "schema_version": _SNAPSHOT_VERSION,
             "period_type": period_type,
             "currency": _CURRENCY,
-            "timezone": _TIMEZONE,
+            "timezone": timezone_name,
             "anchor_date": end.isoformat(),
             "period": _date_period(start, end, label),
             "current_period": current_period,
@@ -690,6 +704,8 @@ class FinancialInsightContextBuilder:
                 "missing_comparison_periods": [],
             },
         }
+        if timezone_fallback:
+            snapshot["data_quality"]["timezone_fallback"] = True
         snapshot["data_quality"].update(goal_data_quality)
         if include_wallet:
             wallet_payload, missing_rates = self._wallet_payload(

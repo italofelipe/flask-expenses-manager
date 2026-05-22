@@ -44,6 +44,7 @@ from app.services.analysis_ready_notification_service import (
 )
 from app.services.entitlement_service import has_entitlement
 from app.services.llm_provider import LLMProviderError
+from app.utils import timezone_utils
 from app.utils.typed_decorators import typed_doc as doc
 from app.utils.typed_decorators import typed_jwt_required as jwt_required
 
@@ -199,6 +200,19 @@ def _parse_ai_insight_generate_body(
     return None, period_type, anchor_date, preview_run_id
 
 
+def _raw_ai_insight_request_timezone(body: dict[str, Any]) -> object:
+    raw_timezone = request.headers.get(timezone_utils.USER_TIMEZONE_HEADER)
+    if raw_timezone in (None, ""):
+        raw_timezone = body.get("timezone")
+    return raw_timezone
+
+
+def _resolve_ai_insight_request_timezone(
+    body: dict[str, Any],
+) -> timezone_utils.UserTimezoneResolution:
+    return timezone_utils.resolve_user_timezone(_raw_ai_insight_request_timezone(body))
+
+
 class AIInsightGenerateResource(MethodResource):
     """POST /ai/insights/generate — period-aware AI financial insights."""
 
@@ -210,12 +224,25 @@ class AIInsightGenerateResource(MethodResource):
         ),
         tags=["AI Advisory"],
         security=[{"BearerAuth": []}],
+        params={
+            timezone_utils.USER_TIMEZONE_HEADER: {
+                "in": "header",
+                "description": (
+                    "Timezone IANA do usuário. Usado para calcular anchor_date "
+                    "quando a data âncora é omitida."
+                ),
+                "type": "string",
+                "required": False,
+                "example": "America/Sao_Paulo",
+            }
+        },
         requestBody=json_request_body(
             schema=AIInsightGenerateRequestSchema,
             description="Período que deve ser consolidado antes da chamada à IA.",
             example={
                 "period_type": "daily",
-                "anchor_date": "2026-05-17",
+                "anchor_date": None,
+                "timezone": "America/Sao_Paulo",
                 "preview_run_id": "550e8400-e29b-41d4-a716-446655440000",
             },
         ),
@@ -287,12 +314,25 @@ class AIInsightGenerateResource(MethodResource):
             return parse_error
         assert period_type is not None
 
+        timezone_resolution = _resolve_ai_insight_request_timezone(body)
+        anchor_was_omitted = anchor_date is None
+        if anchor_was_omitted:
+            anchor_date = timezone_utils.local_today(timezone_resolution)
+
         service = AIAdvisoryService(user_id=user_id)
+        timezone_kwargs: dict[str, Any] = {}
+        raw_timezone = _raw_ai_insight_request_timezone(body)
+        if raw_timezone not in (None, "") or anchor_was_omitted:
+            timezone_kwargs = {
+                "timezone_name": timezone_resolution.name,
+                "timezone_fallback": timezone_resolution.fallback_used,
+            }
         try:
             result = service.generate_financial_insights(
                 period_type=period_type,
                 anchor_date=anchor_date,
                 preview_run_id=preview_run_id,
+                **timezone_kwargs,
             )
         except AIConsentRequiredError as exc:
             return _ai_consent_required_response(exc)

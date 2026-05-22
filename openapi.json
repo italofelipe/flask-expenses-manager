@@ -662,6 +662,12 @@
             "format": "uuid",
             "nullable": true,
             "type": "string"
+          },
+          "timezone": {
+            "description": "Timezone IANA do usuário usado quando anchor_date é omitido. Também pode ser enviado no header X-Auraxis-Timezone.",
+            "example": "America/Sao_Paulo",
+            "nullable": true,
+            "type": "string"
           }
         },
         "required": [
@@ -1372,15 +1378,25 @@
     "/ai/insights/generate": {
       "post": {
         "description": "Gera insights financeiros com contexto daily, weekly ou monthly, incluindo evidências estruturadas extraídas do snapshot financeiro.",
-        "parameters": [],
+        "parameters": [
+          {
+            "description": "Timezone IANA do usuário. Usado para calcular anchor_date quando a data âncora é omitida.",
+            "example": "America/Sao_Paulo",
+            "in": "header",
+            "name": "X-Auraxis-Timezone",
+            "required": false,
+            "type": "string"
+          }
+        ],
         "requestBody": {
           "content": {
             "application/json": {
               "description": "Período que deve ser consolidado antes da chamada à IA.",
               "example": {
-                "anchor_date": "2026-05-17",
+                "anchor_date": null,
                 "period_type": "daily",
-                "preview_run_id": "550e8400-e29b-41d4-a716-446655440000"
+                "preview_run_id": "550e8400-e29b-41d4-a716-446655440000",
+                "timezone": "America/Sao_Paulo"
               },
               "schema": {
                 "$ref": "#/components/schemas/app_schemas_ai_insight_schema_AIInsightGenerateRequestSchema"

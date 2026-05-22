@@ -18,7 +18,7 @@ Coverage areas:
 from __future__ import annotations
 
 import uuid
-from datetime import date, datetime
+from datetime import date, datetime, timezone
 from decimal import Decimal
 from unittest.mock import MagicMock, patch
 
@@ -1018,6 +1018,156 @@ class TestAIInsightGenerateEndpoint:
             "period_type": "daily",
             "anchor_date": date(2026, 5, 17),
             "preview_run_id": None,
+        }
+
+    def test_post_generation_uses_user_timezone_when_anchor_is_omitted(
+        self,
+        app,
+        client,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        token = _register_and_login(client, prefix="ai-generate-tz")
+        user_id = _get_current_user_id(app, token)
+        _grant_entitlement(app, user_id, "advanced_simulations")
+
+        generated = {
+            "period_type": "daily",
+            "period_label": "2026-05-21",
+            "period_start": "2026-05-21",
+            "period_end": "2026-05-21",
+            "summary": "Resumo do dia local.",
+            "items": [],
+            "context_version": "financial_insight_snapshot.v1",
+            "cached": False,
+            "model": "stub",
+            "tokens_used": 123,
+            "cost_usd": 0.00001,
+        }
+        monkeypatch.setattr(
+            "app.controllers.ai.resources.timezone_utils.utc_now",
+            lambda: datetime(2026, 5, 22, 2, 30, tzinfo=timezone.utc),
+        )
+
+        with patch(
+            "app.services.ai_advisory_service.AIAdvisoryService.generate_financial_insights",
+            return_value=generated,
+        ) as mocked_generate:
+            resp = client.post(
+                "/ai/insights/generate",
+                json={"period_type": "daily"},
+                headers={
+                    **_auth(token),
+                    "X-Auraxis-Timezone": "America/Sao_Paulo",
+                },
+            )
+
+        assert resp.status_code == 200
+        mocked_generate.assert_called_once()
+        assert mocked_generate.call_args.kwargs == {
+            "period_type": "daily",
+            "anchor_date": date(2026, 5, 21),
+            "preview_run_id": None,
+            "timezone_name": "America/Sao_Paulo",
+            "timezone_fallback": False,
+        }
+
+    def test_post_generation_falls_back_when_timezone_is_invalid(
+        self,
+        app,
+        client,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        token = _register_and_login(client, prefix="ai-generate-bad-tz")
+        user_id = _get_current_user_id(app, token)
+        _grant_entitlement(app, user_id, "advanced_simulations")
+
+        generated = {
+            "period_type": "daily",
+            "period_label": "2026-05-21",
+            "period_start": "2026-05-21",
+            "period_end": "2026-05-21",
+            "summary": "Resumo com fallback.",
+            "items": [],
+            "context_version": "financial_insight_snapshot.v1",
+            "cached": False,
+            "model": "stub",
+            "tokens_used": 123,
+            "cost_usd": 0.00001,
+        }
+        monkeypatch.setattr(
+            "app.controllers.ai.resources.timezone_utils.utc_now",
+            lambda: datetime(2026, 5, 22, 2, 30, tzinfo=timezone.utc),
+        )
+
+        with patch(
+            "app.services.ai_advisory_service.AIAdvisoryService.generate_financial_insights",
+            return_value=generated,
+        ) as mocked_generate:
+            resp = client.post(
+                "/ai/insights/generate",
+                json={"period_type": "daily"},
+                headers={
+                    **_auth(token),
+                    "X-Auraxis-Timezone": "Mars/Olympus_Mons",
+                },
+            )
+
+        assert resp.status_code == 200
+        mocked_generate.assert_called_once()
+        assert mocked_generate.call_args.kwargs == {
+            "period_type": "daily",
+            "anchor_date": date(2026, 5, 21),
+            "preview_run_id": None,
+            "timezone_name": "America/Sao_Paulo",
+            "timezone_fallback": True,
+        }
+
+    def test_post_generation_accepts_timezone_from_payload_when_header_is_absent(
+        self,
+        app,
+        client,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        token = _register_and_login(client, prefix="ai-generate-body-tz")
+        user_id = _get_current_user_id(app, token)
+        _grant_entitlement(app, user_id, "advanced_simulations")
+
+        generated = {
+            "period_type": "daily",
+            "period_label": "2026-05-21",
+            "period_start": "2026-05-21",
+            "period_end": "2026-05-21",
+            "summary": "Resumo com timezone no payload.",
+            "items": [],
+            "context_version": "financial_insight_snapshot.v1",
+            "cached": False,
+            "model": "stub",
+            "tokens_used": 123,
+            "cost_usd": 0.00001,
+        }
+        monkeypatch.setattr(
+            "app.controllers.ai.resources.timezone_utils.utc_now",
+            lambda: datetime(2026, 5, 21, 23, 30, tzinfo=timezone.utc),
+        )
+
+        with patch(
+            "app.services.ai_advisory_service.AIAdvisoryService.generate_financial_insights",
+            return_value=generated,
+        ) as mocked_generate:
+            resp = client.post(
+                "/ai/insights/generate",
+                json={"period_type": "daily", "timezone": "Pacific/Kiritimati"},
+                headers=_auth(token),
+            )
+
+        assert resp.status_code == 200
+        mocked_generate.assert_called_once()
+        assert mocked_generate.call_args.kwargs == {
+            "period_type": "daily",
+            "anchor_date": date(2026, 5, 22),
+            "preview_run_id": None,
+            "timezone_name": "Pacific/Kiritimati",
+            "timezone_fallback": False,
         }
 
     def test_post_generation_accepts_preview_run_id(self, app, client) -> None:
