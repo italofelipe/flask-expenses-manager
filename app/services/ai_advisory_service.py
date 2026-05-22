@@ -53,6 +53,7 @@ from app.services.goal_projection_service import GoalProjectionService
 from app.services.insight_evidence_validator import filter_valid_items
 from app.services.llm_provider import LLMProvider, LLMProviderError, get_llm_provider
 from app.services.weekly_summary import compute_weekly_summary
+from app.utils import timezone_utils
 from app.utils.datetime_utils import utc_now_naive
 
 log = logging.getLogger(__name__)
@@ -826,6 +827,8 @@ def _build_period_snapshot(
     user_id: UUID,
     anchor: date,
     previous_generated_at: datetime | None = None,
+    timezone_name: str = timezone_utils.DEFAULT_USER_TIMEZONE,
+    timezone_fallback: bool = False,
 ) -> dict[str, Any]:
     """Dispatch to the period-specific snapshot builder."""
     builder = FinancialInsightContextBuilder()
@@ -834,18 +837,24 @@ def _build_period_snapshot(
             user_id=user_id,
             anchor_date=anchor,
             previous_generated_at=previous_generated_at,
+            timezone_name=timezone_name,
+            timezone_fallback=timezone_fallback,
         )
     if insight_type == InsightType.weekly:
         return builder.build_weekly(
             user_id=user_id,
             anchor_date=anchor,
             previous_generated_at=previous_generated_at,
+            timezone_name=timezone_name,
+            timezone_fallback=timezone_fallback,
         )
     if insight_type == InsightType.monthly:
         return builder.build_monthly(
             user_id=user_id,
             anchor_date=anchor,
             previous_generated_at=previous_generated_at,
+            timezone_name=timezone_name,
+            timezone_fallback=timezone_fallback,
         )
     raise ValueError("period_type must be daily, weekly or monthly")
 
@@ -875,11 +884,18 @@ class AIAdvisoryService:
         period_type: str,
         anchor_date: date | None = None,
         preview_run_id: UUID | None = None,
+        timezone_name: str | None = None,
+        timezone_fallback: bool = False,
     ) -> dict[str, Any]:
         """Generate period-aware financial insights with structured evidence."""
         normalized_period_type = period_type.strip().lower()
         insight_type = InsightType(normalized_period_type)
-        anchor = anchor_date or date.today()
+        timezone_resolution = timezone_utils.resolve_user_timezone(timezone_name)
+        fallback_used = timezone_fallback or (
+            timezone_resolution.fallback_used
+            and (anchor_date is None or timezone_name is not None)
+        )
+        anchor = anchor_date or timezone_utils.local_today(timezone_resolution)
         consent_version = ensure_ai_consent_granted(self._user_id)
 
         preview_run: AIInsightRun | None = None
@@ -919,6 +935,8 @@ class AIAdvisoryService:
                 user_id=self._user_id,
                 anchor=anchor,
                 previous_generated_at=previous.created_at if previous else None,
+                timezone_name=timezone_resolution.name,
+                timezone_fallback=fallback_used,
             )
 
             period = snapshot["period"]

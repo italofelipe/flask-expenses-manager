@@ -20,6 +20,17 @@ class AIInsightGenerateRequestSchema(Schema):
             "example": "2026-05-17",
         },
     )
+    timezone = fields.String(
+        required=False,
+        allow_none=True,
+        metadata={
+            "description": (
+                "Timezone IANA do usuário usado quando anchor_date é omitido. "
+                "Também pode ser enviado no header X-Auraxis-Timezone."
+            ),
+            "example": "America/Sao_Paulo",
+        },
+    )
     preview_run_id = fields.UUID(
         required=False,
         allow_none=True,

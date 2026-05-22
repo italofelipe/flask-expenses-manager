@@ -321,6 +321,24 @@ class TestFinancialInsightContextBuilderDaily:
             "same_day_previous_month"
         ]
 
+    def test_daily_snapshot_records_user_timezone_and_fallback_quality(
+        self, app
+    ) -> None:
+        with app.app_context():
+            user_id = _make_user()
+            anchor = date(2026, 5, 21)
+
+            snapshot = FinancialInsightContextBuilder().build_daily(
+                user_id=user_id,
+                anchor_date=anchor,
+                timezone_name="America/Sao_Paulo",
+                timezone_fallback=True,
+            )
+
+        assert snapshot["timezone"] == "America/Sao_Paulo"
+        assert snapshot["anchor_date"] == "2026-05-21"
+        assert snapshot["data_quality"]["timezone_fallback"] is True
+
     def test_snapshot_redacts_user_pii_and_sensitive_transaction_fields(
         self, app
     ) -> None:

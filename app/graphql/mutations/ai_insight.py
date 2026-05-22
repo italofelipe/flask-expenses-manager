@@ -11,6 +11,7 @@ from datetime import date, datetime
 from typing import Any
 
 import graphene
+from flask import request
 
 from app.graphql.auth import get_current_user_required
 from app.graphql.errors import build_public_graphql_error
@@ -18,6 +19,7 @@ from app.graphql.observability import log_graphql_resolver
 from app.services.ai_advisory_service import AIAdvisoryService
 from app.services.financial_insight_context_builder import INSIGHT_DIMENSIONS
 from app.services.llm_provider import LLMProviderError
+from app.utils import timezone_utils
 
 _VALID_PERIOD_TYPES = ("daily", "weekly", "monthly")
 
@@ -98,10 +100,19 @@ class GenerateAiInsightMutation(graphene.Mutation):
                 ) from exc
 
         service = AIAdvisoryService(user_id=user.id)
+        raw_timezone = request.headers.get(timezone_utils.USER_TIMEZONE_HEADER)
+        timezone_kwargs: dict[str, Any] = {}
+        if raw_timezone not in (None, "") or parsed_anchor is None:
+            timezone_resolution = timezone_utils.resolve_user_timezone(raw_timezone)
+            timezone_kwargs = {
+                "timezone_name": timezone_resolution.name,
+                "timezone_fallback": timezone_resolution.fallback_used,
+            }
         try:
             result = service.generate_financial_insights(
                 period_type=normalized,
                 anchor_date=parsed_anchor,
+                **timezone_kwargs,
             )
         except LLMProviderError as exc:
             raise build_public_graphql_error(
