@@ -5,6 +5,7 @@
 
 ### Bug Fixes
 
+* **ai:** honor user timezone for insight periods ([#1347](https://github.com/italofelipe/auraxis-api/issues/1347)) ([5aa6372](https://github.com/italofelipe/auraxis-api/commit/5aa637209dc7816160d0a18491fe1081586b437e))
 * **auth:** harden email confirmation contract ([#1345](https://github.com/italofelipe/auraxis-api/issues/1345)) ([2d4de96](https://github.com/italofelipe/auraxis-api/commit/2d4de9613d9c71eee8539a375d1a87867a86db2e))
 
 ## [1.46.0](https://github.com/italofelipe/auraxis-api/compare/v1.45.0...v1.46.0) (2026-05-21)
