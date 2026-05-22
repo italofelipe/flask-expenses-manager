@@ -210,3 +210,64 @@ jobs:
             --body "Agent run failed (CI timeout or unexpected error). Check workflow logs: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
         env:
           GH_TOKEN: ${{ secrets.TOKEN_GITHUB_ADMIN }}
+
+      # ── Telemetry (Housekeeping R2/3.3) ──────────────────────────────────
+      # Writes a JSON entry consumed by `make agent-dashboard` in the
+      # platform repo. Schema must match `AgentRun.from_dict` in
+      # `auraxis-platform/scripts/agent_dashboard.py`. Inline (no platform
+      # dep) so we don't need a checkout of platform from this submodule
+      # workflow. Cross-repo aggregation cron is a follow-up.
+      - name: Capture agent run telemetry
+        if: always()
+        env:
+          ISSUE: ${{ github.event.issue.number }}
+          REPO: ${{ github.repository }}
+          STATUS: ${{ job.status }}
+          RUN_ID: ${{ github.run_id }}
+          GH_TOKEN: ${{ secrets.TOKEN_GITHUB_ADMIN }}
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/agent-runs"
+          TS="$(date -u +%Y-%m-%dT%H:%M:%S+00:00)"
+          SAFE_TS="$(echo "$TS" | tr ':' '-')"
+          PR=$(gh pr list --search "head:feat/${ISSUE}" \
+            --json number --jq '.[0].number // empty' 2>/dev/null || echo "")
+          MERGED="false"
+          if [ -n "$PR" ]; then
+            MERGED=$(gh pr view "$PR" --json merged --jq '.merged' 2>/dev/null || echo "false")
+          fi
+          OUT="$RUNNER_TEMP/agent-runs/${SAFE_TS}-implement-${ISSUE}.json"
+          # Token counts are not surfaced by claude-code-action@beta — emit
+          # zeros and let the dashboard show "unknown cost". When the action
+          # gains a stats output, wire input_tokens/output_tokens here.
+          TS="$TS" ISSUE="$ISSUE" REPO="$REPO" PR="$PR" MERGED="$MERGED" \
+            STATUS="$STATUS" RUN_ID="$RUN_ID" OUT="$OUT" \
+            python3 - <<'PYEOF'
+          import json, os
+          data = {
+              "timestamp": os.environ["TS"],
+              "role": "implement",
+              "issue": int(os.environ["ISSUE"]),
+              "repo": os.environ["REPO"],
+              "model": "claude-opus-4-7",
+              "input_tokens": 0,
+              "output_tokens": 0,
+              "pr_number": int(os.environ["PR"]) if os.environ.get("PR") else None,
+              "pr_merged": os.environ.get("MERGED") == "true",
+              "files_modified": [],
+              "job_status": os.environ.get("STATUS", "unknown"),
+              "run_id": os.environ.get("RUN_ID", ""),
+          }
+          with open(os.environ["OUT"], "w") as f:
+              json.dump(data, f, indent=2)
+          print(os.environ["OUT"])
+          PYEOF
+
+      - name: Upload telemetry artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: agent-telemetry-implement-${{ github.event.issue.number }}
+          path: ${{ runner.temp }}/agent-runs/
+          retention-days: 30
+          if-no-files-found: warn
