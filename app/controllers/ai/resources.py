@@ -33,12 +33,22 @@ from app.docs.openapi_helpers import (
     json_success_response,
 )
 from app.middleware.ai_rate_limit import ai_daily_limit
-from app.schemas.ai_insight_schema import AIInsightGenerateRequestSchema
+from app.schemas.ai_insight_schema import (
+    AIInsightGenerateRequestSchema,
+    AIMonthlyReportRequestSchema,
+)
 from app.services.ai_advisory_service import (
     AIAdvisoryService,
     AIInsightCostBudgetExceededError,
 )
-from app.services.ai_lgpd import AIConsentRequiredError
+from app.services.ai_lgpd import AIConsentRequiredError, ensure_ai_consent_granted
+from app.services.ai_monthly_report_service import (
+    create_monthly_report_run,
+    enqueue_monthly_report_run,
+    get_ai_insight_by_id,
+    get_monthly_report_run_status,
+    process_monthly_report_run,
+)
 from app.services.analysis_ready_notification_service import (
     dispatch_analysis_ready_notification,
 )
@@ -211,6 +221,42 @@ def _resolve_ai_insight_request_timezone(
     body: dict[str, Any],
 ) -> timezone_utils.UserTimezoneResolution:
     return timezone_utils.resolve_user_timezone(_raw_ai_insight_request_timezone(body))
+
+
+def _parse_optional_iso_date(value: object) -> tuple[Response | None, date | None]:
+    if value in (None, ""):
+        return None, None
+    try:
+        return None, date.fromisoformat(str(value))
+    except ValueError:
+        return (
+            compat_error_response(
+                legacy_payload={
+                    "error": "anchor_date deve estar no formato YYYY-MM-DD"
+                },
+                status_code=400,
+                message="anchor_date deve estar no formato YYYY-MM-DD",
+                error_code="VALIDATION_ERROR",
+            ),
+            None,
+        )
+
+
+def _parse_uuid_param(
+    raw: str, *, field_name: str
+) -> tuple[Response | None, UUID | None]:
+    try:
+        return None, uuid.UUID(str(raw))
+    except (TypeError, ValueError):
+        return (
+            compat_error_response(
+                legacy_payload={"error": f"{field_name} deve ser um UUID válido"},
+                status_code=400,
+                message=f"{field_name} deve ser um UUID válido",
+                error_code="VALIDATION_ERROR",
+            ),
+            None,
+        )
 
 
 class AIInsightGenerateResource(MethodResource):
@@ -674,6 +720,251 @@ class AIWeeklySummaryResource(MethodResource):
         )
 
 
+class AIMonthlyReportResource(MethodResource):
+    """POST /ai/insights/monthly-report — async monthly AI report."""
+
+    @doc(
+        summary="Solicitar relatório mensal com IA (Premium)",
+        description=(
+            "Cria um run auditável para relatório mensal, consolida daily insights "
+            "do mês, compara com o relatório mensal anterior e envia email com "
+            "deep link quando a geração terminar."
+        ),
+        tags=["AI Advisory"],
+        security=[{"BearerAuth": []}],
+        requestBody=json_request_body(
+            schema=AIMonthlyReportRequestSchema,
+            description="Mês que deve ser consolidado pelo relatório mensal.",
+            example={"anchor_date": "2026-05-21", "enqueue": True},
+            required=False,
+        ),
+        responses={
+            200: json_success_response(
+                description="Relatório gerado no fallback síncrono",
+                message="Relatório mensal gerado com sucesso",
+                data_example={
+                    "run_id": "uuid",
+                    "status": "generated",
+                    "period_type": "monthly",
+                    "period_label": "2026-05",
+                    "insight_id": "uuid",
+                    "deep_link": "https://app.auraxis.com.br/insights?open=uuid",
+                },
+            ),
+            202: json_success_response(
+                description="Run mensal enfileirado",
+                message="Relatório mensal enfileirado",
+                data_example={
+                    "run_id": "uuid",
+                    "status": "previewed",
+                    "period_type": "monthly",
+                    "period_label": "2026-05",
+                    "queued": True,
+                    "job_id": "rq-job-id",
+                },
+            ),
+            403: json_error_response(
+                description="Entitlement ou consentimento insuficiente",
+                message="Recurso exclusivo para assinantes Premium.",
+                error_code="ENTITLEMENT_REQUIRED",
+                status_code=403,
+            ),
+        },
+    )
+    @jwt_required()
+    @ai_daily_limit()
+    def post(self) -> Response:
+        token_error = _guard_revoked_token()
+        if token_error is not None:
+            return token_error
+
+        user_id = current_user_id()
+        entitlement_error = _check_entitlement(user_id)
+        if entitlement_error is not None:
+            return entitlement_error
+
+        body = request.get_json(silent=True) or {}
+        parse_error, anchor_date = _parse_optional_iso_date(body.get("anchor_date"))
+        if parse_error is not None:
+            return parse_error
+
+        try:
+            ensure_ai_consent_granted(user_id)
+            run_payload = create_monthly_report_run(
+                user_id=user_id,
+                anchor_date=anchor_date,
+            )
+            run_id = uuid.UUID(str(run_payload["run_id"]))
+            should_enqueue = bool(body.get("enqueue", True))
+            result = (
+                enqueue_monthly_report_run(run_id=run_id)
+                if should_enqueue
+                else process_monthly_report_run(run_id=run_id)
+            )
+        except AIConsentRequiredError as exc:
+            return _ai_consent_required_response(exc)
+        except AIInsightCostBudgetExceededError as exc:
+            return compat_error_response(
+                legacy_payload={"error": str(exc)},
+                status_code=429,
+                message=str(exc),
+                error_code="AI_INSIGHT_BUDGET_EXCEEDED",
+            )
+        except LLMProviderError as exc:
+            return compat_error_response(
+                legacy_payload={"error": str(exc)},
+                status_code=500,
+                message="Erro ao gerar relatório mensal",
+                error_code="INTERNAL_ERROR",
+            )
+        except Exception:
+            log.exception("ai.monthly_report.request_failed user_id=%s", user_id)
+            return compat_error_response(
+                legacy_payload={"error": "Erro interno ao gerar relatório mensal"},
+                status_code=500,
+                message="Erro interno ao gerar relatório mensal",
+                error_code="INTERNAL_ERROR",
+            )
+
+        status_code = 202 if result.get("queued") else 200
+        message = (
+            "Relatório mensal enfileirado"
+            if status_code == 202
+            else "Relatório mensal gerado com sucesso"
+        )
+        return compat_success_response(
+            legacy_payload=result,
+            status_code=status_code,
+            message=message,
+            data=result,
+        )
+
+
+class AIInsightRunStatusResource(MethodResource):
+    """GET /ai/insights/runs/<run_id> — monthly report run status."""
+
+    @doc(
+        summary="Consultar status de run de AI Insight",
+        description="Retorna o status rastreável de um run de AI Insight do usuário.",
+        tags=["AI Advisory"],
+        security=[{"BearerAuth": []}],
+        responses={
+            200: json_success_response(
+                description="Status carregado",
+                message="Status do run carregado",
+                data_example={
+                    "run_id": "uuid",
+                    "status": "generated",
+                    "insight_id": "uuid",
+                    "deep_link": "https://app.auraxis.com.br/insights?open=uuid",
+                },
+            ),
+            404: json_error_response(
+                description="Run não encontrado",
+                message="Run não encontrado",
+                error_code="NOT_FOUND",
+                status_code=404,
+            ),
+        },
+    )
+    @jwt_required()
+    def get(self, run_id: str) -> Response:
+        token_error = _guard_revoked_token()
+        if token_error is not None:
+            return token_error
+
+        parse_error, parsed_run_id = _parse_uuid_param(run_id, field_name="run_id")
+        if parse_error is not None:
+            return parse_error
+        assert parsed_run_id is not None
+
+        try:
+            result = get_monthly_report_run_status(
+                user_id=current_user_id(),
+                run_id=parsed_run_id,
+            )
+        except ValueError:
+            return compat_error_response(
+                legacy_payload={"error": "Run não encontrado"},
+                status_code=404,
+                message="Run não encontrado",
+                error_code="NOT_FOUND",
+            )
+
+        return compat_success_response(
+            legacy_payload=result,
+            status_code=200,
+            message="Status do run carregado",
+            data=result,
+        )
+
+
+class AIInsightDetailResource(MethodResource):
+    """GET /ai/insights/<insight_id> — fetch one insight by id."""
+
+    @doc(
+        summary="Buscar AI Insight por id",
+        description=(
+            "Retorna um insight específico do usuário autenticado, usado por "
+            "deep links como /insights?open=<insight_id>."
+        ),
+        tags=["AI Advisory"],
+        security=[{"BearerAuth": []}],
+        responses={
+            200: json_success_response(
+                description="Insight carregado",
+                message="Insight carregado",
+                data_example={
+                    "id": "uuid",
+                    "summary": "Resumo mensal",
+                    "period_type": "monthly",
+                    "period_label": "2026-05",
+                    "items": [],
+                },
+            ),
+            404: json_error_response(
+                description="Insight não encontrado",
+                message="Insight não encontrado",
+                error_code="NOT_FOUND",
+                status_code=404,
+            ),
+        },
+    )
+    @jwt_required()
+    def get(self, insight_id: str) -> Response:
+        token_error = _guard_revoked_token()
+        if token_error is not None:
+            return token_error
+
+        parse_error, parsed_insight_id = _parse_uuid_param(
+            insight_id,
+            field_name="insight_id",
+        )
+        if parse_error is not None:
+            return parse_error
+        assert parsed_insight_id is not None
+
+        try:
+            result = get_ai_insight_by_id(
+                user_id=current_user_id(),
+                insight_id=parsed_insight_id,
+            )
+        except ValueError:
+            return compat_error_response(
+                legacy_payload={"error": "Insight não encontrado"},
+                status_code=404,
+                message="Insight não encontrado",
+                error_code="NOT_FOUND",
+            )
+
+        return compat_success_response(
+            legacy_payload=result,
+            status_code=200,
+            message="Insight carregado",
+            data=result,
+        )
+
+
 # ---------------------------------------------------------------------------
 # Internal helpers
 # ---------------------------------------------------------------------------
@@ -877,8 +1168,11 @@ class AIInsightHistoryResource(MethodResource):
 
 __all__ = [
     "AIGoalProjectionResource",
+    "AIInsightDetailResource",
     "AIInsightGenerateResource",
     "AIInsightHistoryResource",
+    "AIInsightRunStatusResource",
+    "AIMonthlyReportResource",
     "AISpendingInsightsResource",
     "AIWeeklySummaryResource",
 ]
