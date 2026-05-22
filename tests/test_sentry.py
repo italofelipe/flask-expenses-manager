@@ -222,3 +222,58 @@ def test_before_send_passes_all_events_at_full_rate(
     event: dict = {"message": "error"}
     results = [mod._before_send(event, hint) for _ in range(20)]
     assert all(r is not None for r in results)
+
+
+# ---------------------------------------------------------------------------
+# _resolve_traces_rate — env-aware auto-default
+# ---------------------------------------------------------------------------
+
+
+def test_resolve_traces_rate_dev_defaults_to_full(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """In dev with no explicit SENTRY_TRACES_RATE, return 1.0 to capture all."""
+    monkeypatch.delenv("SENTRY_TRACES_RATE", raising=False)
+    mod = _reload_sentry()
+    assert mod._resolve_traces_rate("dev") == 1.0
+
+
+def test_resolve_traces_rate_staging_and_preview_default_to_half(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """staging and preview return 0.5 when no explicit override."""
+    monkeypatch.delenv("SENTRY_TRACES_RATE", raising=False)
+    mod = _reload_sentry()
+    assert mod._resolve_traces_rate("staging") == 0.5
+    assert mod._resolve_traces_rate("preview") == 0.5
+
+
+def test_resolve_traces_rate_production_defaults_to_zero(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Production keeps baseline 0.0 — opt-in via explicit env."""
+    monkeypatch.delenv("SENTRY_TRACES_RATE", raising=False)
+    mod = _reload_sentry()
+    assert mod._resolve_traces_rate("production") == 0.0
+    assert mod._resolve_traces_rate("unknown") == 0.0
+
+
+def test_resolve_traces_rate_explicit_env_takes_precedence(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Explicit SENTRY_TRACES_RATE overrides env-aware default."""
+    monkeypatch.setenv("SENTRY_TRACES_RATE", "0.3")
+    mod = _reload_sentry()
+    # Even in dev (where default would be 1.0), explicit override wins.
+    assert mod._resolve_traces_rate("dev") == 0.3
+    assert mod._resolve_traces_rate("production") == 0.3
+
+
+def test_resolve_traces_rate_empty_env_uses_default(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Empty string SENTRY_TRACES_RATE falls back to env-aware default."""
+    monkeypatch.setenv("SENTRY_TRACES_RATE", "")
+    mod = _reload_sentry()
+    assert mod._resolve_traces_rate("dev") == 1.0
+    assert mod._resolve_traces_rate("production") == 0.0
