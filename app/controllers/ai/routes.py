@@ -3,8 +3,11 @@ from __future__ import annotations
 from .blueprint import ai_bp
 from .resources import (
     AIGoalProjectionResource,
+    AIInsightDetailResource,
     AIInsightGenerateResource,
     AIInsightHistoryResource,
+    AIInsightRunStatusResource,
+    AIMonthlyReportResource,
     AISpendingInsightsResource,
     AIWeeklySummaryResource,
 )
@@ -38,8 +41,23 @@ def register_ai_routes() -> None:
         methods=["GET"],
     )
     ai_bp.add_url_rule(
+        "/insights/monthly-report",
+        view_func=AIMonthlyReportResource.as_view("ai_monthly_report"),
+        methods=["POST"],
+    )
+    ai_bp.add_url_rule(
+        "/insights/runs/<run_id>",
+        view_func=AIInsightRunStatusResource.as_view("ai_insight_run_status"),
+        methods=["GET"],
+    )
+    ai_bp.add_url_rule(
         "/insights/history",
         view_func=AIInsightHistoryResource.as_view("ai_insight_history"),
+        methods=["GET"],
+    )
+    ai_bp.add_url_rule(
+        "/insights/<insight_id>",
+        view_func=AIInsightDetailResource.as_view("ai_insight_detail"),
         methods=["GET"],
     )
     _ROUTES_REGISTERED = True

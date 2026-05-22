@@ -44,4 +44,29 @@ class AIInsightGenerateRequestSchema(Schema):
     )
 
 
-__all__ = ["AIInsightGenerateRequestSchema"]
+class AIMonthlyReportRequestSchema(Schema):
+    anchor_date = fields.Date(
+        required=False,
+        allow_none=True,
+        metadata={
+            "description": (
+                "Data âncora do mês a consolidar. Quando omitida, a API usa a "
+                "data atual."
+            ),
+            "example": "2026-05-21",
+        },
+    )
+    enqueue = fields.Boolean(
+        required=False,
+        load_default=True,
+        metadata={
+            "description": (
+                "Quando true, tenta enfileirar o processamento mensal em RQ. "
+                "Ambientes sem Redis usam fallback síncrono."
+            ),
+            "example": True,
+        },
+    )
+
+
+__all__ = ["AIInsightGenerateRequestSchema", "AIMonthlyReportRequestSchema"]

@@ -917,6 +917,31 @@ ENRICHMENT: dict[str, dict[str, Any]] = {
             "});",
         ],
     },
+    "GET /ai/insights/{insight_id}": {
+        "test_lines": [
+            "pm.test('Buscar AI Insight por id — expected 200, 400 or 404', function () {",
+            "  pm.expect(pm.response.code).to.be.oneOf([200, 400, 404]);",
+            "});",
+        ],
+    },
+    "GET /ai/insights/runs/{run_id}": {
+        "test_lines": [
+            "pm.test('Consultar status de run de AI Insight — expected 200, 400 or 404', function () {",
+            "  pm.expect(pm.response.code).to.be.oneOf([200, 400, 404]);",
+            "});",
+        ],
+    },
+    "POST /ai/insights/monthly-report": {
+        "body_override": json.dumps(
+            {"anchor_date": "2026-05-21", "enqueue": True},
+            indent=2,
+        ),
+        "test_lines": [
+            "pm.test('Solicitar relatório mensal com IA — expected 200, 202, 403 or 429', function () {",
+            "  pm.expect(pm.response.code).to.be.oneOf([200, 202, 403, 429]);",
+            "});",
+        ],
+    },
 }
 
 # ---------------------------------------------------------------------------

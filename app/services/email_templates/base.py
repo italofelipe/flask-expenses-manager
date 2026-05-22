@@ -573,6 +573,86 @@ def render_analysis_ready_email(
     return html, text
 
 
+def render_monthly_analysis_ready_email(
+    *,
+    first_name: str,
+    summary_preview: str,
+    insight_url: str,
+) -> tuple[str, str]:
+    """Render the monthly AI report ready email with a deep link."""
+    email_title = f"Seu relatório mensal está pronto, {first_name}!"
+    preview = "Seu consolidado mensal de finanças já está disponível no Auraxis."
+
+    body_html = f"""
+      <h1 style="font-family: {_FONT_HEADING}; font-size: 26px; font-weight: 700;
+                 color: {_COLOR_TEXT_PRIMARY}; margin: 0 0 8px; line-height: 1.2;">
+        Seu relatório mensal está pronto
+      </h1>
+      <p style="font-family: {_FONT_BODY}; font-size: 13px; font-weight: 600;
+                color: {_COLOR_BRAND}; margin: 0 0 24px; text-transform: uppercase;
+                letter-spacing: 1px;">
+        Auraxis &mdash; Inteligência Financeira
+      </p>
+
+      <div style="border-top: 1px solid {_COLOR_BG_ELEVATED}; margin: 0 0 28px;"></div>
+
+      <p style="font-family: {_FONT_BODY}; font-size: 15px; color: {_COLOR_TEXT_SECONDARY};
+                line-height: 1.65; margin: 0 0 16px;">
+        Olá, <strong style="color: {_COLOR_TEXT_PRIMARY};">{first_name}</strong>!
+        Consolidamos os seus insights diários, movimentos do mês e histórico
+        recente para montar um relatório mensal completo.
+      </p>
+
+      <div style="background: {_COLOR_BG_SURFACE}; border-left: 3px solid {_COLOR_BRAND};
+                  border-radius: 4px; padding: 16px 20px; margin: 0 0 28px;">
+        <p style="font-family: {_FONT_BODY}; font-size: 14px; color: {_COLOR_TEXT_SECONDARY};
+                  line-height: 1.6; margin: 0; font-style: italic;">
+          {summary_preview}
+        </p>
+      </div>
+
+      <table role="presentation" cellpadding="0" cellspacing="0" border="0" style="margin: 8px 0 32px;">
+        <tr>
+          <td align="left" style="border-radius: 8px; background-color: {_COLOR_BRAND};">
+            <a href="{insight_url}"
+               style="display: inline-block; padding: 14px 28px; font-family: {_FONT_BODY};
+                      font-size: 15px; font-weight: 700; color: #0b0909; text-decoration: none;
+                      border-radius: 8px; letter-spacing: 0.3px;">
+              Abrir relatório mensal
+            </a>
+          </td>
+        </tr>
+      </table>
+
+      <p style="font-family: {_FONT_BODY}; font-size: 12px; color: {_COLOR_TEXT_MUTED};
+                line-height: 1.6; margin: 0;">
+        Se o botão não funcionar, copie e cole este link no navegador:<br/>
+        <a href="{insight_url}"
+           style="color: {_COLOR_BRAND}; word-break: break-all; font-size: 12px;">
+          {insight_url}
+        </a>
+      </p>
+    """
+
+    html = _base_layout(
+        title=email_title,
+        preview_text=preview,
+        body_html=body_html,
+    )
+
+    text = (
+        "Seu relatório mensal está pronto — Auraxis\n"
+        "===========================================\n\n"
+        f"Olá, {first_name}!\n\n"
+        f"{summary_preview}\n\n"
+        "Acesse o relatório completo pelo link abaixo:\n"
+        f"{insight_url}\n\n"
+        "— Equipe Auraxis\n"
+    )
+
+    return html, text
+
+
 def render_email_verification_reminder_email(
     *, days_until_deadline: int
 ) -> tuple[str, str]:
@@ -693,5 +773,6 @@ __all__ = [
     "render_confirmation_email",
     "render_due_soon_email",
     "render_email_verification_reminder_email",
+    "render_monthly_analysis_ready_email",
     "render_password_reset_email",
 ]

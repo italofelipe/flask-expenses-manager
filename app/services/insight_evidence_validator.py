@@ -48,6 +48,7 @@ _KNOWN_SNAPSHOT_PREFIXES: frozenset[str] = frozenset(
         "goals",
         "credit_cards",
         "wallet",
+        "monthly_report_context",
         "financial_health",
         "data_quality",
     }

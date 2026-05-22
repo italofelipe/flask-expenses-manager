@@ -675,6 +675,24 @@
         ],
         "type": "object"
       },
+      "app_schemas_ai_insight_schema_AIMonthlyReportRequestSchema": {
+        "properties": {
+          "anchor_date": {
+            "description": "Data âncora do mês a consolidar. Quando omitida, a API usa a data atual.",
+            "example": "2026-05-21",
+            "format": "date",
+            "nullable": true,
+            "type": "string"
+          },
+          "enqueue": {
+            "default": true,
+            "description": "Quando true, tenta enfileirar o processamento mensal em RQ. Ambientes sem Redis usam fallback síncrono.",
+            "example": true,
+            "type": "boolean"
+          }
+        },
+        "type": "object"
+      },
       "app_schemas_auth_schema_AuthSchema": {
         "properties": {
           "captcha_token": {
@@ -1742,6 +1760,279 @@
         ]
       }
     },
+    "/ai/insights/monthly-report": {
+      "post": {
+        "description": "Cria um run auditável para relatório mensal, consolida daily insights do mês, compara com o relatório mensal anterior e envia email com deep link quando a geração terminar.",
+        "parameters": [],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "description": "Mês que deve ser consolidado pelo relatório mensal.",
+              "example": {
+                "anchor_date": "2026-05-21",
+                "enqueue": true
+              },
+              "schema": {
+                "$ref": "#/components/schemas/app_schemas_ai_insight_schema_AIMonthlyReportRequestSchema"
+              }
+            }
+          },
+          "required": false
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "example": {
+                  "data": {
+                    "deep_link": "https://app.auraxis.com.br/insights?open=uuid",
+                    "insight_id": "uuid",
+                    "period_label": "2026-05",
+                    "period_type": "monthly",
+                    "run_id": "uuid",
+                    "status": "generated"
+                  },
+                  "message": "Relatório mensal gerado com sucesso"
+                },
+                "schema": {
+                  "properties": {
+                    "data": {
+                      "type": "object"
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "meta": {
+                      "type": "object"
+                    }
+                  },
+                  "required": [
+                    "message",
+                    "data"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Relatório gerado no fallback síncrono",
+            "headers": {
+              "X-Request-ID": {
+                "description": "Identificador único da requisição gerado pela API.",
+                "example": "9fcd2e4f4d8747b4a7d8a2b1b930f52a",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "202": {
+            "content": {
+              "application/json": {
+                "example": {
+                  "data": {
+                    "job_id": "rq-job-id",
+                    "period_label": "2026-05",
+                    "period_type": "monthly",
+                    "queued": true,
+                    "run_id": "uuid",
+                    "status": "previewed"
+                  },
+                  "message": "Relatório mensal enfileirado"
+                },
+                "schema": {
+                  "properties": {
+                    "data": {
+                      "type": "object"
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "meta": {
+                      "type": "object"
+                    }
+                  },
+                  "required": [
+                    "message",
+                    "data"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Run mensal enfileirado",
+            "headers": {
+              "X-Request-ID": {
+                "description": "Identificador único da requisição gerado pela API.",
+                "example": "9fcd2e4f4d8747b4a7d8a2b1b930f52a",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "example": {
+                  "code": "ENTITLEMENT_REQUIRED",
+                  "message": "Recurso exclusivo para assinantes Premium.",
+                  "status_code": 403
+                },
+                "schema": {
+                  "properties": {
+                    "code": {
+                      "type": "string"
+                    },
+                    "details": {
+                      "type": "object"
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "status_code": {
+                      "type": "integer"
+                    }
+                  },
+                  "required": [
+                    "message",
+                    "code"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Entitlement ou consentimento insuficiente",
+            "headers": {
+              "X-Request-ID": {
+                "description": "Identificador único da requisição gerado pela API.",
+                "example": "9fcd2e4f4d8747b4a7d8a2b1b930f52a",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "summary": "Solicitar relatório mensal com IA (Premium)",
+        "tags": [
+          "AI Advisory"
+        ]
+      }
+    },
+    "/ai/insights/runs/{run_id}": {
+      "get": {
+        "description": "Retorna o status rastreável de um run de AI Insight do usuário.",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "run_id",
+            "required": true,
+            "type": "string"
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "example": {
+                  "data": {
+                    "deep_link": "https://app.auraxis.com.br/insights?open=uuid",
+                    "insight_id": "uuid",
+                    "run_id": "uuid",
+                    "status": "generated"
+                  },
+                  "message": "Status do run carregado"
+                },
+                "schema": {
+                  "properties": {
+                    "data": {
+                      "type": "object"
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "meta": {
+                      "type": "object"
+                    }
+                  },
+                  "required": [
+                    "message",
+                    "data"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Status carregado",
+            "headers": {
+              "X-Request-ID": {
+                "description": "Identificador único da requisição gerado pela API.",
+                "example": "9fcd2e4f4d8747b4a7d8a2b1b930f52a",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "example": {
+                  "code": "NOT_FOUND",
+                  "message": "Run não encontrado",
+                  "status_code": 404
+                },
+                "schema": {
+                  "properties": {
+                    "code": {
+                      "type": "string"
+                    },
+                    "details": {
+                      "type": "object"
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "status_code": {
+                      "type": "integer"
+                    }
+                  },
+                  "required": [
+                    "message",
+                    "code"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Run não encontrado",
+            "headers": {
+              "X-Request-ID": {
+                "description": "Identificador único da requisição gerado pela API.",
+                "example": "9fcd2e4f4d8747b4a7d8a2b1b930f52a",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "summary": "Consultar status de run de AI Insight",
+        "tags": [
+          "AI Advisory"
+        ]
+      }
+    },
     "/ai/insights/spending": {
       "get": {
         "description": "Analisa os gastos do mês informado e retorna insights gerados por LLM em PT-BR. Requer entitlement 'advanced_simulations' (plano Premium).",
@@ -2131,6 +2422,116 @@
           }
         ],
         "summary": "Briefing semanal com IA (Premium)",
+        "tags": [
+          "AI Advisory"
+        ]
+      }
+    },
+    "/ai/insights/{insight_id}": {
+      "get": {
+        "description": "Retorna um insight específico do usuário autenticado, usado por deep links como /insights?open=<insight_id>.",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "insight_id",
+            "required": true,
+            "type": "string"
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "example": {
+                  "data": {
+                    "id": "uuid",
+                    "items": [],
+                    "period_label": "2026-05",
+                    "period_type": "monthly",
+                    "summary": "Resumo mensal"
+                  },
+                  "message": "Insight carregado"
+                },
+                "schema": {
+                  "properties": {
+                    "data": {
+                      "type": "object"
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "meta": {
+                      "type": "object"
+                    }
+                  },
+                  "required": [
+                    "message",
+                    "data"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Insight carregado",
+            "headers": {
+              "X-Request-ID": {
+                "description": "Identificador único da requisição gerado pela API.",
+                "example": "9fcd2e4f4d8747b4a7d8a2b1b930f52a",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "example": {
+                  "code": "NOT_FOUND",
+                  "message": "Insight não encontrado",
+                  "status_code": 404
+                },
+                "schema": {
+                  "properties": {
+                    "code": {
+                      "type": "string"
+                    },
+                    "details": {
+                      "type": "object"
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "status_code": {
+                      "type": "integer"
+                    }
+                  },
+                  "required": [
+                    "message",
+                    "code"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Insight não encontrado",
+            "headers": {
+              "X-Request-ID": {
+                "description": "Identificador único da requisição gerado pela API.",
+                "example": "9fcd2e4f4d8747b4a7d8a2b1b930f52a",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "summary": "Buscar AI Insight por id",
         "tags": [
           "AI Advisory"
         ]
