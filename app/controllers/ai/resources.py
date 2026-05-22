@@ -62,6 +62,7 @@ log = logging.getLogger(__name__)
 
 _ENTITLEMENT_KEY = "advanced_simulations"
 _AI_INSIGHT_PERIOD_TYPES = {"daily", "weekly", "monthly"}
+_ANCHOR_DATE_FORMAT_ERROR = "anchor_date deve estar no formato YYYY-MM-DD"
 
 
 def _check_entitlement(user_id: UUID) -> Response | None:
@@ -176,11 +177,9 @@ def _parse_ai_insight_generate_body(
         except ValueError:
             return (
                 compat_error_response(
-                    legacy_payload={
-                        "error": "anchor_date deve estar no formato YYYY-MM-DD"
-                    },
+                    legacy_payload={"error": _ANCHOR_DATE_FORMAT_ERROR},
                     status_code=400,
-                    message="anchor_date deve estar no formato YYYY-MM-DD",
+                    message=_ANCHOR_DATE_FORMAT_ERROR,
                     error_code="VALIDATION_ERROR",
                 ),
                 None,
@@ -231,11 +230,9 @@ def _parse_optional_iso_date(value: object) -> tuple[Response | None, date | Non
     except ValueError:
         return (
             compat_error_response(
-                legacy_payload={
-                    "error": "anchor_date deve estar no formato YYYY-MM-DD"
-                },
+                legacy_payload={"error": _ANCHOR_DATE_FORMAT_ERROR},
                 status_code=400,
-                message="anchor_date deve estar no formato YYYY-MM-DD",
+                message=_ANCHOR_DATE_FORMAT_ERROR,
                 error_code="VALIDATION_ERROR",
             ),
             None,
