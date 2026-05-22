@@ -118,3 +118,51 @@ jobs:
             - Only flag real issues: logic errors, missing tests, security problems, contract breaks
             - Don't flag style issues the linter already catches — that's noise
             - Coverage below 85% IS a blocking issue → create bug issue with agent:claude label
+
+      # ── Telemetry (Housekeeping R2/3.3 — mirror of agent-implement step) ─
+      - name: Capture agent run telemetry
+        if: always()
+        env:
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          REPO: ${{ github.repository }}
+          STATUS: ${{ job.status }}
+          RUN_ID: ${{ github.run_id }}
+          GH_TOKEN: ${{ secrets.TOKEN_GITHUB_ADMIN }}
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/agent-runs"
+          TS="$(date -u +%Y-%m-%dT%H:%M:%S+00:00)"
+          SAFE_TS="$(echo "$TS" | tr ':' '-')"
+          MERGED=$(gh pr view "$PR_NUMBER" --json merged --jq '.merged' 2>/dev/null || echo "false")
+          OUT="$RUNNER_TEMP/agent-runs/${SAFE_TS}-qa-${PR_NUMBER}.json"
+          TS="$TS" PR_NUMBER="$PR_NUMBER" REPO="$REPO" MERGED="$MERGED" \
+            STATUS="$STATUS" RUN_ID="$RUN_ID" OUT="$OUT" \
+            python3 - <<'PYEOF'
+          import json, os
+          data = {
+              "timestamp": os.environ["TS"],
+              "role": "qa",
+              "issue": int(os.environ["PR_NUMBER"]),
+              "repo": os.environ["REPO"],
+              "model": "claude-opus-4-7",
+              "input_tokens": 0,
+              "output_tokens": 0,
+              "pr_number": int(os.environ["PR_NUMBER"]),
+              "pr_merged": os.environ.get("MERGED") == "true",
+              "files_modified": [],
+              "job_status": os.environ.get("STATUS", "unknown"),
+              "run_id": os.environ.get("RUN_ID", ""),
+          }
+          with open(os.environ["OUT"], "w") as f:
+              json.dump(data, f, indent=2)
+          print(os.environ["OUT"])
+          PYEOF
+
+      - name: Upload telemetry artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: agent-telemetry-qa-${{ github.event.pull_request.number }}
+          path: ${{ runner.temp }}/agent-runs/
+          retention-days: 30
+          if-no-files-found: warn

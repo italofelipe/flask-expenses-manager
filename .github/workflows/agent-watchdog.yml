@@ -73,3 +73,52 @@ jobs:
             --body "CI still failing — commit \`${SHORT_SHA}\`. Run: ${WORKFLOW_URL}"
         env:
           GH_TOKEN: ${{ secrets.TOKEN_GITHUB_ADMIN }}
+
+      # ── Telemetry (Housekeeping R2/3.3 — mirror of agent-implement step) ─
+      # Identifier for watchdog is the upstream CI run id, since each invocation
+      # corresponds to a unique failed run.
+      - name: Capture agent run telemetry
+        if: always()
+        env:
+          UPSTREAM_RUN_ID: ${{ github.event.workflow_run.id }}
+          REPO: ${{ github.repository }}
+          STATUS: ${{ job.status }}
+          RUN_ID: ${{ github.run_id }}
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/agent-runs"
+          TS="$(date -u +%Y-%m-%dT%H:%M:%S+00:00)"
+          SAFE_TS="$(echo "$TS" | tr ':' '-')"
+          OUT="$RUNNER_TEMP/agent-runs/${SAFE_TS}-watchdog-${UPSTREAM_RUN_ID}.json"
+          TS="$TS" UPSTREAM_RUN_ID="$UPSTREAM_RUN_ID" REPO="$REPO" \
+            STATUS="$STATUS" RUN_ID="$RUN_ID" OUT="$OUT" \
+            python3 - <<'PYEOF'
+          import json, os
+          data = {
+              "timestamp": os.environ["TS"],
+              "role": "watchdog",
+              "issue": f"ci-{os.environ['UPSTREAM_RUN_ID']}",
+              "repo": os.environ["REPO"],
+              "model": "claude-opus-4-7",
+              "input_tokens": 0,
+              "output_tokens": 0,
+              "pr_number": None,
+              "pr_merged": False,
+              "files_modified": [],
+              "job_status": os.environ.get("STATUS", "unknown"),
+              "run_id": os.environ.get("RUN_ID", ""),
+              "upstream_ci_run_id": os.environ["UPSTREAM_RUN_ID"],
+          }
+          with open(os.environ["OUT"], "w") as f:
+              json.dump(data, f, indent=2)
+          print(os.environ["OUT"])
+          PYEOF
+
+      - name: Upload telemetry artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: agent-telemetry-watchdog-${{ github.event.workflow_run.id }}
+          path: ${{ runner.temp }}/agent-runs/
+          retention-days: 30
+          if-no-files-found: warn
