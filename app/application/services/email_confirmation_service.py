@@ -26,12 +26,15 @@ EMAIL_CONFIRMATION_SUCCESS_MESSAGE = "Email confirmed successfully."
 EMAIL_CONFIRMATION_INVALID_TOKEN_MESSAGE = (
     "Invalid or expired email confirmation token."
 )
+EMAIL_CONFIRMATION_INVALID_OR_REUSED_REASON = "invalid_or_reused"
+EMAIL_CONFIRMATION_TOKEN_EXPIRED_REASON = "expired"
 
 
 @dataclass(frozen=True)
 class EmailConfirmationResult:
     ok: bool
     message: str
+    reason: str | None = None
     # Populated when ok=True so the REST controller can mint a JWT and open
     # a session for the user (magic-link login pattern — #1338).
     user_id: UUID | None = None
@@ -122,6 +125,15 @@ def _dispatch_confirmation_email(*, email: str, token: str) -> None:
     )
 
 
+def _log_confirmation_failure(*, reason: str, user_id: UUID | None = None) -> None:
+    safe_user_id = str(user_id) if user_id is not None else "unknown"
+    runtime_logger().info(
+        "event=auth.email_confirmation_failed reason=%s user_id=%s",
+        reason,
+        safe_user_id,
+    )
+
+
 def issue_email_confirmation(user: User) -> EmailConfirmationResult:
     if user.email_verified_at is not None:
         return EmailConfirmationResult(
@@ -162,17 +174,24 @@ def confirm_email(*, token: str) -> EmailConfirmationResult:
     )
     now = _utcnow()
     if user is None or user.email_verification_token_expires_at is None:
+        _log_confirmation_failure(reason=EMAIL_CONFIRMATION_INVALID_OR_REUSED_REASON)
         return EmailConfirmationResult(
             ok=False,
             message=EMAIL_CONFIRMATION_INVALID_TOKEN_MESSAGE,
+            reason=EMAIL_CONFIRMATION_INVALID_OR_REUSED_REASON,
         )
     expires_at = user.email_verification_token_expires_at
     if expires_at.tzinfo is None:
         expires_at = expires_at.replace(tzinfo=UTC)
     if expires_at < now:
+        _log_confirmation_failure(
+            reason=EMAIL_CONFIRMATION_TOKEN_EXPIRED_REASON,
+            user_id=user.id,
+        )
         return EmailConfirmationResult(
             ok=False,
             message=EMAIL_CONFIRMATION_INVALID_TOKEN_MESSAGE,
+            reason=EMAIL_CONFIRMATION_TOKEN_EXPIRED_REASON,
         )
 
     user.email_verified_at = now

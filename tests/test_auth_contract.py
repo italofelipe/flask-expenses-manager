@@ -1,17 +1,27 @@
+import logging
 import uuid
+from dataclasses import replace
+from datetime import UTC, datetime, timedelta
 from typing import Dict
 
 from app.application.services.email_confirmation_service import (
     EMAIL_CONFIRMATION_INVALID_TOKEN_MESSAGE,
     EMAIL_CONFIRMATION_NEUTRAL_MESSAGE,
     EMAIL_CONFIRMATION_SUCCESS_MESSAGE,
+    EmailConfirmationResult,
 )
 from app.application.services.password_reset_service import (
     PASSWORD_RESET_INVALID_TOKEN_MESSAGE,
     PASSWORD_RESET_NEUTRAL_MESSAGE,
     PASSWORD_RESET_SUCCESS_MESSAGE,
 )
+from app.controllers.auth.dependencies import AUTH_DEPENDENCIES_EXTENSION_KEY
+from app.extensions.database import db
 from app.extensions.integration_metrics import snapshot_metrics
+from app.models.user import User
+
+EMAIL_CONFIRMATION_INVALID_OR_REUSED_REASON = "invalid_or_reused"
+EMAIL_CONFIRMATION_TOKEN_EXPIRED_REASON = "expired"
 
 
 def _register_payload(suffix: str, password: str = "StrongPass@123") -> Dict[str, str]:
@@ -343,6 +353,38 @@ def test_auth_email_confirm_v2_contract(client) -> None:
     assert "auraxis_refresh" in set_cookie
 
 
+def test_auth_email_confirm_v2_contract_allows_success_without_session(
+    client,
+    monkeypatch,
+) -> None:
+    """Compatibility path: a valid confirmation can succeed without minting JWTs."""
+    dependencies = client.application.extensions[AUTH_DEPENDENCIES_EXTENSION_KEY]
+    monkeypatch.setitem(
+        client.application.extensions,
+        AUTH_DEPENDENCIES_EXTENSION_KEY,
+        replace(
+            dependencies,
+            confirm_email=lambda _token: EmailConfirmationResult(
+                ok=True,
+                message=EMAIL_CONFIRMATION_SUCCESS_MESSAGE,
+            ),
+        ),
+    )
+
+    response = client.post(
+        "/auth/email/confirm",
+        headers=_v2_headers(),
+        json={"token": "valid-token-value-with-sufficient-length-123456"},
+    )
+
+    assert response.status_code == 200
+    body = response.get_json()
+    assert body["success"] is True
+    assert body["message"] == EMAIL_CONFIRMATION_SUCCESS_MESSAGE
+    assert body["data"] == {"session_created": False}
+    assert "auraxis_refresh" not in response.headers.get("Set-Cookie", "")
+
+
 def test_auth_email_confirm_v2_contract_rejects_reused_token(client) -> None:
     """Second click on the same magic-link must not mint a new session."""
     suffix = uuid.uuid4().hex[:8]
@@ -367,6 +409,46 @@ def test_auth_email_confirm_v2_contract_rejects_reused_token(client) -> None:
     body = second.get_json()
     assert body["success"] is False
     assert body["error"]["code"] == "VALIDATION_ERROR"
+    assert (
+        body["error"]["details"]["reason"]
+        == EMAIL_CONFIRMATION_INVALID_OR_REUSED_REASON
+    )
+
+
+def test_auth_email_confirm_v2_contract_rejects_expired_token_without_leaking_token(
+    app,
+    caplog,
+    client,
+) -> None:
+    suffix = uuid.uuid4().hex[:8]
+    payload = _register_payload(suffix)
+    client.post("/auth/register", json=payload)
+    outbox = client.application.extensions.get("email_confirmation_outbox", [])
+    token = outbox[0]["token"]
+
+    with app.app_context():
+        user = User.query.filter_by(email=payload["email"]).first()
+        assert user is not None
+        user.email_verification_token_expires_at = datetime.now(UTC).replace(
+            tzinfo=None
+        ) - timedelta(minutes=1)
+        db.session.commit()
+
+    caplog.set_level(logging.INFO)
+    response = client.post(
+        "/auth/email/confirm",
+        headers=_v2_headers(),
+        json={"token": token},
+    )
+
+    assert response.status_code == 400
+    body = response.get_json()
+    assert body["success"] is False
+    assert body["error"]["code"] == "VALIDATION_ERROR"
+    assert body["error"]["details"]["reason"] == EMAIL_CONFIRMATION_TOKEN_EXPIRED_REASON
+    assert "event=auth.email_confirmation_failed" in caplog.text
+    assert f"reason={EMAIL_CONFIRMATION_TOKEN_EXPIRED_REASON}" in caplog.text
+    assert token not in caplog.text
 
 
 def test_auth_email_confirm_v2_contract_with_invalid_token(client) -> None:
@@ -381,6 +463,10 @@ def test_auth_email_confirm_v2_contract_with_invalid_token(client) -> None:
     assert body["success"] is False
     assert body["error"]["code"] == "VALIDATION_ERROR"
     assert body["message"] == EMAIL_CONFIRMATION_INVALID_TOKEN_MESSAGE
+    assert (
+        body["error"]["details"]["reason"]
+        == EMAIL_CONFIRMATION_INVALID_OR_REUSED_REASON
+    )
 
 
 def test_auth_email_resend_v2_contract_requires_jwt(client) -> None:

@@ -2160,7 +2160,20 @@
             "content": {
               "application/json": {
                 "example": {
-                  "data": {},
+                  "data": {
+                    "refresh_token": "refresh-token-issued-after-email-confirmation",
+                    "session_created": true,
+                    "token": "access-token-issued-after-email-confirmation",
+                    "user": {
+                      "email_verification": {
+                        "verified": true
+                      },
+                      "identity": {
+                        "email": "usuario@auraxis.com.br",
+                        "id": "00000000-0000-0000-0000-000000000000"
+                      }
+                    }
+                  },
                   "message": "Email confirmed successfully."
                 },
                 "schema": {
@@ -2199,6 +2212,9 @@
               "application/json": {
                 "example": {
                   "code": "VALIDATION_ERROR",
+                  "details": {
+                    "reason": "expired"
+                  },
                   "message": "Invalid or expired email confirmation token.",
                   "status_code": 400
                 },

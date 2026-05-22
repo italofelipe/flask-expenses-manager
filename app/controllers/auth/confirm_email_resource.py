@@ -11,6 +11,7 @@ from app.application.services.authenticated_user_context_service import (
     AuthenticatedUserContextService,
 )
 from app.application.services.email_confirmation_service import (
+    EMAIL_CONFIRMATION_INVALID_OR_REUSED_REASON,
     EMAIL_CONFIRMATION_INVALID_TOKEN_MESSAGE,
     EMAIL_CONFIRMATION_SUCCESS_MESSAGE,
 )
@@ -51,13 +52,25 @@ class ConfirmEmailResource(MethodResource):
             200: json_success_response(
                 description="Email confirmado com sucesso",
                 message=EMAIL_CONFIRMATION_SUCCESS_MESSAGE,
-                data_example={},
+                data_example={
+                    "token": "access-token-issued-after-email-confirmation",
+                    "refresh_token": "refresh-token-issued-after-email-confirmation",
+                    "session_created": True,
+                    "user": {
+                        "identity": {
+                            "id": "00000000-0000-0000-0000-000000000000",
+                            "email": "usuario@auraxis.com.br",
+                        },
+                        "email_verification": {"verified": True},
+                    },
+                },
             ),
             400: json_error_response(
                 description="Token inválido, expirado ou payload inválido",
                 message=EMAIL_CONFIRMATION_INVALID_TOKEN_MESSAGE,
                 error_code="VALIDATION_ERROR",
                 status_code=400,
+                details_example={"reason": "expired"},
             ),
             500: json_error_response(
                 description="Erro interno ao confirmar email",
@@ -72,12 +85,27 @@ class ConfirmEmailResource(MethodResource):
         try:
             dependencies = get_auth_dependencies()
             result = dependencies.confirm_email(str(kwargs["token"]))
-            if not result.ok or result.user_id is None:
+            if not result.ok:
                 return compat_error(
                     legacy_payload={"message": result.message},
                     status_code=400,
                     message=result.message,
                     error_code="VALIDATION_ERROR",
+                    details={
+                        "reason": result.reason
+                        or EMAIL_CONFIRMATION_INVALID_OR_REUSED_REASON
+                    },
+                )
+            if result.user_id is None:
+                current_app.logger.info(
+                    "event=auth.email_confirmation_completed "
+                    "status=success_without_session"
+                )
+                return compat_success(
+                    legacy_payload={"message": result.message},
+                    status_code=200,
+                    message=result.message,
+                    data={"session_created": False},
                 )
             return _build_magic_link_response(
                 user_id=result.user_id,
@@ -149,6 +177,7 @@ def _build_magic_link_response(
     data_payload: dict[str, Any] = {
         "token": access_token,
         "user": user_payload,
+        "session_created": True,
     }
     if not omit_refresh_in_body:
         legacy_payload["refresh_token"] = refresh_token
