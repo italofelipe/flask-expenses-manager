@@ -35,6 +35,29 @@ if TYPE_CHECKING:
     from sentry_sdk.types import Event, Hint
 
 
+def _resolve_traces_rate(environment: str) -> float:
+    """Resolve the active ``traces_sample_rate``.
+
+    Honors an explicit ``SENTRY_TRACES_RATE`` env override; otherwise picks an
+    env-aware default that matches the web/app side defaults (see PRs
+    auraxis-web #928 and auraxis-app #451):
+
+    - ``dev``                 → 1.0 (capture every trace for local debugging)
+    - ``staging`` / ``preview`` → 0.5
+    - everything else         → 0.0 (baseline production rate)
+
+    Use a separate Sentry project for dev to keep prod quota clean.
+    """
+    explicit = os.getenv("SENTRY_TRACES_RATE")
+    if explicit is not None and explicit.strip() != "":
+        return float(explicit)
+    if environment == "dev":
+        return 1.0
+    if environment in ("staging", "preview"):
+        return 0.5
+    return 0.0
+
+
 def _before_send(event: Event, hint: Hint) -> Event | None:
     """Drop client errors (4xx) and apply error sampling to reduce quota use."""
     exc_info = hint.get("exc_info")
@@ -75,7 +98,7 @@ def init_sentry() -> None:
 
     environment = os.getenv("SENTRY_ENVIRONMENT", "dev")
     release = os.getenv("SENTRY_RELEASE", "")
-    traces_sample_rate = float(os.getenv("SENTRY_TRACES_RATE", "0.0"))
+    traces_sample_rate = _resolve_traces_rate(environment)
     profiles_sample_rate = float(os.getenv("SENTRY_PROFILES_RATE", "0.0"))
 
     sentry_sdk.init(
