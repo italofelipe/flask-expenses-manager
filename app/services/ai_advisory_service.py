@@ -428,6 +428,43 @@ def _coerce_financial_insight_metadata(parsed: dict[str, Any]) -> dict[str, str]
     return metadata
 
 
+def _required_dimensions_from_snapshot(snapshot: dict[str, Any]) -> list[str]:
+    contract = snapshot.get("insight_contract")
+    if not isinstance(contract, dict):
+        return []
+    dimensions = contract.get("required_dimensions")
+    if not isinstance(dimensions, list):
+        return []
+    return [
+        str(dimension)
+        for dimension in dimensions
+        if isinstance(dimension, str) and dimension in INSIGHT_DIMENSIONS
+    ]
+
+
+def _ensure_financial_insight_dimension_coverage(
+    *,
+    items: list[FinancialInsightItem],
+    snapshot: dict[str, Any],
+) -> None:
+    required_dimensions = _required_dimensions_from_snapshot(snapshot)
+    if not required_dimensions:
+        return
+
+    present_dimensions = {
+        str(item.get("dimension")) for item in items if item.get("dimension")
+    }
+    missing = [
+        dimension
+        for dimension in required_dimensions
+        if dimension not in present_dimensions
+    ]
+    if missing:
+        raise LLMProviderError(
+            "Missing financial insight dimensions: " + ", ".join(missing)
+        )
+
+
 def _coerce_financial_insight_response(
     content: str,
 ) -> tuple[str, list[FinancialInsightItem], dict[str, str]]:
@@ -972,6 +1009,10 @@ class AIAdvisoryService:
             raise
 
         summary, items, _ = _coerce_financial_insight_response(llm_resp.content)
+        _ensure_financial_insight_dimension_coverage(
+            items=items,
+            snapshot=prompt_snapshot,
+        )
         metadata = {
             "context_schema_version": context_version,
             "context_hash": context_hash,
@@ -1970,11 +2011,44 @@ def _build_financial_insight_prompt(
     }[period_type]
 
     insight_types = ", ".join(_SPENDING_INSIGHT_TYPES)
+    contract = snapshot.get("insight_contract")
+    required_dimensions_raw = (
+        contract.get("required_dimensions") if isinstance(contract, dict) else None
+    )
+    required_dimensions = (
+        [
+            str(dimension)
+            for dimension in required_dimensions_raw
+            if isinstance(dimension, str) and dimension in INSIGHT_DIMENSIONS
+        ]
+        if isinstance(required_dimensions_raw, list)
+        else []
+    )
+    data_quality = snapshot.get("data_quality")
+    domain_presence = (
+        data_quality.get("domain_presence") if isinstance(data_quality, dict) else {}
+    )
+    coverage_instruction = (
+        "Dimensões obrigatórias nesta resposta: "
+        f"{', '.join(required_dimensions)}. Para cada dimensão obrigatória, "
+        "retorne ao menos um item com o mesmo valor em 'dimension'. Quando "
+        "um domínio não tiver dados, retorne um item curto explicando a "
+        "ausência com evidência em data_quality.domain_presence.<dimension>.\n"
+        if required_dimensions
+        else ""
+    )
+    domain_presence_json = json.dumps(
+        domain_presence,
+        ensure_ascii=False,
+        default=str,
+    )
     return (
         "Você é um analista financeiro pessoal. Analise exclusivamente o snapshot "
         "financeiro estruturado abaixo e gere insights em português brasileiro, "
         "objetivos, personalizados e acionáveis.\n"
         f"{period_instruction}\n"
+        f"{coverage_instruction}"
+        f"Presença de dados por domínio: {domain_presence_json}.\n"
         "Use somente os dados do snapshot fornecido. Não invente transações, metas, "
         "orçamentos, rendas, despesas, nomes, datas ou valores ausentes. Quando uma "
         "comparação não existir, mencione a ausência apenas se ela for relevante.\n"

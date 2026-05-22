@@ -20,6 +20,16 @@ from app.services.financial_insight_context_builder import (
 )
 from app.services.llm_provider import LLMResponse
 
+_ALL_FINANCIAL_DIMENSIONS = [
+    "general",
+    "transactions",
+    "credit_cards",
+    "goals",
+    "budgets",
+    "wallet",
+]
+_SORTED_FINANCIAL_DIMENSIONS = sorted(_ALL_FINANCIAL_DIMENSIONS)
+
 
 def _register_and_login(client) -> tuple[str, str]:
     suffix = uuid4().hex[:8]
@@ -120,9 +130,25 @@ class TestMetadataPersistenceAndMetrics:
         provider = MagicMock()
         provider.generate_with_usage.return_value = LLMResponse(
             content=(
-                '{"summary":"Resumo.","items":[{"type":"saude_financeira",'
-                '"dimension":"general","title":"OK","message":"All good.",'
-                '"evidence":["current_period.paid.balance"]}]}'
+                '{"summary":"Resumo.","items":['
+                '{"type":"saude_financeira","dimension":"general",'
+                '"title":"Geral","message":"All good.",'
+                '"evidence":["current_period.paid.balance"]},'
+                '{"type":"saude_financeira","dimension":"transactions",'
+                '"title":"Transações","message":"All good.",'
+                '"evidence":["data_quality.domain_presence.transactions"]},'
+                '{"type":"saude_financeira","dimension":"credit_cards",'
+                '"title":"Cartões","message":"All good.",'
+                '"evidence":["data_quality.domain_presence.credit_cards"]},'
+                '{"type":"saude_financeira","dimension":"goals",'
+                '"title":"Metas","message":"All good.",'
+                '"evidence":["data_quality.domain_presence.goals"]},'
+                '{"type":"saude_financeira","dimension":"budgets",'
+                '"title":"Orçamentos","message":"All good.",'
+                '"evidence":["data_quality.domain_presence.budgets"]},'
+                '{"type":"saude_financeira","dimension":"wallet",'
+                '"title":"Carteira","message":"All good.",'
+                '"evidence":["data_quality.domain_presence.wallet"]}]}'
             ),
             prompt_tokens=10,
             completion_tokens=20,
@@ -147,7 +173,7 @@ class TestMetadataPersistenceAndMetrics:
             assert record.called
             kwargs = record.call_args.kwargs
             assert kwargs["period_type"] == "daily"
-            assert kwargs["dimensions"] == ["general"]
+            assert kwargs["dimensions"] == _SORTED_FINANCIAL_DIMENSIONS
             assert kwargs["tokens_used"] == 30
             assert isinstance(kwargs["truncated"], bool)
             assert kwargs["snapshot_bytes"] >= 0
@@ -162,7 +188,7 @@ class TestMetadataPersistenceAndMetrics:
             assert row is not None
             md = row.metadata_dict
             assert md["snapshot_version"] == "financial_insight_snapshot.v1"
-            assert md["dimensions_present"] == ["general"]
+            assert md["dimensions_present"] == _SORTED_FINANCIAL_DIMENSIONS
             assert "snapshot_bytes_original" in md
             assert "snapshot_bytes_final" in md
             assert isinstance(md["truncated"], bool)

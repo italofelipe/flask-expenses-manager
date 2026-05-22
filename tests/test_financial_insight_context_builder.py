@@ -21,6 +21,7 @@ from app.models.transaction import (
     TransactionType,
 )
 from app.models.user import User
+from app.models.wallet import Wallet
 from app.services import financial_insight_context_builder
 from app.services.financial_insight_context_builder import (
     FinancialInsightContextBuilder,
@@ -160,6 +161,28 @@ def _make_goal_contribution(
     return contribution
 
 
+def _make_wallet(
+    user_id: uuid.UUID,
+    *,
+    name: str = "Tesouro Selic",
+    value: str = "5000.00",
+    asset_class: str = "fixed_income",
+) -> Wallet:
+    wallet = Wallet(
+        user_id=user_id,
+        name=name,
+        value=Decimal(value),
+        estimated_value_on_create_date=Decimal(value),
+        asset_class=asset_class,
+        annual_rate=Decimal("12.00"),
+        register_date=date(2026, 1, 1),
+        should_be_on_wallet=True,
+    )
+    db.session.add(wallet)
+    db.session.commit()
+    return wallet
+
+
 def _as_json(value: dict[str, Any]) -> str:
     return json.dumps(value, ensure_ascii=False, default=str)
 
@@ -297,6 +320,80 @@ class TestFinancialInsightContextBuilderDaily:
             snapshot["comparisons"]["month_to_date"]["paid"]["expense_total"]
             == "700.00"
         )
+        assert "week_to_date_vs_previous_week" in snapshot["comparisons"]
+
+    def test_daily_snapshot_includes_all_financial_domains_and_presence_flags(
+        self, app
+    ) -> None:
+        with app.app_context():
+            user_id = _make_user()
+            anchor = date(2026, 5, 17)
+            card = _make_credit_card(user_id, limit_amount="3000.00")
+            _make_transaction(
+                user_id,
+                title="Mercado",
+                amount="250.00",
+                tx_type=TransactionType.EXPENSE,
+                status=TransactionStatus.PAID,
+                due_date=anchor,
+                category=TransactionCategory.alimentacao,
+            )
+            _make_transaction(
+                user_id,
+                title="Compra no cartão",
+                amount="500.00",
+                tx_type=TransactionType.EXPENSE,
+                status=TransactionStatus.PENDING,
+                due_date=anchor,
+                credit_card_id=card.id,
+            )
+            _make_budget(
+                user_id,
+                name="Mercado",
+                amount="1000.00",
+                category=TransactionCategory.alimentacao,
+            )
+            goal = _make_goal(
+                user_id,
+                title="Reserva",
+                current_amount="1500.00",
+                target_amount="10000.00",
+                target_date=date(2027, 5, 17),
+            )
+            _make_goal_contribution(
+                user_id,
+                goal.id,
+                amount="500.00",
+                created_at=datetime(2026, 5, 10, 12, 0, 0),
+            )
+            _make_wallet(user_id, value="5000.00")
+
+            snapshot = FinancialInsightContextBuilder().build_daily(
+                user_id=user_id,
+                anchor_date=anchor,
+            )
+
+        assert snapshot["insight_contract"]["required_dimensions"] == [
+            "general",
+            "transactions",
+            "credit_cards",
+            "goals",
+            "budgets",
+            "wallet",
+        ]
+        assert snapshot["budgets"][0]["name"] == "Mercado"
+        assert snapshot["goals"][0]["title"] == "Reserva"
+        assert snapshot["credit_cards"][0]["name"] == "Cartão principal"
+        assert snapshot["wallet"]["total_value"] == "5000.00"
+        assert snapshot["data_quality"]["domain_presence"] == {
+            "general": True,
+            "transactions": True,
+            "credit_cards": True,
+            "goals": True,
+            "budgets": True,
+            "wallet": True,
+        }
+        assert snapshot["data_quality"]["missing_domains"] == []
 
     def test_daily_snapshot_marks_missing_previous_month_same_day(self, app) -> None:
         with app.app_context():
@@ -316,6 +413,20 @@ class TestFinancialInsightContextBuilderDaily:
                 anchor_date=anchor,
             )
 
+        assert snapshot["data_quality"]["domain_presence"] == {
+            "general": True,
+            "transactions": True,
+            "credit_cards": False,
+            "goals": False,
+            "budgets": False,
+            "wallet": False,
+        }
+        assert snapshot["data_quality"]["missing_domains"] == [
+            "credit_cards",
+            "goals",
+            "budgets",
+            "wallet",
+        ]
         assert "same_day_previous_month" not in snapshot["comparisons"]
         assert snapshot["data_quality"]["missing_comparison_periods"] == [
             "same_day_previous_month"

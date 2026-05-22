@@ -44,6 +44,7 @@ INSIGHT_DIMENSIONS: tuple[str, ...] = (
     "credit_cards",
     "goals",
     "budgets",
+    "wallet",
 )
 """Closed enum of dimension labels assigned to each AI insight item.
 
@@ -267,6 +268,13 @@ def _date_period(start: date, end: date, label: str) -> dict[str, str]:
     }
 
 
+def _insight_contract() -> dict[str, Any]:
+    return {
+        "required_dimensions": list(INSIGHT_DIMENSIONS),
+        "absence_evidence_prefix": "data_quality.domain_presence",
+    }
+
+
 def _risk_flag(
     *,
     code: str,
@@ -474,7 +482,10 @@ class FinancialInsightContextBuilder:
             end=anchor_date,
             label=anchor_date.isoformat(),
             period_type="daily",
+            include_budgets=True,
+            include_goals=True,
             include_credit_cards=True,
+            include_wallet=True,
             previous_generated_at=previous_generated_at,
         )
         yesterday = anchor_date - timedelta(days=1)
@@ -482,6 +493,29 @@ class FinancialInsightContextBuilder:
         same_day_previous_month = _same_day_previous_month(anchor_date)
         same_day_previous_year = _same_day_previous_year(anchor_date)
         month_start = date(anchor_date.year, anchor_date.month, 1)
+        week_start, _ = _week_bounds(anchor_date)
+        week_elapsed_days = (anchor_date - week_start).days
+        previous_week_start = week_start - timedelta(days=7)
+        previous_week_equivalent_end = previous_week_start + timedelta(
+            days=week_elapsed_days
+        )
+        week_to_date = self._period_snapshot(
+            user_id=user_id,
+            start=week_start,
+            end=anchor_date,
+            label=f"{anchor_date.isocalendar().year}-W{anchor_date.isocalendar().week:02d}-to-date",
+            period_type="week_to_date",
+        )
+        previous_week_to_date = self._period_snapshot(
+            user_id=user_id,
+            start=previous_week_start,
+            end=previous_week_equivalent_end,
+            label=(
+                f"{previous_week_start.isocalendar().year}-"
+                f"W{previous_week_start.isocalendar().week:02d}-equivalent"
+            ),
+            period_type="previous_week_to_date",
+        )
 
         missing_comparisons: list[str] = []
         comparisons: dict[str, Any] = {
@@ -508,6 +542,14 @@ class FinancialInsightContextBuilder:
                     period_type="month_to_date",
                 )
             ),
+            "week_to_date_vs_previous_week": {
+                "current": self._compact_period_snapshot(week_to_date),
+                "previous": self._compact_period_snapshot(previous_week_to_date),
+                "delta": self._delta(
+                    week_to_date["current_period"],
+                    previous_week_to_date,
+                ),
+            },
         }
         if same_day_previous_month is not None:
             comparisons["same_day_previous_month"] = self._comparison_snapshot(
@@ -665,6 +707,7 @@ class FinancialInsightContextBuilder:
             "timezone": _TIMEZONE,
             "anchor_date": end.isoformat(),
             "period": _date_period(start, end, label),
+            "insight_contract": _insight_contract(),
             "current_period": current_period,
             "comparisons": {},
             "daily_series": self._daily_series(paid, start=start, end=end)
@@ -702,11 +745,36 @@ class FinancialInsightContextBuilder:
                 snapshot["data_quality"]["missing_external_rates"] = missing_rates
         else:
             snapshot["wallet"] = {"items": [], "total_value": "0.00"}
+        self._record_domain_presence(snapshot)
         snapshot["financial_health"] = self._financial_health_payload(snapshot)
         snapshot["data_quality"]["insufficient_financial_health_data"] = (
             snapshot["financial_health"]["grade"] == "insufficient_data"
         )
         return snapshot
+
+    def _record_domain_presence(self, snapshot: dict[str, Any]) -> None:
+        wallet = (
+            snapshot.get("wallet") if isinstance(snapshot.get("wallet"), dict) else {}
+        )
+        wallet_items = wallet.get("items") if isinstance(wallet, dict) else []
+        domain_presence = {
+            "general": True,
+            "transactions": bool(
+                (snapshot.get("transactions") or {}).get("included_count")
+            ),
+            "credit_cards": bool(snapshot.get("credit_cards")),
+            "goals": bool(snapshot.get("goals")),
+            "budgets": bool(snapshot.get("budgets")),
+            "wallet": bool(wallet_items) or _money(wallet.get("total_value")) > 0
+            if isinstance(wallet, dict)
+            else False,
+        }
+        snapshot["data_quality"]["domain_presence"] = domain_presence
+        snapshot["data_quality"]["missing_domains"] = [
+            dimension
+            for dimension in INSIGHT_DIMENSIONS
+            if not domain_presence.get(dimension, False)
+        ]
 
     def _credit_cards_payload(
         self,
