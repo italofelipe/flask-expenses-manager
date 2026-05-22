@@ -362,7 +362,9 @@ def enqueue_monthly_report_run(*, run_id: UUID) -> dict[str, Any]:
         return process_monthly_report_run(run_id=run_id)
 
     run = db.session.get(AIInsightRun, run_id)
-    payload = _serialize_run(run) if run is not None else {"run_id": str(run_id)}
+    payload: dict[str, Any] = (
+        _serialize_run(run) if run is not None else {"run_id": str(run_id)}
+    )
     payload["queued"] = True
     payload["job_id"] = str(job.id)
     return payload
