@@ -700,13 +700,34 @@ class FinancialInsightContextBuilder:
         timezone_name: str = _TIMEZONE,
         timezone_fallback: bool = False,
     ) -> dict[str, Any]:
-        transactions = self._fetch_transactions(user_id=user_id, start=start, end=end)
+        due_transactions = self._fetch_transactions(
+            user_id=user_id,
+            start=start,
+            end=end,
+        )
+        created_transactions = self._fetch_transactions_created(
+            user_id=user_id,
+            start=start,
+            end=end,
+        )
+        transactions = self._merge_transactions(
+            due_transactions,
+            created_transactions,
+        )
         non_cancelled = [
             tx for tx in transactions if tx.status != TransactionStatus.CANCELLED
         ]
-        paid = [tx for tx in non_cancelled if tx.status == TransactionStatus.PAID]
+        due_non_cancelled = [
+            tx
+            for tx in due_transactions
+            if tx.status != TransactionStatus.CANCELLED
+        ]
+        paid = [tx for tx in due_non_cancelled if tx.status == TransactionStatus.PAID]
 
-        current_period = self._current_period_summary(transactions)
+        current_period = self._current_period_summary(
+            due_transactions,
+            created_transactions=created_transactions,
+        )
         goals_payload: list[dict[str, Any]] = []
         goal_data_quality: dict[str, Any] = {}
         if include_goals:
@@ -952,9 +973,45 @@ class FinancialInsightContextBuilder:
         )
         return cast(list[Transaction], rows)
 
+    def _fetch_transactions_created(
+        self,
+        *,
+        user_id: UUID,
+        start: date,
+        end: date,
+    ) -> list[Transaction]:
+        start_dt = datetime.combine(start, datetime.min.time())
+        end_dt = datetime.combine(end + timedelta(days=1), datetime.min.time())
+        rows = (
+            Transaction.query.filter(
+                Transaction.user_id == user_id,
+                Transaction.deleted.is_(False),
+                Transaction.created_at >= start_dt,
+                Transaction.created_at < end_dt,
+            )
+            .order_by(Transaction.created_at.asc(), Transaction.due_date.asc())
+            .all()
+        )
+        return cast(list[Transaction], rows)
+
+    def _merge_transactions(
+        self,
+        *transaction_groups: list[Transaction],
+    ) -> list[Transaction]:
+        by_id: dict[UUID, Transaction] = {}
+        for group in transaction_groups:
+            for transaction in group:
+                by_id[transaction.id] = transaction
+        return sorted(
+            by_id.values(),
+            key=lambda tx: (tx.due_date, tx.created_at, _money(tx.amount)),
+        )
+
     def _current_period_summary(
         self,
         transactions: list[Transaction],
+        *,
+        created_transactions: list[Transaction] | None = None,
     ) -> dict[str, Any]:
         paid = [tx for tx in transactions if tx.status == TransactionStatus.PAID]
         pending = [tx for tx in transactions if tx.status == TransactionStatus.PENDING]
@@ -962,11 +1019,27 @@ class FinancialInsightContextBuilder:
         cancelled_count = sum(
             1 for tx in transactions if tx.status == TransactionStatus.CANCELLED
         )
+        created = [
+            tx
+            for tx in (created_transactions or [])
+            if tx.status != TransactionStatus.CANCELLED
+        ]
+        created_pending = [
+            tx
+            for tx in created
+            if tx.status in {TransactionStatus.PENDING, TransactionStatus.OVERDUE}
+        ]
 
         paid_income = self._sum(paid, TransactionType.INCOME)
         paid_expense = self._sum(paid, TransactionType.EXPENSE)
         pending_expense = self._sum(pending, TransactionType.EXPENSE)
         overdue_expense = self._sum(overdue, TransactionType.EXPENSE)
+        created_income = self._sum(created, TransactionType.INCOME)
+        created_expense = self._sum(created, TransactionType.EXPENSE)
+        created_pending_expense = self._sum(
+            created_pending,
+            TransactionType.EXPENSE,
+        )
 
         return {
             "paid": {
@@ -979,6 +1052,13 @@ class FinancialInsightContextBuilder:
                 "pending_expense_total": _money_str(pending_expense),
                 "overdue_expense_total": _money_str(overdue_expense),
                 "transaction_count": len(pending) + len(overdue),
+            },
+            "created_today": {
+                "income_total": _money_str(created_income),
+                "expense_total": _money_str(created_expense),
+                "pending_expense_total": _money_str(created_pending_expense),
+                "transaction_count": len(created),
+                "items": self._transaction_event_payload(created)["items"],
             },
             "cancelled_transaction_count": cancelled_count,
         }

@@ -105,6 +105,29 @@ class TestCsrfEnforcementWhenEnabled:
         assert raw, "CSRF cookie must be emitted"
         assert "HttpOnly" not in raw, "CSRF cookie must be readable by client JS"
 
+    def test_refresh_csrf_cookie_is_readable_from_app_shell_path(self, app, client):
+        """The app shell at /dashboard must read the double-submit CSRF cookie."""
+        self._enable_csrf(app)
+        app.config["JWT_COOKIE_DOMAIN"] = ".auraxis.com.br"
+        app.config["JWT_COOKIE_SECURE"] = True
+        _create_user(app, email="csrf-on-cookie-scope@test.com")
+        resp = _login(client, email="csrf-on-cookie-scope@test.com")
+
+        csrf_raw = _find_set_cookie(resp, CSRF_REFRESH_COOKIE_NAME) or ""
+        refresh_raw = _find_set_cookie(resp, REFRESH_COOKIE_NAME) or ""
+
+        assert csrf_raw, "CSRF cookie must be emitted"
+        assert "HttpOnly" not in csrf_raw
+        assert "Path=/" in csrf_raw
+        assert "Domain=auraxis.com.br" in csrf_raw
+        assert "SameSite=Lax" in csrf_raw
+        assert "Secure" in csrf_raw
+
+        assert refresh_raw, "refresh cookie must still be emitted"
+        assert "HttpOnly" in refresh_raw
+        assert "Path=/auth/refresh" in refresh_raw
+        assert "Domain=auraxis.com.br" in refresh_raw
+
     def test_refresh_without_csrf_header_returns_401(self, app, client):
         self._enable_csrf(app)
         _create_user(app, email="csrf-on-missing-header@test.com")
