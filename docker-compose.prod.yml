@@ -1,11 +1,64 @@
-# Production compose is RDS-canonical: no local `db` service is provisioned.
-# The web container resolves the database via DATABASE_URL loaded from
-# .env.prod (points to the RDS endpoint at
-# auraxis-prod.cav02gmeg759.us-east-1.rds.amazonaws.com:5432).
-# Local Postgres for offline dev lives in docker-compose.dev.yml.
-# Re-introducing a `db` service here will reopen issue #1254 (wait-for-db hang
-# on deploy) — keep this file RDS-only.
+# Production compose now self-hosts Postgres in the `db` service (ADR
+# `rds_to_self_hosted_postgres.md`, umbrella issue #1376). DATABASE_URL in
+# .env.prod must point to `db:5432` — NOT to the RDS endpoint, which is
+# being decommissioned. This pairing (db service + DATABASE_URL pointing
+# to `db`) is the explicit fix for issue #1254 (mixed RDS-canonical
+# configuration that crashed deploys when both coexisted).
+#
+# Postgres is tuned for t2.micro (1 GB RAM, ~185 MB free pre-migration):
+#   - shared_buffers=128MB   (25% of available)
+#   - effective_cache_size=256MB
+#   - max_connections=20     (more than enough for 6 users)
+#   - work_mem=4MB           (low to avoid OOM during sorts)
+# Monitor swap via CloudWatch alarms (issue platform#802).
 services:
+  db:
+    image: ${POSTGRES_IMAGE:-public.ecr.aws/docker/library/postgres:16-alpine}
+    restart: unless-stopped
+    container_name: auraxis-db-1
+    # Low-memory tuning for t2.micro. Slow query log at 500ms.
+    command:
+      - "postgres"
+      - "-c"
+      - "shared_buffers=128MB"
+      - "-c"
+      - "effective_cache_size=256MB"
+      - "-c"
+      - "max_connections=20"
+      - "-c"
+      - "work_mem=4MB"
+      - "-c"
+      - "maintenance_work_mem=64MB"
+      - "-c"
+      - "log_min_duration_statement=500"
+      - "-c"
+      - "log_statement=none"
+      - "-c"
+      - "log_line_prefix=%m [%p] %q%u@%d "
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    volumes:
+      - pgdata_prod:/var/lib/postgresql/data
+    logging:
+      driver: json-file
+      options:
+        max-size: "20m"
+        max-file: "3"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+    deploy:
+      resources:
+        limits:
+          memory: 384M
+        reservations:
+          memory: 256M
+
   redis:
     image: ${REDIS_IMAGE:-public.ecr.aws/docker/library/redis:7-alpine}
     restart: unless-stopped
@@ -31,11 +84,13 @@ services:
       DOCS_EXPOSURE_POLICY: "${DOCS_EXPOSURE_POLICY:-disabled}"
       AUTO_CREATE_DB: "${AUTO_CREATE_DB:-false}"
       MIGRATE_ON_START: "${MIGRATE_ON_START:-false}"
-      # DATABASE_URL in .env.prod points to RDS:
-      # auraxis-prod.cav02gmeg759.us-east-1.rds.amazonaws.com:5432
+      # DATABASE_URL in .env.prod must point to db:5432 (local container).
+      # Post-migration from RDS — see ADR `rds_to_self_hosted_postgres.md`.
       RATE_LIMIT_REDIS_URL: "${RATE_LIMIT_REDIS_URL:-redis://redis:6379/0}"
       LOGIN_GUARD_REDIS_URL: "${LOGIN_GUARD_REDIS_URL:-redis://redis:6379/0}"
     depends_on:
+      db:
+        condition: service_healthy
       redis:
         condition: service_healthy
     healthcheck:
@@ -72,6 +127,7 @@ services:
       - letsencrypt:/etc/letsencrypt
 
 volumes:
+  pgdata_prod:
   redis_prod:
   certbot_challenge:
   letsencrypt:
