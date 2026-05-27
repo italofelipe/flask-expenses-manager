@@ -88,8 +88,9 @@ Templates:
 | **Gemini** | Consultive: architecture second opinions | On-demand only |
 | **CrewAI** | Automated pipeline | Paused indefinitely |
 
-For autonomous execution, issues labeled `agent:claude` trigger `agent-implement.yml`
-in GitHub Actions, which uses the `backend-agent.md` skill.
+Execution model: Claude works **locally** (CLI, IDE). Previous label-triggered
+workflows (`agent-implement.yml`, `agent-qa.yml`, `agent-watchdog*.yml`) were
+retired on 2026-05-27 — see platform ADR `agent_workflows_decommissioned.md`.
 
 All agents share:
 - Knowledge base: `.context/`
