@@ -21,6 +21,12 @@ TEST_ENV_OVERRIDES = {
     "CORS_ALLOWED_ORIGINS": "https://frontend.local",
     "GRAPHQL_ALLOW_INTROSPECTION": "true",
     "BRAPI_CACHE_TTL_SECONDS": "0",
+    # Force the deterministic stub provider for market rates (BCB SGS data)
+    # so AI advisory tests don't flake on real BCB API timeouts. The default
+    # is BcbMarketRatesProvider which hits the public BCB API and returns
+    # different values on each call when the network is slow — that breaks
+    # snapshot hashing and cache-hit behaviour in tests.
+    "AI_MARKET_RATES_PROVIDER": "stub",
 }
 
 for key, value in TEST_ENV_OVERRIDES.items():
@@ -37,6 +43,29 @@ def isolate_test_env() -> Generator[None, None, None]:
             os.environ.pop(key, None)
         else:
             os.environ[key] = value
+
+
+@pytest.fixture(autouse=True)
+def reset_market_rates_provider_singleton() -> Generator[None, None, None]:
+    """Reset the BCB market-rates singleton so each test gets the stub.
+
+    The provider is a process-level singleton picked the first time it is
+    needed. If a test (or app import) instantiates it before our env var
+    `AI_MARKET_RATES_PROVIDER=stub` is read, subsequent tests inherit the
+    real BCB adapter and start flaking on timeouts. Resetting before each
+    test forces re-evaluation with our test env.
+    """
+    try:
+        from app.services.market_rates_provider import (
+            reset_market_rates_provider_for_tests,
+        )
+    except ImportError:
+        yield
+        return
+
+    reset_market_rates_provider_for_tests()
+    yield
+    reset_market_rates_provider_for_tests()
 
 
 @pytest.fixture
