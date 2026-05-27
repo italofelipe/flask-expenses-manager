@@ -42,9 +42,10 @@ node_modules/
 *.zip
 *.tgz
 .mypy
-# Pytest cache
+# Pytest / lint caches
 .pytest_cache/
 .mypy_cache/
+.ruff_cache/
 
 # Migrations must remain versioned (Alembic source of truth).
 
