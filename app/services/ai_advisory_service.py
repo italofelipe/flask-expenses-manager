@@ -2014,7 +2014,10 @@ def _build_financial_insight_prompt(
         "daily": (
             "Para insight diário: compare hoje com ontem, com o mesmo dia do mês "
             "passado quando disponível, recapitule rapidamente o mês até agora e "
-            "resuma como o usuário está hoje."
+            "resuma como o usuário está hoje. Diferencie transações pagas hoje "
+            "de transações criadas hoje: dívidas em current_period.created_today "
+            "devem ser mencionadas mesmo quando ainda estiverem pendentes ou com "
+            "vencimento futuro."
         ),
         "weekly": (
             "Para insight semanal: resuma a semana, cite maiores e menores gastos, "
@@ -2071,9 +2074,12 @@ def _build_financial_insight_prompt(
         "orçamentos, rendas, despesas, nomes, datas ou valores ausentes. Quando uma "
         "comparação não existir, mencione a ausência apenas se ela for relevante.\n"
         "Cada item deve conter evidências que apontem para chaves conhecidas do "
-        "snapshot, como current_period.paid.balance, comparisons.yesterday.delta, "
-        "daily_series, extremes, categories, transactions.sample, budgets, goals, "
-        "credit_cards, wallet ou financial_health.\n"
+        "snapshot, como current_period.paid.balance, "
+        "current_period.created_today.pending_expense_total, "
+        "comparisons.yesterday.delta, daily_series, extremes, categories, "
+        "transactions.sample, budgets, goals, credit_cards, wallet ou "
+        "financial_health. Nunca diga que não houve transações hoje quando "
+        "current_period.created_today.transaction_count for maior que zero.\n"
         "Quando 'wallet' estiver presente e o ativo total for > 0, contextualize "
         "a rentabilidade e a alocação atual: compare com "
         "'wallet.benchmark.cdi_monthly_pct' e 'wallet.benchmark.ipca_monthly_pct' "

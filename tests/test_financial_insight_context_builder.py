@@ -188,6 +188,40 @@ def _as_json(value: dict[str, Any]) -> str:
 
 
 class TestFinancialInsightContextBuilderDaily:
+    def test_daily_snapshot_includes_pending_expenses_created_today_even_when_due_later(
+        self, app
+    ) -> None:
+        with app.app_context():
+            user_id = _make_user()
+            anchor = date(2026, 5, 26)
+            for index, amount in enumerate(("120.25", "2580.00", "45.90"), start=1):
+                _make_transaction(
+                    user_id,
+                    title=f"Dívida nova {index}",
+                    amount=amount,
+                    tx_type=TransactionType.EXPENSE,
+                    status=TransactionStatus.PENDING,
+                    due_date=date(2026, 6, index),
+                    created_at=datetime(2026, 5, 26, 9 + index, 0, 0),
+                )
+
+            snapshot = FinancialInsightContextBuilder().build_daily(
+                user_id=user_id,
+                anchor_date=anchor,
+            )
+
+        created_today = snapshot["current_period"]["created_today"]
+        assert created_today["transaction_count"] == 3
+        assert created_today["expense_total"] == "2746.15"
+        assert created_today["pending_expense_total"] == "2746.15"
+        assert [item["title"] for item in created_today["items"]] == [
+            "Dívida nova 1",
+            "Dívida nova 2",
+            "Dívida nova 3",
+        ]
+        assert snapshot["transactions"]["included_count"] == 3
+        assert snapshot["data_quality"]["domain_presence"]["transactions"] is True
+
     def test_daily_snapshot_compares_today_yesterday_previous_month_and_mtd(
         self, app
     ) -> None:

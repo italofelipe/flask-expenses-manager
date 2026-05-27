@@ -74,6 +74,7 @@ class Config:
     # body during the transition period.
     JWT_TOKEN_LOCATION = ["headers", "cookies"]
     JWT_HEADER_TYPE = "Bearer"
+    JWT_COOKIE_DOMAIN = os.getenv("JWT_COOKIE_DOMAIN") or None
     JWT_REFRESH_COOKIE_NAME = "auraxis_refresh"
     JWT_REFRESH_COOKIE_PATH = "/auth/refresh"
     # Secure flag is enabled in non-dev/test runtimes. HTTPS is required for
@@ -96,6 +97,8 @@ class Config:
     JWT_REFRESH_CSRF_HEADER_NAME = "X-CSRF-TOKEN"
     JWT_ACCESS_CSRF_COOKIE_NAME = "auraxis_csrf_access"
     JWT_REFRESH_CSRF_COOKIE_NAME = "auraxis_csrf_refresh"
+    JWT_ACCESS_CSRF_COOKIE_PATH = os.getenv("JWT_ACCESS_CSRF_COOKIE_PATH", "/")
+    JWT_REFRESH_CSRF_COOKIE_PATH = os.getenv("JWT_REFRESH_CSRF_COOKIE_PATH", "/")
     JWT_CSRF_IN_COOKIES = True
     # SEC-1 — close dual-mode: when True, login/refresh responses stop echoing
     # refresh_token in the JSON body; clients must rely on the httpOnly cookie.
