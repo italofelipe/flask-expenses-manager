@@ -718,9 +718,7 @@ class FinancialInsightContextBuilder:
             tx for tx in transactions if tx.status != TransactionStatus.CANCELLED
         ]
         due_non_cancelled = [
-            tx
-            for tx in due_transactions
-            if tx.status != TransactionStatus.CANCELLED
+            tx for tx in due_transactions if tx.status != TransactionStatus.CANCELLED
         ]
         paid = [tx for tx in due_non_cancelled if tx.status == TransactionStatus.PAID]
 
