@@ -56,6 +56,22 @@ class TransactionSchema(Schema):
             "example": 12,
         },
     )
+    recurrence_interval = fields.Int(
+        load_default=1,
+        validate=validate.Range(min=1, max=365),
+        metadata={
+            "description": "Intervalo da recorrência (a cada N unidades)",
+            "example": 1,
+        },
+    )
+    recurrence_unit = fields.Str(
+        load_default="month",
+        validate=validate.OneOf(["day", "week", "month", "year"]),
+        metadata={
+            "description": "Unidade da recorrência: day, week, month ou year",
+            "example": "month",
+        },
+    )
     amount = fields.Decimal(
         as_string=True,
         required=True,

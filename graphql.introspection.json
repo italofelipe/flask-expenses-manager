@@ -8166,6 +8166,30 @@
               "deprecationReason": null,
               "description": null,
               "isDeprecated": false,
+              "name": "recurrenceInterval",
+              "type": {
+                "kind": "SCALAR",
+                "name": "Int",
+                "ofType": null
+              }
+            },
+            {
+              "args": [],
+              "deprecationReason": null,
+              "description": null,
+              "isDeprecated": false,
+              "name": "recurrenceUnit",
+              "type": {
+                "kind": "SCALAR",
+                "name": "String",
+                "ofType": null
+              }
+            },
+            {
+              "args": [],
+              "deprecationReason": null,
+              "description": null,
+              "isDeprecated": false,
               "name": "category",
               "type": {
                 "kind": "SCALAR",
@@ -10324,6 +10348,30 @@
                   "description": null,
                   "isDeprecated": false,
                   "name": "observation",
+                  "type": {
+                    "kind": "SCALAR",
+                    "name": "String",
+                    "ofType": null
+                  }
+                },
+                {
+                  "defaultValue": null,
+                  "deprecationReason": null,
+                  "description": null,
+                  "isDeprecated": false,
+                  "name": "recurrenceInterval",
+                  "type": {
+                    "kind": "SCALAR",
+                    "name": "Int",
+                    "ofType": null
+                  }
+                },
+                {
+                  "defaultValue": null,
+                  "deprecationReason": null,
+                  "description": null,
+                  "isDeprecated": false,
+                  "name": "recurrenceUnit",
                   "type": {
                     "kind": "SCALAR",
                     "name": "String",

@@ -53,6 +53,8 @@ class TransactionTypeObject(graphene.ObjectType):
     is_recurring = graphene.Boolean(required=True)
     is_installment = graphene.Boolean(required=True)
     installment_count = graphene.Int()
+    recurrence_interval = graphene.Int()
+    recurrence_unit = graphene.String()
     category = graphene.String()
     tag_id = graphene.String()
     account_id = graphene.String()
