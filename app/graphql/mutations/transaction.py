@@ -33,6 +33,8 @@ class CreateTransactionMutation(graphene.Mutation):
         is_recurring = graphene.Boolean(default_value=False)
         is_installment = graphene.Boolean(default_value=False)
         installment_count = graphene.Int()
+        recurrence_interval = graphene.Int()
+        recurrence_unit = graphene.String()
         currency = graphene.String(default_value="BRL")
         status = TransactionStatusEnum()
         start_date = graphene.String()
