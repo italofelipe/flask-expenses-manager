@@ -228,3 +228,77 @@ class TestMonthlyCapHTTP:
         assert resp.status_code == 429
         assert resp.get_json()["error"]["code"] == "AI_MONTHLY_LIMIT_EXCEEDED"
         assert resp.headers.get("X-AI-Calls-Remaining-Month") == "0"
+
+
+# ---------------------------------------------------------------------------
+# Admin bypass — admins are exempt from caps and cost ceiling (for testing)
+# ---------------------------------------------------------------------------
+
+
+class TestAdminBypass:
+    def setup_method(self) -> None:
+        _reset_ai_counter()
+
+    def test_request_is_admin_reads_roles_claim(self) -> None:
+        from app.middleware.ai_rate_limit import request_is_admin
+
+        admin_ctx = type("Ctx", (), {"roles": ["admin"]})()
+        user_ctx = type("Ctx", (), {"roles": ["user"]})()
+        with patch("app.auth.get_active_auth_context", return_value=admin_ctx):
+            assert request_is_admin() is True
+        with patch("app.auth.get_active_auth_context", return_value=user_ctx):
+            assert request_is_admin() is False
+
+    def test_admin_bypasses_daily_and_monthly_caps(self, app, client) -> None:
+        from app.middleware.ai_rate_limit import AI_MONTHLY_LIMIT
+
+        token = _register_and_login(client, "ai-admin")
+        user_id = _grant_premium(app, token)
+        # Pre-saturate both counters; an admin must still pass through.
+        from app.middleware.ai_rate_limit import record_ai_monthly_success
+
+        for _ in range(AI_MONTHLY_LIMIT):
+            record_ai_monthly_success(user_id)
+
+        with (
+            patch(
+                "app.middleware.ai_rate_limit.request_is_admin",
+                return_value=True,
+            ),
+            patch(
+                "app.services.ai_advisory_service.AIAdvisoryService.generate_spending_insights",
+                return_value={
+                    "insights": "ok",
+                    "tokens_used": 10,
+                    "cost_usd": 0.0,
+                    "month": "2026-05",
+                    "model": "stub",
+                },
+            ),
+        ):
+            first = client.get("/ai/insights/spending", headers=_auth(token, v2=True))
+            second = client.get("/ai/insights/spending", headers=_auth(token, v2=True))
+
+        assert first.status_code == 200
+        assert second.status_code == 200  # would be 429 for a non-admin
+
+    def test_admin_bypasses_cost_ceiling(self, app) -> None:
+        with app.app_context():
+            from app.services.ai_advisory_service import (
+                _enforce_financial_insight_generation_budget,
+            )
+
+            user_id = uuid.uuid4()
+            _seed_llm_cost(
+                user_id, cost_usd="100.00", endpoint="financial_insights_daily"
+            )
+            with patch(
+                "app.middleware.ai_rate_limit.request_is_admin",
+                return_value=True,
+            ):
+                # Far above budget, but an admin must not be blocked.
+                _enforce_financial_insight_generation_budget(
+                    user_id=user_id,
+                    normalized_period_type="daily",
+                    preview_run=None,
+                )
