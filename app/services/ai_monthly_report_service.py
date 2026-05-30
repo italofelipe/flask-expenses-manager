@@ -247,6 +247,88 @@ def create_monthly_report_run(
     return _serialize_run(run, include_snapshot=True)
 
 
+def _previous_month_anchor(reference_date: date) -> date:
+    """First day of the month before ``reference_date`` (the month to recap)."""
+    if reference_date.month == 1:
+        return date(reference_date.year - 1, 12, 1)
+    return date(reference_date.year, reference_date.month - 1, 1)
+
+
+def _users_with_daily_insights(*, period_start: date, period_end: date) -> list[UUID]:
+    rows = (
+        db.session.query(AIInsight.user_id)
+        .filter(AIInsight.insight_type == InsightType.daily)
+        .filter(AIInsight.period_start >= period_start)
+        .filter(AIInsight.period_end <= period_end)
+        .distinct()
+        .all()
+    )
+    return [cast(UUID, row[0]) for row in rows]
+
+
+def _has_monthly_recap(*, user_id: UUID, period_label: str) -> bool:
+    return (
+        db.session.query(AIInsight.id)
+        .filter_by(
+            user_id=user_id,
+            insight_type=InsightType.monthly,
+            period_label=period_label,
+        )
+        .first()
+        is not None
+    )
+
+
+def generate_monthly_recaps_for_all(
+    *,
+    reference_date: date | None = None,
+    llm_provider: LLMProvider | None = None,
+) -> int:
+    """Generate the end-of-month recap for every user with activity.
+
+    Intended to run on the 1st of each month (cron): for the month that just
+    ended, every user that produced at least one daily insight gets a
+    consolidated monthly recap. Idempotent — users that already have a recap
+    for the period are skipped. The recap is exempt from the per-user daily/
+    monthly caps and cost ceiling (it does not go through the rate-limited
+    endpoint and ``monthly`` is exempt from the cost guard).
+    """
+    reference = reference_date or date.today()
+    anchor = _previous_month_anchor(reference)
+    period_start, period_end = _month_bounds(anchor)
+    period_label = f"{anchor:%Y-%m}"
+
+    user_ids = _users_with_daily_insights(
+        period_start=period_start, period_end=period_end
+    )
+    log.info(
+        "monthly_recap.batch start period=%s eligible_users=%d",
+        period_label,
+        len(user_ids),
+    )
+
+    generated = 0
+    for user_id in user_ids:
+        if _has_monthly_recap(user_id=user_id, period_label=period_label):
+            continue
+        try:
+            run = create_monthly_report_run(user_id=user_id, anchor_date=anchor)
+            process_monthly_report_run(
+                run_id=UUID(str(run["run_id"])), llm_provider=llm_provider
+            )
+            generated += 1
+        except Exception:
+            log.warning(
+                "monthly_recap.user_failed user_id=%s period=%s",
+                user_id,
+                period_label,
+                exc_info=True,
+            )
+
+    log.info("monthly_recap.batch done period=%s generated=%d", period_label, generated)
+    return generated
+
+
 def _app_deep_link(insight_id: UUID) -> str:
     base_url = os.getenv("AURAXIS_APP_URL", _DEFAULT_APP_URL).rstrip("/")
     return f"{base_url}/insights?open={insight_id}"
