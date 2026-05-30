@@ -38,6 +38,15 @@ class TransactionStatus(enum.Enum):
     OVERDUE = "overdue"
 
 
+class RecurrenceUnit(enum.Enum):
+    """Cadence unit for a recurring transaction (combined with an interval)."""
+
+    day = "day"
+    week = "week"
+    month = "month"
+    year = "year"
+
+
 class Transaction(db.Model):
     __tablename__ = "transactions"
 
@@ -50,6 +59,23 @@ class Transaction(db.Model):
     is_recurring = db.Column(db.Boolean, default=False)
     is_installment = db.Column(db.Boolean, default=False)
     installment_count = db.Column(db.Integer, nullable=True)
+    # Recurrence cadence: repeat every ``recurrence_interval`` ``recurrence_unit``s
+    # (e.g. interval=2 + unit=week → every two weeks). Legacy rows default to a
+    # monthly cadence so existing recurring transactions keep working.
+    recurrence_interval = db.Column(
+        db.Integer, nullable=False, default=1, server_default=db.text("1")
+    )
+    recurrence_unit = db.Column(
+        db.Enum(
+            RecurrenceUnit,
+            name="recurrence_unit_enum",
+            native_enum=False,
+            values_callable=lambda e: [m.value for m in e],
+        ),
+        nullable=False,
+        default=RecurrenceUnit.month,
+        server_default=RecurrenceUnit.month.value,
+    )
     amount = db.Column(db.Numeric(12, 2), nullable=False)
     currency = db.Column(db.String(3), default="BRL")
 
