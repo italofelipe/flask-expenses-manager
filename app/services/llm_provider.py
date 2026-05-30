@@ -42,7 +42,9 @@ class LLMResponse:
         Falls back to conservative defaults for unknown models.
         """
         _PRICES: dict[str, tuple[float, float]] = {
+            "gpt-4o": (2.50, 10.00),
             "gpt-4o-mini": (0.15, 0.60),
+            "gpt-4.1": (2.00, 8.00),
             "gpt-4.1-mini": (0.40, 1.60),
             "claude-haiku-4-5-20251001": (0.25, 1.25),
         }
@@ -123,7 +125,9 @@ class OpenAILLMProvider:
 
     def __init__(self) -> None:
         self._api_key = os.getenv("OPENAI_API_KEY", "")
-        self._model = os.getenv("OPENAI_ADVISORY_MODEL", "gpt-4o-mini")
+        # Strong model by default (#1386): richer, more assertive insights.
+        # Cost is bounded by the per-user monthly budget + 1/day cap.
+        self._model = os.getenv("OPENAI_ADVISORY_MODEL", "gpt-4o")
 
     def generate(self, prompt: str) -> str:
         return self.generate_with_usage(prompt).content

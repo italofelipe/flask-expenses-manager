@@ -93,14 +93,15 @@ class TestOpenAILLMProvider:
                 provider.generate("prompt")
 
     def test_uses_custom_model_from_env(self, monkeypatch):
-        monkeypatch.setenv("OPENAI_ADVISORY_MODEL", "gpt-4o")
-        provider = OpenAILLMProvider()
-        assert provider._model == "gpt-4o"
-
-    def test_default_model_is_gpt4o_mini(self, monkeypatch):
-        monkeypatch.delenv("OPENAI_ADVISORY_MODEL", raising=False)
+        monkeypatch.setenv("OPENAI_ADVISORY_MODEL", "gpt-4o-mini")
         provider = OpenAILLMProvider()
         assert provider._model == "gpt-4o-mini"
+
+    def test_default_model_is_strong(self, monkeypatch):
+        monkeypatch.delenv("OPENAI_ADVISORY_MODEL", raising=False)
+        provider = OpenAILLMProvider()
+        # Strong model by default (#1386); overridable via OPENAI_ADVISORY_MODEL.
+        assert provider._model == "gpt-4o"
 
 
 class TestClaudeLLMProvider:
