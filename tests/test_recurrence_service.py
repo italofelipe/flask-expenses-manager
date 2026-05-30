@@ -5,7 +5,12 @@ from unittest.mock import patch
 import pytest
 
 from app.extensions.database import db
-from app.models.transaction import Transaction, TransactionStatus, TransactionType
+from app.models.transaction import (
+    RecurrenceUnit,
+    Transaction,
+    TransactionStatus,
+    TransactionType,
+)
 from app.models.user import User
 from app.services.recurrence_service import RecurrenceService
 
@@ -55,6 +60,90 @@ def test_generate_missing_occurrences_is_idempotent(app) -> None:
             date(2026, 3, 5),
             date(2026, 4, 5),
         ]
+
+
+def test_generate_materializes_future_occurrences_until_end_date(app) -> None:
+    """Occurrences must be created up to end_date even when it is in the future
+    relative to the reference date — this is the fix for recurring transactions
+    not showing up in future months."""
+    with app.app_context():
+        user = _create_user()
+        template = Transaction(
+            user_id=user.id,
+            title="Aluguel",
+            amount=Decimal("1000.00"),
+            type=TransactionType.EXPENSE,
+            status=TransactionStatus.PENDING,
+            due_date=date(2026, 1, 5),
+            is_recurring=True,
+            start_date=date(2026, 1, 5),
+            end_date=date(2026, 4, 5),
+            currency="BRL",
+        )
+        db.session.add(template)
+        db.session.commit()
+
+        # Reference date is early January, but occurrences through April must
+        # still be materialised.
+        created = RecurrenceService.generate_missing_occurrences(
+            reference_date=date(2026, 1, 10)
+        )
+
+        due_dates = [
+            item.due_date
+            for item in Transaction.query.filter_by(
+                user_id=user.id, deleted=False
+            ).order_by(Transaction.due_date.asc())
+        ]
+
+        assert created == 3
+        assert due_dates == [
+            date(2026, 1, 5),
+            date(2026, 2, 5),
+            date(2026, 3, 5),
+            date(2026, 4, 5),
+        ]
+
+
+def test_generate_respects_weekly_interval(app) -> None:
+    with app.app_context():
+        user = _create_user()
+        template = Transaction(
+            user_id=user.id,
+            title="Feira",
+            amount=Decimal("100.00"),
+            type=TransactionType.EXPENSE,
+            status=TransactionStatus.PENDING,
+            due_date=date(2026, 1, 1),
+            is_recurring=True,
+            start_date=date(2026, 1, 1),
+            end_date=date(2026, 1, 29),
+            currency="BRL",
+            recurrence_interval=1,
+            recurrence_unit=RecurrenceUnit.week,
+        )
+        db.session.add(template)
+        db.session.commit()
+
+        created = RecurrenceService.generate_missing_occurrences(
+            reference_date=date(2026, 1, 1)
+        )
+
+        occurrences = Transaction.query.filter_by(
+            user_id=user.id, deleted=False
+        ).order_by(Transaction.due_date.asc())
+        due_dates = [item.due_date for item in occurrences]
+
+        assert due_dates == [
+            date(2026, 1, 1),
+            date(2026, 1, 8),
+            date(2026, 1, 15),
+            date(2026, 1, 22),
+            date(2026, 1, 29),
+        ]
+        assert created == 4
+        # New occurrences inherit the cadence so subsequent runs stay idempotent.
+        assert all(item.recurrence_unit == RecurrenceUnit.week for item in occurrences)
 
 
 def test_generate_missing_occurrences_skips_invalid_or_installment(app) -> None:
