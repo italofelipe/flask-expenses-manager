@@ -30,11 +30,11 @@ from app.controllers.response_contract import compat_error_response
 
 _F = TypeVar("_F", bound=Callable[..., Any])
 
-AI_DAILY_LIMIT = 2
+AI_DAILY_LIMIT = 1
 AI_DAILY_LIMIT_ERROR_CODE = "AI_DAILY_LIMIT_EXCEEDED"
 AI_DAILY_LIMIT_MESSAGE = (
     "Limite diário de insights atingido. "
-    "Você pode gerar até 2 insights por dia. "
+    "Você pode gerar 1 insight por dia. "
     "Tente novamente amanhã."
 )
 
@@ -214,6 +214,20 @@ def check_ai_daily_limit(
     return record_ai_daily_success(user_id)
 
 
+def request_is_admin() -> bool:
+    """True when the active JWT carries the 'admin' role.
+
+    Admins bypass the AI insight rate limits and cost ceiling so the team can
+    exercise the feature end-to-end without burning a real user's allowance.
+    """
+    try:
+        from app.auth import get_active_auth_context
+
+        return "admin" in get_active_auth_context().roles
+    except Exception:
+        return False
+
+
 def _is_countable_ai_success(response: Response) -> bool:
     """Return True when this response represents a new AI generation."""
     if not 200 <= response.status_code < 300:
@@ -248,6 +262,11 @@ def ai_daily_limit(
             from app.services.entitlement_service import has_entitlement
 
             user_id = current_user_id()
+
+            # Admins bypass the rate limits entirely so the team can test the
+            # feature without consuming a user's daily/monthly allowance.
+            if request_is_admin():
+                return cast(Response, fn(*args, **kwargs))
 
             # Only Premium users (advanced_simulations) can make manual AI insights
             # calls. Skip the rate-limit counter for Free users — the handler will
@@ -306,6 +325,7 @@ __all__ = [
     "AI_MONTHLY_LIMIT_ERROR_CODE",
     "AI_MONTHLY_LIMIT_MESSAGE",
     "ai_daily_limit",
+    "request_is_admin",
     "check_ai_daily_limit",
     "get_ai_daily_usage",
     "get_ai_monthly_usage",

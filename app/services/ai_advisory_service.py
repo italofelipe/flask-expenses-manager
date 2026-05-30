@@ -905,6 +905,13 @@ def _enforce_financial_insight_generation_budget(
     normalized_period_type: str,
     preview_run: AIInsightRun | None,
 ) -> None:
+    # Admins bypass the cost ceiling so the team can exercise insight
+    # generation end-to-end without being blocked by the per-user budget.
+    from app.middleware.ai_rate_limit import request_is_admin
+
+    if request_is_admin():
+        return
+
     try:
         _enforce_ai_insight_cost_budget()
         _enforce_ai_insight_user_cost_budget(user_id=user_id)
