@@ -1,5 +1,20 @@
 # Changelog
 
+## [1.49.0](https://github.com/italofelipe/auraxis-api/compare/v1.48.0...v1.49.0) (2026-05-30)
+
+
+### Features
+
+* **infra:** add db service to docker-compose.prod.yml (Postgres 16, low-mem) ([#1380](https://github.com/italofelipe/auraxis-api/issues/1380)) ([4ba02ea](https://github.com/italofelipe/auraxis-api/commit/4ba02ea52931f28c679ce6aff0274a89477a4805)), closes [#1376](https://github.com/italofelipe/auraxis-api/issues/1376) [#1377](https://github.com/italofelipe/auraxis-api/issues/1377)
+* **infra:** add migration script pg_dump RDS → restore local container ([#1381](https://github.com/italofelipe/auraxis-api/issues/1381)) ([77e6369](https://github.com/italofelipe/auraxis-api/commit/77e6369ebb2651540b077dcd77eb82a50c3e9ed3)), closes [#1378](https://github.com/italofelipe/auraxis-api/issues/1378)
+* **transactions:** configurable recurrence cadence + materialize future months ([#1388](https://github.com/italofelipe/auraxis-api/issues/1388)) ([fc9b686](https://github.com/italofelipe/auraxis-api/commit/fc9b68649dff86fa8a08a9f9866a413c57a685a3))
+
+
+### Bug Fixes
+
+* repair refresh csrf and daily insight context ([#1364](https://github.com/italofelipe/auraxis-api/issues/1364)) ([d943318](https://github.com/italofelipe/auraxis-api/commit/d943318e8ba915e7a7aaeeb224ec56e4b0cd8b01))
+* **tests:** force stub market rates provider in conftest ([#1383](https://github.com/italofelipe/auraxis-api/issues/1383)) ([b9ae998](https://github.com/italofelipe/auraxis-api/commit/b9ae9989cf9933e5707e677c4cf710db9cd80010)), closes [#1382](https://github.com/italofelipe/auraxis-api/issues/1382)
+
 ## [1.48.0](https://github.com/italofelipe/auraxis-api/compare/v1.47.0...v1.48.0) (2026-05-22)
 
 
