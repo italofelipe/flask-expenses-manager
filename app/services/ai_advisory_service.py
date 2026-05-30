@@ -905,6 +905,12 @@ def _enforce_financial_insight_generation_budget(
     normalized_period_type: str,
     preview_run: AIInsightRun | None,
 ) -> None:
+    # The monthly recap is a guaranteed end-of-month deliverable (+1/mês,
+    # automático) — exempt from the per-user cost ceiling so it always runs.
+    # Its cost is still logged and counts toward future daily/weekly checks.
+    if normalized_period_type == "monthly":
+        return
+
     # Admins bypass the cost ceiling so the team can exercise insight
     # generation end-to-end without being blocked by the per-user budget.
     from app.middleware.ai_rate_limit import request_is_admin
