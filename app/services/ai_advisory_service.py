@@ -1006,9 +1006,15 @@ class AIAdvisoryService:
             preview_run=preview_run,
         )
 
+        # Forecast mode: the requested period lies entirely in the future
+        # (e.g. generating an insight for June while it is still May). The
+        # snapshot's transactions are scheduled commitments/income — recurring
+        # occurrences materialised ahead of time — not realised history.
+        forecast = period_start > timezone_utils.local_today(timezone_resolution)
         prompt = _build_financial_insight_prompt(
             prompt_snapshot,
             period_type=normalized_period_type,
+            forecast=forecast,
         )
 
         try:
@@ -1119,6 +1125,7 @@ class AIAdvisoryService:
             "cost_usd": llm_resp.estimated_cost_usd,
             "model": llm_resp.model,
             "cached": False,
+            "forecast": forecast,
         }
 
     def generate_spending_insights(self, month: str | None = None) -> dict[str, Any]:
@@ -2008,28 +2015,42 @@ def _build_financial_insight_prompt(
     snapshot: dict[str, Any],
     *,
     period_type: str,
+    forecast: bool = False,
 ) -> str:
     context = json.dumps(snapshot, ensure_ascii=False, default=str)
-    period_instruction = {
-        "daily": (
-            "Para insight diário: compare hoje com ontem, com o mesmo dia do mês "
-            "passado quando disponível, recapitule rapidamente o mês até agora e "
-            "resuma como o usuário está hoje. Diferencie transações pagas hoje "
-            "de transações criadas hoje: dívidas em current_period.created_today "
-            "devem ser mencionadas mesmo quando ainda estiverem pendentes ou com "
-            "vencimento futuro."
-        ),
-        "weekly": (
-            "Para insight semanal: resuma a semana, cite maiores e menores gastos, "
-            "maiores e menores recebimentos, e identifique dias da semana com mais "
-            "e menos consumo/recebimento quando os dados permitirem."
-        ),
-        "monthly": (
-            "Para insight mensal: mostre o dia de maior gasto, maior recebimento, "
-            "menor gasto com atividade, menor recebimento com atividade e faça um "
-            "panorama geral do mês."
-        ),
-    }[period_type]
+    if forecast:
+        period_instruction = (
+            "MODO PREVISÃO: o período solicitado está inteiramente no futuro. As "
+            "transações do snapshot são compromissos e recebimentos já AGENDADOS "
+            "(ocorrências recorrentes materializadas e lançamentos futuros), não "
+            "fatos consumados — NUNCA afirme que já ocorreram e use sempre verbos "
+            "no futuro. Faça uma prévia acionável: projete o total de despesas e "
+            "receitas previstas, o saldo esperado, destaque o que aumentou em "
+            "relação a períodos anteriores, aponte riscos de caixa (ex.: despesas "
+            "previstas acima da receita prevista) e oriente como o usuário pode se "
+            "preparar. Trate cada dimensão obrigatória nessa ótica de previsão."
+        )
+    else:
+        period_instruction = {
+            "daily": (
+                "Para insight diário: compare hoje com ontem, com o mesmo dia do mês "
+                "passado quando disponível, recapitule rapidamente o mês até agora e "
+                "resuma como o usuário está hoje. Diferencie transações pagas hoje "
+                "de transações criadas hoje: dívidas em current_period.created_today "
+                "devem ser mencionadas mesmo quando ainda estiverem pendentes ou com "
+                "vencimento futuro."
+            ),
+            "weekly": (
+                "Para insight semanal: resuma a semana, cite maiores e menores gastos, "
+                "maiores e menores recebimentos, e identifique dias da semana com mais "
+                "e menos consumo/recebimento quando os dados permitirem."
+            ),
+            "monthly": (
+                "Para insight mensal: mostre o dia de maior gasto, maior recebimento, "
+                "menor gasto com atividade, menor recebimento com atividade e faça um "
+                "panorama geral do mês."
+            ),
+        }[period_type]
 
     insight_types = ", ".join(_SPENDING_INSIGHT_TYPES)
     contract = snapshot.get("insight_contract")

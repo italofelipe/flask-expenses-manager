@@ -385,6 +385,54 @@ class TestAIAdvisoryServiceFinancialInsights:
             assert audit.model == "gpt-4o-mini"
             assert audit.total_tokens == 140
 
+    def test_build_prompt_forecast_mode_frames_as_preview(self) -> None:
+        from app.services.ai_advisory_service import _build_financial_insight_prompt
+
+        snapshot = {"schema_version": "financial_insight_snapshot.v1"}
+        forecast_prompt = _build_financial_insight_prompt(
+            snapshot, period_type="monthly", forecast=True
+        )
+        normal_prompt = _build_financial_insight_prompt(
+            snapshot, period_type="monthly", forecast=False
+        )
+
+        assert "MODO PREVISÃO" in forecast_prompt
+        assert "MODO PREVISÃO" not in normal_prompt
+        assert "panorama geral do mês" in normal_prompt
+
+    def test_generate_financial_insights_flags_future_month_as_forecast(
+        self,
+        app,
+    ) -> None:
+        with app.app_context():
+            from app.services.ai_advisory_service import AIAdvisoryService
+
+            user_id = uuid.uuid4()
+            provider = MagicMock()
+            provider.generate_with_usage.return_value = _financial_llm_response(
+                summary="Prévia de julho."
+            )
+            service = AIAdvisoryService(user_id=user_id, llm_provider=provider)
+
+            with patch(
+                "app.services.ai_advisory_service.timezone_utils.local_today",
+                return_value=date(2026, 5, 30),
+            ):
+                future = service.generate_financial_insights(
+                    period_type="monthly",
+                    anchor_date=date(2026, 7, 15),
+                )
+                current = service.generate_financial_insights(
+                    period_type="monthly",
+                    anchor_date=date(2026, 5, 15),
+                )
+
+            assert future["forecast"] is True
+            assert current["forecast"] is False
+            # Future-month generation must frame the prompt as a forecast.
+            future_prompt = provider.generate_with_usage.call_args_list[0].args[0]
+            assert "MODO PREVISÃO" in future_prompt
+
     def test_financial_insights_reject_missing_required_dimensions(
         self,
         app,
