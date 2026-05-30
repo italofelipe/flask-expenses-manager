@@ -7,6 +7,7 @@ focused on composition.
 
 from __future__ import annotations
 
+import logging
 from typing import Any, Callable
 from uuid import UUID
 
@@ -33,7 +34,10 @@ from app.application.services.transaction.validators import (
 )
 from app.extensions.database import db
 from app.models.transaction import Transaction
+from app.services.recurrence_service import RecurrenceService
 from app.services.transaction_serialization import TransactionPayload
+
+logger = logging.getLogger(__name__)
 
 
 def execute_create_transaction(
@@ -127,6 +131,23 @@ def execute_create_transaction(
     except Exception:
         db.session.rollback()
         raise
+
+    # Populate future occurrences immediately so a recurring transaction shows
+    # up in upcoming months without waiting for the daily reconciliation cron.
+    # Best-effort: a failure here must not fail the create that already
+    # committed — the cron will reconcile.
+    if transaction.is_recurring:
+        try:
+            RecurrenceService.materialize_for_template(transaction)
+            invalidate_cache()
+        except Exception:
+            db.session.rollback()
+            logger.warning(
+                "recurrence: inline materialisation failed for transaction %s; "
+                "cron will reconcile",
+                transaction.id,
+                exc_info=True,
+            )
 
     return {
         "message": "Transação criada com sucesso",

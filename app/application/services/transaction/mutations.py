@@ -29,6 +29,7 @@ from app.application.services.transaction.validators import (
     normalize_transaction_type,
 )
 from app.models.transaction import (
+    RecurrenceUnit,
     Transaction,
     TransactionCategory,
     TransactionStatus,
@@ -105,6 +106,9 @@ def build_transaction_kwargs(
     """Map a pre-normalised payload to ``Transaction`` constructor kwargs."""
     raw_category = normalized.get("category")
     category = TransactionCategory(raw_category) if raw_category else None
+    raw_unit = normalized.get("recurrence_unit")
+    recurrence_unit = RecurrenceUnit(raw_unit) if raw_unit else RecurrenceUnit.month
+    recurrence_interval = int(normalized.get("recurrence_interval") or 1)
     return {
         "user_id": user_id,
         "title": str(normalized.get("title", "")),
@@ -118,6 +122,8 @@ def build_transaction_kwargs(
         "is_recurring": bool(normalized.get("is_recurring", False)),
         "is_installment": bool(normalized.get("is_installment", False)),
         "installment_count": normalized.get("installment_count"),
+        "recurrence_interval": recurrence_interval,
+        "recurrence_unit": recurrence_unit,
         "category": category,
         "tag_id": normalized.get("tag_id"),
         "account_id": normalized.get("account_id"),
