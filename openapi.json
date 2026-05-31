@@ -2,6 +2,7 @@
   "components": {
     "schemas": {
       "InstallmentVsCashCalculation": {
+        "additionalProperties": false,
         "properties": {
           "cash_price": {
             "minimum": 0.01,
@@ -75,6 +76,7 @@
         "type": "object"
       },
       "InstallmentVsCashGoalBridge": {
+        "additionalProperties": false,
         "properties": {
           "category": {
             "default": "planned_purchase",
@@ -125,6 +127,7 @@
         "type": "object"
       },
       "InstallmentVsCashPlannedExpenseBridge": {
+        "additionalProperties": false,
         "properties": {
           "account_id": {
             "default": null,
@@ -211,6 +214,7 @@
         "type": "object"
       },
       "InstallmentVsCashSave": {
+        "additionalProperties": false,
         "properties": {
           "cash_price": {
             "minimum": 0.01,
@@ -284,6 +288,7 @@
         "type": "object"
       },
       "TransactionCreate": {
+        "additionalProperties": false,
         "properties": {
           "account_id": {
             "description": "ID da conta bancária associada",
@@ -398,6 +403,26 @@
             "example": "2024-02-10T14:30:00Z",
             "format": "date-time",
             "nullable": true,
+            "type": "string"
+          },
+          "recurrence_interval": {
+            "default": 1,
+            "description": "Intervalo da recorrência (a cada N unidades)",
+            "example": 1,
+            "maximum": 365,
+            "minimum": 1,
+            "type": "integer"
+          },
+          "recurrence_unit": {
+            "default": "month",
+            "description": "Unidade da recorrência: day, week, month ou year",
+            "enum": [
+              "day",
+              "week",
+              "month",
+              "year"
+            ],
+            "example": "month",
             "type": "string"
           },
           "start_date": {
@@ -464,6 +489,7 @@
         "type": "object"
       },
       "TransactionCreate_7d3b606eab": {
+        "additionalProperties": false,
         "properties": {
           "account_id": {
             "description": "ID da conta bancária associada",
@@ -580,6 +606,26 @@
             "nullable": true,
             "type": "string"
           },
+          "recurrence_interval": {
+            "default": 1,
+            "description": "Intervalo da recorrência (a cada N unidades)",
+            "example": 1,
+            "maximum": 365,
+            "minimum": 1,
+            "type": "integer"
+          },
+          "recurrence_unit": {
+            "default": "month",
+            "description": "Unidade da recorrência: day, week, month ou year",
+            "enum": [
+              "day",
+              "week",
+              "month",
+              "year"
+            ],
+            "example": "month",
+            "type": "string"
+          },
           "start_date": {
             "default": null,
             "description": "Data de início (para transações recorrentes)",
@@ -638,6 +684,7 @@
         "type": "object"
       },
       "app_schemas_ai_insight_schema_AIInsightGenerateRequestSchema": {
+        "additionalProperties": false,
         "properties": {
           "anchor_date": {
             "description": "Data âncora do período no formato YYYY-MM-DD.",
@@ -676,6 +723,7 @@
         "type": "object"
       },
       "app_schemas_ai_insight_schema_AIMonthlyReportRequestSchema": {
+        "additionalProperties": false,
         "properties": {
           "anchor_date": {
             "description": "Data âncora do mês a consolidar. Quando omitida, a API usa a data atual.",
@@ -694,6 +742,7 @@
         "type": "object"
       },
       "app_schemas_auth_schema_AuthSchema": {
+        "additionalProperties": false,
         "properties": {
           "captcha_token": {
             "default": null,
@@ -721,6 +770,7 @@
         "type": "object"
       },
       "app_schemas_auth_schema_ConfirmEmailSchema": {
+        "additionalProperties": false,
         "properties": {
           "token": {
             "description": "Token de confirmacao recebido por email",
@@ -736,6 +786,7 @@
         "type": "object"
       },
       "app_schemas_auth_schema_ForgotPasswordSchema": {
+        "additionalProperties": false,
         "properties": {
           "email": {
             "description": "Email da conta que deseja recuperar acesso",
@@ -750,6 +801,7 @@
         "type": "object"
       },
       "app_schemas_auth_schema_ResetPasswordSchema": {
+        "additionalProperties": false,
         "properties": {
           "new_password": {
             "description": "Nova senha (mínimo 10 caracteres, com maiúscula, número e símbolo)",
@@ -773,6 +825,7 @@
         "type": "object"
       },
       "app_schemas_consent_schemas_ConsentRecordSchema": {
+        "additionalProperties": false,
         "properties": {
           "action": {
             "enum": [
@@ -815,6 +868,7 @@
         "type": "object"
       },
       "app_schemas_push_subscription_schema_SubscribeSchema": {
+        "additionalProperties": false,
         "properties": {
           "device_label": {
             "default": null,
@@ -849,6 +903,7 @@
         "type": "object"
       },
       "app_schemas_push_subscription_schema_UnsubscribeSchema": {
+        "additionalProperties": false,
         "properties": {
           "endpoint": {
             "type": "string"
@@ -860,6 +915,7 @@
         "type": "object"
       },
       "app_schemas_user_schemas_DeleteAccountSchema": {
+        "additionalProperties": false,
         "properties": {
           "password": {
             "description": "Senha atual do usuário para confirmar a exclusão da conta",
@@ -874,6 +930,7 @@
         "type": "object"
       },
       "app_schemas_user_schemas_QuestionnaireAnswerSchema": {
+        "additionalProperties": false,
         "properties": {
           "answers": {
             "description": "Lista de 5 respostas — pontos da opção escolhida em cada pergunta (1–3).",
@@ -893,6 +950,7 @@
         "type": "object"
       },
       "app_schemas_user_schemas_SalaryIncreaseSimulationRequestSchema": {
+        "additionalProperties": false,
         "properties": {
           "base_date": {
             "description": "Data base do salário atual",
@@ -928,6 +986,7 @@
         "type": "object"
       },
       "app_schemas_user_schemas_UserProfileSchema": {
+        "additionalProperties": false,
         "properties": {
           "birth_date": {
             "description": "Data de nascimento",
@@ -1040,6 +1099,7 @@
         "type": "object"
       },
       "app_schemas_user_schemas_UserRegistrationSchema": {
+        "additionalProperties": false,
         "properties": {
           "captcha_token": {
             "default": null,
@@ -2532,6 +2592,161 @@
           }
         ],
         "summary": "Buscar AI Insight por id",
+        "tags": [
+          "AI Advisory"
+        ]
+      }
+    },
+    "/ai/insights/{insight_id}/feedback": {
+      "post": {
+        "description": "Registra notas de 0 a 5 (relevância, veracidade, profundidade, utilidade) e um comentário opcional sobre um insight do próprio usuário. Reenviar atualiza o feedback existente.",
+        "parameters": [
+          {
+            "description": "UUID do insight",
+            "in": "path",
+            "name": "insight_id",
+            "required": true,
+            "type": "string"
+          }
+        ],
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "example": {
+                  "data": {
+                    "comment": "Muito útil",
+                    "depth": 4,
+                    "id": "uuid",
+                    "insight_id": "uuid",
+                    "relevance": 5,
+                    "truthfulness": 4,
+                    "usefulness": 5
+                  },
+                  "message": "Feedback registrado com sucesso"
+                },
+                "schema": {
+                  "properties": {
+                    "data": {
+                      "type": "object"
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "meta": {
+                      "type": "object"
+                    }
+                  },
+                  "required": [
+                    "message",
+                    "data"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Feedback registrado",
+            "headers": {
+              "X-Request-ID": {
+                "description": "Identificador único da requisição gerado pela API.",
+                "example": "9fcd2e4f4d8747b4a7d8a2b1b930f52a",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "example": {
+                  "code": "VALIDATION_ERROR",
+                  "message": "Dados de feedback inválidos.",
+                  "status_code": 400
+                },
+                "schema": {
+                  "properties": {
+                    "code": {
+                      "type": "string"
+                    },
+                    "details": {
+                      "type": "object"
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "status_code": {
+                      "type": "integer"
+                    }
+                  },
+                  "required": [
+                    "message",
+                    "code"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Dados inválidos",
+            "headers": {
+              "X-Request-ID": {
+                "description": "Identificador único da requisição gerado pela API.",
+                "example": "9fcd2e4f4d8747b4a7d8a2b1b930f52a",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "example": {
+                  "code": "AI_INSIGHT_NOT_FOUND",
+                  "message": "Insight não encontrado.",
+                  "status_code": 404
+                },
+                "schema": {
+                  "properties": {
+                    "code": {
+                      "type": "string"
+                    },
+                    "details": {
+                      "type": "object"
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "status_code": {
+                      "type": "integer"
+                    }
+                  },
+                  "required": [
+                    "message",
+                    "code"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Insight não encontrado",
+            "headers": {
+              "X-Request-ID": {
+                "description": "Identificador único da requisição gerado pela API.",
+                "example": "9fcd2e4f4d8747b4a7d8a2b1b930f52a",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "summary": "Enviar feedback de um insight de IA",
         "tags": [
           "AI Advisory"
         ]
