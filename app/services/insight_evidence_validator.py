@@ -23,6 +23,8 @@ from __future__ import annotations
 import logging
 from typing import Any
 
+from app.extensions.prometheus_metrics import record_ai_insight_rejection
+
 log = logging.getLogger(__name__)
 
 
@@ -156,6 +158,7 @@ def filter_valid_items(
         if ok:
             accepted.append(item)
             continue
+        record_ai_insight_rejection(reason=reason or "unknown")
         log.warning(
             "ai_advisory.evidence_validation.rejected user=%s reason=%s "
             "dimension=%s type=%s evidence=%s",

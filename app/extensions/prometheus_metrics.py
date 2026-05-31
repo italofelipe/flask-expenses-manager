@@ -48,15 +48,31 @@ _CACHE_INVALIDATIONS_TOTAL: Any = None
 _AI_INSIGHT_GENERATED_TOTAL: Any = None
 _AI_INSIGHT_TOKENS: Any = None
 _AI_INSIGHT_SNAPSHOT_BYTES: Any = None
+_AI_INSIGHT_RUNS_TOTAL: Any = None
+_AI_INSIGHT_COST_USD_TOTAL: Any = None
+_AI_INSIGHT_REJECTIONS_TOTAL: Any = None
+_AI_INSIGHT_TRUNCATED_TOTAL: Any = None
+_AI_INSIGHT_DATA_QUALITY_DOMAINS: Any = None
+_AI_INSIGHT_RUNS_PURGED_TOTAL: Any = None
 
 _DURATION_BUCKETS = (0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1.0, 2.5)
 _AI_TOKENS_BUCKETS = (100, 250, 500, 1000, 2500, 5000, 10000, 25000)
 _AI_SNAPSHOT_BYTES_BUCKETS = (1024, 2048, 4096, 8192, 12288, 16384, 32768)
+_AI_DATA_QUALITY_DOMAIN_BUCKETS = (0, 1, 2, 3, 4, 5, 6)
 
 
 def _init_ai_insight_metrics() -> None:
     """Lazily initialise the MVP-3 AI insight observability instruments."""
-    global _AI_INSIGHT_GENERATED_TOTAL, _AI_INSIGHT_TOKENS, _AI_INSIGHT_SNAPSHOT_BYTES
+    global \
+        _AI_INSIGHT_GENERATED_TOTAL, \
+        _AI_INSIGHT_TOKENS, \
+        _AI_INSIGHT_SNAPSHOT_BYTES, \
+        _AI_INSIGHT_RUNS_TOTAL, \
+        _AI_INSIGHT_COST_USD_TOTAL, \
+        _AI_INSIGHT_REJECTIONS_TOTAL, \
+        _AI_INSIGHT_TRUNCATED_TOTAL, \
+        _AI_INSIGHT_DATA_QUALITY_DOMAINS, \
+        _AI_INSIGHT_RUNS_PURGED_TOTAL
 
     if _AI_INSIGHT_GENERATED_TOTAL is None:
         _AI_INSIGHT_GENERATED_TOTAL = Counter(
@@ -77,6 +93,48 @@ def _init_ai_insight_metrics() -> None:
             "Snapshot size in bytes sent to the LLM (post truncation)",
             ["period_type", "truncated"],
             buckets=_AI_SNAPSHOT_BYTES_BUCKETS,
+        )
+    # #1314 — governance/quality observability for AI insight runs.
+    if _AI_INSIGHT_RUNS_TOTAL is None:
+        _AI_INSIGHT_RUNS_TOTAL = Counter(
+            "auraxis_ai_insight_runs_total",
+            (
+                "AIInsightRun lifecycle state entries by status and period_type. "
+                "A single logical run contributes once per status it enters "
+                "(e.g. previewed then generated), so rates like "
+                "rejected/previewed are derivable."
+            ),
+            ["status", "period_type"],
+        )
+    if _AI_INSIGHT_COST_USD_TOTAL is None:
+        _AI_INSIGHT_COST_USD_TOTAL = Counter(
+            "auraxis_ai_insight_cost_usd_total",
+            "Cumulative estimated LLM cost (USD) attributed to AI insight runs",
+            ["period_type"],
+        )
+    if _AI_INSIGHT_REJECTIONS_TOTAL is None:
+        _AI_INSIGHT_REJECTIONS_TOTAL = Counter(
+            "auraxis_ai_insight_rejections_total",
+            "AI insight items rejected by the evidence validator, by reason",
+            ["reason"],
+        )
+    if _AI_INSIGHT_TRUNCATED_TOTAL is None:
+        _AI_INSIGHT_TRUNCATED_TOTAL = Counter(
+            "auraxis_ai_insight_truncated_total",
+            "AI insight runs whose snapshot was truncated before the LLM call",
+            ["period_type"],
+        )
+    if _AI_INSIGHT_DATA_QUALITY_DOMAINS is None:
+        _AI_INSIGHT_DATA_QUALITY_DOMAINS = Histogram(
+            "auraxis_ai_insight_data_quality_domains",
+            "Number of financial domains present in the run snapshot (0-6)",
+            ["period_type"],
+            buckets=_AI_DATA_QUALITY_DOMAIN_BUCKETS,
+        )
+    if _AI_INSIGHT_RUNS_PURGED_TOTAL is None:
+        _AI_INSIGHT_RUNS_PURGED_TOTAL = Counter(
+            "auraxis_ai_insight_runs_purged_total",
+            "AIInsightRun snapshot payloads purged by the retention job",
         )
 
 
@@ -272,6 +330,62 @@ def record_ai_insight_generated(
         ).observe(snapshot_bytes)
 
 
+def record_ai_insight_run(*, status: str, period_type: str) -> None:
+    """Count an ``AIInsightRun`` entering *status* (#1314).
+
+    ``status`` is an ``AIInsightRunStatus`` value (previewed/generated/cached/
+    rejected/blocked/failed/purged); ``period_type`` is an ``InsightType``
+    value. Both are bounded enums — safe label cardinality, no PII.
+    """
+    _ensure_metrics_initialized()
+    if _AI_INSIGHT_RUNS_TOTAL is not None:
+        _AI_INSIGHT_RUNS_TOTAL.labels(
+            status=status or "unknown",
+            period_type=period_type or "unknown",
+        ).inc()
+
+
+def record_ai_insight_cost(*, period_type: str, cost_usd: float) -> None:
+    """Add *cost_usd* to the cumulative AI insight cost counter (#1314)."""
+    _ensure_metrics_initialized()
+    if _AI_INSIGHT_COST_USD_TOTAL is not None and cost_usd > 0:
+        _AI_INSIGHT_COST_USD_TOTAL.labels(
+            period_type=period_type or "unknown",
+        ).inc(cost_usd)
+
+
+def record_ai_insight_rejection(*, reason: str) -> None:
+    """Count one evidence-validation rejection by stable *reason* (#1314)."""
+    _ensure_metrics_initialized()
+    if _AI_INSIGHT_REJECTIONS_TOTAL is not None:
+        _AI_INSIGHT_REJECTIONS_TOTAL.labels(reason=reason or "unknown").inc()
+
+
+def record_ai_insight_truncated(*, period_type: str) -> None:
+    """Count one AI insight run whose snapshot was truncated (#1314)."""
+    _ensure_metrics_initialized()
+    if _AI_INSIGHT_TRUNCATED_TOTAL is not None:
+        _AI_INSIGHT_TRUNCATED_TOTAL.labels(
+            period_type=period_type or "unknown",
+        ).inc()
+
+
+def record_ai_insight_data_quality(*, period_type: str, domains_present: int) -> None:
+    """Observe how many financial domains were present in the run snapshot."""
+    _ensure_metrics_initialized()
+    if _AI_INSIGHT_DATA_QUALITY_DOMAINS is not None and domains_present >= 0:
+        _AI_INSIGHT_DATA_QUALITY_DOMAINS.labels(
+            period_type=period_type or "unknown",
+        ).observe(domains_present)
+
+
+def record_ai_insight_runs_purged(count: int) -> None:
+    """Increment ``auraxis_ai_insight_runs_purged_total`` by *count* (#1314)."""
+    _ensure_metrics_initialized()
+    if _AI_INSIGHT_RUNS_PURGED_TOTAL is not None and count > 0:
+        _AI_INSIGHT_RUNS_PURGED_TOTAL.inc(count)
+
+
 def generate_latest_metrics() -> tuple[bytes, str]:
     """Return ``(body_bytes, content_type)`` for the Prometheus scrape endpoint.
 
@@ -321,7 +435,13 @@ def register_prometheus_middleware(app: "Flask") -> None:
 
 __all__ = [
     "generate_latest_metrics",
+    "record_ai_insight_cost",
+    "record_ai_insight_data_quality",
     "record_ai_insight_generated",
+    "record_ai_insight_rejection",
+    "record_ai_insight_run",
+    "record_ai_insight_runs_purged",
+    "record_ai_insight_truncated",
     "record_audit_purge",
     "record_auth_login",
     "record_auth_login_cookie_only_header",

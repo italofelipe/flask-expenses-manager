@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 import re
 from datetime import date, datetime
 from decimal import Decimal
@@ -7,6 +8,13 @@ from typing import Any
 from uuid import UUID
 
 from app.extensions.database import db
+from app.extensions.prometheus_metrics import (
+    record_ai_insight_cost,
+    record_ai_insight_data_quality,
+    record_ai_insight_run,
+    record_ai_insight_runs_purged,
+    record_ai_insight_truncated,
+)
 from app.models.ai_insight import InsightType
 from app.models.ai_insight_run import (
     DEFAULT_AI_INSIGHT_RUN_RETENTION_DAYS,
@@ -14,6 +22,38 @@ from app.models.ai_insight_run import (
     AIInsightRunStatus,
 )
 from app.utils.datetime_utils import utc_now_naive
+
+log = logging.getLogger(__name__)
+
+
+def _count_domains_present(data_quality_json: Any) -> int:
+    """Count financial domains flagged present in ``data_quality.domain_presence``.
+
+    Defensive against shape drift: a domain counts as present when its value is
+    truthy, or (when a dict) when its ``present``/``available`` field is truthy.
+    Returns 0 when the structure is missing or unrecognised. No PII is read.
+    """
+    if not isinstance(data_quality_json, dict):
+        return 0
+    presence = data_quality_json.get("domain_presence")
+    if not isinstance(presence, dict):
+        return 0
+    count = 0
+    for value in presence.values():
+        if isinstance(value, dict):
+            if value.get("present") or value.get("available") or value.get("has_data"):
+                count += 1
+        elif value:
+            count += 1
+    return count
+
+
+def _is_truncated(truncation_flags_json: Any) -> bool:
+    return bool(
+        isinstance(truncation_flags_json, dict)
+        and truncation_flags_json.get("truncated")
+    )
+
 
 _EMAIL_RE = re.compile(r"\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\b", re.IGNORECASE)
 _CPF_RE = re.compile(r"\b\d{3}\.\d{3}\.\d{3}-\d{2}\b")
@@ -134,7 +174,68 @@ def create_ai_insight_run(
     db.session.add(run)
     if commit:
         db.session.commit()
+
+    # #1314 — observability: emit lifecycle/quality metrics + a PII-free
+    # structured log keyed by run_id/snapshot_hash. snapshot_json itself is
+    # never logged (it carries deterministic facts but we keep logs lean).
+    period_value = period_type.value
+    record_ai_insight_run(status=status.value, period_type=period_value)
+    if _is_truncated(truncation_flags_json):
+        record_ai_insight_truncated(period_type=period_value)
+    domains_present = _count_domains_present(data_quality_json)
+    record_ai_insight_data_quality(
+        period_type=period_value,
+        domains_present=domains_present,
+    )
+    cost_value = float(run.cost_usd)
+    if cost_value > 0:
+        record_ai_insight_cost(period_type=period_value, cost_usd=cost_value)
+    log.info(
+        "ai_insight.run.created run_id=%s status=%s period_type=%s "
+        "period=%s snapshot_hash=%s tokens=%s cost_usd=%s truncated=%s "
+        "domains_present=%s",
+        run.id,
+        status.value,
+        period_value,
+        period_label,
+        snapshot_hash,
+        run.tokens_total,
+        cost_value,
+        _is_truncated(truncation_flags_json),
+        domains_present,
+    )
     return run
+
+
+def transition_ai_insight_run_status(
+    run: AIInsightRun,
+    new_status: AIInsightRunStatus,
+    *,
+    reason: str | None = None,
+) -> None:
+    """Move *run* to *new_status*, emitting the lifecycle metric + a log (#1314).
+
+    Centralises status changes so every transition is observable. Callers keep
+    setting their other side-effect fields (ai_insight_id, tokens, cost) around
+    this call. The structured log uses run_id/snapshot_hash only — no PII.
+    """
+    run.status = new_status
+    period_value = run.period_type.value
+    record_ai_insight_run(status=new_status.value, period_type=period_value)
+    cost_value = float(run.cost_usd)
+    if new_status is AIInsightRunStatus.generated and cost_value > 0:
+        record_ai_insight_cost(period_type=period_value, cost_usd=cost_value)
+    log.info(
+        "ai_insight.run.transition run_id=%s status=%s period_type=%s "
+        "snapshot_hash=%s tokens=%s cost_usd=%s reason=%s",
+        run.id,
+        new_status.value,
+        period_value,
+        run.snapshot_hash,
+        run.tokens_total,
+        cost_value,
+        reason or "",
+    )
 
 
 def purge_expired_ai_insight_runs(*, now: datetime | None = None) -> int:
@@ -155,8 +256,15 @@ def purge_expired_ai_insight_runs(*, now: datetime | None = None) -> int:
         row.evidence_manifest_json = None
         row.status = AIInsightRunStatus.purged
         row.purged_at = purge_at
+        record_ai_insight_run(
+            status=AIInsightRunStatus.purged.value,
+            period_type=row.period_type.value,
+        )
     db.session.commit()
-    return len(rows)
+    purged = len(rows)
+    record_ai_insight_runs_purged(purged)
+    log.info("ai_insight.run.purged count=%s purge_at=%s", purged, purge_at)
+    return purged
 
 
 __all__ = [
@@ -164,4 +272,5 @@ __all__ = [
     "create_ai_insight_run",
     "purge_expired_ai_insight_runs",
     "sanitize_audit_snapshot",
+    "transition_ai_insight_run_status",
 ]
