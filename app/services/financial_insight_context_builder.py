@@ -465,6 +465,155 @@ def _goal_risk_penalties(goals: object) -> list[_RiskPenalty]:
     return penalties
 
 
+_PROJECTION_HORIZONS: tuple[int, ...] = (3, 6, 12)
+
+
+def _decimal(value: object) -> Decimal:
+    try:
+        return Decimal(str(value if value not in (None, "") else "0"))
+    except (InvalidOperation, ValueError):
+        return Decimal("0")
+
+
+def _annual_pct_to_monthly_rate(annual_pct: Decimal) -> Decimal:
+    """Convert an annual percentage (e.g. 12.0) to an equivalent monthly rate."""
+    base = Decimal(1) + (annual_pct / Decimal(100))
+    if base <= 0:
+        return Decimal(0)
+    return base ** (Decimal(1) / Decimal(12)) - Decimal(1)
+
+
+def _wallet_monthly_rate(wallet: dict[str, Any]) -> tuple[Decimal, str]:
+    """Return (monthly_rate, basis). Observed weighted return, else CDI fallback."""
+    items = wallet.get("items") if isinstance(wallet, dict) else None
+    weighted_num = Decimal(0)
+    total = Decimal(0)
+    for item in items or []:
+        if not isinstance(item, dict):
+            continue
+        value = _money(item.get("current_value"))
+        if value <= 0:
+            continue
+        weighted_num += value * _decimal(item.get("annual_rate"))
+        total += value
+    if total > 0 and weighted_num > 0:
+        return _annual_pct_to_monthly_rate(weighted_num / total), "observed"
+    benchmark = wallet.get("benchmark") if isinstance(wallet, dict) else None
+    cdi = benchmark.get("cdi_monthly_pct") if isinstance(benchmark, dict) else None
+    if cdi:
+        return _decimal(cdi) / Decimal(100), "cdi_fallback"
+    return Decimal(0), "none"
+
+
+def _fv_lump_sum(present_value: Decimal, rate: Decimal, months: int) -> Decimal:
+    return present_value * (Decimal(1) + rate) ** months
+
+
+def _fv_monthly_contribution(amount: Decimal, rate: Decimal, months: int) -> Decimal:
+    if rate == 0:
+        return amount * Decimal(months)
+    return amount * (((Decimal(1) + rate) ** months - Decimal(1)) / rate)
+
+
+def _wallet_projection(
+    wallet: dict[str, Any], rate: Decimal, horizons: tuple[int, ...]
+) -> dict[str, Any] | None:
+    total_value = (
+        _money(wallet.get("total_value")) if isinstance(wallet, dict) else Decimal(0)
+    )
+    if total_value <= 0:
+        return None
+    block: dict[str, Any] = {"current_value": _money_str(total_value)}
+    for h in horizons:
+        block[f"horizon_{h}m"] = _money_str(_fv_lump_sum(total_value, rate, h))
+    return block
+
+
+def _goal_projection_entry(
+    goal: dict[str, Any], horizons: tuple[int, ...]
+) -> tuple[dict[str, Any], Decimal | None]:
+    current = _money(goal.get("current_amount"))
+    observed = _money(goal.get("observed_monthly_pace_90d"))
+    required_raw = goal.get("required_monthly_pace")
+    required = _money(required_raw) if required_raw is not None else None
+    entry: dict[str, Any] = {
+        "title": goal.get("title") or "Meta",
+        "current_amount": _money_str(current),
+        "observed_monthly_pace_90d": _money_str(observed),
+        "required_monthly_pace": _money_str(required) if required is not None else None,
+    }
+    for h in horizons:
+        entry[f"horizon_{h}m_observed"] = _money_str(current + observed * h)
+        if required is not None:
+            entry[f"horizon_{h}m_required"] = _money_str(current + required * h)
+    return entry, required
+
+
+def _combined_scenario(
+    *,
+    required: Decimal,
+    margin: Decimal,
+    rate: Decimal,
+    basis: str,
+    horizons: tuple[int, ...],
+) -> dict[str, Any]:
+    combined: dict[str, Any] = {
+        "monthly_goal_contribution": _money_str(required),
+        "monthly_investment": _money_str(margin),
+        "investment_rate_basis": basis,
+    }
+    for h in horizons:
+        goal_part = required * h
+        invest_part = _fv_monthly_contribution(margin, rate, h)
+        combined[f"horizon_{h}m"] = _money_str(goal_part + invest_part)
+    return combined
+
+
+def _compute_projections(
+    *,
+    wallet: dict[str, Any],
+    goals: list[dict[str, Any]],
+    available_margin: Decimal,
+    horizons: tuple[int, ...] = _PROJECTION_HORIZONS,
+) -> dict[str, Any]:
+    """Deterministic 3/6/12-month projections for wallet, goals and a combined
+    "save X + invest Y" scenario. Every figure is snapshot-anchored so the LLM
+    can cite ``projections.*`` instead of fabricating numbers (#1394)."""
+    rate, basis = _wallet_monthly_rate(wallet if isinstance(wallet, dict) else {})
+    payload: dict[str, Any] = {
+        "horizons_months": list(horizons),
+        "rate_basis": basis,
+        "monthly_rate_pct": f"{(rate * Decimal(100)):.4f}",
+    }
+
+    wallet_block = _wallet_projection(wallet, rate, horizons)
+    if wallet_block is not None:
+        payload["wallet"] = wallet_block
+
+    goal_projections: list[dict[str, Any]] = []
+    required_for_combined: Decimal | None = None
+    for goal in goals or []:
+        if not isinstance(goal, dict):
+            continue
+        entry, required = _goal_projection_entry(goal, horizons)
+        goal_projections.append(entry)
+        if required_for_combined is None and required is not None and required > 0:
+            required_for_combined = required
+    if goal_projections:
+        payload["goals"] = goal_projections
+
+    if required_for_combined is not None and available_margin > 0:
+        payload["combined_scenario"] = _combined_scenario(
+            required=required_for_combined,
+            margin=available_margin,
+            rate=rate,
+            basis=basis,
+            horizons=horizons,
+        )
+
+    return payload
+
+
 class FinancialInsightContextBuilder:
     """Build sanitized financial snapshots for daily, weekly and monthly insights."""
 
@@ -579,6 +728,14 @@ class FinancialInsightContextBuilder:
 
         current["comparisons"] = comparisons
         current["data_quality"]["missing_comparison_periods"] = missing_comparisons
+        paid_balance = _money(
+            ((current.get("current_period") or {}).get("paid") or {}).get("balance")
+        )
+        current["projections"] = _compute_projections(
+            wallet=current.get("wallet") or {},
+            goals=current.get("goals") or [],
+            available_margin=max(paid_balance, Decimal(0)),
+        )
         return current
 
     def build_weekly(

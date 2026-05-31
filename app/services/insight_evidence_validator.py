@@ -48,6 +48,7 @@ _KNOWN_SNAPSHOT_PREFIXES: frozenset[str] = frozenset(
         "goals",
         "credit_cards",
         "wallet",
+        "projections",
         "monthly_report_context",
         "financial_health",
         "data_quality",
@@ -66,10 +67,15 @@ _DIMENSION_EVIDENCE_PREFIXES: dict[str, tuple[str, ...] | None] = {
         "current_period.paid",
         "current_period.commitments",
         "comparisons",
+        # The transactions narrative legitimately weaves in goals, wallet and
+        # forward projections (#1394), so those prefixes are allowed here too.
+        "goals",
+        "wallet",
+        "projections",
         "data_quality.domain_presence.transactions",
     ),
     "credit_cards": ("credit_cards", "data_quality.domain_presence.credit_cards"),
-    "goals": ("goals", "data_quality.domain_presence.goals"),
+    "goals": ("goals", "projections", "data_quality.domain_presence.goals"),
     "budgets": ("budgets", "data_quality.domain_presence.budgets"),
     "wallet": ("wallet", "data_quality.domain_presence.wallet"),
 }
