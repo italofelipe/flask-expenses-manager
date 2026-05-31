@@ -149,6 +149,10 @@ FinancialInsightItem = dict[str, Any]
 
 _AI_INSIGHTS_DAILY_BUDGET_ENV = "AI_INSIGHTS_DAILY_BUDGET_USD"
 _AI_INSIGHTS_MONTHLY_BUDGET_ENV = "AI_INSIGHTS_MONTHLY_BUDGET_USD"
+_AI_INSIGHTS_USER_BUDGET_PCT_ENV = "AI_INSIGHTS_USER_BUDGET_PCT"
+_AI_INSIGHTS_BRL_USD_FX_ENV = "AI_INSIGHTS_BRL_USD_FX"
+_DEFAULT_USER_BUDGET_PCT = Decimal("0.5")
+_DEFAULT_BRL_USD_FX = Decimal("5.50")
 _AI_INSIGHT_COST_ENDPOINTS = (
     "financial_insights_daily",
     "financial_insights_weekly",
@@ -772,6 +776,71 @@ def _enforce_ai_insight_cost_budget(*, now: datetime | None = None) -> None:
         )
 
 
+def _read_decimal_env(env_name: str, default: Decimal) -> Decimal:
+    raw = os.getenv(env_name)
+    if raw is None or not raw.strip():
+        return default
+    try:
+        value = Decimal(raw.strip())
+    except InvalidOperation:
+        log.warning("ai_advisory.cost_budget.invalid_env name=%s", env_name)
+        return default
+    return value
+
+
+def _user_ai_insight_monthly_budget_usd() -> Decimal:
+    """Per-user monthly LLM budget in USD: a share of the Premium plan price.
+
+    Hard rule (#1386): AI cost per user must never exceed 50% of the
+    subscription value. Derived from the canonical Premium monthly price
+    (R$29,90, ADR-669) × ``AI_INSIGHTS_USER_BUDGET_PCT`` (default 0.5),
+    converted to USD via ``AI_INSIGHTS_BRL_USD_FX`` (default 5.50).
+    """
+    from app.config.billing_plans import PREMIUM_MONTHLY_PLAN
+
+    pct = _read_decimal_env(_AI_INSIGHTS_USER_BUDGET_PCT_ENV, _DEFAULT_USER_BUDGET_PCT)
+    fx = _read_decimal_env(_AI_INSIGHTS_BRL_USD_FX_ENV, _DEFAULT_BRL_USD_FX)
+    if fx <= 0:
+        fx = _DEFAULT_BRL_USD_FX
+    if pct <= 0:
+        pct = _DEFAULT_USER_BUDGET_PCT
+    price_brl = Decimal(PREMIUM_MONTHLY_PLAN.price_cents) / Decimal(100)
+    return (price_brl * pct) / fx
+
+
+def _ai_insight_user_spend_usd(
+    *, user_id: UUID, start_at: datetime, end_at: datetime
+) -> Decimal:
+    total = (
+        db.session.query(func.coalesce(func.sum(LLMAuditLog.estimated_cost_usd), 0))
+        .filter(LLMAuditLog.user_id == user_id)
+        .filter(LLMAuditLog.endpoint.in_(_AI_INSIGHT_COST_ENDPOINTS))
+        .filter(LLMAuditLog.created_at >= start_at)
+        .filter(LLMAuditLog.created_at < end_at)
+        .scalar()
+    )
+    return Decimal(str(total or "0"))
+
+
+def _enforce_ai_insight_user_cost_budget(
+    *, user_id: UUID, now: datetime | None = None
+) -> None:
+    """Block generation when a single user's month-to-date AI cost hits the cap."""
+    current = now or utc_now_naive()
+    month_start = datetime(current.year, current.month, 1)
+    month_end = month_start + relativedelta(months=1)
+    limit = _user_ai_insight_monthly_budget_usd()
+    spent = _ai_insight_user_spend_usd(
+        user_id=user_id, start_at=month_start, end_at=month_end
+    )
+    _raise_if_budget_exceeded(
+        scope="user_monthly",
+        scope_label="mensal por usuário",
+        limit_usd=limit,
+        spent_usd=spent,
+    )
+
+
 def _mark_preview_run_cached(
     *,
     preview_run: AIInsightRun,
@@ -836,8 +905,16 @@ def _enforce_financial_insight_generation_budget(
     normalized_period_type: str,
     preview_run: AIInsightRun | None,
 ) -> None:
+    # Admins bypass the cost ceiling so the team can exercise insight
+    # generation end-to-end without being blocked by the per-user budget.
+    from app.middleware.ai_rate_limit import request_is_admin
+
+    if request_is_admin():
+        return
+
     try:
         _enforce_ai_insight_cost_budget()
+        _enforce_ai_insight_user_cost_budget(user_id=user_id)
     except AIInsightCostBudgetExceededError as exc:
         if preview_run is not None:
             _mark_preview_run_blocked(preview_run=preview_run, reason=str(exc))

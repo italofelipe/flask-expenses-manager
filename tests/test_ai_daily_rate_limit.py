@@ -219,9 +219,9 @@ class TestAIDailyRateLimitHTTP:
             resp = client.get("/ai/insights/spending", headers=_auth(token))
 
         assert resp.status_code == 200
-        assert resp.headers.get("X-AI-Calls-Remaining") == "1"
+        assert resp.headers.get("X-AI-Calls-Remaining") == "0"
 
-    def test_second_call_returns_200_remaining_zero(self, app, client) -> None:
+    def test_second_call_returns_429_at_daily_limit(self, app, client) -> None:
         token = _register_and_login(client, "ai-rl-2nd")
         _grant_premium(app, token)
 
@@ -236,9 +236,11 @@ class TestAIDailyRateLimitHTTP:
             },
         ):
             client.get("/ai/insights/spending", headers=_auth(token))
-            resp = client.get("/ai/insights/spending", headers=_auth(token))
+            resp = client.get("/ai/insights/spending", headers=_auth(token, v2=True))
 
-        assert resp.status_code == 200
+        # Daily limit is 1/day → the second call is blocked.
+        assert resp.status_code == 429
+        assert resp.get_json()["error"]["code"] == "AI_DAILY_LIMIT_EXCEEDED"
         assert resp.headers.get("X-AI-Calls-Remaining") == "0"
 
     def test_third_call_returns_429(self, app, client) -> None:
@@ -288,7 +290,7 @@ class TestAIDailyRateLimitHTTP:
 
         assert failed.status_code == 500
         assert recovered.status_code == 200
-        assert recovered.headers.get("X-AI-Calls-Remaining") == "1"
+        assert recovered.headers.get("X-AI-Calls-Remaining") == "0"
 
     def test_cached_spending_insight_does_not_consume_daily_limit(
         self, app, client
@@ -310,7 +312,7 @@ class TestAIDailyRateLimitHTTP:
             resp = client.get("/ai/insights/spending", headers=_auth(token))
 
         assert resp.status_code == 200
-        assert resp.headers.get("X-AI-Calls-Remaining") == "2"
+        assert resp.headers.get("X-AI-Calls-Remaining") == "1"
 
     def test_cached_period_generate_does_not_consume_daily_limit(
         self, app, client
@@ -341,7 +343,7 @@ class TestAIDailyRateLimitHTTP:
             )
 
         assert resp.status_code == 200
-        assert resp.headers.get("X-AI-Calls-Remaining") == "2"
+        assert resp.headers.get("X-AI-Calls-Remaining") == "1"
 
     def test_429_message_is_portuguese(self, app, client) -> None:
         token = _register_and_login(client, "ai-rl-ptbr")
@@ -393,7 +395,8 @@ class TestAIDailyRateLimitHTTP:
         assert resp.get_json()["error"]["code"] == "AI_DAILY_LIMIT_EXCEEDED"
 
     def test_spending_and_weekly_share_same_daily_counter(self, app, client) -> None:
-        """1 spending call + 1 weekly call = 2 calls total — next call is 429."""
+        """Spending and weekly share one daily counter — at 1/day the second
+        call (weekly) is already blocked."""
         token = _register_and_login(client, "ai-rl-shared")
         _grant_premium(app, token)
 
@@ -420,11 +423,13 @@ class TestAIDailyRateLimitHTTP:
             ),
         ):
             r1 = client.get("/ai/insights/spending", headers=_auth(token))
-            r2 = client.get("/ai/insights/weekly-summary", headers=_auth(token))
-            r3 = client.get("/ai/insights/spending", headers=_auth(token))
+            r2 = client.get(
+                "/ai/insights/weekly-summary", headers=_auth(token, v2=True)
+            )
+            r3 = client.get("/ai/insights/spending", headers=_auth(token, v2=True))
 
         assert r1.status_code == 200
-        assert r2.status_code == 200
+        assert r2.status_code == 429
         assert r3.status_code == 429
 
     def test_free_user_gets_403_not_429(self, app, client) -> None:
@@ -453,13 +458,14 @@ class TestAIDailyRateLimitHTTP:
                 "model": "stub",
             },
         ):
-            # Exhaust user_a
+            # Exhaust user_a (1/day → second call blocked)
             client.get("/ai/insights/spending", headers=_auth(token_a))
-            client.get("/ai/insights/spending", headers=_auth(token_a))
-            blocked = client.get("/ai/insights/spending", headers=_auth(token_a))
+            blocked = client.get(
+                "/ai/insights/spending", headers=_auth(token_a, v2=True)
+            )
             assert blocked.status_code == 429
 
             # user_b still has full quota
             resp_b = client.get("/ai/insights/spending", headers=_auth(token_b))
             assert resp_b.status_code == 200
-            assert resp_b.headers.get("X-AI-Calls-Remaining") == "1"
+            assert resp_b.headers.get("X-AI-Calls-Remaining") == "0"
