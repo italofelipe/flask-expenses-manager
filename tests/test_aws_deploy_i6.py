@@ -204,6 +204,30 @@ def test_build_script_asserts_alembic_current_equals_heads_after_upgrade() -> No
     assert "exit 37" in script
 
 
+def test_build_script_migration_targets_pinned_web_container() -> None:
+    """#1405: migrate/drift must target the pinned $WEB_CID, not `compose exec web`.
+
+    Re-resolving the ``web`` service by name can hit a stale one-off container
+    (``auraxis-web-run-*``) with an older migration set, making the upgrade a
+    no-op and the drift gate pass against the wrong head — the deploy reports
+    success while the live container serves new code against an un-migrated DB.
+    """
+    script = aws_deploy_i6._build_script(
+        env_name="prod",
+        aws_region="us-east-1",
+        git_ref="origin/master",
+        mode="deploy",
+    )
+    # Upgrade + drift queries must use the captured container id.
+    assert 'docker exec "$WEB_CID" flask db upgrade' in script
+    assert 'docker exec "$WEB_CID" flask db current' in script
+    assert 'docker exec "$WEB_CID" flask db heads' in script
+    # And must NOT re-resolve the service by name for these commands.
+    assert "exec -T web flask db upgrade" not in script
+    assert "exec -T web flask db current" not in script
+    assert "exec -T web flask db heads" not in script
+
+
 def test_build_script_rollback_does_not_run_flask_db_upgrade() -> None:
     """Rollback must NOT run migrations — schema downgrades are out of scope."""
     script = aws_deploy_i6._build_script(

@@ -1042,7 +1042,7 @@ if [ "$WEB_HEALTH" != "healthy" ]; then
   exit 34
 fi
 
-# Apply pending Alembic migrations against the canonical DB (RDS in prod).
+# Apply pending Alembic migrations against the canonical DB.
 # This runs inside the freshly-started web container, after the container is
 # healthy (gunicorn up, DATABASE_URL connectable) but BEFORE the /healthz
 # smoke check validates the deploy. Rationale: /healthz does not exercise
@@ -1051,14 +1051,23 @@ fi
 # the first real request. Failing here aborts the deploy and blocks traffic.
 # See issue #1252.
 #
+# IMPORTANT (#1405): we target the pinned container id "$WEB_CID" captured and
+# health-validated right after --force-recreate, NOT "docker compose exec web".
+# Re-resolving the "web" service by name can select a STALE one-off container
+# (e.g. leftover auraxis-web-run-* from a prior `docker compose run`), whose
+# image carries an OLDER migration set. Running upgrade there is a no-op and
+# the drift gate then sees current==heads for the *old* head — so the deploy
+# reports success while the live container serves new code against an
+# un-migrated DB (the 2026-05-31 transactions outage: recurrence_* columns
+# missing at alembic head ai6). Pinning to $WEB_CID makes this deterministic.
+#
 # We intentionally do NOT run this in rollback mode: rolling back schema is
 # risky with multi-head merges and out-of-scope for the rollback path
 # (forward-only migrations is the policy).
 if [ "$MODE" = "deploy" ]; then
-  echo "[i6] applying pending alembic migrations (flask db upgrade)..."
+  echo "[i6] applying pending alembic migrations (flask db upgrade) in $WEB_CID..."
   ALEMBIC_STDERR="$(mktemp)"
-  if ! docker compose --env-file "$ENV_FILE" -f docker-compose.prod.yml \\
-       exec -T web flask db upgrade 2>"$ALEMBIC_STDERR"; then
+  if ! docker exec "$WEB_CID" flask db upgrade 2>"$ALEMBIC_STDERR"; then
     echo "[i6] alembic upgrade failed"
     echo "[i6] stderr:"
     cat "$ALEMBIC_STDERR" || true
@@ -1074,11 +1083,9 @@ if [ "$MODE" = "deploy" ]; then
   # this fails the deploy has applied migrations but the resulting tip
   # diverges from the code's expected head — indicates alembic config drift
   # or a manual edit to the live DB. Abort before flipping traffic.
-  CUR_REV="$(docker compose --env-file "$ENV_FILE" -f docker-compose.prod.yml \\
-    exec -T web flask db current 2>/dev/null \\
+  CUR_REV="$(docker exec "$WEB_CID" flask db current 2>/dev/null \\
     | awk '{{print $1}}' | tail -1)"
-  HEAD_REV="$(docker compose --env-file "$ENV_FILE" -f docker-compose.prod.yml \\
-    exec -T web flask db heads 2>/dev/null \\
+  HEAD_REV="$(docker exec "$WEB_CID" flask db heads 2>/dev/null \\
     | awk '{{print $1}}' | tail -1)"
   echo "[i6] alembic current=$CUR_REV heads=$HEAD_REV"
   if [ -z "$CUR_REV" ] || [ -z "$HEAD_REV" ] || [ "$CUR_REV" != "$HEAD_REV" ]; then
