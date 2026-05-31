@@ -56,6 +56,7 @@ class GenerateAiInsightPayload(graphene.ObjectType):
     model = graphene.String()
     tokens_used = graphene.Int()
     cost_usd = graphene.Float()
+    forecast = graphene.Boolean()
 
 
 def _to_item_type(item: dict[str, Any]) -> AIInsightItemType:
@@ -151,6 +152,7 @@ class GenerateAiInsightMutation(graphene.Mutation):
             model=result.get("model"),
             tokens_used=int(result.get("tokens_used") or 0),
             cost_usd=float(result.get("cost_usd") or 0),
+            forecast=bool(result.get("forecast", False)),
         )
 
 

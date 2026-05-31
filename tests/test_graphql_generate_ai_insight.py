@@ -42,6 +42,7 @@ mutation Gen($periodType: String!, $anchorDate: String) {
     items { type dimension title message evidence }
     cached
     model
+    forecast
   }
 }
 """
@@ -136,6 +137,100 @@ class TestGenerateAiInsightMutation:
         assert len(data["items"]) == 1
         assert data["items"][0]["dimension"] == "credit_cards"
         assert data["items"][0]["evidence"] == ["credit_cards[0].utilization_pct"]
+
+    def test_exposes_forecast_flag_for_future_period(self, app, client):
+        """GraphQL parity (#1393): a future-month generation returns forecast=true.
+
+        Mirrors the REST `forecast` field on POST /ai/insights/generate.
+        """
+        token = _register_and_login(client, prefix="gql-gen-forecast")
+        from flask_jwt_extended import decode_token
+
+        from app.services.entitlement_service import grant_entitlement
+
+        with app.app_context():
+            user_id = UUID(decode_token(token)["sub"])
+            grant_entitlement(
+                user_id=user_id,
+                feature_key="advanced_simulations",
+                source="trial",
+            )
+            from app.extensions.database import db
+
+            db.session.commit()
+
+        fake_result = {
+            "period_type": "monthly",
+            "period_label": "2026-12",
+            "period_start": "2026-12-01",
+            "period_end": "2026-12-31",
+            "summary": "Previsão de dezembro.",
+            "items": [],
+            "context_version": "financial_insight_snapshot.v1",
+            "cached": False,
+            "model": "gpt-4o-mini",
+            "tokens_used": 50,
+            "cost_usd": 0.0001,
+            "forecast": True,
+        }
+        with patch("app.graphql.mutations.ai_insight.AIAdvisoryService") as MockSvc:
+            instance = MockSvc.return_value
+            instance.generate_financial_insights.return_value = fake_result
+            response = _gql(
+                client,
+                _GENERATE_MUTATION,
+                token,
+                variables={"periodType": "monthly", "anchorDate": "2026-12-01"},
+            )
+
+        body = response.get_json()
+        assert "errors" not in body or not body["errors"], body
+        assert body["data"]["generateAiInsight"]["forecast"] is True
+
+    def test_forecast_defaults_false_when_absent(self, app, client):
+        """A present-period result without an explicit forecast reads as false."""
+        token = _register_and_login(client, prefix="gql-gen-noforecast")
+        from flask_jwt_extended import decode_token
+
+        from app.services.entitlement_service import grant_entitlement
+
+        with app.app_context():
+            user_id = UUID(decode_token(token)["sub"])
+            grant_entitlement(
+                user_id=user_id,
+                feature_key="advanced_simulations",
+                source="trial",
+            )
+            from app.extensions.database import db
+
+            db.session.commit()
+
+        fake_result = {
+            "period_type": "daily",
+            "period_label": "2026-05-18",
+            "period_start": "2026-05-18",
+            "period_end": "2026-05-18",
+            "summary": "Resumo do dia.",
+            "items": [],
+            "context_version": "financial_insight_snapshot.v1",
+            "cached": False,
+            "model": "gpt-4o-mini",
+            "tokens_used": 50,
+            "cost_usd": 0.0001,
+        }
+        with patch("app.graphql.mutations.ai_insight.AIAdvisoryService") as MockSvc:
+            instance = MockSvc.return_value
+            instance.generate_financial_insights.return_value = fake_result
+            response = _gql(
+                client,
+                _GENERATE_MUTATION,
+                token,
+                variables={"periodType": "daily", "anchorDate": "2026-05-18"},
+            )
+
+        body = response.get_json()
+        assert "errors" not in body or not body["errors"], body
+        assert body["data"]["generateAiInsight"]["forecast"] is False
 
     def test_passes_timezone_header_to_generation_service(self, app, client):
         token = _register_and_login(client, prefix="gql-gen-tz")

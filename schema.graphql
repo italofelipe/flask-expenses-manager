@@ -1287,6 +1287,7 @@ type GenerateAiInsightPayload {
   model: String
   tokensUsed: Int
   costUsd: Float
+  forecast: Boolean
 }
 
 """A single LLM-produced insight item, tagged by dimension."""
