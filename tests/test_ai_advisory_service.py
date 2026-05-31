@@ -385,6 +385,20 @@ class TestAIAdvisoryServiceFinancialInsights:
             assert audit.model == "gpt-4o-mini"
             assert audit.total_tokens == 140
 
+    def test_build_prompt_instructs_transactions_narrative_with_projections(
+        self,
+    ) -> None:
+        from app.services.ai_advisory_service import _build_financial_insight_prompt
+
+        prompt = _build_financial_insight_prompt(
+            {"schema_version": "financial_insight_snapshot.v1"},
+            period_type="daily",
+        )
+        assert "NARRATIVA" in prompt
+        assert "projections" in prompt
+        assert "comparisons.same_day_previous_month" in prompt
+        assert "transactions.sample" in prompt
+
     def test_build_prompt_forecast_mode_frames_as_preview(self) -> None:
         from app.services.ai_advisory_service import _build_financial_insight_prompt
 
