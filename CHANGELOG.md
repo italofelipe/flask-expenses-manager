@@ -1,5 +1,18 @@
 # Changelog
 
+## [1.52.0](https://github.com/italofelipe/auraxis-api/compare/v1.51.0...v1.52.0) (2026-05-31)
+
+
+### Features
+
+* **ai:** instrument insight runs, cost, rejections, truncation & purge ([#1314](https://github.com/italofelipe/auraxis-api/issues/1314)) ([#1406](https://github.com/italofelipe/auraxis-api/issues/1406)) ([1189029](https://github.com/italofelipe/auraxis-api/commit/11890299af6d936198cf68e34628d618e9b4f2f4))
+
+
+### Bug Fixes
+
+* **ai:** exec weekly/monthly insights in running web container ([#1249](https://github.com/italofelipe/auraxis-api/issues/1249)) ([#1403](https://github.com/italofelipe/auraxis-api/issues/1403)) ([0950a7c](https://github.com/italofelipe/auraxis-api/commit/0950a7ce0c0f3a7fabb870ddbb3def6585e2c480))
+* **deploy:** pin alembic upgrade + drift gate to the recreated web container ([#1405](https://github.com/italofelipe/auraxis-api/issues/1405)) ([#1407](https://github.com/italofelipe/auraxis-api/issues/1407)) ([41a3592](https://github.com/italofelipe/auraxis-api/commit/41a35923e2d70da93a5431d3ea84b12c7523c2a3))
+
 ## [1.51.0](https://github.com/italofelipe/auraxis-api/compare/v1.50.0...v1.51.0) (2026-05-31)
 
 
