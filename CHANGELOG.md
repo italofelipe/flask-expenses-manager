@@ -1,5 +1,16 @@
 # Changelog
 
+## [1.50.0](https://github.com/italofelipe/auraxis-api/compare/v1.49.0...v1.50.0) (2026-05-31)
+
+
+### Features
+
+* **ai:** assertive transactions narrative + deterministic projections ([#1394](https://github.com/italofelipe/auraxis-api/issues/1394)) ([#1396](https://github.com/italofelipe/auraxis-api/issues/1396)) ([43c6456](https://github.com/italofelipe/auraxis-api/commit/43c6456ad6a6bf9eb6c4d26488a28c83fae4d14f))
+* **ai:** automatic end-of-month recap batch + cron ([#1386](https://github.com/italofelipe/auraxis-api/issues/1386) slice B) ([#1397](https://github.com/italofelipe/auraxis-api/issues/1397)) ([b49f060](https://github.com/italofelipe/auraxis-api/commit/b49f0603eef3ee619f35b7e11fcbf64202ad66ff))
+* **ai:** cost ceiling + 1/day & 30/month caps + strong model + admin bypass ([#1386](https://github.com/italofelipe/auraxis-api/issues/1386) slice A) ([#1390](https://github.com/italofelipe/auraxis-api/issues/1390)) ([3f7a9a7](https://github.com/italofelipe/auraxis-api/commit/3f7a9a70e9094249f6ad198dd6b6b711850aabc9))
+* **ai:** forecast mode for future-month financial insights ([#1389](https://github.com/italofelipe/auraxis-api/issues/1389)) ([b3eef6a](https://github.com/italofelipe/auraxis-api/commit/b3eef6a9938f9b77619ddba4caafcfc76c345559))
+* **ai:** insight feedback/rating loop — model + REST + GraphQL ([#1387](https://github.com/italofelipe/auraxis-api/issues/1387)) ([#1398](https://github.com/italofelipe/auraxis-api/issues/1398)) ([f63c339](https://github.com/italofelipe/auraxis-api/commit/f63c339bbba54928d4e6ac8012d9f5ad634849b7))
+
 ## [1.49.0](https://github.com/italofelipe/auraxis-api/compare/v1.48.0...v1.49.0) (2026-05-30)
 
 
