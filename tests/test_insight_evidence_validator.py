@@ -216,3 +216,26 @@ class TestPipelineIntegration:
         )
         with pytest.raises(LLMProviderError):
             _coerce_financial_insight_response(content)
+
+
+class TestProjectionsEvidence:
+    def test_projections_is_known_prefix(self) -> None:
+        assert is_known_evidence_prefix("projections.wallet.horizon_12m") is True
+        assert is_known_evidence_prefix("projections.goals[0].horizon_3m") is True
+
+    def test_transactions_dimension_accepts_projections_goals_wallet(self) -> None:
+        for evidence in (
+            "projections.combined_scenario.horizon_12m",
+            "goals[0].required_monthly_pace",
+            "wallet.total_value",
+        ):
+            ok, reason = validate_item_evidence(
+                {
+                    "type": "saude_financeira",
+                    "dimension": "transactions",
+                    "title": "Narrativa",
+                    "message": "...",
+                    "evidence": [evidence],
+                }
+            )
+            assert ok is True, (evidence, reason)
