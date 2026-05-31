@@ -321,7 +321,15 @@ for SERVICE in "${{SERVICE_START_ARGS[@]}}"; do
   fi
 done
 
-docker compose --env-file "$ENV_FILE" -f "$COMPOSE_FILE" run --rm --no-deps \\
+# Issue #1249: exec the CLI inside the *running* web container instead of
+# `docker compose run`. The prod ENTRYPOINT (scripts/entrypoint_prod.sh) always
+# `exec gunicorn ...` and ignores any passed command, so `run web <cmd>` booted
+# a web server that never exited and the SSM wait timed out (~30 min) on every
+# scheduled run. `exec` runs the command in the live container — which also
+# carries the correct DATABASE_URL / LLM_PROVIDER the API actually serves with
+# (the `run` path used .env.prod, still pointing at the decommissioned RDS) —
+# and exits cleanly when the batch finishes.
+docker compose --env-file "$ENV_FILE" -f "$COMPOSE_FILE" exec -T \\
   -e FLASK_APP=run.py \\
   web {flask_cmd}
 """
