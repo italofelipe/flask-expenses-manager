@@ -429,6 +429,49 @@ class TestFinancialInsightContextBuilderDaily:
         }
         assert snapshot["data_quality"]["missing_domains"] == []
 
+    def test_daily_snapshot_includes_projections_block(self, app) -> None:
+        with app.app_context():
+            user_id = _make_user()
+            anchor = date(2026, 5, 17)
+            _make_transaction(
+                user_id,
+                title="Salário",
+                amount="6000.00",
+                tx_type=TransactionType.INCOME,
+                status=TransactionStatus.PAID,
+                due_date=anchor,
+            )
+            goal = _make_goal(
+                user_id,
+                title="Reserva",
+                current_amount="1500.00",
+                target_amount="10000.00",
+                target_date=date(2027, 5, 17),
+            )
+            _make_goal_contribution(
+                user_id,
+                goal.id,
+                amount="500.00",
+                created_at=datetime(2026, 5, 10, 12, 0, 0),
+            )
+            _make_wallet(user_id, value="5000.00")  # annual_rate 12%
+
+            snapshot = FinancialInsightContextBuilder().build_daily(
+                user_id=user_id,
+                anchor_date=anchor,
+            )
+
+        projections = snapshot["projections"]
+        assert projections["horizons_months"] == [3, 6, 12]
+        assert projections["rate_basis"] == "observed"
+        # Wallet R$5.000 @ 12% a.a. → ~R$5.600 em 12 meses.
+        assert "wallet" in projections
+        assert abs(
+            Decimal(projections["wallet"]["horizon_12m"]) - Decimal("5600.00")
+        ) < Decimal("5.00")
+        assert projections["goals"][0]["title"] == "Reserva"
+        assert "horizon_12m_required" in projections["goals"][0]
+
     def test_daily_snapshot_marks_missing_previous_month_same_day(self, app) -> None:
         with app.app_context():
             user_id = _make_user()
