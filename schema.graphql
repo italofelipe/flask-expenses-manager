@@ -1276,6 +1276,7 @@ type FiscalDocumentPayload {
 
 type GenerateAiInsightPayload {
   ok: Boolean!
+  id: String
   periodType: String
   periodLabel: String
   periodStart: String

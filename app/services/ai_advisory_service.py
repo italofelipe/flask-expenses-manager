@@ -624,6 +624,7 @@ def _cached_financial_insight_payload(
         return None
 
     return {
+        "id": str(cached.id),
         "period_type": normalized_period_type,
         "period_label": cached.period_label,
         "period_start": cached.period_start.isoformat(),
@@ -1200,6 +1201,7 @@ class AIAdvisoryService:
             )
 
         return {
+            "id": str(saved_insight.id),
             "period_type": normalized_period_type,
             "period_label": period_label,
             "period_start": period_start.isoformat(),

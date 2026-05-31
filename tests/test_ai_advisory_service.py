@@ -372,6 +372,7 @@ class TestAIAdvisoryServiceFinancialInsights:
             )
 
             saved = db.session.query(AIInsight).filter_by(user_id=user_id).one()
+            assert result["id"] == str(saved.id)
             assert saved.insight_type == InsightType.daily
             assert saved.period_label == "2026-05-17"
             assert "current_period.paid.balance" in saved.content
