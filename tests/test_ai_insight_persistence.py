@@ -14,7 +14,10 @@ from __future__ import annotations
 import json
 import uuid
 from datetime import date, timedelta
+from typing import Generator
 from unittest.mock import MagicMock, patch
+
+import pytest
 
 from app.models.ai_insight import AIInsight, InsightType
 from app.services.llm_provider import LLMResponse
@@ -97,6 +100,27 @@ def _stub_response(
 
 
 class TestAdvisoryServicePersistence:
+    @pytest.fixture(autouse=True)
+    def _freeze_today_midmonth(self) -> Generator[None, None, None]:
+        """Pin ``date.today()`` to a deterministic mid-month day.
+
+        ``generate_spending_insights`` produces an ``InsightType.recap`` (not a
+        daily insight) on the last calendar day of the month
+        (``is_recap = today == end``). CI runs in UTC, so on a month-end-UTC day
+        the daily-asserting tests below would receive a recap and fail with
+        ``assert None is not None``. Freezing today to mid-month makes
+        ``insight_type`` deterministically ``daily``.
+
+        ``test_last_day_of_month_uses_recap_type`` re-patches the same symbol
+        inside its own ``with`` block, which transparently overrides this
+        fixture for that test's duration.
+        """
+        fixed = date(2026, 5, 15)
+        with patch("app.services.ai_advisory_service.date") as mock_date:
+            mock_date.today.return_value = fixed
+            mock_date.side_effect = lambda *args, **kwargs: date(*args, **kwargs)
+            yield
+
     def test_generate_spending_insights_saves_ai_insight(self, app) -> None:
         with app.app_context():
             from app.extensions.database import db
