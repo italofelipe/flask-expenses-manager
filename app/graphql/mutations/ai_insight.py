@@ -45,6 +45,7 @@ class AIInsightItemType(graphene.ObjectType):
 
 class GenerateAiInsightPayload(graphene.ObjectType):
     ok = graphene.Boolean(required=True)
+    id = graphene.String()
     period_type = graphene.String()
     period_label = graphene.String()
     period_start = graphene.String()
@@ -141,6 +142,7 @@ class GenerateAiInsightMutation(graphene.Mutation):
 
         return GenerateAiInsightPayload(
             ok=True,
+            id=result.get("id"),
             period_type=result.get("period_type"),
             period_label=result.get("period_label"),
             period_start=result.get("period_start"),

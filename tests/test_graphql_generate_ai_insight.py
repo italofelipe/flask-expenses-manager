@@ -37,6 +37,7 @@ _GENERATE_MUTATION = """
 mutation Gen($periodType: String!, $anchorDate: String) {
   generateAiInsight(periodType: $periodType, anchorDate: $anchorDate) {
     ok
+    id
     periodType
     summary
     items { type dimension title message evidence }
@@ -99,6 +100,7 @@ class TestGenerateAiInsightMutation:
             db.session.commit()
 
         fake_result = {
+            "id": "cccccccc-cccc-cccc-cccc-cccccccccccc",
             "period_type": "daily",
             "period_label": "2026-05-18",
             "period_start": "2026-05-18",
@@ -133,6 +135,7 @@ class TestGenerateAiInsightMutation:
         assert "errors" not in body or not body["errors"], body
         data = body["data"]["generateAiInsight"]
         assert data["ok"] is True
+        assert data["id"] == "cccccccc-cccc-cccc-cccc-cccccccccccc"
         assert data["summary"] == "Resumo do dia."
         assert len(data["items"]) == 1
         assert data["items"][0]["dimension"] == "credit_cards"
