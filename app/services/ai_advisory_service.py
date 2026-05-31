@@ -638,6 +638,10 @@ def _cached_financial_insight_payload(
         "cost_usd": float(cached.cost_usd),
         "model": cached.model,
         "cached": True,
+        # Mirror the fresh-generation `forecast` flag so cache hits stay
+        # consistent: an insight whose period still lies in the future is a
+        # forecast regardless of whether it was just generated or replayed.
+        "forecast": cached.period_start > date.today(),
     }
 
 
