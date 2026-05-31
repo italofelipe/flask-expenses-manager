@@ -849,6 +849,19 @@ GRAPHQL_OPERATION_CATALOG: tuple[GraphQLOperationDoc, ...] = (
         ),
         source_module="app.graphql.mutations.ai_insight",
     ),
+    # AI Advisory — feedback (#1387)
+    GraphQLOperationDoc(
+        name="submitAiInsightFeedback",
+        operation_type="mutation",
+        domain="ai_advisory",
+        access="auth_required",
+        summary=(
+            "Registra feedback (notas 0–5 de relevância/veracidade/profundidade/"
+            "utilidade + comentário) de um insight do próprio usuário. Paridade "
+            "com POST /ai/insights/<id>/feedback."
+        ),
+        source_module="app.graphql.mutations.ai_insight",
+    ),
 )
 
 

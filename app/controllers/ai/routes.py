@@ -4,6 +4,7 @@ from .blueprint import ai_bp
 from .resources import (
     AIGoalProjectionResource,
     AIInsightDetailResource,
+    AIInsightFeedbackResource,
     AIInsightGenerateResource,
     AIInsightHistoryResource,
     AIInsightRunStatusResource,
@@ -59,6 +60,11 @@ def register_ai_routes() -> None:
         "/insights/<insight_id>",
         view_func=AIInsightDetailResource.as_view("ai_insight_detail"),
         methods=["GET"],
+    )
+    ai_bp.add_url_rule(
+        "/insights/<insight_id>/feedback",
+        view_func=AIInsightFeedbackResource.as_view("ai_insight_feedback"),
+        methods=["POST"],
     )
     _ROUTES_REGISTERED = True
 
