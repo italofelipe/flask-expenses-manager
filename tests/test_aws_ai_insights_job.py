@@ -27,11 +27,15 @@ def test_build_script_waits_only_for_services_started_by_the_job() -> None:
     assert "redis container was not created" not in script
 
 
-def test_build_script_still_runs_weekly_command_inside_web_without_deps() -> None:
+def test_build_script_execs_weekly_command_in_running_web_container() -> None:
+    # Issue #1249: must `exec` into the live web container, not `run` a fresh
+    # one — the prod entrypoint always launches gunicorn and ignores the passed
+    # command, so `run` left the SSM job hanging until the ~30 min timeout.
     script = aws_ai_insights_job._build_script(env_name="prod", mode="weekly")
 
-    assert "run --rm --no-deps \\" in script
+    assert "exec -T \\" in script
     assert "web flask ai weekly-insights" in script
+    assert "run --rm --no-deps" not in script
 
 
 def test_build_script_passes_month_to_monthly_command() -> None:
