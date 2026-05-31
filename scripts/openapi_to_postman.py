@@ -942,6 +942,16 @@ ENRICHMENT: dict[str, dict[str, Any]] = {
             "});",
         ],
     },
+    "POST /ai/insights/{insight_id}/feedback": {
+        # The smoke run targets a placeholder insight_id with an auto-generated
+        # body, so it never owns a real insight — expect 400 (bad path/body) or
+        # 404 (insight not found/owned), with 201 on the happy path.
+        "test_lines": [
+            "pm.test('Enviar feedback de um insight de IA — expected 201, 400 or 404', function () {",
+            "  pm.expect(pm.response.code).to.be.oneOf([201, 400, 404]);",
+            "});",
+        ],
+    },
 }
 
 # ---------------------------------------------------------------------------

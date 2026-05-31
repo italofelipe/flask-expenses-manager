@@ -4707,8 +4707,8 @@
               "listen": "test",
               "script": {
                 "exec": [
-                  "pm.test('Enviar feedback de um insight de IA — status 201', function () {",
-                  "  pm.response.to.have.status(201);",
+                  "pm.test('Enviar feedback de um insight de IA — expected 201, 400 or 404', function () {",
+                  "  pm.expect(pm.response.code).to.be.oneOf([201, 400, 404]);",
                   "});"
                 ],
                 "type": "text/javascript"
