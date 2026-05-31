@@ -7,7 +7,10 @@ from app.graphql.mutations.account import (
     DeleteAccountMutation,
     UpdateAccountMutation,
 )
-from app.graphql.mutations.ai_insight import GenerateAiInsightMutation
+from app.graphql.mutations.ai_insight import (
+    GenerateAiInsightMutation,
+    SubmitAiInsightFeedbackMutation,
+)
 from app.graphql.mutations.auth import (
     ConfirmEmailMutation,
     ForgotPasswordMutation,
@@ -181,6 +184,7 @@ class Mutation(graphene.ObjectType):
     )
     # AI Advisory — canonical GraphQL parity for POST /ai/insights/generate
     generate_ai_insight = GenerateAiInsightMutation.Field()
+    submit_ai_insight_feedback = SubmitAiInsightFeedbackMutation.Field()
 
 
 __all__ = ["Mutation"]

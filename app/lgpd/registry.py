@@ -95,6 +95,7 @@ def _build_registry() -> list[EntityRule]:
     """
     from app.models.account import Account
     from app.models.ai_insight import AIInsight
+    from app.models.ai_insight_feedback import AIInsightFeedback
     from app.models.ai_insight_run import AIInsightRun
     from app.models.alert import Alert, AlertPreference
     from app.models.audit_event import AuditEvent
@@ -318,6 +319,16 @@ def _build_registry() -> list[EntityRule]:
             retention_reason=RetentionReason.NONE,
             retention_days=None,
             description="AI-generated financial insights",
+        ),
+        EntityRule(
+            model=AIInsightFeedback,
+            user_id_field="user_id",
+            table_name="ai_insight_feedback",
+            deletion_strategy=DeletionStrategy.DELETE,
+            export_included=True,
+            retention_reason=RetentionReason.NONE,
+            retention_days=None,
+            description="User ratings/comments on AI-generated insights",
         ),
         EntityRule(
             model=AIInsightRun,

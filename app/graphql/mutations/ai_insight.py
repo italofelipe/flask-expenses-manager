@@ -9,12 +9,21 @@ from __future__ import annotations
 
 from datetime import date, datetime
 from typing import Any
+from uuid import UUID
 
 import graphene
 from flask import request
 
+from app.application.services.ai_insight_feedback_service import (
+    AIInsightFeedbackError,
+    submit_insight_feedback,
+)
 from app.graphql.auth import get_current_user_required
-from app.graphql.errors import build_public_graphql_error
+from app.graphql.errors import (
+    GRAPHQL_ERROR_CODE_NOT_FOUND,
+    GRAPHQL_ERROR_CODE_VALIDATION,
+    build_public_graphql_error,
+)
 from app.graphql.observability import log_graphql_resolver
 from app.services.ai_advisory_service import AIAdvisoryService
 from app.services.financial_insight_context_builder import INSIGHT_DIMENSIONS
@@ -142,4 +151,86 @@ class GenerateAiInsightMutation(graphene.Mutation):
             model=result.get("model"),
             tokens_used=int(result.get("tokens_used") or 0),
             cost_usd=float(result.get("cost_usd") or 0),
+        )
+
+
+class AIInsightFeedbackPayload(graphene.ObjectType):
+    ok = graphene.Boolean(required=True)
+    id = graphene.String()
+    insight_id = graphene.String()
+    relevance = graphene.Int()
+    truthfulness = graphene.Int()
+    depth = graphene.Int()
+    usefulness = graphene.Int()
+    comment = graphene.String()
+
+
+class SubmitAiInsightFeedbackMutation(graphene.Mutation):
+    """GraphQL parity for POST /ai/insights/<id>/feedback (#1387)."""
+
+    class Arguments:
+        insight_id = graphene.String(required=True)
+        relevance = graphene.Int(required=True)
+        truthfulness = graphene.Int(required=True)
+        depth = graphene.Int(required=True)
+        usefulness = graphene.Int(required=True)
+        comment = graphene.String()
+
+    Output = AIInsightFeedbackPayload
+
+    @log_graphql_resolver("submitAiInsightFeedback")
+    def mutate(
+        self,
+        _info: graphene.ResolveInfo,
+        insight_id: str,
+        relevance: int,
+        truthfulness: int,
+        depth: int,
+        usefulness: int,
+        comment: str | None = None,
+    ) -> "AIInsightFeedbackPayload":
+        user = get_current_user_required()
+
+        ratings = {
+            "relevance": relevance,
+            "truthfulness": truthfulness,
+            "depth": depth,
+            "usefulness": usefulness,
+        }
+        for name, value in ratings.items():
+            if value is None or not (0 <= int(value) <= 5):
+                raise build_public_graphql_error(
+                    f"{name} deve estar entre 0 e 5",
+                    code=GRAPHQL_ERROR_CODE_VALIDATION,
+                )
+
+        try:
+            parsed_insight_id = UUID(str(insight_id))
+        except (ValueError, AttributeError, TypeError) as exc:
+            raise build_public_graphql_error(
+                "insight_id inválido",
+                code=GRAPHQL_ERROR_CODE_VALIDATION,
+            ) from exc
+
+        try:
+            result = submit_insight_feedback(
+                user_id=user.id,
+                insight_id=parsed_insight_id,
+                data={**ratings, "comment": comment},
+            )
+        except AIInsightFeedbackError as exc:
+            raise build_public_graphql_error(
+                exc.message,
+                code=GRAPHQL_ERROR_CODE_NOT_FOUND,
+            ) from exc
+
+        return AIInsightFeedbackPayload(
+            ok=True,
+            id=result["id"],
+            insight_id=result["insight_id"],
+            relevance=result["relevance"],
+            truthfulness=result["truthfulness"],
+            depth=result["depth"],
+            usefulness=result["usefulness"],
+            comment=result["comment"],
         )

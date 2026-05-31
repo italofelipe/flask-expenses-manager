@@ -20,7 +20,12 @@ from uuid import UUID
 
 from flask import Response, request
 from flask_apispec.views import MethodResource
+from marshmallow import ValidationError
 
+from app.application.services.ai_insight_feedback_service import (
+    AIInsightFeedbackError,
+    submit_insight_feedback,
+)
 from app.auth import current_user_id
 from app.controllers.response_contract import (
     compat_error_response,
@@ -33,6 +38,7 @@ from app.docs.openapi_helpers import (
     json_success_response,
 )
 from app.middleware.ai_rate_limit import ai_daily_limit
+from app.schemas.ai_insight_feedback_schema import AIInsightFeedbackSchema
 from app.schemas.ai_insight_schema import (
     AIInsightGenerateRequestSchema,
     AIMonthlyReportRequestSchema,
@@ -1163,9 +1169,109 @@ class AIInsightHistoryResource(MethodResource):
         )
 
 
+class AIInsightFeedbackResource(MethodResource):
+    """POST /ai/insights/<insight_id>/feedback — rate a generated insight."""
+
+    @doc(
+        summary="Enviar feedback de um insight de IA",
+        description=(
+            "Registra notas de 0 a 5 (relevância, veracidade, profundidade, "
+            "utilidade) e um comentário opcional sobre um insight do próprio "
+            "usuário. Reenviar atualiza o feedback existente."
+        ),
+        tags=["AI Advisory"],
+        security=[{"BearerAuth": []}],
+        params={
+            "insight_id": {
+                "in": "path",
+                "type": "string",
+                "required": True,
+                "description": "UUID do insight",
+            }
+        },
+        responses={
+            201: json_success_response(
+                description="Feedback registrado",
+                message="Feedback registrado com sucesso",
+                data_example={
+                    "id": "uuid",
+                    "insight_id": "uuid",
+                    "relevance": 5,
+                    "truthfulness": 4,
+                    "depth": 4,
+                    "usefulness": 5,
+                    "comment": "Muito útil",
+                },
+            ),
+            400: json_error_response(
+                description="Dados inválidos",
+                message="Dados de feedback inválidos.",
+                error_code="VALIDATION_ERROR",
+                status_code=400,
+            ),
+            404: json_error_response(
+                description="Insight não encontrado",
+                message="Insight não encontrado.",
+                error_code="AI_INSIGHT_NOT_FOUND",
+                status_code=404,
+            ),
+        },
+    )
+    @jwt_required()
+    def post(self, insight_id: str) -> Response:
+        token_error = _guard_revoked_token()
+        if token_error is not None:
+            return token_error
+
+        user_id = current_user_id()
+
+        try:
+            parsed_insight_id = uuid.UUID(str(insight_id))
+        except (ValueError, AttributeError, TypeError):
+            return compat_error_response(
+                legacy_payload={"error": "insight_id inválido."},
+                status_code=400,
+                message="insight_id inválido.",
+                error_code="VALIDATION_ERROR",
+            )
+
+        body = request.get_json(silent=True) or {}
+        try:
+            data = AIInsightFeedbackSchema().load(body)
+        except ValidationError as exc:
+            return compat_error_response(
+                legacy_payload={"errors": exc.messages},
+                status_code=400,
+                message="Dados de feedback inválidos.",
+                error_code="VALIDATION_ERROR",
+            )
+
+        try:
+            result = submit_insight_feedback(
+                user_id=user_id,
+                insight_id=parsed_insight_id,
+                data=data,
+            )
+        except AIInsightFeedbackError as exc:
+            return compat_error_response(
+                legacy_payload={"error": exc.message},
+                status_code=exc.status_code,
+                message=exc.message,
+                error_code=exc.code,
+            )
+
+        return compat_success_response(
+            legacy_payload=result,
+            status_code=201,
+            message="Feedback registrado com sucesso",
+            data=result,
+        )
+
+
 __all__ = [
     "AIGoalProjectionResource",
     "AIInsightDetailResource",
+    "AIInsightFeedbackResource",
     "AIInsightGenerateResource",
     "AIInsightHistoryResource",
     "AIInsightRunStatusResource",
