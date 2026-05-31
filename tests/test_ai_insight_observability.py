@@ -201,3 +201,203 @@ class TestMaxBytesEnvOverride:
         # 12 KiB. Just sanity-check the unit (multiple of 1024).
         assert MAX_SNAPSHOT_BYTES > 0
         assert MAX_SNAPSHOT_BYTES % 1024 == 0
+
+
+class TestRunGovernanceMetrics:
+    """#1314 — runs/cost/rejections/truncation/data-quality/purge observability."""
+
+    @staticmethod
+    def _make_run(user_id: UUID, *, status, truncated, with_pii=False):
+        from datetime import date as _date
+
+        from app.models.ai_insight import InsightType
+        from app.services.ai_insight_runs import create_ai_insight_run
+
+        snapshot = {
+            "schema_version": "financial_insight_snapshot.v1",
+            "data_quality": {
+                "domain_presence": {
+                    "transactions": {"present": True},
+                    "goals": {"present": True},
+                    "wallet": {"present": False},
+                }
+            },
+        }
+        if with_pii:
+            snapshot["note"] = "contato fulano@email.com cpf 123.456.789-00"
+        return create_ai_insight_run(
+            user_id=user_id,
+            status=status,
+            period_type=InsightType.daily,
+            period_label="2026-05-18",
+            period_start=_date(2026, 5, 18),
+            period_end=_date(2026, 5, 18),
+            snapshot_schema_version="financial_insight_snapshot.v1",
+            snapshot_hash="hash-abc123",
+            prompt_template_version="v1",
+            snapshot_json=snapshot,
+            data_quality_json=snapshot["data_quality"],
+            truncation_flags_json={"truncated": truncated},
+        )
+
+    def test_create_emits_run_truncation_and_data_quality(self, app, client) -> None:
+        from app.models.ai_insight_run import AIInsightRunStatus
+
+        _, user_id_str = _register_and_login(client)
+        user_id = UUID(user_id_str)
+        with app.app_context():
+            with (
+                patch("app.services.ai_insight_runs.record_ai_insight_run") as run_m,
+                patch(
+                    "app.services.ai_insight_runs.record_ai_insight_truncated"
+                ) as trunc_m,
+                patch(
+                    "app.services.ai_insight_runs.record_ai_insight_data_quality"
+                ) as dq_m,
+            ):
+                self._make_run(
+                    user_id,
+                    status=AIInsightRunStatus.previewed,
+                    truncated=True,
+                )
+
+            assert run_m.call_args.kwargs == {
+                "status": "previewed",
+                "period_type": "daily",
+            }
+            assert trunc_m.call_args.kwargs == {"period_type": "daily"}
+            # 2 of 3 domains present (wallet flagged absent).
+            assert dq_m.call_args.kwargs == {
+                "period_type": "daily",
+                "domains_present": 2,
+            }
+
+    def test_create_does_not_emit_truncation_when_not_truncated(
+        self, app, client
+    ) -> None:
+        from app.models.ai_insight_run import AIInsightRunStatus
+
+        _, user_id_str = _register_and_login(client)
+        user_id = UUID(user_id_str)
+        with app.app_context():
+            with patch(
+                "app.services.ai_insight_runs.record_ai_insight_truncated"
+            ) as trunc_m:
+                self._make_run(
+                    user_id,
+                    status=AIInsightRunStatus.previewed,
+                    truncated=False,
+                )
+            assert not trunc_m.called
+
+    def test_create_structured_log_carries_run_fields_without_pii(
+        self, app, client, caplog
+    ) -> None:
+        import logging
+
+        from app.models.ai_insight_run import AIInsightRunStatus
+
+        _, user_id_str = _register_and_login(client)
+        user_id = UUID(user_id_str)
+        with app.app_context():
+            with caplog.at_level(logging.INFO, logger="app.services.ai_insight_runs"):
+                self._make_run(
+                    user_id,
+                    status=AIInsightRunStatus.previewed,
+                    truncated=False,
+                    with_pii=True,
+                )
+
+        created = [r for r in caplog.records if "ai_insight.run.created" in r.message]
+        assert created, "expected an ai_insight.run.created structured log"
+        msg = created[0].getMessage()
+        # Carries the auditable, non-PII fields.
+        assert "snapshot_hash=hash-abc123" in msg
+        assert "status=previewed" in msg
+        assert "period_type=daily" in msg
+        # Never leaks PII from the snapshot.
+        assert "fulano@email.com" not in msg
+        assert "123.456.789-00" not in msg
+
+    def test_transition_emits_run_and_cost_on_generated(self, app, client) -> None:
+        from decimal import Decimal
+
+        from app.extensions.database import db
+        from app.models.ai_insight_run import AIInsightRunStatus
+        from app.services.ai_insight_runs import transition_ai_insight_run_status
+
+        _, user_id_str = _register_and_login(client)
+        user_id = UUID(user_id_str)
+        with app.app_context():
+            run = self._make_run(
+                user_id,
+                status=AIInsightRunStatus.previewed,
+                truncated=False,
+            )
+            run.cost_usd = Decimal("0.0123")
+            db.session.commit()
+            with (
+                patch("app.services.ai_insight_runs.record_ai_insight_run") as run_m,
+                patch("app.services.ai_insight_runs.record_ai_insight_cost") as cost_m,
+            ):
+                transition_ai_insight_run_status(run, AIInsightRunStatus.generated)
+
+            assert run_m.call_args.kwargs == {
+                "status": "generated",
+                "period_type": "daily",
+            }
+            assert cost_m.call_args.kwargs["period_type"] == "daily"
+            assert cost_m.call_args.kwargs["cost_usd"] > 0
+
+    def test_purge_emits_purged_metric(self, app, client) -> None:
+        from datetime import timedelta
+
+        from app.extensions.database import db
+        from app.models.ai_insight_run import AIInsightRunStatus
+        from app.services.ai_insight_runs import purge_expired_ai_insight_runs
+        from app.utils.datetime_utils import utc_now_naive
+
+        _, user_id_str = _register_and_login(client)
+        user_id = UUID(user_id_str)
+        with app.app_context():
+            run = self._make_run(
+                user_id,
+                status=AIInsightRunStatus.previewed,
+                truncated=False,
+            )
+            run.expires_at = utc_now_naive() - timedelta(days=1)
+            db.session.commit()
+
+            with (
+                patch(
+                    "app.services.ai_insight_runs.record_ai_insight_runs_purged"
+                ) as purged_m,
+                patch("app.services.ai_insight_runs.record_ai_insight_run") as run_m,
+            ):
+                count = purge_expired_ai_insight_runs()
+
+            assert count >= 1
+            assert purged_m.call_args.args[0] >= 1
+            statuses = {c.kwargs["status"] for c in run_m.call_args_list}
+            assert "purged" in statuses
+
+    def test_filter_valid_items_emits_rejection_per_reason(self) -> None:
+        from app.services.insight_evidence_validator import filter_valid_items
+
+        items = [
+            {"dimension": "nope", "type": "x", "evidence": ["transactions"]},
+            {"dimension": "transactions", "type": "x", "evidence": []},
+            {
+                "dimension": "general",
+                "type": "x",
+                "evidence": ["current_period.paid.balance"],
+            },
+        ]
+        with patch(
+            "app.services.insight_evidence_validator.record_ai_insight_rejection"
+        ) as rej_m:
+            accepted = filter_valid_items(items, user_id=None)
+
+        assert len(accepted) == 1
+        reasons = {c.kwargs["reason"] for c in rej_m.call_args_list}
+        assert reasons == {"invalid_dimension", "missing_evidence"}

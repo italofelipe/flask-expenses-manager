@@ -37,6 +37,7 @@ from app.models.goal import Goal
 from app.models.goal_contribution import GoalContribution
 from app.models.llm_audit_log import LLMAuditLog
 from app.models.transaction import Transaction, TransactionStatus, TransactionType
+from app.services.ai_insight_runs import transition_ai_insight_run_status
 from app.services.ai_lgpd import (
     ensure_ai_consent_granted,
     minimize_prompt_data,
@@ -851,13 +852,13 @@ def _mark_preview_run_cached(
     preview_run: AIInsightRun,
     cached: AIInsight,
 ) -> None:
-    preview_run.status = AIInsightRunStatus.cached
     preview_run.ai_insight_id = cached.id
     preview_run.model = cached.model
     preview_run.tokens_in = 0
     preview_run.tokens_out = 0
     preview_run.tokens_total = 0
     preview_run.cost_usd = Decimal("0")
+    transition_ai_insight_run_status(preview_run, AIInsightRunStatus.cached)
     db.session.commit()
 
 
@@ -866,8 +867,10 @@ def _mark_preview_run_blocked(
     preview_run: AIInsightRun,
     reason: str,
 ) -> None:
-    preview_run.status = AIInsightRunStatus.blocked
     preview_run.rejection_reasons_json = [reason]
+    transition_ai_insight_run_status(
+        preview_run, AIInsightRunStatus.blocked, reason=reason
+    )
     db.session.commit()
 
 
@@ -1176,13 +1179,13 @@ class AIAdvisoryService:
         )
 
         if preview_run is not None:
-            preview_run.status = AIInsightRunStatus.generated
             preview_run.ai_insight_id = saved_insight.id
             preview_run.model = llm_resp.model
             preview_run.tokens_in = int(llm_resp.prompt_tokens or 0)
             preview_run.tokens_out = int(llm_resp.completion_tokens or 0)
             preview_run.tokens_total = int(llm_resp.total_tokens or 0)
             preview_run.cost_usd = Decimal(str(llm_resp.estimated_cost_usd))
+            transition_ai_insight_run_status(preview_run, AIInsightRunStatus.generated)
             db.session.commit()
 
         try:
