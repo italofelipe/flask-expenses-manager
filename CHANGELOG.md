@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.51.0](https://github.com/italofelipe/auraxis-api/compare/v1.50.0...v1.51.0) (2026-05-31)
+
+
+### Features
+
+* **ai:** expose forecast flag on generateAiInsight (GraphQL parity) ([#1399](https://github.com/italofelipe/auraxis-api/issues/1399)) ([3c9c2f2](https://github.com/italofelipe/auraxis-api/commit/3c9c2f21a43614ce26d0168652afc1f9dc43d2dc)), closes [#1393](https://github.com/italofelipe/auraxis-api/issues/1393)
+* **ai:** return persisted insight id on generation (REST + GraphQL) ([#1402](https://github.com/italofelipe/auraxis-api/issues/1402)) ([c37e41d](https://github.com/italofelipe/auraxis-api/commit/c37e41d5237a5b88ba6ecf35fb1b6c9d801384ec)), closes [#1400](https://github.com/italofelipe/auraxis-api/issues/1400)
+
 ## [1.50.0](https://github.com/italofelipe/auraxis-api/compare/v1.49.0...v1.50.0) (2026-05-31)
 
 
