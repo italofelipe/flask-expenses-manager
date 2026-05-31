@@ -145,6 +145,23 @@ class TestUserCostEnforcement:
             # Must not raise.
             _enforce_ai_insight_user_cost_budget(user_id=user_id, now=now)
 
+    def test_monthly_recap_is_exempt_from_cost_ceiling(self, app) -> None:
+        with app.app_context():
+            from app.services.ai_advisory_service import (
+                _enforce_financial_insight_generation_budget,
+            )
+
+            user_id = uuid.uuid4()
+            _seed_llm_cost(
+                user_id, cost_usd="100.00", endpoint="financial_insights_daily"
+            )
+            # Monthly recap is a guaranteed deliverable → never blocked by budget.
+            _enforce_financial_insight_generation_budget(
+                user_id=user_id,
+                normalized_period_type="monthly",
+                preview_run=None,
+            )
+
     def test_spend_is_isolated_per_user(self, app) -> None:
         with app.app_context():
             from app.services.ai_advisory_service import (
